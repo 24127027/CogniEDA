@@ -9,7 +9,10 @@ description = "Hypothesis-driven exploratory data analysis with structured analy
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "pandas>=2.2,<3.0",
+    "pandera>=0.23,<0.27",
     "pydantic>=2.9,<3.0",
+    "pyarrow>=18.0,<22.0",
     "sqlmodel>=0.0.22,<0.1",
     "typer>=0.16,<1.0",
 ]
