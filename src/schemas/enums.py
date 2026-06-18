@@ -1,9 +1,9 @@
 """Enumerations for CogniEDA analytical artifacts."""
 
-from enum import Enum
+from enum import StrEnum
 
 
-class ProjectStatus(str, Enum):
+class ProjectStatus(StrEnum):
     """Lifecycle states for a project."""
 
     ACTIVE = "active"
@@ -11,14 +11,14 @@ class ProjectStatus(str, Enum):
     ARCHIVED = "archived"
 
 
-class DatasetKind(str, Enum):
+class DatasetKind(StrEnum):
     """High-level lineage role for a dataset asset."""
 
     RAW = "raw"
     DERIVED = "derived"
 
 
-class DatasetRole(str, Enum):
+class DatasetRole(StrEnum):
     """Analytical role a dataset plays within a project."""
 
     PRIMARY = "primary"
@@ -27,7 +27,7 @@ class DatasetRole(str, Enum):
     VALIDATION = "validation"
 
 
-class DatasetSourceType(str, Enum):
+class DatasetSourceType(StrEnum):
     """Origin type for a dataset asset."""
 
     FILE = "file"
@@ -38,7 +38,7 @@ class DatasetSourceType(str, Enum):
     GENERATED = "generated"
 
 
-class DataProfileMethod(str, Enum):
+class DataProfileMethod(StrEnum):
     """Profiling strategies used to summarize a dataset."""
 
     INFERRED_SCHEMA = "inferred_schema"
@@ -47,7 +47,7 @@ class DataProfileMethod(str, Enum):
     CUSTOM = "custom"
 
 
-class ConfidenceLevel(str, Enum):
+class ConfidenceLevel(StrEnum):
     """Confidence levels for provisional analytical artifacts."""
 
     LOW = "low"
@@ -55,7 +55,7 @@ class ConfidenceLevel(str, Enum):
     HIGH = "high"
 
 
-class AssumptionStatus(str, Enum):
+class AssumptionStatus(StrEnum):
     """Lifecycle states for an assumption."""
 
     ACTIVE = "active"
@@ -64,7 +64,7 @@ class AssumptionStatus(str, Enum):
     ARCHIVED = "archived"
 
 
-class HypothesisStatus(str, Enum):
+class HypothesisStatus(StrEnum):
     """Lifecycle states for a hypothesis."""
 
     PROPOSED = "proposed"
@@ -76,7 +76,7 @@ class HypothesisStatus(str, Enum):
     ARCHIVED = "archived"
 
 
-class EvidenceType(str, Enum):
+class EvidenceType(StrEnum):
     """Evidence categories for analytical results."""
 
     PROFILE = "profile"
@@ -88,7 +88,7 @@ class EvidenceType(str, Enum):
     EXPERIMENT_RESULT = "experiment_result"
 
 
-class DecisionType(str, Enum):
+class DecisionType(StrEnum):
     """Decision categories captured in the analytical decision log."""
 
     DATA_SELECTION = "data_selection"
@@ -99,7 +99,7 @@ class DecisionType(str, Enum):
     REPORTING = "reporting"
 
 
-class DecisionStatus(str, Enum):
+class DecisionStatus(StrEnum):
     """Lifecycle states for a decision record."""
 
     ACTIVE = "active"
@@ -108,7 +108,7 @@ class DecisionStatus(str, Enum):
     ARCHIVED = "archived"
 
 
-class QualityFlagSeverity(str, Enum):
+class QualityFlagSeverity(StrEnum):
     """Severity levels for profile quality flags."""
 
     INFO = "info"

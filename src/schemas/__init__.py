@@ -6,18 +6,21 @@ from schemas.artifacts import (
     DatasetAsset,
     DecisionLog,
     Evidence,
+    Hypothesis,
     Project,
     SessionFrame,
-    Hypothesis,
 )
 from schemas.common import (
     BaselineSummary,
+    CategoricalColumnSummary,
     ColumnSchemaSummary,
     EvidenceProvenance,
     EvidenceResultSummary,
     MethodParameter,
+    NumericColumnSummary,
     QualityFlag,
     SchemaSummary,
+    TopValueSummary,
 )
 from schemas.enums import (
     AssumptionStatus,
@@ -38,6 +41,7 @@ __all__ = [
     "Assumption",
     "AssumptionStatus",
     "BaselineSummary",
+    "CategoricalColumnSummary",
     "ColumnSchemaSummary",
     "ConfidenceLevel",
     "DataProfile",
@@ -56,10 +60,12 @@ __all__ = [
     "Hypothesis",
     "HypothesisStatus",
     "MethodParameter",
+    "NumericColumnSummary",
     "Project",
     "ProjectStatus",
     "QualityFlag",
     "QualityFlagSeverity",
     "SchemaSummary",
     "SessionFrame",
+    "TopValueSummary",
 ]
