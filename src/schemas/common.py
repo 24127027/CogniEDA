@@ -124,3 +124,55 @@ class EvidenceResultSummary(CogniEDABaseModel):
     metric_name: str | None = None
     metric_value: ScalarParameterValue = None
     metric_unit: str | None = None
+
+
+class DatasetContextSummary(CogniEDABaseModel):
+    """Compact dataset summary used inside a session frame."""
+
+    dataset_id: str
+    name: NonEmptyStr
+    version: NonEmptyStr
+    kind: NonEmptyStr
+    role: NonEmptyStr
+    row_count: NonNegativeInt | None = None
+    column_count: NonNegativeInt | None = None
+    warning_count: NonNegativeInt = 0
+
+
+class AssumptionContextSummary(CogniEDABaseModel):
+    """Compact active-assumption summary for a session frame."""
+
+    assumption_id: str
+    statement: NonEmptyStr
+    confidence: NonEmptyStr
+    linked_evidence_count: NonNegativeInt = 0
+
+
+class HypothesisContextSummary(CogniEDABaseModel):
+    """Compact active-hypothesis summary for a session frame."""
+
+    hypothesis_id: str
+    statement: NonEmptyStr
+    status: NonEmptyStr
+    validation_method: NonEmptyStr
+    linked_evidence_count: NonNegativeInt = 0
+
+
+class EvidenceContextSummary(CogniEDABaseModel):
+    """Compact evidence summary for reuse in session memory."""
+
+    evidence_id: str
+    evidence_type: NonEmptyStr
+    method: NonEmptyStr
+    summary: NonEmptyStr
+    created_at: datetime
+
+
+class DecisionContextSummary(CogniEDABaseModel):
+    """Compact decision summary for reuse in session memory."""
+
+    decision_id: str
+    decision_type: NonEmptyStr
+    decision: NonEmptyStr
+    status: NonEmptyStr
+    created_at: datetime

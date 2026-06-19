@@ -8,10 +8,15 @@ from uuid import UUID, uuid4
 from pydantic import Field, NonNegativeInt
 
 from schemas.common import (
+    AssumptionContextSummary,
     BaselineSummary,
     CogniEDABaseModel,
+    DatasetContextSummary,
+    DecisionContextSummary,
+    EvidenceContextSummary,
     EvidenceProvenance,
     EvidenceResultSummary,
+    HypothesisContextSummary,
     MethodParameter,
     NonEmptyStr,
     QualityFlag,
@@ -152,10 +157,18 @@ class SessionFrame(CogniEDABaseModel):
     session_frame_id: UUID = Field(default_factory=uuid4)
     project_id: UUID
     objective_snapshot: NonEmptyStr
+    project_summary: str | None = None
+    dataset_summaries: list[DatasetContextSummary] = Field(default_factory=list)
     active_dataset_refs: list[UUID] = Field(default_factory=list)
+    active_assumptions: list[AssumptionContextSummary] = Field(default_factory=list)
     active_assumption_refs: list[UUID] = Field(default_factory=list)
+    active_hypotheses: list[HypothesisContextSummary] = Field(default_factory=list)
     active_hypothesis_refs: list[UUID] = Field(default_factory=list)
+    strongest_evidence: list[EvidenceContextSummary] = Field(default_factory=list)
     strongest_evidence_refs: list[UUID] = Field(default_factory=list)
+    recent_decisions: list[DecisionContextSummary] = Field(default_factory=list)
     recent_decision_refs: list[UUID] = Field(default_factory=list)
     pending_tasks: list[NonEmptyStr] = Field(default_factory=list)
+    open_questions: list[NonEmptyStr] = Field(default_factory=list)
+    key_warnings: list[NonEmptyStr] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
