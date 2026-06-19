@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -27,7 +27,7 @@ from schemas.enums import (
 def utc_now() -> datetime:
     """Return a timezone-aware UTC timestamp for persisted rows."""
 
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class TimestampedRecord(SQLModel):
@@ -45,7 +45,10 @@ class ProjectRecord(TimestampedRecord, table=True):
     project_id: UUID = Field(default_factory=uuid4, primary_key=True)
     name: str = Field(index=True, min_length=1, nullable=False)
     objective: str = Field(sa_column=Column(Text, nullable=False))
-    research_questions: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    research_questions: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
     status: ProjectStatus = Field(default=ProjectStatus.ACTIVE, nullable=False, index=True)
 
 
@@ -75,8 +78,14 @@ class DataProfileRecord(SQLModel, table=True):
     project_id: UUID = Field(foreign_key="projects.project_id", nullable=False, index=True)
     dataset_id: UUID = Field(foreign_key="dataset_assets.dataset_id", nullable=False, index=True)
     method: DataProfileMethod = Field(nullable=False, index=True)
-    schema_summary: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
-    baseline_summary: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+    schema_summary: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    baseline_summary: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
     row_count: int = Field(ge=0, nullable=False)
     column_count: int = Field(ge=0, nullable=False)
     quality_flags: list[dict[str, Any]] = Field(
@@ -128,9 +137,15 @@ class EvidenceRecord(SQLModel, table=True):
     dataset_id: UUID = Field(foreign_key="dataset_assets.dataset_id", nullable=False, index=True)
     evidence_type: EvidenceType = Field(nullable=False, index=True)
     method: str = Field(sa_column=Column(Text, nullable=False))
-    parameters: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    parameters: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
     provenance: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
-    result_summary: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+    result_summary: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
     limitations: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     assumption_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     hypothesis_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
@@ -168,16 +183,45 @@ class SessionFrameRecord(SQLModel, table=True):
     session_frame_id: UUID = Field(default_factory=uuid4, primary_key=True)
     project_id: UUID = Field(foreign_key="projects.project_id", nullable=False, index=True)
     objective_snapshot: str = Field(sa_column=Column(Text, nullable=False))
-    active_dataset_refs: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    project_summary: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    dataset_summaries: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    active_dataset_refs: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    active_assumptions: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
     active_assumption_refs: list[str] = Field(
         default_factory=list, sa_column=Column(JSON, nullable=False)
+    )
+    active_hypotheses: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
     )
     active_hypothesis_refs: list[str] = Field(
         default_factory=list, sa_column=Column(JSON, nullable=False)
     )
+    strongest_evidence: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
     strongest_evidence_refs: list[str] = Field(
         default_factory=list, sa_column=Column(JSON, nullable=False)
     )
-    recent_decision_refs: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    recent_decisions: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    recent_decision_refs: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
     pending_tasks: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    open_questions: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    key_warnings: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
