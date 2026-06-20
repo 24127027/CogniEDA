@@ -9,6 +9,8 @@ The system has two core goals:
 1. Reduce context rot through durable, structured analytical artifacts.
 2. Support iterative data investigation through assumptions, hypotheses, validation, evidence, decisions, and session continuity.
 
+The memory model is agent-agnostic. It is not only for one coding agent or one EDA workflow. The current concrete persisted implementation of the broader `Context Frame` idea is `SessionFrame`.
+
 ## Non-Goals
 
 - CogniEDA is not a generic chatbot.
@@ -38,9 +40,12 @@ See [docs/artifacts.md](/D:/mduy/source/repos/CogniEDA/docs/artifacts.md) for th
 - Reconstruct working context from active artifacts, not from conversation history.
 - Separate durable facts from transient reasoning.
 - Mark superseded, archived, rejected, and active states explicitly.
+- When context is carried forward, preserve memory status, provenance, and invalidation rules where the contract allows them.
 - Preserve provenance for every material analytical conclusion.
 - Do not compress away evidence lineage or dataset/version references.
 - Treat session continuity as an artifact problem, not a prompt-length problem.
+- Keep stale, overruled, and dead-end context historically visible without letting it silently influence active reasoning.
+- Treat checkpoints, branch labels, and cached tool results as explicit context data when they matter.
 
 ## Hypothesis, Evidence, and Decision Discipline
 
@@ -86,6 +91,12 @@ Target structure guidance for future implementation:
 - `docs/`: durable architecture and artifact references.
 - `tests/`: unit and integration coverage.
 - `data/` or equivalent future location: versioned local data assets and derived outputs, if introduced later.
+
+Current storage split:
+
+- The local SQLModel store is the runtime persistence surface for all first-class artifacts.
+- `artifacts/dataset_assets/` and `artifacts/data_profiles/` are Git-tracked metadata mirrors for reviewable dataset lineage and profile snapshots.
+- Other first-class artifacts are currently DB-backed in the scaffold unless an explicit export/import flow is added later.
 
 This is guidance for the intended shape of the repository. Step 3 does not require all directories or modules to exist yet.
 
