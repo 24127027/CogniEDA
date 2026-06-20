@@ -208,6 +208,11 @@ cython_debug/
 tempCodeRunnerFile.py
 .local/
 
+# DVC local state
+.dvc/cache/
+.dvc/tmp/
+.dvc/config.local
+
 # Ruff stuff:
 .ruff_cache/
 
