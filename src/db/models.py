@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, Column, Text
+from sqlalchemy import JSON, Column, Text, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 from schemas.enums import (
@@ -19,8 +19,10 @@ from schemas.enums import (
     DecisionStatus,
     DecisionType,
     EvidenceType,
+    HypothesisEvidenceOutcome,
     HypothesisStatus,
     ProjectStatus,
+    SessionFrameStatus,
 )
 
 
@@ -56,6 +58,14 @@ class DatasetAssetRecord(TimestampedRecord, table=True):
     """Persisted dataset asset and lineage reference."""
 
     __tablename__ = "dataset_assets"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "name",
+            "version",
+            name="uq_dataset_assets_project_name_version",
+        ),
+    )
 
     dataset_id: UUID = Field(default_factory=uuid4, primary_key=True)
     project_id: UUID = Field(foreign_key="projects.project_id", nullable=False, index=True)
@@ -65,8 +75,20 @@ class DatasetAssetRecord(TimestampedRecord, table=True):
     version: str = Field(nullable=False, index=True)
     kind: DatasetKind = Field(nullable=False, index=True)
     role: DatasetRole = Field(default=DatasetRole.PRIMARY, nullable=False, index=True)
-    parent_dataset_id: UUID | None = Field(default=None, foreign_key="dataset_assets.dataset_id")
+    lineage_steps: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
     description: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+
+
+class DatasetLineageLinkRecord(SQLModel, table=True):
+    """Normalized upstream lineage links for a dataset asset."""
+
+    __tablename__ = "dataset_lineage_links"
+
+    dataset_id: UUID = Field(foreign_key="dataset_assets.dataset_id", primary_key=True)
+    upstream_dataset_id: UUID = Field(foreign_key="dataset_assets.dataset_id", primary_key=True)
 
 
 class DataProfileRecord(SQLModel, table=True):
@@ -107,7 +129,6 @@ class AssumptionRecord(TimestampedRecord, table=True):
     status: AssumptionStatus = Field(default=AssumptionStatus.ACTIVE, nullable=False, index=True)
     dataset_id: UUID | None = Field(default=None, foreign_key="dataset_assets.dataset_id")
     profile_id: UUID | None = Field(default=None, foreign_key="data_profiles.profile_id")
-    evidence_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
 
 
 class HypothesisRecord(TimestampedRecord, table=True):
@@ -122,9 +143,24 @@ class HypothesisRecord(TimestampedRecord, table=True):
     scope: str = Field(sa_column=Column(Text, nullable=False))
     validation_method: str = Field(sa_column=Column(Text, nullable=False))
     status: HypothesisStatus = Field(default=HypothesisStatus.PROPOSED, nullable=False, index=True)
-    assumption_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
-    dataset_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
-    evidence_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+
+
+class HypothesisAssumptionLinkRecord(SQLModel, table=True):
+    """Normalized assumption links for a hypothesis."""
+
+    __tablename__ = "hypothesis_assumption_links"
+
+    hypothesis_id: UUID = Field(foreign_key="hypotheses.hypothesis_id", primary_key=True)
+    assumption_id: UUID = Field(foreign_key="assumptions.assumption_id", primary_key=True)
+
+
+class HypothesisDatasetLinkRecord(SQLModel, table=True):
+    """Normalized dataset links for a hypothesis."""
+
+    __tablename__ = "hypothesis_dataset_links"
+
+    hypothesis_id: UUID = Field(foreign_key="hypotheses.hypothesis_id", primary_key=True)
+    dataset_id: UUID = Field(foreign_key="dataset_assets.dataset_id", primary_key=True)
 
 
 class EvidenceRecord(SQLModel, table=True):
@@ -147,10 +183,36 @@ class EvidenceRecord(SQLModel, table=True):
         sa_column=Column(JSON, nullable=False),
     )
     limitations: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
-    assumption_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
-    hypothesis_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
-    decision_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
+
+
+class EvidenceAssumptionLinkRecord(SQLModel, table=True):
+    """Normalized assumption links for an evidence artifact."""
+
+    __tablename__ = "evidence_assumption_links"
+
+    evidence_id: UUID = Field(foreign_key="evidence.evidence_id", primary_key=True)
+    assumption_id: UUID = Field(foreign_key="assumptions.assumption_id", primary_key=True)
+
+
+class EvidenceHypothesisLinkRecord(SQLModel, table=True):
+    """Normalized evaluated-hypothesis links for an evidence artifact."""
+
+    __tablename__ = "evidence_hypothesis_links"
+
+    evidence_id: UUID = Field(foreign_key="evidence.evidence_id", primary_key=True)
+    hypothesis_id: UUID = Field(foreign_key="hypotheses.hypothesis_id", primary_key=True)
+    outcome: HypothesisEvidenceOutcome = Field(nullable=False, index=True)
+    note: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+
+
+class EvidenceDecisionLinkRecord(SQLModel, table=True):
+    """Normalized decision links for an evidence artifact."""
+
+    __tablename__ = "evidence_decision_links"
+
+    evidence_id: UUID = Field(foreign_key="evidence.evidence_id", primary_key=True)
+    decision_id: UUID = Field(foreign_key="decision_logs.decision_id", primary_key=True)
 
 
 class DecisionLogRecord(TimestampedRecord, table=True):
@@ -164,26 +226,55 @@ class DecisionLogRecord(TimestampedRecord, table=True):
     decision: str = Field(sa_column=Column(Text, nullable=False))
     rationale: str = Field(sa_column=Column(Text, nullable=False))
     status: DecisionStatus = Field(default=DecisionStatus.ACTIVE, nullable=False, index=True)
-    evidence_refs: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     alternatives_considered: list[str] = Field(
         default_factory=list, sa_column=Column(JSON, nullable=False)
     )
-    assumption_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
-    hypothesis_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     superseded_by_decision_id: UUID | None = Field(
         default=None, foreign_key="decision_logs.decision_id"
     )
 
 
+class DecisionAssumptionLinkRecord(SQLModel, table=True):
+    """Normalized assumption links for a decision log artifact."""
+
+    __tablename__ = "decision_assumption_links"
+
+    decision_id: UUID = Field(foreign_key="decision_logs.decision_id", primary_key=True)
+    assumption_id: UUID = Field(foreign_key="assumptions.assumption_id", primary_key=True)
+
+
+class DecisionHypothesisLinkRecord(SQLModel, table=True):
+    """Normalized hypothesis links for a decision log artifact."""
+
+    __tablename__ = "decision_hypothesis_links"
+
+    decision_id: UUID = Field(foreign_key="decision_logs.decision_id", primary_key=True)
+    hypothesis_id: UUID = Field(foreign_key="hypotheses.hypothesis_id", primary_key=True)
+
+
 class SessionFrameRecord(SQLModel, table=True):
-    """Persisted compact snapshot of active analytical context."""
+    """Persisted concrete context frame snapshot for analytical continuity."""
 
     __tablename__ = "session_frames"
 
     session_frame_id: UUID = Field(default_factory=uuid4, primary_key=True)
     project_id: UUID = Field(foreign_key="projects.project_id", nullable=False, index=True)
+    frame_topic: str = Field(sa_column=Column(Text, nullable=False))
+    frame_status: SessionFrameStatus = Field(
+        default=SessionFrameStatus.ACTIVE,
+        nullable=False,
+        index=True,
+    )
     objective_snapshot: str = Field(sa_column=Column(Text, nullable=False))
+    frame_outcome: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     project_summary: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    branch_key: str | None = Field(default=None, index=True)
+    checkpoint_label: str | None = Field(default=None, index=True)
+    parent_session_frame_id: UUID | None = Field(
+        default=None,
+        foreign_key="session_frames.session_frame_id",
+    )
+    handoff_summary: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     dataset_summaries: list[dict[str, Any]] = Field(
         default_factory=list,
         sa_column=Column(JSON, nullable=False),
@@ -224,4 +315,20 @@ class SessionFrameRecord(SQLModel, table=True):
     pending_tasks: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     open_questions: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     key_warnings: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    stale_context: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    dead_ends: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    cached_tool_results: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    frame_invalidation_rules: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
     created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)

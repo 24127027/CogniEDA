@@ -7,7 +7,10 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from sqlmodel import Session, create_engine
 
 DEFAULT_SQLITE_PATH = Path(__file__).resolve().parents[2] / ".local" / "cognieda_artifacts.sqlite3"
@@ -48,14 +51,31 @@ def ensure_sqlite_directory(database_url: str) -> None:
 
 
 @lru_cache(maxsize=4)
-def create_db_engine(database_url: str | None = None):
+def create_db_engine(database_url: str | None = None) -> Engine:
     """Create and cache a SQLModel engine for the configured artifact store."""
 
     resolved_url = database_url or get_database_url()
     ensure_sqlite_directory(resolved_url)
     connect_args = {"check_same_thread": False} if is_sqlite_url(resolved_url) else {}
     echo = os.getenv("COGNIEDA_DB_ECHO", "").strip().lower() == "true"
-    return create_engine(resolved_url, echo=echo, connect_args=connect_args)
+    engine = create_engine(resolved_url, echo=echo, connect_args=connect_args)
+    if is_sqlite_url(resolved_url):
+        _enable_sqlite_foreign_keys(engine)
+    return engine
+
+
+def _enable_sqlite_foreign_keys(engine: Engine) -> None:
+    """Enable SQLite foreign-key enforcement on each connection."""
+
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(
+        dbapi_connection: Any,
+        connection_record: Any,
+    ) -> None:
+        del connection_record
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 
 def get_session(database_url: str | None = None) -> Session:

@@ -21,7 +21,7 @@ from schemas.common import (
     SchemaSummary,
     TopValueSummary,
 )
-from schemas.enums import DataProfileMethod, QualityFlagSeverity
+from schemas.enums import DataProfileMethod, LogicalDtype, QualityFlagSeverity
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,7 +131,7 @@ class DatasetProfiler:
                 numeric_column_count += 1
             if column_summary.categorical_summary is not None:
                 categorical_column_count += 1
-            if pd_types.is_datetime64_any_dtype(series):
+            if self._is_datetime_column(series):
                 inferred_time_columns.append(column_name)
 
             quality_flags.extend(self._column_quality_flags(column_summary))
@@ -197,7 +197,8 @@ class DatasetProfiler:
         return ColumnSchemaSummary(
             name=column_name,
             inferred_dtype=str(series.dtype),
-            nullable=missing_count > 0,
+            logical_dtype=self._logical_dtype(series),
+            observed_nullable=missing_count > 0,
             non_null_count=non_null_count,
             distinct_count=distinct_count,
             missing_count=missing_count,
@@ -291,8 +292,29 @@ class DatasetProfiler:
         return pd_types.is_numeric_dtype(series) and not pd_types.is_bool_dtype(series)
 
     @staticmethod
-    def _is_categorical_like_column(series: pd.Series) -> bool:
-        return not DatasetProfiler._is_numeric_column(series)
+    def _is_datetime_column(series: pd.Series) -> bool:
+        return pd_types.is_datetime64_any_dtype(series)
+
+    @staticmethod
+    def _is_boolean_column(series: pd.Series) -> bool:
+        return pd_types.is_bool_dtype(series)
+
+    @classmethod
+    def _is_categorical_like_column(cls, series: pd.Series) -> bool:
+        return (
+            not cls._is_numeric_column(series)
+            and not cls._is_datetime_column(series)
+        )
+
+    @classmethod
+    def _logical_dtype(cls, series: pd.Series) -> LogicalDtype:
+        if cls._is_numeric_column(series):
+            return LogicalDtype.NUMERIC
+        if cls._is_boolean_column(series):
+            return LogicalDtype.BOOLEAN
+        if cls._is_datetime_column(series):
+            return LogicalDtype.DATETIME
+        return LogicalDtype.CATEGORICAL
 
     @staticmethod
     def _safe_ratio(numerator: int, denominator: int) -> float:
