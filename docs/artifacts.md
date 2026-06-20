@@ -3,11 +3,28 @@
 ## Cross-Cutting Contracts
 
 - IDs are stable and explicit.
-- Every artifact must be attributable to a `Project`.
+- Every artifact is attributable to one `Project`.
 - Time or version fields are mandatory for reproducibility.
-- Relationships must be explicit references, not inferred from free text.
+- Relationships use explicit references, not free-text inference.
 - Status fields use controlled vocabularies, not ad hoc strings.
-- Corrections should create superseding artifacts or status transitions, not silent overwrites.
+- Corrections create superseding artifacts or explicit status transitions, not silent overwrites.
+
+## Current Storage Split
+
+- The local SQLModel store is the runtime persistence surface for all first-class artifacts.
+- `artifacts/dataset_assets/` and `artifacts/data_profiles/` are Git-tracked metadata mirrors and examples for reviewable dataset lineage and profile snapshots.
+- Other first-class artifacts currently persist operationally through the local database scaffold, not as Git-tracked JSON files by default.
+
+## Context-Memory Contract
+
+- `SessionFrame` is the current persisted implementation of CogniEDA's broader `Context Frame` concept.
+- Memory items carried inside a `SessionFrame` may record:
+  - `memory_status`
+  - `provenance`
+  - `invalidation_rules`
+  - `fresh_until`
+- Stale, overruled, superseded, archived, and dead-end context should remain historically visible without continuing to influence active reasoning silently.
+- Cached tool results, branch labels, checkpoint labels, and handoff summaries are first-class context data, not implicit chat residue.
 
 ## `Project`
 
@@ -15,7 +32,7 @@
 
 Root analytical container for objective, research questions, active scope, and durable defaults.
 
-**Minimum fields**
+**Minimum required fields**
 
 - `project_id`
 - `name`
@@ -45,7 +62,7 @@ Root analytical container for objective, research questions, active scope, and d
 
 Versioned reference to a raw or derived dataset used in analysis.
 
-**Minimum fields**
+**Minimum required fields**
 
 - `dataset_id`
 - `project_id`
@@ -53,15 +70,19 @@ Versioned reference to a raw or derived dataset used in analysis.
 - `source_type`
 - `location`
 - `version`
+- `kind`
 - `role`
-- `parent_dataset_id` optional
+- `upstream_dataset_ids`
+- `lineage_steps`
 - `created_at`
+- `updated_at`
 
 **Lifecycle / status notes**
 
 - Raw versus derived role must be explicit.
 - Raw assets are immutable references.
-- Derived assets must preserve lineage to their parent dataset or transformation source.
+- Derived assets must preserve lineage to every upstream dataset they depend on.
+- Transformations such as filters, joins, imputations, sampling, renames, feature engineering, and column drops should be recorded explicitly in `lineage_steps`.
 - Replacing a dataset version creates a new asset version, not a silent overwrite.
 
 **Relationships**
@@ -69,7 +90,7 @@ Versioned reference to a raw or derived dataset used in analysis.
 - Belongs to one `Project`.
 - Can be the subject of one or more `DataProfile` snapshots.
 - Can be referenced by `Evidence`.
-- Can reference another `DatasetAsset` through `parent_dataset_id` for lineage.
+- Can reference one or more upstream `DatasetAsset` records for lineage.
 
 ## `DataProfile`
 
@@ -77,16 +98,18 @@ Versioned reference to a raw or derived dataset used in analysis.
 
 Reproducible structural and quality summary for a specific dataset version.
 
-**Minimum fields**
+**Minimum required fields**
 
 - `profile_id`
+- `project_id`
 - `dataset_id`
 - `method`
-- `created_at`
 - `schema_summary`
+- `baseline_summary`
 - `row_count`
 - `column_count`
 - `quality_flags`
+- `created_at`
 
 **Lifecycle / status notes**
 
@@ -107,7 +130,7 @@ Reproducible structural and quality summary for a specific dataset version.
 
 Provisional statement used to guide analysis.
 
-**Minimum fields**
+**Minimum required fields**
 
 - `assumption_id`
 - `project_id`
@@ -116,6 +139,12 @@ Provisional statement used to guide analysis.
 - `confidence`
 - `status`
 - `created_at`
+- `updated_at`
+
+**Key optional relational fields**
+
+- `dataset_id`
+- `profile_id`
 
 **Lifecycle / status notes**
 
@@ -136,7 +165,7 @@ Provisional statement used to guide analysis.
 
 Testable analytical claim.
 
-**Minimum fields**
+**Minimum required fields**
 
 - `hypothesis_id`
 - `project_id`
@@ -145,7 +174,10 @@ Testable analytical claim.
 - `scope`
 - `validation_method`
 - `status`
+- `assumption_ids`
+- `dataset_ids`
 - `created_at`
+- `updated_at`
 
 **Lifecycle / status notes**
 
@@ -167,29 +199,35 @@ Testable analytical claim.
 
 Reproducible result from a concrete method run.
 
-**Minimum fields**
+**Minimum required fields**
 
 - `evidence_id`
 - `project_id`
 - `dataset_id`
+- `evidence_type`
 - `method`
 - `parameters`
+- `provenance`
 - `result_summary`
 - `limitations`
+- `assumption_ids`
+- `hypothesis_evaluations`
+- `decision_ids`
 - `created_at`
 
 **Lifecycle / status notes**
 
 - Evidence is immutable once captured.
 - Corrections or reruns should create new evidence that supersedes earlier evidence where appropriate.
-- Evidence may support, refute, or leave a hypothesis inconclusive.
+- Evidence may support, refute, or leave a hypothesis inconclusive through typed `hypothesis_evaluations`.
+- `dataset_id` is the authoritative link to the versioned dataset asset; provenance should not duplicate version labels independently.
 
 **Relationships**
 
 - Belongs to one `Project`.
 - References one `DatasetAsset`.
 - Can link to `Assumption` records.
-- Can link to `Hypothesis` records.
+- Can link to `Hypothesis` records with an explicit typed outcome per hypothesis.
 - Can support `DecisionLog` entries.
 - May reference output files, plots, or reports produced by the method run.
 
@@ -199,16 +237,23 @@ Reproducible result from a concrete method run.
 
 Record of meaningful analytical choices.
 
-**Minimum fields**
+**Minimum required fields**
 
 - `decision_id`
 - `project_id`
+- `decision_type`
 - `decision`
 - `rationale`
 - `status`
-- `evidence_refs`
 - `alternatives_considered`
+- `assumption_ids`
+- `hypothesis_ids`
 - `created_at`
+- `updated_at`
+
+**Key optional relational fields**
+
+- `superseded_by_decision_id`
 
 **Lifecycle / status notes**
 
@@ -219,7 +264,7 @@ Record of meaningful analytical choices.
 **Relationships**
 
 - Belongs to one `Project`.
-- References supporting `Evidence`.
+- References supporting `Evidence` indirectly through evidence-to-decision links, with `Evidence` as the source of truth for that relation.
 - May cite related `Hypothesis` and `Assumption` records.
 - Affects future analysis plans and interpretation boundaries.
 
@@ -227,27 +272,54 @@ Record of meaningful analytical choices.
 
 **Purpose**
 
-Compact state handoff for continuity across sessions.
+Concrete persisted context frame for continuity, checkpointing, branching, and handoff across sessions or agents.
 
-**Minimum fields**
+**Minimum required fields**
 
 - `session_frame_id`
 - `project_id`
+- `frame_topic`
+- `frame_status`
 - `objective_snapshot`
+- `dataset_summaries`
 - `active_dataset_refs`
+- `active_assumptions`
 - `active_assumption_refs`
+- `active_hypotheses`
 - `active_hypothesis_refs`
+- `strongest_evidence`
+- `strongest_evidence_refs`
+- `recent_decisions`
+- `recent_decision_refs`
 - `pending_tasks`
+- `open_questions`
+- `key_warnings`
+- `stale_context`
+- `dead_ends`
+- `cached_tool_results`
+- `frame_invalidation_rules`
 - `created_at`
+
+**Key optional frame-governance fields**
+
+- `frame_outcome`
+- `project_summary`
+- `branch_key`
+- `checkpoint_label`
+- `parent_session_frame_id`
+- `handoff_summary`
 
 **Lifecycle / status notes**
 
 - Session frames are append-only snapshots.
+- `SessionFrame` is the current concrete artifact that carries the generalized `Context Frame` semantics described for CogniEDA.
 - Later frames supersede earlier frames operationally, but earlier frames remain historical records.
+- Stale context, dead ends, and cached tool results should be recorded explicitly rather than left implicit in conversation history.
 - A session frame summarizes active state; it does not replace underlying artifacts.
 
 **Relationships**
 
 - Belongs to one `Project`.
-- Summarizes current references to `DatasetAsset`, `Assumption`, and `Hypothesis`.
-- May reflect recent `DecisionLog` outcomes and strongest current `Evidence`.
+- Summarizes current references to `DatasetAsset`, `Assumption`, `Hypothesis`, `Evidence`, and `DecisionLog`.
+- May point to a parent frame for checkpoint or branch continuity.
+- May carry cached tool results and invalidation rules for reuse in later agent work.
