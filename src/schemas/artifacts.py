@@ -12,15 +12,21 @@ from schemas.common import (
     BaselineSummary,
     CogniEDABaseModel,
     DatasetContextSummary,
+    DeadEndSummary,
     DecisionContextSummary,
     EvidenceContextSummary,
     EvidenceProvenance,
     EvidenceResultSummary,
     HypothesisContextSummary,
+    HypothesisEvaluation,
+    InvalidationRule,
+    LineageStep,
     MethodParameter,
     NonEmptyStr,
     QualityFlag,
     SchemaSummary,
+    StaleContextMarker,
+    ToolResultCacheSummary,
     utc_now,
 )
 from schemas.enums import (
@@ -35,6 +41,7 @@ from schemas.enums import (
     EvidenceType,
     HypothesisStatus,
     ProjectStatus,
+    SessionFrameStatus,
 )
 
 
@@ -61,7 +68,8 @@ class DatasetAsset(CogniEDABaseModel):
     version: NonEmptyStr
     kind: DatasetKind
     role: DatasetRole = DatasetRole.PRIMARY
-    parent_dataset_id: UUID | None = None
+    upstream_dataset_ids: list[UUID] = Field(default_factory=list)
+    lineage_steps: list[LineageStep] = Field(default_factory=list)
     description: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
@@ -93,7 +101,6 @@ class Assumption(CogniEDABaseModel):
     status: AssumptionStatus = AssumptionStatus.ACTIVE
     dataset_id: UUID | None = None
     profile_id: UUID | None = None
-    evidence_ids: list[UUID] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -110,7 +117,6 @@ class Hypothesis(CogniEDABaseModel):
     status: HypothesisStatus = HypothesisStatus.PROPOSED
     assumption_ids: list[UUID] = Field(default_factory=list)
     dataset_ids: list[UUID] = Field(default_factory=list)
-    evidence_ids: list[UUID] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -128,7 +134,7 @@ class Evidence(CogniEDABaseModel):
     result_summary: EvidenceResultSummary
     limitations: list[NonEmptyStr] = Field(default_factory=list)
     assumption_ids: list[UUID] = Field(default_factory=list)
-    hypothesis_ids: list[UUID] = Field(default_factory=list)
+    hypothesis_evaluations: list[HypothesisEvaluation] = Field(default_factory=list)
     decision_ids: list[UUID] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
 
@@ -142,7 +148,6 @@ class DecisionLog(CogniEDABaseModel):
     decision: NonEmptyStr
     rationale: NonEmptyStr
     status: DecisionStatus = DecisionStatus.ACTIVE
-    evidence_refs: list[UUID] = Field(default_factory=list)
     alternatives_considered: list[NonEmptyStr] = Field(default_factory=list)
     assumption_ids: list[UUID] = Field(default_factory=list)
     hypothesis_ids: list[UUID] = Field(default_factory=list)
@@ -152,12 +157,19 @@ class DecisionLog(CogniEDABaseModel):
 
 
 class SessionFrame(CogniEDABaseModel):
-    """Compact snapshot of the active working context for session continuity."""
+    """Concrete persisted context frame for session continuity and handoff."""
 
     session_frame_id: UUID = Field(default_factory=uuid4)
     project_id: UUID
+    frame_topic: NonEmptyStr
+    frame_status: SessionFrameStatus = SessionFrameStatus.ACTIVE
     objective_snapshot: NonEmptyStr
+    frame_outcome: str | None = None
     project_summary: str | None = None
+    branch_key: str | None = None
+    checkpoint_label: str | None = None
+    parent_session_frame_id: UUID | None = None
+    handoff_summary: str | None = None
     dataset_summaries: list[DatasetContextSummary] = Field(default_factory=list)
     active_dataset_refs: list[UUID] = Field(default_factory=list)
     active_assumptions: list[AssumptionContextSummary] = Field(default_factory=list)
@@ -171,4 +183,8 @@ class SessionFrame(CogniEDABaseModel):
     pending_tasks: list[NonEmptyStr] = Field(default_factory=list)
     open_questions: list[NonEmptyStr] = Field(default_factory=list)
     key_warnings: list[NonEmptyStr] = Field(default_factory=list)
+    stale_context: list[StaleContextMarker] = Field(default_factory=list)
+    dead_ends: list[DeadEndSummary] = Field(default_factory=list)
+    cached_tool_results: list[ToolResultCacheSummary] = Field(default_factory=list)
+    frame_invalidation_rules: list[InvalidationRule] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)

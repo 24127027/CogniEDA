@@ -4,10 +4,26 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Annotated
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat, NonNegativeInt
 
-from schemas.enums import QualityFlagSeverity
+from schemas.enums import (
+    ConfidenceLevel,
+    DatasetKind,
+    DatasetRole,
+    DecisionStatus,
+    DecisionType,
+    EvidenceType,
+    HypothesisEvidenceOutcome,
+    HypothesisStatus,
+    InvalidationTrigger,
+    LineageOperationType,
+    LogicalDtype,
+    MemorySourceType,
+    MemoryStatus,
+    QualityFlagSeverity,
+)
 
 type NonEmptyStr = Annotated[str, Field(min_length=1)]
 type ScalarParameterValue = str | int | float | bool | None
@@ -30,6 +46,18 @@ class MethodParameter(CogniEDABaseModel):
 
     name: NonEmptyStr
     value: ScalarParameterValue
+
+
+class LineageStep(CogniEDABaseModel):
+    """Explicit reversible or explainable step in derived-dataset lineage."""
+
+    operation_type: LineageOperationType
+    description: NonEmptyStr
+    input_dataset_ids: list[UUID] = Field(default_factory=list)
+    column_names: list[NonEmptyStr] = Field(default_factory=list)
+    row_constraint: str | None = None
+    parameters: list[MethodParameter] = Field(default_factory=list)
+    code_reference: str | None = None
 
 
 class TopValueSummary(CogniEDABaseModel):
@@ -65,7 +93,8 @@ class ColumnSchemaSummary(CogniEDABaseModel):
 
     name: NonEmptyStr
     inferred_dtype: NonEmptyStr
-    nullable: bool
+    logical_dtype: LogicalDtype
+    observed_nullable: bool
     non_null_count: NonNegativeInt = 0
     distinct_count: NonNegativeInt | None = None
     missing_count: NonNegativeInt = 0
@@ -109,11 +138,18 @@ class QualityFlag(CogniEDABaseModel):
 class EvidenceProvenance(CogniEDABaseModel):
     """Provenance fields that explain how an evidence record was produced."""
 
-    dataset_version: NonEmptyStr
-    source_profile_id: str | None = None
+    source_profile_id: UUID | None = None
     execution_label: str | None = None
     code_reference: str | None = None
     artifact_paths: list[NonEmptyStr] = Field(default_factory=list)
+
+
+class HypothesisEvaluation(CogniEDABaseModel):
+    """Typed link from one evidence record to one evaluated hypothesis."""
+
+    hypothesis_id: UUID
+    outcome: HypothesisEvidenceOutcome
+    note: str | None = None
 
 
 class EvidenceResultSummary(CogniEDABaseModel):
@@ -126,53 +162,121 @@ class EvidenceResultSummary(CogniEDABaseModel):
     metric_unit: str | None = None
 
 
+class ContextProvenance(CogniEDABaseModel):
+    """Typed provenance entry for one memory item carried in a context frame."""
+
+    source_type: MemorySourceType
+    reference: str | None = None
+    note: str | None = None
+
+
+class InvalidationRule(CogniEDABaseModel):
+    """Explicit invalidation rule for cached or summarized context."""
+
+    trigger: InvalidationTrigger
+    detail: str | None = None
+
+
+class StaleContextMarker(CogniEDABaseModel):
+    """Marker describing context that should not continue influencing reasoning."""
+
+    artifact_type: NonEmptyStr
+    reason: NonEmptyStr
+    ref_id: UUID | None = None
+    replacement_ref_id: UUID | None = None
+
+
+class DeadEndSummary(CogniEDABaseModel):
+    """Recorded analytical path that should not be retried without new conditions."""
+
+    summary: NonEmptyStr
+    reason: NonEmptyStr
+    related_dataset_id: UUID | None = None
+    related_hypothesis_id: UUID | None = None
+    revived_only_if: str | None = None
+
+
+class ToolResultCacheSummary(CogniEDABaseModel):
+    """Reusable tool-result cache entry scoped to the current analytical frame."""
+
+    cache_key: NonEmptyStr
+    summary: NonEmptyStr
+    status: MemoryStatus = MemoryStatus.ACTIVE
+    source_type: MemorySourceType = MemorySourceType.TOOL_RESULT
+    created_at: datetime
+    expires_at: datetime | None = None
+    source_dataset_id: UUID | None = None
+    code_reference: str | None = None
+    invalidation_rules: list[InvalidationRule] = Field(default_factory=list)
+
+
 class DatasetContextSummary(CogniEDABaseModel):
     """Compact dataset summary used inside a session frame."""
 
-    dataset_id: str
+    dataset_id: UUID
     name: NonEmptyStr
     version: NonEmptyStr
-    kind: NonEmptyStr
-    role: NonEmptyStr
+    kind: DatasetKind
+    role: DatasetRole
     row_count: NonNegativeInt | None = None
     column_count: NonNegativeInt | None = None
     warning_count: NonNegativeInt = 0
+    memory_status: MemoryStatus = MemoryStatus.ACTIVE
+    provenance: list[ContextProvenance] = Field(default_factory=list)
+    invalidation_rules: list[InvalidationRule] = Field(default_factory=list)
+    fresh_until: datetime | None = None
 
 
 class AssumptionContextSummary(CogniEDABaseModel):
     """Compact active-assumption summary for a session frame."""
 
-    assumption_id: str
+    assumption_id: UUID
     statement: NonEmptyStr
-    confidence: NonEmptyStr
+    confidence: ConfidenceLevel
     linked_evidence_count: NonNegativeInt = 0
+    memory_status: MemoryStatus = MemoryStatus.ACTIVE
+    provenance: list[ContextProvenance] = Field(default_factory=list)
+    invalidation_rules: list[InvalidationRule] = Field(default_factory=list)
+    fresh_until: datetime | None = None
 
 
 class HypothesisContextSummary(CogniEDABaseModel):
     """Compact active-hypothesis summary for a session frame."""
 
-    hypothesis_id: str
+    hypothesis_id: UUID
     statement: NonEmptyStr
-    status: NonEmptyStr
+    status: HypothesisStatus
     validation_method: NonEmptyStr
     linked_evidence_count: NonNegativeInt = 0
+    memory_status: MemoryStatus = MemoryStatus.ACTIVE
+    provenance: list[ContextProvenance] = Field(default_factory=list)
+    invalidation_rules: list[InvalidationRule] = Field(default_factory=list)
+    fresh_until: datetime | None = None
 
 
 class EvidenceContextSummary(CogniEDABaseModel):
     """Compact evidence summary for reuse in session memory."""
 
-    evidence_id: str
-    evidence_type: NonEmptyStr
+    evidence_id: UUID
+    evidence_type: EvidenceType
     method: NonEmptyStr
     summary: NonEmptyStr
     created_at: datetime
+    memory_status: MemoryStatus = MemoryStatus.ACTIVE
+    provenance: list[ContextProvenance] = Field(default_factory=list)
+    invalidation_rules: list[InvalidationRule] = Field(default_factory=list)
+    fresh_until: datetime | None = None
 
 
 class DecisionContextSummary(CogniEDABaseModel):
     """Compact decision summary for reuse in session memory."""
 
-    decision_id: str
-    decision_type: NonEmptyStr
+    decision_id: UUID
+    decision_type: DecisionType
     decision: NonEmptyStr
-    status: NonEmptyStr
+    status: DecisionStatus
     created_at: datetime
+    memory_status: MemoryStatus = MemoryStatus.ACTIVE
+    provenance: list[ContextProvenance] = Field(default_factory=list)
+    invalidation_rules: list[InvalidationRule] = Field(default_factory=list)
+    fresh_until: datetime | None = None
