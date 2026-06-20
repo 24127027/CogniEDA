@@ -1,0 +1,27 @@
+{
+  "profile_id": "<profile-uuid>",
+  "project_id": "<project-uuid>",
+  "dataset_id": "<dataset-uuid>",
+  "method": "baseline_summary",
+  "schema_summary": {
+    "columns": [],
+    "column_order": [],
+    "detected_primary_key": null,
+    "inferred_time_columns": []
+  },
+  "baseline_summary": {
+    "column_names": [],
+    "missing_cell_count": 0,
+    "missing_cell_ratio": 0.0,
+    "duplicate_row_count": 0,
+    "duplicate_row_ratio": 0.0,
+    "numeric_column_count": 0,
+    "categorical_column_count": 0,
+    "columns_with_missing_values": [],
+    "warning_codes": []
+  },
+  "row_count": 0,
+  "column_count": 0,
+  "quality_flags": [],
+  "created_at": "<timestamp>"
+}

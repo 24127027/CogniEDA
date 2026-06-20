@@ -1,0 +1,15 @@
+{
+  "dataset_id": "<dataset-uuid>",
+  "project_id": "<project-uuid>",
+  "name": "<dataset-name>",
+  "source_type": "file",
+  "location": "data/raw/<dataset-file>",
+  "version": "<dataset-version>",
+  "kind": "raw",
+  "role": "primary",
+  "upstream_dataset_ids": [],
+  "lineage_steps": [],
+  "description": "<short lineage or provenance note>",
+  "created_at": "<timestamp>",
+  "updated_at": "<timestamp>"
+}
