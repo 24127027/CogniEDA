@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from uuid import UUID
 
 from schemas.artifacts import (
     Assumption,
@@ -17,17 +18,26 @@ from schemas.artifacts import (
 )
 from schemas.common import (
     AssumptionContextSummary,
+    ContextProvenance,
     DatasetContextSummary,
+    DeadEndSummary,
     DecisionContextSummary,
     EvidenceContextSummary,
     HypothesisContextSummary,
+    InvalidationRule,
+    StaleContextMarker,
+    ToolResultCacheSummary,
 )
 from schemas.enums import (
     AssumptionStatus,
     DecisionStatus,
     HypothesisStatus,
+    InvalidationTrigger,
+    MemorySourceType,
+    MemoryStatus,
     ProjectStatus,
     QualityFlagSeverity,
+    SessionFrameStatus,
 )
 
 ACTIVE_HYPOTHESIS_STATUSES = {
@@ -62,6 +72,12 @@ class SessionFrameBuilder:
         self,
         *,
         project: Project,
+        frame_topic: str | None = None,
+        frame_status: SessionFrameStatus = SessionFrameStatus.ACTIVE,
+        frame_outcome: str | None = None,
+        branch_key: str | None = None,
+        checkpoint_label: str | None = None,
+        parent_session_frame_id: UUID | None = None,
         datasets: Sequence[DatasetAsset] = (),
         profiles: Sequence[DataProfile] = (),
         assumptions: Sequence[Assumption] = (),
@@ -70,6 +86,11 @@ class SessionFrameBuilder:
         decisions: Sequence[DecisionLog] = (),
         pending_tasks: Sequence[str] = (),
         open_questions: Sequence[str] = (),
+        stale_context: Sequence[StaleContextMarker] = (),
+        dead_ends: Sequence[DeadEndSummary] = (),
+        cached_tool_results: Sequence[ToolResultCacheSummary] = (),
+        frame_invalidation_rules: Sequence[InvalidationRule] = (),
+        handoff_summary: str | None = None,
     ) -> SessionFrame:
         """Build a deterministic compact `SessionFrame` from active artifacts."""
 
@@ -79,14 +100,12 @@ class SessionFrameBuilder:
             evidence,
             relation_name="assumption_ids",
         )
-        hypothesis_evidence_counts = self._linked_evidence_counts(
-            evidence,
-            relation_name="hypothesis_ids",
-        )
+        hypothesis_evidence_counts = self._hypothesis_evidence_counts(evidence)
         active_dataset_ids = self._active_dataset_ids(
             datasets,
             active_assumptions,
             active_hypotheses,
+            evidence,
         )
         latest_profiles = self._latest_profiles_by_dataset(profiles)
         selected_datasets = self._select_datasets(datasets, active_dataset_ids)
@@ -96,18 +115,23 @@ class SessionFrameBuilder:
 
         return SessionFrame(
             project_id=project.project_id,
+            frame_topic=frame_topic or project.name,
+            frame_status=frame_status,
             objective_snapshot=project.objective,
+            frame_outcome=frame_outcome,
             project_summary=self._project_summary(project),
+            branch_key=branch_key,
+            checkpoint_label=checkpoint_label,
+            parent_session_frame_id=parent_session_frame_id,
+            handoff_summary=handoff_summary,
             dataset_summaries=[
                 self._dataset_summary(dataset, latest_profiles.get(dataset.dataset_id))
                 for dataset in selected_datasets
             ],
             active_dataset_refs=[dataset.dataset_id for dataset in selected_datasets],
             active_assumptions=[
-                AssumptionContextSummary(
-                    assumption_id=str(assumption.assumption_id),
-                    statement=assumption.statement,
-                    confidence=assumption.confidence.value,
+                self._assumption_summary(
+                    assumption,
                     linked_evidence_count=assumption_evidence_counts.get(
                         assumption.assumption_id,
                         0,
@@ -120,11 +144,8 @@ class SessionFrameBuilder:
                 for assumption in active_assumptions[: self._options.max_assumptions]
             ],
             active_hypotheses=[
-                HypothesisContextSummary(
-                    hypothesis_id=str(hypothesis.hypothesis_id),
-                    statement=hypothesis.statement,
-                    status=hypothesis.status.value,
-                    validation_method=hypothesis.validation_method,
+                self._hypothesis_summary(
+                    hypothesis,
                     linked_evidence_count=hypothesis_evidence_counts.get(
                         hypothesis.hypothesis_id,
                         0,
@@ -137,24 +158,12 @@ class SessionFrameBuilder:
                 for hypothesis in active_hypotheses[: self._options.max_hypotheses]
             ],
             strongest_evidence=[
-                EvidenceContextSummary(
-                    evidence_id=str(item.evidence_id),
-                    evidence_type=item.evidence_type.value,
-                    method=item.method,
-                    summary=item.result_summary.summary,
-                    created_at=item.created_at,
-                )
+                self._evidence_summary(item)
                 for item in selected_evidence
             ],
             strongest_evidence_refs=[item.evidence_id for item in selected_evidence],
             recent_decisions=[
-                DecisionContextSummary(
-                    decision_id=str(decision.decision_id),
-                    decision_type=decision.decision_type.value,
-                    decision=decision.decision,
-                    status=decision.status.value,
-                    created_at=decision.created_at,
-                )
+                self._decision_summary(decision)
                 for decision in selected_decisions
             ],
             recent_decision_refs=[decision.decision_id for decision in selected_decisions],
@@ -165,6 +174,10 @@ class SessionFrameBuilder:
             ),
             open_questions=list(open_questions[: self._options.max_open_questions]),
             key_warnings=key_warnings[: self._options.max_warnings],
+            stale_context=list(stale_context),
+            dead_ends=list(dead_ends),
+            cached_tool_results=list(cached_tool_results),
+            frame_invalidation_rules=list(frame_invalidation_rules),
         )
 
     @staticmethod
@@ -196,11 +209,19 @@ class SessionFrameBuilder:
         evidence: Sequence[Evidence],
         *,
         relation_name: str,
-    ) -> dict:
-        counts: dict = {}
+    ) -> dict[UUID, int]:
+        counts: dict[UUID, int] = {}
         for item in evidence:
             for related_id in getattr(item, relation_name):
                 counts[related_id] = counts.get(related_id, 0) + 1
+        return counts
+
+    @staticmethod
+    def _hypothesis_evidence_counts(evidence: Sequence[Evidence]) -> dict[UUID, int]:
+        counts: dict[UUID, int] = {}
+        for item in evidence:
+            for evaluation in item.hypothesis_evaluations:
+                counts[evaluation.hypothesis_id] = counts.get(evaluation.hypothesis_id, 0) + 1
         return counts
 
     def _active_dataset_ids(
@@ -208,7 +229,8 @@ class SessionFrameBuilder:
         datasets: Sequence[DatasetAsset],
         active_assumptions: Sequence[Assumption],
         active_hypotheses: Sequence[Hypothesis],
-    ) -> set:
+        evidence: Sequence[Evidence],
+    ) -> set[UUID]:
         dataset_ids = {
             item.dataset_id
             for item in active_assumptions
@@ -222,14 +244,18 @@ class SessionFrameBuilder:
         if dataset_ids:
             return dataset_ids
 
+        evidence_dataset_ids = {item.dataset_id for item in evidence}
+        if evidence_dataset_ids:
+            return evidence_dataset_ids
+
         primary_datasets = [dataset for dataset in datasets if dataset.role.value == "primary"]
         if primary_datasets:
             return {dataset.dataset_id for dataset in primary_datasets}
         return {dataset.dataset_id for dataset in datasets}
 
     @staticmethod
-    def _latest_profiles_by_dataset(profiles: Sequence[DataProfile]) -> dict:
-        latest: dict = {}
+    def _latest_profiles_by_dataset(profiles: Sequence[DataProfile]) -> dict[UUID, DataProfile]:
+        latest: dict[UUID, DataProfile] = {}
         for profile in sorted(profiles, key=lambda item: item.created_at, reverse=True):
             latest.setdefault(profile.dataset_id, profile)
         return latest
@@ -237,7 +263,7 @@ class SessionFrameBuilder:
     def _select_datasets(
         self,
         datasets: Sequence[DatasetAsset],
-        active_dataset_ids: set,
+        active_dataset_ids: set[UUID],
     ) -> list[DatasetAsset]:
         selected = [dataset for dataset in datasets if dataset.dataset_id in active_dataset_ids]
         selected.sort(
@@ -260,7 +286,7 @@ class SessionFrameBuilder:
         ranked = sorted(
             evidence,
             key=lambda item: (
-                len(active_hypothesis_ids.intersection(item.hypothesis_ids)),
+                len(active_hypothesis_ids.intersection(self._evidence_hypothesis_ids(item))),
                 len(active_assumption_ids.intersection(item.assumption_ids)),
                 item.created_at,
             ),
@@ -269,7 +295,7 @@ class SessionFrameBuilder:
         relevant = [
             item
             for item in ranked
-            if active_hypothesis_ids.intersection(item.hypothesis_ids)
+            if active_hypothesis_ids.intersection(self._evidence_hypothesis_ids(item))
             or active_assumption_ids.intersection(item.assumption_ids)
         ]
         if relevant:
@@ -284,7 +310,7 @@ class SessionFrameBuilder:
     def _collect_warnings(
         self,
         selected_datasets: Sequence[DatasetAsset],
-        latest_profiles: dict,
+        latest_profiles: dict[UUID, DataProfile],
         selected_evidence: Sequence[Evidence],
     ) -> list[str]:
         warnings: list[str] = []
@@ -312,6 +338,10 @@ class SessionFrameBuilder:
                 deduped.append(warning)
         return deduped
 
+    @staticmethod
+    def _evidence_hypothesis_ids(evidence: Evidence) -> set[UUID]:
+        return {evaluation.hypothesis_id for evaluation in evidence.hypothesis_evaluations}
+
     def _dataset_summary(
         self,
         dataset: DatasetAsset,
@@ -328,15 +358,132 @@ class SessionFrameBuilder:
             )
             row_count = profile.row_count
             column_count = profile.column_count
+        provenance: list[ContextProvenance] = []
+        if profile is not None:
+            provenance.append(
+                ContextProvenance(
+                    source_type=MemorySourceType.DATA_PROFILE,
+                    reference=str(profile.profile_id),
+                    note="Counts and warnings derive from the latest available data profile.",
+                )
+            )
+        invalidation_rules = [
+            InvalidationRule(
+                trigger=InvalidationTrigger.DATASET_VERSION_CHANGE,
+                detail=f"Refresh if dataset {dataset.name} moves beyond version {dataset.version}.",
+            ),
+            InvalidationRule(
+                trigger=InvalidationTrigger.SCHEMA_CHANGE,
+                detail=f"Refresh if dataset {dataset.name} changes shape or inferred schema.",
+            ),
+        ]
         return DatasetContextSummary(
-            dataset_id=str(dataset.dataset_id),
+            dataset_id=dataset.dataset_id,
             name=dataset.name,
             version=dataset.version,
-            kind=dataset.kind.value,
-            role=dataset.role.value,
+            kind=dataset.kind,
+            role=dataset.role,
             row_count=row_count,
             column_count=column_count,
             warning_count=warning_count,
+            provenance=provenance,
+            invalidation_rules=invalidation_rules,
+        )
+
+    @staticmethod
+    def _assumption_summary(
+        assumption: Assumption,
+        *,
+        linked_evidence_count: int,
+    ) -> AssumptionContextSummary:
+        provenance: list[ContextProvenance] = []
+        if assumption.profile_id is not None:
+            provenance.append(
+                ContextProvenance(
+                    source_type=MemorySourceType.DATA_PROFILE,
+                    reference=str(assumption.profile_id),
+                    note="Assumption was linked to a data profile when captured.",
+                )
+            )
+        invalidation_rules: list[InvalidationRule] = []
+        if assumption.dataset_id is not None:
+            invalidation_rules.append(
+                InvalidationRule(
+                    trigger=InvalidationTrigger.DATASET_VERSION_CHANGE,
+                    detail="Review the assumption if the linked dataset version changes.",
+                )
+            )
+        return AssumptionContextSummary(
+            assumption_id=assumption.assumption_id,
+            statement=assumption.statement,
+            confidence=assumption.confidence,
+            linked_evidence_count=linked_evidence_count,
+            provenance=provenance,
+            invalidation_rules=invalidation_rules,
+        )
+
+    @staticmethod
+    def _hypothesis_summary(
+        hypothesis: Hypothesis,
+        *,
+        linked_evidence_count: int,
+    ) -> HypothesisContextSummary:
+        invalidation_rules: list[InvalidationRule] = []
+        if hypothesis.assumption_ids:
+            invalidation_rules.append(
+                InvalidationRule(
+                    trigger=InvalidationTrigger.ASSUMPTION_REJECTED,
+                    detail="Re-evaluate the hypothesis if any supporting assumption is rejected.",
+                )
+            )
+        if hypothesis.dataset_ids:
+            invalidation_rules.append(
+                InvalidationRule(
+                    trigger=InvalidationTrigger.DATASET_VERSION_CHANGE,
+                    detail="Re-evaluate the hypothesis if any linked dataset version changes.",
+                )
+            )
+        return HypothesisContextSummary(
+            hypothesis_id=hypothesis.hypothesis_id,
+            statement=hypothesis.statement,
+            status=hypothesis.status,
+            validation_method=hypothesis.validation_method,
+            linked_evidence_count=linked_evidence_count,
+            invalidation_rules=invalidation_rules,
+        )
+
+    @staticmethod
+    def _evidence_summary(evidence: Evidence) -> EvidenceContextSummary:
+        return EvidenceContextSummary(
+            evidence_id=evidence.evidence_id,
+            evidence_type=evidence.evidence_type,
+            method=evidence.method,
+            summary=evidence.result_summary.summary,
+            created_at=evidence.created_at,
+            memory_status=MemoryStatus.VALIDATED,
+            provenance=[
+                ContextProvenance(
+                    source_type=MemorySourceType.VALIDATION_RESULT,
+                    reference=evidence.provenance.execution_label,
+                    note="Evidence was captured as a reproducible validation result.",
+                )
+            ],
+            invalidation_rules=[
+                InvalidationRule(
+                    trigger=InvalidationTrigger.DATASET_VERSION_CHANGE,
+                    detail="Re-check the evidence if the evaluated dataset version changes.",
+                )
+            ],
+        )
+
+    @staticmethod
+    def _decision_summary(decision: DecisionLog) -> DecisionContextSummary:
+        return DecisionContextSummary(
+            decision_id=decision.decision_id,
+            decision_type=decision.decision_type,
+            decision=decision.decision,
+            status=decision.status,
+            created_at=decision.created_at,
         )
 
     def _pending_tasks(
