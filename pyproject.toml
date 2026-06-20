@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cognieda"
 version = "0.1.0"
-description = "Hypothesis-driven exploratory data analysis with structured analytical memory."
+description = "CogniEDA helps users explore data through structured memory, hypothesis generation, validation, and traceable evidence."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

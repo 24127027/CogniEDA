@@ -2,7 +2,7 @@
 
 ## Project Purpose
 
-CogniEDA is a hypothesis-driven exploratory data analysis system with structured analytical memory.
+CogniEDA helps users explore data through structured memory, hypothesis generation, validation, and traceable evidence.
 
 The system has two core goals:
 
