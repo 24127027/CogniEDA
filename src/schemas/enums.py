@@ -11,6 +11,61 @@ class ProjectStatus(StrEnum):
     ARCHIVED = "archived"
 
 
+class MemoryStatus(StrEnum):
+    """Lifecycle states for memory items inside an active context frame."""
+
+    ACTIVE = "active"
+    PINNED = "pinned"
+    TENTATIVE = "tentative"
+    VALIDATED = "validated"
+    REJECTED = "rejected"
+    STALE = "stale"
+    SUPERSEDED = "superseded"
+    ARCHIVED = "archived"
+    DEAD_END = "dead_end"
+    OVERRULED = "overruled"
+    NEEDS_REVIEW = "needs_review"
+    UNRESOLVED = "unresolved"
+
+
+class MemorySourceType(StrEnum):
+    """Provenance sources for durable analytical memory items."""
+
+    USER_CONFIRMATION = "user_confirmation"
+    TOOL_RESULT = "tool_result"
+    DATA_PROFILE = "data_profile"
+    STATISTICAL_TEST = "statistical_test"
+    AGENT_INFERENCE = "agent_inference"
+    EXTERNAL_DOCUMENTATION = "external_documentation"
+    CODE_INSPECTION = "code_inspection"
+    PREVIOUS_FRAME = "previous_frame"
+    VALIDATION_RESULT = "validation_result"
+
+
+class InvalidationTrigger(StrEnum):
+    """Events that make cached or summarized context stale."""
+
+    DATASET_VERSION_CHANGE = "dataset_version_change"
+    SOURCE_HASH_CHANGE = "source_hash_change"
+    SCHEMA_CHANGE = "schema_change"
+    METRIC_DEFINITION_CHANGE = "metric_definition_change"
+    ASSUMPTION_REJECTED = "assumption_rejected"
+    USER_OVERRULE = "user_overrule"
+    TTL_EXPIRED = "ttl_expired"
+    COMMIT_SHA_CHANGE = "commit_sha_change"
+    MANUAL_REVIEW = "manual_review"
+
+
+class SessionFrameStatus(StrEnum):
+    """Operational states for a persisted context frame snapshot."""
+
+    ACTIVE = "active"
+    CHECKPOINT = "checkpoint"
+    HANDOFF = "handoff"
+    SUPERSEDED = "superseded"
+    ARCHIVED = "archived"
+
+
 class DatasetKind(StrEnum):
     """High-level lineage role for a dataset asset."""
 
@@ -36,6 +91,21 @@ class DatasetSourceType(StrEnum):
     QUERY = "query"
     MANUAL = "manual"
     GENERATED = "generated"
+
+
+class LineageOperationType(StrEnum):
+    """Explicit transformation steps recorded in dataset lineage."""
+
+    FILTER = "filter"
+    ROW_DROP = "row_drop"
+    COLUMN_DROP = "column_drop"
+    IMPUTATION = "imputation"
+    JOIN = "join"
+    AGGREGATION = "aggregation"
+    FEATURE_ENGINEERING = "feature_engineering"
+    SAMPLING = "sampling"
+    RENAME = "rename"
+    CUSTOM = "custom"
 
 
 class DataProfileMethod(StrEnum):
@@ -76,6 +146,14 @@ class HypothesisStatus(StrEnum):
     ARCHIVED = "archived"
 
 
+class HypothesisEvidenceOutcome(StrEnum):
+    """Typed outcome of one evidence record against one hypothesis."""
+
+    SUPPORTS = "supports"
+    REFUTES = "refutes"
+    INCONCLUSIVE = "inconclusive"
+
+
 class EvidenceType(StrEnum):
     """Evidence categories for analytical results."""
 
@@ -114,3 +192,12 @@ class QualityFlagSeverity(StrEnum):
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
+
+
+class LogicalDtype(StrEnum):
+    """Semantic column categories inferred during profiling."""
+
+    NUMERIC = "numeric"
+    BOOLEAN = "boolean"
+    DATETIME = "datetime"
+    CATEGORICAL = "categorical"
