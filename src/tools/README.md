@@ -153,21 +153,17 @@ Additionally, in `src/agents/llm.py`, the `create_agent` function should ensure 
 
 ```python
 # src/agents/llm.py
-from tools.manager import tool_manager, initialize_tool_manager
+from tools import manager as tools_manager
 
 # ... (existing ModelConfig and other code) ...
 
 def create_agent(worker: str, config: ModelConfig) -> Agent:
-    global tool_manager
-    if tool_manager is None:
-        initialize_tool_manager()
+    if tools_manager.tool_manager is None:
+        tools_manager.initialize_tool_manager()
 
-    # ... (rest of the create_agent function) ...
-    
     return Agent(
         model=model,
-        toolsets=tool_manager.toolsets_for(worker), # Toolsets are provided here
+        toolsets=tools_manager.tool_manager.toolsets_for(worker),
     )
-```
 
 This pattern ensures that `tool_manager` is always available and correctly configured when an agent needs to access its toolsets.
