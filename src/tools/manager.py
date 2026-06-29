@@ -112,5 +112,12 @@ class ToolManager:
 
         return toolsets
 
+tool_manager: ToolManager | None = None
 
-tool_manager = ToolManager.from_config_path()
+
+def initialize_tool_manager(
+    path: str | Path = "config/agents.toml",
+    mcp_path: str | Path = "config/mcp.toml",
+) -> None:
+    global tool_manager
+    tool_manager = ToolManager.from_config_path(path=path, mcp_path=mcp_path)
