@@ -29,11 +29,10 @@ def create_agent(worker: str, config: ModelConfig) -> Agent:
     if not config.api_key:
         raise ValueError("COGNIEDA_OPENAI_API_KEY must be set to create an agent.")
 
-    provider_kwargs: dict[str, str] = {"api_key": config.api_key}
-    if config.base_url:
-        provider_kwargs["base_url"] = config.base_url
-
-    provider = OpenAIProvider(**provider_kwargs)
+    provider = OpenAIProvider(
+        api_key=config.api_key,
+        base_url=config.base_url if config.base_url else None
+    )    
     model = OpenAIChatModel(model_name=config.model_name, provider=provider)
 
     return Agent(model=model, toolsets=tools_manager.tool_manager.toolsets_for(worker))
