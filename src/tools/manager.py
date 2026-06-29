@@ -62,14 +62,18 @@ class ToolManager:
         path: str | Path = "config/agents.toml",
         mcp_path: str | Path = "config/mcp.toml",
     ) -> "ToolManager":
+        config: dict[str, WorkerConfig] = {}
+        try:
+            with open(path, "rb") as f:
+                config = tomllib.load(f)
+        except FileNotFoundError:
+            pass
 
-        with open(path, "rb") as f:
-            config: dict[str, WorkerConfig] = tomllib.load(f)
+        mcp_toolsets: dict[str, MCPToolset] = {}
+        if Path(mcp_path).exists():
+            mcp_toolsets = load_mcp_toolsets(mcp_path)
 
-        return cls(
-            config=config,
-            mcp_toolsets=load_mcp_toolsets(mcp_path),
-        )
+        return cls(config=config, mcp_toolsets=mcp_toolsets)
 
     def toolsets_for(
         self,
