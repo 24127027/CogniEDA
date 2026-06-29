@@ -80,10 +80,8 @@ class ToolManager:
         worker: str,
     ) -> list[FunctionToolset | MCPToolset]:
 
-        if worker not in self.config:
-            raise ValueError(
-                f"Unknown worker '{worker}'."
-            )
+        if worker not in self.config and worker not in WORKER_BUILTIN_TOOLS:
+            raise ValueError(f"Unknown worker '{worker}'.")
 
         toolsets: list[FunctionToolset | MCPToolset] = []
 
@@ -93,14 +91,12 @@ class ToolManager:
         builtin = WORKER_BUILTIN_TOOLS.get(worker)
 
         if builtin:
-            toolsets.append(
-                registry.create_toolset(builtin)
-            )
+            toolsets.append(registry.create_toolset(builtin))
 
         #
         # MCP toolsets
         #
-        worker_cfg = self.config[worker]
+        worker_cfg = self.config.get(worker, {})
 
         for server_name in worker_cfg.get("mcp", []):
 
