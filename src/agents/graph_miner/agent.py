@@ -8,7 +8,7 @@ class GraphMiner(BaseAgent):
         )
         # Initialize any additional attributes specific to the GraphMiner here
 
-    def before_run(self, input):
+    async def before_run(self, input):
         # Implement any preprocessing or setup before the main run method
         pass
 
