@@ -1,29 +1,39 @@
 import os
+
+from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
-from pydantic import BaseModel
 
-from tools.manager import tool_manager
+from tools import manager as tools_manager
+
 
 class ModelConfig(BaseModel):
-    """ 
-    Configuration for the custom model.
-    """
-    model_name: str = "gpt-5.2"
-    provider: OpenAIProvider = OpenAIProvider(
-        base_url="https://your-custom-endpoint.com/v1",
-        api_key=os.environ.get("CUSTOM_API_KEY", "your-api-key"),
-    )
+    """Configuration for the OpenAI-compatible chat model used by agents."""
+
+    model_name: str = Field(default_factory=lambda: os.environ.get("COGNIEDA_MODEL_NAME", ""))
+    base_url: str = Field(default_factory=lambda: os.environ.get("COGNIEDA_OPENAI_BASE_URL", ""))
+    api_key: str = Field(default_factory=lambda: os.environ.get("COGNIEDA_OPENAI_API_KEY", ""))
 
 
 def create_agent(worker: str, config: ModelConfig) -> Agent:
-    model = OpenAIChatModel(
-        model_name=config.model_name,
-        provider=config.provider,
-    )
-    
-    return Agent(
-        model=model,
-        toolsets=tool_manager.toolsets_for(worker),
-    )
+    if tools_manager.tool_manager is None:
+        tools_manager.initialize_tool_manager()
+
+    if tools_manager.tool_manager is None:
+        raise RuntimeError("Tool manager was not initialized.")
+
+    if not config.model_name:
+        raise ValueError("COGNIEDA_MODEL_NAME must be set to create an agent.")
+
+    if not config.api_key:
+        raise ValueError("COGNIEDA_OPENAI_API_KEY must be set to create an agent.")
+
+    provider_kwargs: dict[str, str] = {"api_key": config.api_key}
+    if config.base_url:
+        provider_kwargs["base_url"] = config.base_url
+
+    provider = OpenAIProvider(**provider_kwargs)
+    model = OpenAIChatModel(model_name=config.model_name, provider=provider)
+
+    return Agent(model=model, toolsets=tools_manager.tool_manager.toolsets_for(worker))
