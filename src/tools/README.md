@@ -145,9 +145,7 @@ def initialize_tool_manager(
     mcp_path: str | Path = "config/mcp.toml",
 ) -> None:
     global tool_manager
-    from .registry import registry # Import registry locally to avoid circular dependencies
-    tool_manager = ToolManager.from_config_path(registry, path, mcp_path)
-```
+    tool_manager = ToolManager.from_config_path(path=path, mcp_path=mcp_path)
 
 This `initialize_tool_manager` function should be called once at the application's startup, for example, in your main application entry point or a dedicated setup module.
 
