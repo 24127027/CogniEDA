@@ -1,17 +1,15 @@
 from ..base_agent import BaseAgent
+from ..types import BaseState
 from .graph import build_graph
+from .types import GraphMinerRequest, GraphMinerResult
 
-class GraphMiner(BaseAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(
-            graph=build_graph()
-        )
-        # Initialize any additional attributes specific to the GraphMiner here
 
-    async def before_run(self, input):
-        # Implement any preprocessing or setup before the main run method
-        pass
+class GraphMiner(BaseAgent[GraphMinerRequest, GraphMinerResult, BaseState]):
+    def __init__(self) -> None:
+        super().__init__(graph=build_graph())
 
-    async def after_run(self, output: dict):
-        # Implement any postprocessing or conversion of the output to the expected format
-        return output  # Modify this as needed to convert to the expected ResT
+    async def before_run(self, input: GraphMinerRequest) -> BaseState:
+        raise NotImplementedError("GraphMiner.before_run is not implemented yet.")
+
+    async def after_run(self, output: BaseState) -> GraphMinerResult:
+        raise NotImplementedError("GraphMiner.after_run is not implemented yet.")
