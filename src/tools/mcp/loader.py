@@ -33,13 +33,19 @@ def load_mcp_toolsets(
     toolsets: dict[str, MCPToolset] = {}
 
     for name, cfg in config.items():
-        transport = cfg["transport"]
+        transport = cfg.get("transport")
+        if transport is None:
+            raise ValueError(f"MCP server '{name}' is missing required key 'transport'.")
 
         if transport == "stdio":
             # Use StdioTransport from fastmcp for arbitrary terminal/local commands
+            command = cfg.get("command")
+            if not command:
+                raise ValueError(f"MCP server '{name}' is missing required key 'command'.")
+
             toolsets[name] = MCPToolset(
                 StdioTransport(
-                    command=cfg["command"],
+                    command=command,
                     args=cfg.get("args", []),
                     env=cfg.get("env"),
                 )
@@ -47,7 +53,11 @@ def load_mcp_toolsets(
 
         elif transport == "http":
             # For HTTP/SSE endpoints, you can pass the URL string directly to MCPToolset
-            toolsets[name] = MCPToolset(cfg["url"])
+            url = cfg.get("url")
+            if not url:
+                raise ValueError(f"MCP server '{name}' is missing required key 'url'.")
+
+            toolsets[name] = MCPToolset(url)
 
         else:
             raise ValueError(
