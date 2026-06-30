@@ -50,8 +50,7 @@ def build_graph() -> CompiledStateGraph:
     # --------------------------------------------------
 
     builder.add_edge(R.propose_questions, R.request_user_input)
-    builder.add_edge(R.expand_plan, R.commit)
-
+    builder.add_edge(R.expand_plan, R.request_user_input)
     # --------------------------------------------------
     # Task management
     # --------------------------------------------------
@@ -89,9 +88,8 @@ def build_graph() -> CompiledStateGraph:
         {
             "clarify": R.understand_request,
             "approved_questions": R.expand_plan,
-            "approved_task": R.commit,
+            "approved_task, approved_plan, approved_conflict": R.commit,
             "approved_execution": R.dispatch_executor,
-            "approved_conflict": R.commit,
             "cancel": R.commit,
         },
     )
@@ -104,4 +102,6 @@ def build_graph() -> CompiledStateGraph:
 
     return builder.compile()
 
-
+# if __name__ == "__main__":
+    # agent_graph = build_graph()
+    # agent_graph.get_graph().draw_mermaid_png(output_file_path="graph.png")
