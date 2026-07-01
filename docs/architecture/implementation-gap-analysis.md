@@ -1,0 +1,40 @@
+# Implementation Gap Analysis
+
+This report compares the audited current implementation against the target architecture. Code is the source of truth for current behavior; the final FCO design is the source of truth for target behavior.
+
+| Affected concept | Target design says | Current implementation appears to do | Why the mismatch matters | Type |
+| --- | --- | --- | --- | --- |
+| FCO set | Only `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, and `SessionFrame` are FCOs. | Current schemas and DB tables include `Project`, `DatasetAsset`, and `DecisionLog`; no `Objective`, `Task`, or `Discovery` exists. | Docs or future code may preserve the older artifact set and drift away from the final epistemic model. | Implementation issue |
+| `Project` vs `Objective` | `Objective` is the research-intent FCO. Workspace is not an FCO. | `Project` is the root analytical container with `objective` and `research_questions`. | Research intent, workspace boundary, and persistence scope remain conflated. | Implementation issue |
+| `DatasetAsset` vs `DataProfile` | Raw dataset is not a graph node; `DataProfile` stores dataset/version identity directly. | `DatasetAsset` is a persisted artifact with source, location, version, role, kind, and lineage links. `DataProfile` references `dataset_id`. | The current model preserves useful lineage but conflicts with the final rule that `DataProfile` is the data-state FCO. | Open design question |
+| `DecisionLog` | User decisions and cleaning decisions belong to provenance, not FCOs. | `DecisionLog` is a schema, table, repository, and session-frame summary input. | Decision records may be retrieved as durable analytical artifacts instead of audit/provenance state. | Implementation issue |
+| `Task` lifecycle | `Task` is an FCO with state, hierarchy, user approval, and terminal analytical readiness rules. | No `Task` model exists; pending tasks are strings inside `SessionFrame`. | Proposed-task execution guards, decomposition, and parent-task synthesis cannot be enforced. | Implementation issue |
+| Terminal task to hypothesis | Only active terminal analytical Tasks generate Hypotheses; one terminal Task generates exactly one Hypothesis. | `Hypothesis` can be created directly through repository code and has no `source_task_id`. | Hypothesis admission and cardinality are not protected. | Implementation issue |
+| Hypothesis to Discovery | One Hypothesis produces exactly one Discovery. | No `Discovery` model exists; `Hypothesis` has no `produced_discovery_id`. | The system cannot preserve evidence-bound conclusions as durable knowledge. | Implementation issue |
+| Discovery validity | Discovery must have a `ValidityEnvelope`. | No `Discovery` or `ValidityEnvelope` schema exists. | Claims cannot carry enforceable scope, evidence lineage, assumptions-excluded audit, or invalidators. | Implementation issue |
+| Evidence provenance | Evidence must reference `DataProfile` and `AnalysisFrame` provenance, method identity, parameters, execution run, code/environment identity, and seed where applicable. | Evidence references `dataset_id`, optional `source_profile_id`, `execution_label`, `code_reference`, artifact paths, parameters, result summary, and limitations. No `AnalysisFrame` or `ExecutionRun` exists. | Evidence reproducibility is partial and cannot fully support target validity envelopes. | Implementation issue |
+| Evidence immutability | Evidence is immutable; wrong/stale output creates new Evidence and marks old Evidence superseded/invalidated. | `EvidenceRepository` exposes no `update()` and tests assert that. No lifecycle state or supersession fields exist. | Append-only creation is present, but lifecycle transitions for invalidation/supersession are missing. | Part documentation, part implementation issue |
+| DataProfile immutability | DataProfile is immutable and versioned; cleaning creates a new DataProfile. | `DataProfileRepository` exposes no `update()` and tests assert that. No target lifecycle, DVC hash, accepted ground-truth field, or preprocessing history exists. | The repo partially protects immutability but cannot represent the full target cleaning lifecycle. | Implementation issue |
+| Assumption quarantine | Assumptions may guide planning but must be excluded from Conclusion Context. | Assumptions can link to Hypotheses and Evidence; `SessionFrame` includes active assumptions. No conclusion-context retrieval boundary exists. | Assumptions could contaminate inference if future LLM prompts reuse SessionFrame naively. | Architectural risk |
+| Context type safety | Retrieval must filter by epistemic role and lifecycle state. | No retrieval system was found. `SessionFrameBuilder` selects active current artifacts but does not implement context modes. | Wrong-type memory may enter planning or conclusion generation once agents are wired. | Architectural risk |
+| Planner operations | Planner nodes produce `PlannerOperation`; `commit` atomically persists approved operations. | Planner node names and graph routing exist, but nodes are mostly stubs and no `PlannerOperation` model exists. | Persistent mutations cannot be reviewed, approved, or committed atomically. | Implementation issue |
+| `AnalysisFrame` | Provenance/data-view record identifies rows, variables, filters, derived features, missing-data policy, and frame hash. | No implementation found. | Evidence cannot identify the exact dataframe view used. | Implementation issue |
+| `ExecutionRun` | Provenance record for one execution attempt. | No implementation found. | Failed/rerun/cancelled executions cannot be audited as target provenance. | Implementation issue |
+| Evidence cache | Cache is keyed by data profile, analysis frame, method, parameters, code, environment, and seed; cache never creates Discovery. | `ToolResultCacheSummary` exists inside `SessionFrame`, but no cache service or target cache key exists. | Computation reuse cannot be validity-checked against target invalidation keys. | Implementation issue |
+| Planner graph behavior | Node pipeline should drive user workflow and commit operations. | Graph is wired, but `route_intent`, `process_decision`, `Planner.before_run`, and `Planner.after_run` are not implemented. | Agent execution cannot currently complete planner workflows. | Implementation issue |
+| `.env.example` vs LLM config | Setup should include required agent model env vars when agent creation is supported. | `src/agents/llm.py` requires `COGNIEDA_MODEL_NAME` and `COGNIEDA_OPENAI_API_KEY`; `.env.example` omits them. | Agent setup will fail unless users infer undocumented env vars. | Documentation issue |
+| DVC workflow | Dataset versioning workflow uses DVC. | Docs mention DVC, but `pyproject.toml` does not declare DVC and no DVC integration code was found. | Docs may imply working DVC support that is not installed or automated by the repo. | Documentation issue |
+
+## Highest-Risk Mismatches
+
+1. The current persisted artifact set differs from the target FCO set.
+2. `Discovery` and `ValidityEnvelope` are absent, so evidence-bound conclusions are not yet representable.
+3. `Task` is absent, so the terminal analytical Task gate cannot protect Hypothesis admission.
+4. Context type safety is target-only and must be enforced before LLM conclusion generation uses retrieved context.
+5. `AnalysisFrame` and `ExecutionRun` are absent, limiting Evidence reproducibility.
+
+## Project-Owner Review Needed
+
+- Decide how to migrate or reclassify current `Project`, `DatasetAsset`, and `DecisionLog`.
+- Decide whether SQLModel remains the runtime store during convergence or whether/when a graph store is introduced.
+- Decide how `SessionFrame` should evolve from snapshot summaries to target user-governed context items.
