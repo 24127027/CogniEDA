@@ -88,7 +88,9 @@ def build_graph() -> CompiledStateGraph:
         {
             "clarify": R.understand_request,
             "approved_questions": R.expand_plan,
-            "approved_task, approved_plan, approved_conflict": R.commit,
+            "approved_task": R.commit,
+            "approved_plan": R.commit,
+            "approved_conflict": R.commit,
             "approved_execution": R.dispatch_executor,
             "cancel": R.commit,
         },
