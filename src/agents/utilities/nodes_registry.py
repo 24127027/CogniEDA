@@ -12,10 +12,10 @@ class NodeRegistry(Generic[StateT]):
     How to use:
         In nodes.py:
             from ..utilities.nodes_registry import NodeRegistry
-            registry = NodeRegistry[PlannerState]() #Specify the state type for type checking
-            R = reg.R  # Shortcut export for graph.py to use dot-notation
+            registry = NodeRegistry[PlannerState]()  # Specify the state type for type checking
+            R = registry.R  # Shortcut export for graph.py to use dot-notation
 
-            @reg.register()
+            @registry.register()
             def my_node(state: PlannerState):
                 pass
         
