@@ -49,4 +49,4 @@ class NodeRegistry(Generic[StateT]):
     @property
     def nodes(self) -> Dict[str, StateNode[StateT, None]]:
         """Returns the dictionary mapping string names to functions for graph.add_node()."""
-        return self._registry
+        return dict(self._registry)
