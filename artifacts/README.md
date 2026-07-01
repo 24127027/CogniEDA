@@ -11,4 +11,5 @@ This directory stores Git-tracked analytical metadata files that describe datase
 
 - These Git-tracked files are intentionally separate from DVC-managed data so that code review can inspect lineage, version labels, upstream dependencies, and profiling metadata without pulling large files.
 - The current scaffold mirrors only `DatasetAsset` and `DataProfile` here by default.
-- The full first-class artifact set still includes `Project`, `Assumption`, `Hypothesis`, `Evidence`, `DecisionLog`, and `SessionFrame`, but those are currently persisted operationally through the local SQLModel store rather than as Git-tracked JSON files.
+- Current SQLModel persistence also includes scaffold artifacts such as `Project`, `Assumption`, `Hypothesis`, `Evidence`, `DecisionLog`, and `SessionFrame`.
+- The target FCO set is narrower: `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, and `SessionFrame`. Do not treat `Project`, `DatasetAsset`, or `DecisionLog` as target FCOs.
