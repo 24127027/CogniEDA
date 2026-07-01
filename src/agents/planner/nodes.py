@@ -21,11 +21,11 @@ def understand_request(state: PlannerState):
 
 
 @registry.register()
-def route_intent(state: PlannerState):
-    """ Pure routing of the user's intent to the appropriate node in the graph.  
-    This node purely a python function
-    """
-    pass
+def route_intent(state: PlannerState) -> str:
+    """Route the user's intent to the appropriate node and return a routing key."""
+    raise NotImplementedError(
+        "route_intent must return one of: answer, suggest, manage_task, execute, objective, assumption."
+    )
 
 
 # --------------------
