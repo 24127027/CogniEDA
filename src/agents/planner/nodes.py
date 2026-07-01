@@ -152,15 +152,11 @@ def pause(state: PlannerState):
     pass
 
 @registry.register()
-def process_decision(state: PlannerState):
-    """
-    Interpret the user's response after a pause.
-
-    The user may approve, reject, request clarification, modify the
-    proposal, or redirect the conversation. This node converts the
-    response into a routing decision for the planner.
-    """
-    pass
+def process_decision(state: PlannerState) -> str:
+    """Interpret the user's response after a pause and return a routing key for the planner."""
+    raise NotImplementedError(
+        "process_decision must return one of: clarify, approved_questions, approved_task, approved_plan, approved_conflict, approved_execution, cancel."
+    )
 
 
 # --------------------
