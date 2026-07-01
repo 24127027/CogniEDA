@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `Objective` | Target FCO for research intent. | Not implemented. Current `Project.objective` partially overlaps. |
 | `DataProfile` | Target FCO for dataset-version semantic state. Immutable. | Partially implemented as current schema/repository/profiler; target fields differ. |
-| `Assumption` | Target FCO for planning constraints or axioms. Not Evidence. | Partially implemented; testability admission and conclusion exclusion are not enforced. |
+| `Assumption` | Target FCO for planning constraints or axioms. Not Evidence. | Partially implemented; testability admission is not enforced, and conclusion exclusion is implemented only for `SessionFrame` projection. |
 | `Task` | Target FCO for workflow state and user-controlled work. | Not implemented. |
 | `Hypothesis` | Target FCO for one atomic test contract from one terminal Task. | Partially implemented; no source Task or produced Discovery. |
 | `Evidence` | Target FCO for observed analytical result. Not interpretation. | Partially implemented; lacks AnalysisFrame and execution-run provenance. |
@@ -20,8 +20,8 @@
 | `ExecutionRun` | Provenance record for one execution attempt. | Not implemented. |
 | `EvidenceCacheEntry` | Cache record keyed by data/method/parameter/code/environment identity. | Not implemented. |
 | `ValidityEnvelope` | Required Discovery metadata describing scope, evidence, method, uncertainty, excluded assumptions, and invalidators. | Not implemented. |
-| Planning Context | Context mode where assumptions may guide planning. | Not implemented as a separate retriever/context builder. |
-| Conclusion Context | Context mode for generating evidence-bound conclusions; excludes assumptions. | Not implemented as a separate retriever/context builder. |
+| Planning Context | Context mode where assumptions may guide planning. | Partially implemented as a `SessionFrame` projection; no graph retriever exists. |
+| Conclusion Context | Context mode for generating evidence-bound conclusions; excludes assumptions. | Partially implemented as a `SessionFrame` projection; no graph retriever exists. |
 
 ## Current Implementation Names
 
@@ -33,3 +33,4 @@
 | `ToolResultCacheSummary` | Cached tool-result summary embedded in `SessionFrame`. | Not target `EvidenceCacheEntry`. |
 | `EvidenceProvenance` | Embedded provenance fields on current Evidence. | Partial substitute only; target also needs `AnalysisFrame` and `ExecutionRun`. |
 | `SessionFrameBuilder` | Deterministic builder for compact current SessionFrame snapshots. | Useful scaffold; not target retrieval governance. |
+| `SessionContextBuilder` | Non-persistent projector from `SessionFrame` snapshots into planning or conclusion context bundles. | Partial context-type-safety guard; not a graph retriever and not an FCO. |

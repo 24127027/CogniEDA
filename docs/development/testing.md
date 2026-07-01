@@ -23,10 +23,11 @@ Current tests cover:
 - append-only repository surfaces for `DataProfile`, `Evidence`, and `SessionFrame`
 - baseline profiling semantic dtype behavior
 - `SessionFrameBuilder` evidence and dataset selection behavior
+- `SessionContextBuilder` planning-vs-conclusion projection for `SessionFrame` snapshots
 
 ## Important Gaps
 
-No tests were found for target-only invariants:
+No tests were found for these target-only or graph-level invariants:
 
 - target FCO admission rules
 - `Objective` lifecycle
@@ -38,8 +39,8 @@ No tests were found for target-only invariants:
 - `Discovery` validity envelope
 - `AnalysisFrame` provenance requirements
 - operation-before-commit planner mutation
-- Planning Context vs Conclusion Context exclusion rules
-- Assumption quarantine
+- graph-retrieved Planning Context vs Conclusion Context exclusion rules
+- full Assumption quarantine outside `SessionFrame` projection
 - Evidence supersession/invalidation propagation
 - DataProfile supersession propagation
 - Evidence cache validity keys
