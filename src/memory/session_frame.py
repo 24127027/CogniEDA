@@ -30,6 +30,7 @@ from schemas.common import (
 )
 from schemas.enums import (
     AssumptionStatus,
+    ContextMode,
     DecisionStatus,
     HypothesisStatus,
     InvalidationTrigger,
@@ -47,6 +48,21 @@ ACTIVE_HYPOTHESIS_STATUSES = {
     HypothesisStatus.INCONCLUSIVE,
 }
 
+PLANNING_MEMORY_STATUSES = {
+    MemoryStatus.ACTIVE,
+    MemoryStatus.PINNED,
+    MemoryStatus.TENTATIVE,
+    MemoryStatus.VALIDATED,
+    MemoryStatus.NEEDS_REVIEW,
+    MemoryStatus.UNRESOLVED,
+}
+
+CONCLUSION_MEMORY_STATUSES = {
+    MemoryStatus.ACTIVE,
+    MemoryStatus.PINNED,
+    MemoryStatus.VALIDATED,
+}
+
 
 @dataclass(frozen=True, slots=True)
 class SessionFrameBuildOptions:
@@ -60,6 +76,144 @@ class SessionFrameBuildOptions:
     max_warnings: int = 8
     max_pending_tasks: int = 8
     max_open_questions: int = 5
+
+
+@dataclass(frozen=True, slots=True)
+class ContextBundle:
+    """A typed, non-persistent view over a `SessionFrame` for one reasoning mode."""
+
+    mode: ContextMode
+    session_frame_id: UUID
+    project_id: UUID
+    objective_snapshot: str
+    dataset_summaries: tuple[DatasetContextSummary, ...] = ()
+    active_dataset_refs: tuple[UUID, ...] = ()
+    assumptions: tuple[AssumptionContextSummary, ...] = ()
+    assumption_refs: tuple[UUID, ...] = ()
+    hypotheses: tuple[HypothesisContextSummary, ...] = ()
+    hypothesis_refs: tuple[UUID, ...] = ()
+    evidence: tuple[EvidenceContextSummary, ...] = ()
+    evidence_refs: tuple[UUID, ...] = ()
+    decisions: tuple[DecisionContextSummary, ...] = ()
+    decision_refs: tuple[UUID, ...] = ()
+    pending_tasks: tuple[str, ...] = ()
+    open_questions: tuple[str, ...] = ()
+    key_warnings: tuple[str, ...] = ()
+    stale_context: tuple[StaleContextMarker, ...] = ()
+    dead_ends: tuple[DeadEndSummary, ...] = ()
+    cached_tool_results: tuple[ToolResultCacheSummary, ...] = ()
+    exclusion_notes: tuple[str, ...] = ()
+
+
+class SessionContextBuilder:
+    """Project `SessionFrame` snapshots into mode-specific context bundles."""
+
+    def build(
+        self,
+        session_frame: SessionFrame,
+        *,
+        mode: ContextMode,
+    ) -> ContextBundle:
+        """Build a mode-specific context view without mutating the frame."""
+
+        if mode == ContextMode.PLANNING:
+            return self._planning_context(session_frame)
+        if mode == ContextMode.CONCLUSION:
+            return self._conclusion_context(session_frame)
+        raise ValueError(f"Unsupported context mode: {mode}")
+
+    def _planning_context(self, session_frame: SessionFrame) -> ContextBundle:
+        dataset_summaries = tuple(
+            item
+            for item in session_frame.dataset_summaries
+            if item.memory_status in PLANNING_MEMORY_STATUSES
+        )
+        assumptions = tuple(
+            item
+            for item in session_frame.active_assumptions
+            if item.memory_status in PLANNING_MEMORY_STATUSES
+        )
+        hypotheses = tuple(
+            item
+            for item in session_frame.active_hypotheses
+            if item.memory_status in PLANNING_MEMORY_STATUSES
+            and item.status in ACTIVE_HYPOTHESIS_STATUSES
+        )
+        evidence = tuple(
+            item
+            for item in session_frame.strongest_evidence
+            if item.memory_status in PLANNING_MEMORY_STATUSES
+        )
+        decisions = tuple(
+            item
+            for item in session_frame.recent_decisions
+            if item.memory_status in PLANNING_MEMORY_STATUSES
+            and item.status == DecisionStatus.ACTIVE
+        )
+
+        return ContextBundle(
+            mode=ContextMode.PLANNING,
+            session_frame_id=session_frame.session_frame_id,
+            project_id=session_frame.project_id,
+            objective_snapshot=session_frame.objective_snapshot,
+            dataset_summaries=dataset_summaries,
+            active_dataset_refs=tuple(item.dataset_id for item in dataset_summaries),
+            assumptions=assumptions,
+            assumption_refs=tuple(item.assumption_id for item in assumptions),
+            hypotheses=hypotheses,
+            hypothesis_refs=tuple(item.hypothesis_id for item in hypotheses),
+            evidence=evidence,
+            evidence_refs=tuple(item.evidence_id for item in evidence),
+            decisions=decisions,
+            decision_refs=tuple(item.decision_id for item in decisions),
+            pending_tasks=tuple(session_frame.pending_tasks),
+            open_questions=tuple(session_frame.open_questions),
+            key_warnings=tuple(session_frame.key_warnings),
+            stale_context=tuple(session_frame.stale_context),
+            dead_ends=tuple(session_frame.dead_ends),
+            cached_tool_results=tuple(
+                item
+                for item in session_frame.cached_tool_results
+                if item.status in PLANNING_MEMORY_STATUSES
+            ),
+        )
+
+    def _conclusion_context(self, session_frame: SessionFrame) -> ContextBundle:
+        dataset_summaries = tuple(
+            item
+            for item in session_frame.dataset_summaries
+            if item.memory_status in CONCLUSION_MEMORY_STATUSES
+        )
+        hypotheses = tuple(
+            item
+            for item in session_frame.active_hypotheses
+            if item.memory_status in CONCLUSION_MEMORY_STATUSES
+            and item.status in ACTIVE_HYPOTHESIS_STATUSES
+        )
+        evidence = tuple(
+            item
+            for item in session_frame.strongest_evidence
+            if item.memory_status in CONCLUSION_MEMORY_STATUSES
+        )
+
+        return ContextBundle(
+            mode=ContextMode.CONCLUSION,
+            session_frame_id=session_frame.session_frame_id,
+            project_id=session_frame.project_id,
+            objective_snapshot=session_frame.objective_snapshot,
+            dataset_summaries=dataset_summaries,
+            active_dataset_refs=tuple(item.dataset_id for item in dataset_summaries),
+            hypotheses=hypotheses,
+            hypothesis_refs=tuple(item.hypothesis_id for item in hypotheses),
+            evidence=evidence,
+            evidence_refs=tuple(item.evidence_id for item in evidence),
+            key_warnings=tuple(session_frame.key_warnings),
+            exclusion_notes=(
+                "Assumptions are excluded from Conclusion Context.",
+                "Decision logs, pending tasks, stale context, dead ends, and cached tool "
+                "summaries are excluded from Conclusion Context.",
+            ),
+        )
 
 
 class SessionFrameBuilder:
