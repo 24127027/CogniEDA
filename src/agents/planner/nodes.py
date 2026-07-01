@@ -18,7 +18,7 @@ def understand_request(state: PlannerState):
     consume Session Frame context so intent recognition is based solely
     on the user's request.
     """
-
+    pass
 
 @registry.register()
 def route_intent(state: PlannerState) -> str:
