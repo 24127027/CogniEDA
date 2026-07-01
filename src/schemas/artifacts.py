@@ -6,7 +6,6 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from pydantic import Field, NonNegativeInt
-
 from schemas.common import (
     AssumptionContextSummary,
     BaselineSummary,

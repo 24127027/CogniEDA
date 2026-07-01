@@ -37,6 +37,7 @@ from schemas.common import (
 from schemas.enums import (
     AssumptionStatus,
     ConfidenceLevel,
+    ContextMode,
     DataProfileMethod,
     DatasetKind,
     DatasetRole,
@@ -65,6 +66,7 @@ __all__ = [
     "ColumnSchemaSummary",
     "ConfidenceLevel",
     "ContextProvenance",
+    "ContextMode",
     "DataProfile",
     "DataProfileMethod",
     "DeadEndSummary",

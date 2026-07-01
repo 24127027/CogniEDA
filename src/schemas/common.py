@@ -7,7 +7,6 @@ from typing import Annotated
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat, NonNegativeInt
-
 from schemas.enums import (
     ConfidenceLevel,
     DatasetKind,

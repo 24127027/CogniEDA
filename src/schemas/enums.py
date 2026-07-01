@@ -28,6 +28,13 @@ class MemoryStatus(StrEnum):
     UNRESOLVED = "unresolved"
 
 
+class ContextMode(StrEnum):
+    """Typed context views used to protect epistemic-role boundaries."""
+
+    PLANNING = "planning"
+    CONCLUSION = "conclusion"
+
+
 class MemorySourceType(StrEnum):
     """Provenance sources for durable analytical memory items."""
 
