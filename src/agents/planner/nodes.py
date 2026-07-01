@@ -1,7 +1,4 @@
 from .types import PlannerState
-from typing import List
-
-from .types import PlannerState
 from ..utilities.nodes_registry import NodeRegistry
 
 registry = NodeRegistry[PlannerState]()
