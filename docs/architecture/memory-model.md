@@ -22,9 +22,10 @@ The current repository implements parts of this model:
 
 - `SessionFrame` is persisted as an append-only snapshot with dataset summaries, active assumptions, active hypotheses, evidence summaries, recent decisions, pending task strings, warnings, stale context, dead ends, cached tool-result summaries, and invalidation rules.
 - `SessionFrameBuilder` can construct a compact frame from current `Project`, `DatasetAsset`, `DataProfile`, `Assumption`, `Hypothesis`, `Evidence`, and `DecisionLog` objects.
+- `SessionContextBuilder` can project a `SessionFrame` snapshot into typed `planning` and `conclusion` context bundles. Planning context may include active assumptions. Conclusion context excludes assumptions, decisions, pending tasks, stale context, dead ends, and cached tool-result summaries.
 - Evidence and profile records include some provenance and invalidation metadata.
 - There is no typed graph retrieval implementation.
-- There is no enforced separation between Planning Context, Execution Context, Conclusion Context, and Audit Context.
+- There is no graph-level separation between Planning Context, Execution Context, Conclusion Context, and Audit Context.
 - There is no target `Discovery` object, so future-session retrieval cannot yet retrieve evidence-bound discoveries instead of completed hypotheses.
 
 ## Implementation Status
@@ -36,8 +37,8 @@ The current repository implements parts of this model:
 | Workflow State Memory | Not implemented | `Task` does not exist; planner state is empty. |
 | Provenance Memory | Partially implemented | Evidence provenance and decision logs exist, but no `AnalysisFrame`, `ExecutionRun`, or append-only provenance ledger exists. |
 | Evidence Cache | Not implemented | Only session-frame-level `ToolResultCacheSummary` exists. |
-| Context Type Safety | Design target | No code-enforced retrieval policy was found. |
+| Context Type Safety | Partially implemented | Basic `SessionFrame` projection enforces planning-vs-conclusion exclusions, but no typed graph retrieval policy exists. |
 
 ## Known Deviation
 
-The current `SessionFrame` can include active assumptions and evidence summaries together. That is acceptable for a working context snapshot, but the current code does not enforce the target rule that assumptions must be excluded from Conclusion Context.
+The current `SessionFrame` can include active assumptions and evidence summaries together. That is acceptable for a working context snapshot. Code now provides a conclusion-context projection that excludes assumptions, but direct prompt construction from raw `SessionFrame` snapshots would still bypass that guard.

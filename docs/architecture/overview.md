@@ -25,7 +25,7 @@ The current implementation is a Python scaffold managed with `uv`. It contains:
 - SQLModel tables and SQLite setup in `src/db/`.
 - artifact-specific repositories in `src/repositories/`.
 - baseline profiling utilities in `src/data/`.
-- a `SessionFrameBuilder` in `src/memory/session_frame.py`.
+- `SessionFrameBuilder` and `SessionContextBuilder` in `src/memory/session_frame.py`.
 - agent and planner scaffolding in `src/agents/`.
 - tests for repositories, profiling semantics, DB foreign keys, and session-frame building.
 
@@ -41,7 +41,7 @@ The current code does not implement the full target FCO set. It uses older/curre
 | Data profiling | Partially implemented | Baseline dataframe profiling exists; target DVC/profile acceptance lifecycle is not fully modeled. |
 | Target FCO set | Partially implemented | `DataProfile`, `Assumption`, `Hypothesis`, `Evidence`, and `SessionFrame` exist in older forms. `Objective`, `Task`, and `Discovery` do not exist. |
 | Planner workflow | Partially implemented | Target node names and graph routing exist, but most nodes are stubs. |
-| Context type safety | Design target | No code-enforced Planning Context vs Conclusion Context retrieval boundary was found. |
+| Context type safety | Partially implemented | `SessionContextBuilder` enforces basic Planning Context vs Conclusion Context filtering for `SessionFrame` snapshots; graph retrieval policy does not exist. |
 | Validity envelope | Not implemented | No `ValidityEnvelope` schema or enforcement was found. |
 | AnalysisFrame provenance | Not implemented | No `AnalysisFrame` record exists. |
 | Evidence cache | Not implemented | `ToolResultCacheSummary` exists inside `SessionFrame`, but target `EvidenceCacheEntry` does not. |
