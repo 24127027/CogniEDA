@@ -2,28 +2,29 @@
 
 The `application` package is the runtime coordination layer of CogniEDA.
 
-It owns the lifecycle of an application request and connects the major subsystems of the application, including planners, executors, tools, memory, repositories, and external services.
+It owns the lifecycle of an application request and serves as the boundary between external interfaces (such as the UI or API) and the internal agent system. The application layer coordinates planners, executors, persistence, events, tools, and other infrastructure to execute a request from start to finish.
 
 The application layer **does not contain research logic or domain reasoning**. Those responsibilities belong to the Planner and specialist agents.
 
-Instead, this package is responsible for ensuring that every component is invoked in the correct order and that state changes are coordinated consistently.
+Instead, the application layer ensures that the appropriate components are invoked in the correct order and that runtime state is coordinated consistently.
 
 ## Responsibilities
 
 The application layer is responsible for:
 
-- Receiving user requests
-- Loading runtime context (workspace, session, repositories)
+- Receiving requests from external interfaces
+- Validating and preprocessing requests
+- Loading runtime context
+- Constructing agent state
 - Invoking the Planner
 - Dispatching specialist executors
-- Managing application-level transactions
-- Publishing and handling runtime events
-- Persisting state changes
-- Returning responses to the API or UI
+- Coordinating persistence
+- Publishing runtime events
+- Producing responses for external interfaces
 
 In short, it answers the question:
 
-> **How does the application execute a request?**
+> **How should the application execute this request?**
 
 while the Planner answers:
 
@@ -42,48 +43,71 @@ The application layer should never contain:
 
 These belong to the Planner or specialist agents.
 
-Likewise, this layer should not implement storage engines, databases, or tool logic directly. Those belong to their respective packages.
+Likewise, the application layer should not implement storage engines, databases, tool implementations, or memory systems directly. Those belong to their respective packages.
 
 ## Typical Request Flow
 
 ```
-User Request
+UI / API
       │
       ▼
 Application
       │
+      ├── Validate request
       ├── Load runtime context
+      ├── Construct agent state
       ├── Invoke Planner
-      ├── Dispatch executor (if needed)
-      ├── Commit state changes
+      ├── Dispatch executors (if required)
+      ├── Persist state changes
       ├── Publish events
-      └── Return response
+      └── Produce response
+      │
+      ▼
+UI / API
 ```
 
-The application layer coordinates execution but does not decide research direction.
+The application layer owns the request lifecycle but never determines research direction.
 
 ## Design Principles
 
-- Thin orchestration layer
+- Thin coordination layer
+- Clear system boundary
 - No domain knowledge
 - No scientific reasoning
 - Infrastructure-oriented
-- Transactional and deterministic
+- Deterministic request lifecycle
 - Composes subsystems instead of implementing them
+
+## Package Structure
+
+```
+application/
+    bootstrap/
+    orchestrator/
+    execution/
+    events/
+```
+
+- `bootstrap/` initializes and wires application dependencies.
+- `orchestrator/` coordinates the lifecycle of an application request.
+- `execution/` runs planners and dispatches specialist executors.
+- `events/` provides the application's internal event system.
 
 ## Relationship to Other Packages
 
 ```
-application
-    │
-    ├── agents
-    ├── memory
-    ├── tools
-    ├── mcp
-    ├── repositories
-    └── events
+                UI / API
+                    │
+                    ▼
+             application
+                    │
+     ┌──────────────┼──────────────┐
+     ▼              ▼              ▼
+  agents       repositories      events
+     │              │
+     ├────── memory ──────┤
+     │
+    tools
 ```
 
-The application package sits above these components and coordinates them during execution.
-
-Individual components remain independent and reusable.
+The application layer coordinates these subsystems while keeping them independent and reusable.
