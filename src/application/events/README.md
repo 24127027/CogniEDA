@@ -2,15 +2,15 @@
 
 The `events` package provides the application's internal event system.
 
-Events allow independent components to react to changes in application state without introducing direct dependencies. They communicate that **something has already happened**, enabling side effects to remain decoupled from the primary execution flow.
+It enables independent components to react to changes in application state without introducing direct dependencies. Events represent facts that have already occurred, allowing side effects to be handled outside the primary request execution flow.
 
-The event system **does not contain business logic or research reasoning**. It only transports notifications between components.
+The event system does **not** coordinate request execution or perform research reasoning. Its responsibility is to propagate notifications so interested components can react independently.
 
 ## Responsibilities
 
 The events package is responsible for:
 
-- Defining event types
+- Defining application event types
 - Publishing runtime events
 - Registering event handlers
 - Delivering events to subscribers
@@ -18,57 +18,80 @@ The events package is responsible for:
 
 In short, it answers the question:
 
-> **How do components react to runtime events?**
+> **How do application components react to completed runtime events?**
 
 ## Responsibilities that do NOT belong here
 
 The events package should never contain:
 
-- research planning
-- workflow orchestration
-- domain reasoning
+- request orchestration
+- workflow planning
+- research reasoning
 - executor implementation
-- persistence logic
+- task decomposition
 
-Event handlers should react to events rather than determine application behavior.
+Event handlers may implement application side effects, but they should never control the primary execution flow.
 
 ## Typical Event Flow
 
 ```
-Component
-     │
-     ▼
+Application
+      │
+      ▼
 Publish Event
-     │
-     ▼
+      │
+      ▼
 Event Bus
-     │
-     ├── Handler A
-     ├── Handler B
-     └── Handler C
+      │
+      ├── Handler A
+      ├── Handler B
+      └── Handler C
 ```
 
-Publishers remain unaware of which handlers receive an event.
+Publishers remain unaware of which handlers receive an event, allowing components to evolve independently.
+
+## Events vs Commands
+
+Events represent completed facts rather than requests.
+
+Publishing an event does not imply that any subscriber exists or that a particular action will occur. Components publish events without knowledge of who, if anyone, will react.
+
+For example:
+
+```
+DiscoveryCreated
+      │
+      ├── Update search index
+      ├── Persist audit log
+      └── Notify interested services
+```
+
+The publisher is unaware of these side effects.
 
 ## Design Principles
 
 - Event-driven communication
 - Loose coupling
 - Immutable event payloads
-- Multiple subscribers
+- Multiple independent subscribers
 - Side-effect isolation
+- No control over primary execution flow
 
 ## Relationship to Other Packages
 
 ```
+application
+      │
+      ▼
 events
-    │
-    ├── application
-    ├── execution
-    └── persistence
+      │
+      ├── persistence
+      ├── indexing
+      ├── logging
+      └── notifications
 ```
 
-The event system coordinates notifications between packages without coupling them directly.
+Application components publish events. Independent subscribers react to them without introducing direct dependencies between packages.
 
 ## Package Structure
 
@@ -79,6 +102,6 @@ events/
     event_types.py
 ```
 
-- `event_types.py` defines application event models.
-- `event_bus.py` publishes and delivers events.
-- `event_handlers.py` implements reactions to published events.
+- `event_types.py` defines the application's event models.
+- `event_bus.py` publishes events and delivers them to registered subscribers.
+- `event_handlers.py` implements side effects triggered by published events.
