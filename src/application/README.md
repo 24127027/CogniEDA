@@ -57,7 +57,6 @@ Application
       ├── Load runtime context
       ├── Construct agent state
       ├── Invoke Planner
-      ├── Dispatch executors (if required)
       ├── Persist state changes
       ├── Publish events
       └── Produce response
@@ -84,13 +83,11 @@ The application layer owns the request lifecycle but never determines research d
 application/
     bootstrap/
     orchestrator/
-    execution/
     events/
 ```
 
 - `bootstrap/` initializes and wires application dependencies.
 - `orchestrator/` coordinates the lifecycle of an application request.
-- `execution/` runs planners and dispatches specialist executors.
 - `events/` provides the application's internal event system.
 
 ## Relationship to Other Packages
