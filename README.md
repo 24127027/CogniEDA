@@ -21,7 +21,7 @@ Not implemented yet:
 - Target `Objective`, `Task`, and `Discovery` FCO models.
 - `ValidityEnvelope`, `AnalysisFrame`, `PlannerOperation`, `ExecutionRun`, and `EvidenceCacheEntry` records.
 - Operation-before-commit planner persistence.
-- Enforced context type safety between Planning Context and Conclusion Context.
+- Full context type safety (typed retrieval / graph-level enforcement) is not implemented; `SessionContextBuilder` currently enforces planning vs conclusion projections for `SessionFrame` snapshots.
 - The target Task -> Hypothesis -> Evidence -> Discovery lifecycle.
 - A production CLI or service API. The `cognieda` entrypoint is currently a placeholder.
 
