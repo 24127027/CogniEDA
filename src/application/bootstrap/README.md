@@ -1,33 +1,83 @@
-# Orchestrator
+# Bootstrap
 
-The `orchestrator` package coordinates the execution of an application request.
+The `bootstrap` package is responsible for initializing the CogniEDA application.
 
-It manages the overall execution flow by invoking the appropriate subsystems in the correct order. The orchestrator owns execution sequencing but never performs scientific reasoning or workflow planning.
+It creates the application's runtime environment by constructing shared infrastructure, configuring dependencies, and wiring together the major subsystems before the application begins processing requests.
 
-Research decisions remain the responsibility of the Planner.
+Bootstrap executes once during application startup. After initialization, the runtime components interact through the interfaces established by the bootstrap process.
 
 ## Responsibilities
 
-- Receive application requests
-- Load runtime context
-- Invoke the Planner
-- Dispatch specialist executors
-- Coordinate persistence
-- Publish runtime events
-- Produce application responses
+The bootstrap package is responsible for:
 
-## Does NOT contain
+- Creating the dependency injection container
+- Constructing application services
+- Registering implementations
+- Initializing shared infrastructure
+- Wiring runtime dependencies
+- Producing the application's root runtime object
 
-- Hypothesis generation
-- Task decomposition
-- Statistical reasoning
-- Domain knowledge
-- Tool implementations
+In short, it answers the question:
 
-The orchestrator answers:
+> **How is the application assembled before it starts?**
 
-> How should this request be executed?
+## Responsibilities that do NOT belong here
 
-The Planner answers:
+The bootstrap package should never contain:
 
-> What should be done?
+- research planning
+- request processing
+- workflow orchestration
+- execution logic
+- business rules
+- domain reasoning
+
+Bootstrap configures the application but never participates in request execution.
+
+## Typical Startup Flow
+
+```
+Application Start
+        │
+        ▼
+Bootstrap
+        │
+        ├── Create infrastructure
+        ├── Register services
+        ├── Build dependency container
+        ├── Wire components
+        └── Return application instance
+```
+
+After startup completes, all requests execute using the initialized runtime.
+
+## Design Principles
+
+- Single startup responsibility
+- Dependency injection
+- Explicit configuration
+- Immutable application wiring
+- Infrastructure-oriented
+
+## Relationship to Other Packages
+
+```
+bootstrap
+    │
+    ├── application
+    ├── agents
+    ├── persistence
+    ├── tools
+    └── events
+```
+
+The bootstrap package constructs these components and connects them into a functioning application without owning their behavior.
+
+## Package Structure
+
+```
+bootstrap/
+    dependency_container.py
+```
+
+- `dependency_container.py` defines how application components are created, configured, and wired together.
