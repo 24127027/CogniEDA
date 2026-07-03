@@ -115,11 +115,10 @@ class Task(CogniEDABaseModel):
     updated_at: datetime = Field(default_factory=utc_now)
 
     @property
-    def is_terminal(self) -> bool:
-        """Return whether this task can be treated as a terminal analytical task."""
+def is_terminal(self) -> bool:
+    """Return whether this task can be treated as a terminal analytical task."""
 
-        return self.parent_task_id is not None or self.task_kind == TaskKind.ANALYTICAL
-
+    return self.parent_task_id is not None and self.task_kind == TaskKind.ANALYTICAL
     def can_generate_hypothesis(self) -> bool:
         """Return whether this Task satisfies local hypothesis-admission guards."""
 
