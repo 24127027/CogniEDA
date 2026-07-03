@@ -37,7 +37,7 @@ Current implementation:
 - `Discovery` does not exist.
 - `GeneratedView` does not exist.
 - `Hypothesis` exists but is not tied to a source task.
-- `Evidence` exists but is not tied to a target `AnalysisFrame` or `ExecutionRun`.
+- `Evidence` exists as an immutable schema/table/repository and requires `analysis_frame_ref` and `execution_run_ref`.
 - Planner nodes for task selection, execution preparation, dispatch, review, conflict review, and commit are stubs.
 
 ## Implementation Status
