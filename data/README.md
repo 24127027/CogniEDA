@@ -1,13 +1,15 @@
 # Data Layout
 
-CogniEDA keeps physical datasets under `data/` and tracks durable analytical metadata separately under `artifacts/`.
+CogniEDA keeps physical datasets under `data/`. Durable research state is stored in the workspace-local graph database.
 
-## Directory conventions
+## Directory Conventions
 
-- `data/raw/`: immutable source snapshots. Add real datasets here and track them with DVC.
-- `data/derived/`: reversible or reproducible outputs derived from raw datasets.
+- `data/raw/`: immutable source snapshots.
+- `data/derived/`: reproducible outputs derived from source data.
 - `data/samples/`: small Git-tracked fixtures intended for tests and smoke checks.
 
-## Current compatibility note
+Each profiled dataset version should be represented semantically by a `DataProfile` record with `dataset_path` and, when available, DVC or equivalent version identity.
 
-The existing `data/sample_customers.csv` and `data/sample_customers.parquet` files remain in place because current tests and smoke checks already reference them directly. New sample fixtures should prefer `data/samples/`.
+## Current Compatibility Note
+
+The existing root-level sample data files remain in place because tests and smoke checks may reference them directly. New sample fixtures should prefer `data/samples/`.
