@@ -2,9 +2,9 @@
 
 ## Implementation Status
 
-Design target.
+Partially implemented scaffold.
 
-The current repo does not implement an end-to-end user workflow. It has schemas, repositories, profiling utilities, session-frame construction, and planner graph stubs. The workflow below is the target workflow from the internal user-agent workflow design, adapted to the final FCO architecture.
+The repo has target FCO schemas, repositories, profiling utilities, session-frame construction, and planner/executor contract stubs. It does not implement an end-to-end user workflow.
 
 ## Target Workflow
 
@@ -14,16 +14,18 @@ Target design:
 
 - User opens or creates a filesystem workspace.
 - Workspace is a runtime/filesystem boundary, not an FCO.
-- User creates the first `Objective` FCO with title, description, guiding questions, and optional orientation.
-- Objective refinements preserve prior versions as provenance rather than overwriting history.
+- Each workspace owns one independent graph database.
+- User creates the first `Objective` FCO.
+- Objective refinements preserve prior versions as provenance.
 
 Current implementation:
 
-- No workspace initializer exists.
-- No `Objective` model exists.
-- Current `Project` stores `objective` and `research_questions`.
+- `Objective` schema/table/repository exist.
+- Default persistence is workspace-local SQLite.
+- No workspace initializer or registry exists.
+- No `ObjectiveRevision` provenance exists.
 
-Status: Implementation deviates from target.
+Status: Partially implemented.
 
 ### 2. Mount Dataset And Generate DataProfile
 
@@ -31,13 +33,13 @@ Target design:
 
 - User mounts a dataset into the workspace.
 - The system creates an immutable `DataProfile` for the dataset version.
-- `DataProfile` records dataset path, DVC/version identity, schema, row/column counts, missingness, descriptive statistics, anomalies, correlation summaries, profile artifacts, and preprocessing history.
+- `DataProfile` records dataset path, DVC/version identity, schema, row/column counts, missingness, descriptive statistics, artifacts, and preprocessing history.
 
 Current implementation:
 
-- `DatasetProfiler` can profile a pandas dataframe or loaded file into a current `DataProfile`.
-- Current `DataProfile` stores schema summary, baseline summary, counts, quality flags, method, project ID, dataset ID, and creation time.
-- DVC hash, acceptance as ground truth, anomaly/correlation summaries, and preprocessing history are not implemented in the target form.
+- `DatasetProfiler` can profile a pandas dataframe or loaded file into a `DataProfile`.
+- `DataProfile` stores dataset path, optional DVC identity, source metadata, summaries, preprocessing history, lifecycle, and acceptance fields.
+- Executable DVC integration is not implemented; the adapter boundary raises explicit not-implemented behavior.
 
 Status: Partially implemented.
 
@@ -53,9 +55,8 @@ Target design:
 
 Current implementation:
 
-- `DatasetAsset` supports raw/derived roles and lineage steps.
-- `DataProfileRepository` is append-only.
-- No cleaning service, DVC integration, user-decision loop, accepted-ground-truth field, or cleaning provenance ledger exists.
+- `DataProfile` and `LineageStep` can represent preprocessing history.
+- No cleaning execution service, user-decision loop, or cleaning provenance ledger exists.
 
 Status: Partially implemented.
 
@@ -71,8 +72,8 @@ Target design:
 Current implementation:
 
 - `Assumption` schema/table/repository exist.
-- No testability admission check was found.
-- No context-mode retrieval enforcement was found.
+- `SessionContextBuilder` excludes assumptions from conclusion context.
+- No testability admission check or graph retrieval policy exists.
 
 Status: Partially implemented.
 
@@ -80,18 +81,17 @@ Status: Partially implemented.
 
 Target design:
 
-- Planner proposes `Task` objects from Objective, DataProfile, Assumptions, and existing Discoveries.
-- Proposed Tasks are shown for user approval.
+- Planner proposes task operations before durable Task creation.
 - Approved Tasks become active.
 - Broad Tasks are decomposed into child Tasks until terminal analytical Tasks are reached.
 
 Current implementation:
 
-- No `Task` model exists.
-- Planner node names exist, but task management nodes are stubs.
-- `SessionFrame.pending_tasks` stores strings only.
+- `Task` schema/table/repository exist with active/paused/completed/failed/cancelled lifecycle.
+- Durable proposed/rejected Task states are not used.
+- Planner task-management nodes are stubs.
 
-Status: Not implemented.
+Status: Partially implemented.
 
 ### 6. SessionFrame Governance
 
@@ -103,7 +103,8 @@ Target design:
 
 Current implementation:
 
-- Current `SessionFrame` snapshots can store compact summaries, stale context, dead ends, cached tool-result summaries, and invalidation rules.
+- `SessionFrame` snapshots store compact profile, task, assumption, hypothesis, discovery, evidence, decision-provenance, stale-context, dead-end, cache, and warning summaries.
+- Planning vs conclusion projection is implemented locally.
 - No UI or per-item user governance exists.
 
 Status: Partially implemented.
@@ -114,18 +115,20 @@ Target design:
 
 - A terminal analytical Task compiles into exactly one `Hypothesis`.
 - Planner prepares execution and dispatches a specialist executor.
-- Executor creates or references `AnalysisFrame` provenance.
+- Executor creates or references AnalysisFrame provenance.
 - Executor produces immutable `Evidence`.
-- Planner reviews execution and creates exactly one `Discovery` for the `Hypothesis`.
-- Discovery includes a `ValidityEnvelope`.
+- Executor authors a `Discovery` draft as an evidence-bound claim.
+- Commit persists approved executor outputs with execution provenance.
 
 Current implementation:
 
-- `Hypothesis` and `Evidence` exist in older/current forms.
-- No `Task`, `AnalysisFrame`, `ExecutionRun`, `Discovery`, or `ValidityEnvelope` exists.
-- Execution nodes are stubs.
+- `Hypothesis`, `Evidence`, and `Discovery` schemas/tables/repositories exist.
+- Evidence requires `DataProfile`, `AnalysisFrame`, and `ExecutionRun` references.
+- Discovery requires Evidence and `validity_basis`.
+- Executor contracts can return Evidence/Discovery drafts.
+- Executor nodes are stubs.
 
-Status: Mostly not implemented.
+Status: Partially implemented.
 
 ### 8. Conflict Review
 
@@ -137,22 +140,21 @@ Target design:
 
 Current implementation:
 
-- No Discovery object exists.
-- No conflict review implementation was found.
+- `Discovery` exists.
+- No conflict-review implementation was found.
 
-Status: Not implemented.
+Status: Mostly not implemented.
 
-### 9. Project Closure
+### 9. Workspace Closure
 
 Target design:
 
 - User reviews open Tasks, testing Hypotheses, and flagged Assumptions.
 - Planner traverses Objective, Tasks, Hypotheses, Evidence, Discoveries, Assumptions, DataProfiles, and provenance records to generate a research summary.
-- User reviews and closes the project.
+- Summary output is a generated view unless new claims go through Task -> Hypothesis -> Evidence -> Discovery.
 
 Current implementation:
 
-- Current `Project` has `active`, `paused`, and `archived` statuses.
 - No closure workflow or target summary generation exists.
 
 Status: Design target.
