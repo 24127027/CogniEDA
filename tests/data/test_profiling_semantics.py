@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from uuid import uuid4
-
 import pandas as pd
 
 from data.profiling import profile_dataframe
@@ -21,8 +19,8 @@ def test_profile_dataframe_uses_semantic_logical_dtypes() -> None:
 
     profile = profile_dataframe(
         dataframe,
-        project_id=uuid4(),
-        dataset_id=uuid4(),
+        dataset_path="data/test-profile.csv",
+        dvc_hash="md5:test-profile-v1",
         method=DataProfileMethod.BASELINE_SUMMARY,
     )
 
@@ -42,5 +40,7 @@ def test_profile_dataframe_uses_semantic_logical_dtypes() -> None:
     assert columns["category_col"].categorical_summary is not None
 
     assert columns["missing_col"].observed_nullable is True
+    assert profile.dataset_path == "data/test-profile.csv"
+    assert profile.dvc_hash == "md5:test-profile-v1"
     assert profile.baseline_summary.numeric_column_count == 2
     assert profile.baseline_summary.categorical_column_count == 2
