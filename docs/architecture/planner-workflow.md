@@ -52,7 +52,7 @@ Current files inspected:
 | `dispatch_executor` | Delegate to specialist agent. | Registered stub with `pass`. | Partially implemented |
 | `review_execution` | Review results and prepare Evidence/Discovery/Task/SessionFrame operations. | Registered stub with `pass`. | Partially implemented |
 | `review_conflicts` | Detect conflicts with assumptions or existing knowledge. | Registered stub with `pass`. | Partially implemented |
-| `manage_objective` | Create objective revision operations. | Registered stub with `pass`; no `Objective` model exists. | Partially implemented |
+| `manage_objective` | Create objective revision operations. | Registered stub with `pass`; `Objective` exists, but objective revision provenance and operation persistence are missing. | Partially implemented |
 | `manage_assumptions` | Create assumption operations. | Registered stub with `pass`. | Partially implemented |
 | `request_user_input` | Prepare user approval/clarification request. | Registered stub with `pass`. | Partially implemented |
 | `pause` | Pause for user input. | Registered stub with `pass`. | Partially implemented |
