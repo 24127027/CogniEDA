@@ -27,7 +27,7 @@ COGNIEDA_DB_ECHO=false
 
 Database behavior:
 
-- If `COGNIEDA_DB_URL` is empty, the default SQLite URL points to `.local/cognieda_artifacts.sqlite3`.
+- If `COGNIEDA_DB_URL` is empty, the default SQLite URL points to `.local/cognieda_graph.sqlite3`.
 - SQLite foreign keys are enabled on connect.
 - `init_db()` creates all SQLModel tables.
 
