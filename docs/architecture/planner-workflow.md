@@ -35,7 +35,7 @@ Current files inspected:
 - `src/agents/planner/types.py`
 - `src/agents/planner/agent.py`
 
-`nodes.py` registers all target node names. Most node bodies are `pass`. `route_intent` and `process_decision` raise `NotImplementedError`. `PlannerState`, `PlannerRequest`, and `PlannerResult` are empty subclasses. `Planner.before_run()` and `Planner.after_run()` are not implemented.
+`nodes.py` registers all target node names. Most node bodies are `pass`. `route_intent` and `process_decision` raise `NotImplementedError`. `PlannerInput`/`PlannerOutput` are typed envelopes, and `PlannerState` stores input/output plus `pending_operations`. `Planner.before_run()` and `Planner.after_run()` are not implemented.
 
 ## Node Status
 
