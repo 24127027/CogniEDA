@@ -4,7 +4,7 @@ This file is retained as a legacy entry point for current persistence behavior. 
 
 ## Current Implementation
 
-CogniEDA currently uses a local SQLModel-backed store. By default it writes to `.local/cognieda_artifacts.sqlite3` unless `COGNIEDA_DB_URL` is set.
+CogniEDA currently uses a local SQLModel-backed store. By default it writes to `.local/cognieda_graph.sqlite3` unless `COGNIEDA_DB_URL` is set.
 
 Implemented persistence surfaces:
 
@@ -13,16 +13,15 @@ Implemented persistence surfaces:
 - table creation in `src/db/init_db.py`
 - repositories in `src/repositories/`
 - SQLite foreign-key enforcement
-- normalized association tables for lineage and artifact links
 
 ## Current Invariants
 
-- `DatasetAsset` is unique by `project_id + name + version`.
-- `DataProfileRepository`, `EvidenceRepository`, and `SessionFrameRepository` do not expose `update()`.
-- Evidence-to-hypothesis links store typed outcomes.
-- Dataset lineage supports multiple upstream assets.
-- `SessionFrame` can persist stale context, dead ends, cached tool-result summaries, and invalidation rules.
+- Workspace/database isolation is handled by using a separate database URL per workspace.
+- `DataProfileRepository`, `EvidenceRepository`, `DiscoveryRepository`, and `SessionFrameRepository` do not expose `update()`.
+- Evidence references Hypothesis, DataProfile, AnalysisFrame, and ExecutionRun identifiers.
+- Discovery requires Evidence and `validity_basis`.
+- `SessionFrame` conclusion projection excludes assumptions and other planning-only context.
 
 ## Target Gaps
 
-The target architecture calls for a research knowledge graph, workflow store, provenance store, and evidence cache. The current implementation does not yet provide a graph store, `Task`, `Discovery`, `AnalysisFrame`, `ExecutionRun`, `PlannerOperation`, or `EvidenceCacheEntry`.
+The target architecture calls for full graph retrieval policy, workflow store, provenance store, and evidence cache. The current implementation does not yet provide persisted `PlannerOperation`, full `AnalysisFrame`, full `ExecutionRun`, or cache records.
