@@ -4,7 +4,7 @@
 
 A First-Class Object is admitted only when it needs explicit identity, lifecycle, user-control semantics, retrieval policy, and epistemic role.
 
-The canonical target FCO set is:
+The canonical FCO set is:
 
 - `Objective`
 - `DataProfile`
@@ -15,45 +15,35 @@ The canonical target FCO set is:
 - `Discovery`
 - `SessionFrame`
 
-The target design explicitly excludes `Workspace`, `Question`, `AnalysisFrame`, `GeneratedView`, `PlannerOperation`, `ExecutionRun`, and `EvidenceCacheEntry` from the FCO set.
+The design explicitly excludes `Workspace`, `Question`, `AnalysisFrame`, `GeneratedView`, `PlannerOperation`, `ExecutionRun`, and `EvidenceCacheEntry` from the FCO set.
 
 ## Current Implementation Status
 
 | Concept | Status | Current implementation |
 | --- | --- | --- |
-| `Objective` | Not implemented | Current code has `Project.objective` and `Project.research_questions`, but no `Objective` schema, table, repository, or lifecycle. |
-| `DataProfile` | Partially implemented | `DataProfile` schema, table, repository, and profiler exist. Target fields such as direct DVC hash, lifecycle state, accepted ground truth, preprocessing history, and `immutable: true` are not fully modeled. Repository does not expose `update()`. |
-| `Assumption` | Partially implemented | Schema, table, and repository exist. Current statuses are `active`, `validated`, `rejected`, `archived`, which differ from the target lifecycle. Testability admission is not enforced. Conclusion-context exclusion is implemented only for `SessionFrame` projection, not graph retrieval. |
-| `Task` | Not implemented | No `Task` schema/table/repository exists. `SessionFrame.pending_tasks` stores strings only. |
-| `Hypothesis` | Partially implemented | Schema, table, repository, and evidence evaluation links exist. Current model is not compiled from a terminal analytical `Task`, can link to multiple datasets, and lacks target fields such as `source_task_id`, `claim_type`, `evidence_expectation`, and `produced_discovery_id`. |
-| `Evidence` | Partially implemented | Schema, table, and append-only repository exist. Current model stores result summary, parameters, provenance, limitations, and typed hypothesis evaluations. It lacks target `analysis_frame_ref`, lifecycle state, method IDs/hashes, environment hash, seed, execution run, and supersession fields. |
-| `Discovery` | Not implemented | No schema, table, repository, or validity-envelope enforcement exists. |
-| `SessionFrame` | Partially implemented | Schema, table, repository, and builder exist. Current implementation is a compact append-only snapshot. Target user-governed fields such as `pinned_object_ids`, `active_object_ids`, `excluded_object_ids`, ordered `context_items`, inclusion reasons, and audit notes are not implemented in the target form. |
+| `Objective` | Implemented | Schema, SQLModel table, and repository exist for workspace-local research intent. |
+| `DataProfile` | Implemented locally | Immutable schema, table, repository, and profiler exist. It stores dataset path, optional DVC identity, source metadata, summaries, preprocessing history, lifecycle state, and ground-truth acceptance. |
+| `Assumption` | Partially implemented | Schema, table, and repository exist. Assumptions are planning context only and are excluded from conclusion projection. |
+| `Task` | Partially implemented | Schema, table, repository, lifecycle, and local hypothesis-readiness guard exist. Planner operation integration is still missing. |
+| `Hypothesis` | Partially implemented | Schema, table, and repository exist. It references one Task and one DataProfile. Admission cardinality is not database-enforced. |
+| `Evidence` | Implemented locally | Immutable schema, table, and append-only repository exist. It references Hypothesis, DataProfile, AnalysisFrame, and ExecutionRun. |
+| `Discovery` | Implemented locally | Immutable schema, table, repository, structured claim, epistemic status, and `validity_basis` enforcement exist. |
+| `SessionFrame` | Partially implemented | Schema, table, repository, builder, and planning/conclusion projection exist. Target user-governed context-item audit details remain incomplete. |
 
-## Current Non-Target Artifacts
+## Current Non-FCO Boundaries
 
-| Current artifact | Status | Target-design note |
+| Concept | Status | Implementation note |
 | --- | --- | --- |
-| `Project` | Implementation deviates from target | Current root analytical container. Target design replaces research intent with `Objective` and treats workspace as the runtime boundary. |
-| `DatasetAsset` | Implementation deviates from target | Current versioned dataset reference and lineage object. Target design says raw dataset is not a graph node and `DataProfile` stores dataset/version identity directly. |
-| `DecisionLog` | Implementation deviates from target | Current persisted analytical decision artifact. Target design treats decisions as provenance/user decision records, not FCOs. |
-
-## Target FCO Contract
-
-Every target FCO must carry:
-
-- explicit identity
-- lifecycle state
-- epistemic role
-- provenance references
-- authorization or user-control semantics
-- retrieval policy
-
-This is not currently encoded as a common base FCO class. Current Pydantic models use explicit IDs and timestamps, but do not all expose a target `type`, `epistemic_role`, `provenance_refs`, or `authorization_policy`.
+| Workspace | Valid infrastructure | Represented by filesystem path and database URL, not by a research graph object. |
+| AnalysisFrame | Valid provenance | Referenced by Evidence as `analysis_frame_ref`; no full provenance table yet. |
+| ExecutionRun | Valid provenance | Referenced by Evidence and executor output; no full provenance table yet. |
+| PlannerOperation | Valid workflow/provenance | Planner contracts produce operation identifiers; no persistence table yet. |
+| UserDecision | Valid provenance | Typed provenance record, not an FCO. |
+| Evidence cache | Not implemented | Must remain an optimization index and must not create Discovery. |
 
 ## Admission Rule
 
-Future FCO additions must first answer:
+Future durable additions must first answer:
 
 - Is this research intent, workflow state, data state, planning constraint, test contract, observed result, evidence-bound claim, or active context?
 - Does it require its own lifecycle and user controls?
