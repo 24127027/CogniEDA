@@ -32,6 +32,6 @@
 - `AnalysisFrame`, `PlannerOperation`, and `ExecutionRun` are provenance/runtime records.
 - `GeneratedView` is runtime output, not `Discovery`.
 - `EvidenceCacheEntry` is cache.
-- `Assumption` may guide planning but must be excluded from Conclusion Context.
+- `Assumption` may guide planning but must be excluded from Conclusion/Discovery Synthesis Context.
 - `Evidence` and `DataProfile` are immutable.
 - `Discovery` requires Evidence and `validity_basis`.
