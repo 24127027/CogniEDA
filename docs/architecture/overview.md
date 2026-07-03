@@ -25,11 +25,11 @@ The current implementation is a Python scaffold managed with `uv`. It contains:
 | --- | --- | --- |
 | Current schema layer | Implemented | Pydantic models exist for the target FCO set plus typed `UserDecision` provenance. |
 | SQLModel persistence | Implemented locally | Tables exist under `src/db/models.py`; `init_db()` creates tables for the target local schema. |
-| Repository layer | Implemented locally | Thin repositories exist for FCOs and `UserDecision` provenance. |
+| Repository layer | Implemented locally | Thin repositories exist for FCOs and `UserDecision` provenance, with local Task-to-Hypothesis and Hypothesis-to-Discovery admission guards. |
 | Data profiling | Partially implemented | Baseline dataframe profiling exists and produces immutable DataProfiles with optional DVC identity. Executable DVC integration is missing. |
 | Planner workflow | Partially implemented | Planner contracts and node names exist, but most nodes are stubs and operation persistence is missing. |
 | Executor workflow | Partially implemented | Executor contracts can return Evidence/Discovery drafts, but executor graph bodies are stubs. |
-| Context type safety | Partially implemented | `SessionContextBuilder` enforces Planning Context vs Conclusion Context filtering for `SessionFrame` snapshots; graph retrieval policy does not exist. |
+| Context type safety | Partially implemented | `SessionContextBuilder` enforces Planning, Answer, and Discovery Synthesis filtering for `SessionFrame` snapshots; graph retrieval policy does not exist. |
 | Validity basis | Implemented locally | `Discovery.validity_basis` records dependency and invalidation metadata. Full provenance records are still missing. |
 | AnalysisFrame provenance | Partially implemented | Evidence requires `analysis_frame_ref`; no full `AnalysisFrame` provenance table exists. |
 | Evidence cache | Not implemented | No evidence-cache service exists. |
