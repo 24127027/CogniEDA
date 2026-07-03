@@ -1,39 +1,33 @@
-from typing import Generic, TypeVar
+"""Base class for graph-backed agents."""
+
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from typing import cast
 
 from langgraph.graph.state import CompiledStateGraph
+from pydantic import BaseModel
 
-from .types import AgentRequest, AgentResult, BaseState
+from agents.types import BaseState
 
-ReqT = TypeVar("ReqT", bound=AgentRequest)
-ResT = TypeVar("ResT", bound=AgentResult)
-StateT = TypeVar("StateT", bound=BaseState)
 
-class BaseAgent(ABC, Generic[ReqT, ResT, StateT]):
-    def __init__(self, graph: CompiledStateGraph):
+class BaseAgent[ReqT: BaseModel, ResT: BaseModel, StateT: BaseState](ABC):
+    """Small async wrapper around a compiled LangGraph graph."""
+
+    def __init__(self, graph: CompiledStateGraph) -> None:
         self.graph = graph
 
     async def run(self, input: ReqT) -> ResT:
-        """Run the agent with the given input and return the output."""
-        
+        """Run the agent with typed input and return typed output."""
+
         preprocessed_input = await self.before_run(input)
-
         output = await self.graph.ainvoke(preprocessed_input)
-
-        return await self.after_run(output) # type: ignore
+        return await self.after_run(cast(StateT, output))
 
     @abstractmethod
     async def before_run(self, input: ReqT) -> StateT:
-        """
-        Preprocesses the input and prepares the state for the graph invocation.
-        This method can be overridden by subclasses to implement custom preprocessing logic.
-        """        
-        ...  
+        """Prepare graph state from agent-specific input."""
 
     @abstractmethod
     async def after_run(self, output: StateT) -> ResT:
-        """
-        Receives the final TypedDict state from LangGraph,
-        extracts the final payload, and converts it to the expected ResT.
-        """
-        ...  
+        """Convert final graph state to agent-specific output."""
