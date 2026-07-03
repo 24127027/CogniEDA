@@ -67,13 +67,15 @@ Target design:
 - User may add `Assumption` objects after data review.
 - Planner checks whether each statement is a framing axiom or a testable claim.
 - Testable claims should be rejected as assumptions and proposed as Tasks/Hypotheses instead.
-- Assumptions can guide planning but cannot enter Conclusion Context.
+- Assumptions can guide planning but cannot enter Conclusion/Discovery Synthesis Context.
 
 Current implementation:
 
 - `Assumption` schema/table/repository exist.
-- `SessionContextBuilder` excludes assumptions from conclusion context.
-- No testability admission check or graph retrieval policy exists.
+- `Assumption` stores source, testability, scope, scoped DataProfile ids, contradiction Discovery refs, and replacement refs.
+- Schema admission rejects claims marked as testable so they can be converted into Task/Hypothesis candidates instead of Assumptions.
+- `SessionContextBuilder` excludes assumptions from conclusion/discovery-synthesis context.
+- No planner warning flow or graph retrieval policy exists.
 
 Status: Partially implemented.
 
@@ -87,8 +89,9 @@ Target design:
 
 Current implementation:
 
-- `Task` schema/table/repository exist with active/paused/completed/failed/cancelled lifecycle.
-- Durable proposed/rejected Task states are not used.
+- `Task` schema/table/repository exist with proposed/active/paused/completed/failed/rejected/cancelled lifecycle.
+- Proposed Tasks can appear in planning SessionFrame context but cannot generate Hypotheses.
+- `HypothesisRepository.create()` rejects Hypothesis creation from non-active, non-analytical, parent, unaccepted-DataProfile, or duplicate Task sources.
 - Planner task-management nodes are stubs.
 
 Status: Partially implemented.
@@ -104,7 +107,8 @@ Target design:
 Current implementation:
 
 - `SessionFrame` snapshots store compact profile, task, assumption, hypothesis, discovery, evidence, decision-provenance, stale-context, dead-end, cache, and warning summaries.
-- Planning vs conclusion projection is implemented locally.
+- Planning, answer, and discovery-synthesis projection is implemented locally.
+- Existing Discoveries are available for planning and answer context but excluded from discovery-synthesis context.
 - No UI or per-item user governance exists.
 
 Status: Partially implemented.
@@ -125,6 +129,7 @@ Current implementation:
 - `Hypothesis`, `Evidence`, and `Discovery` schemas/tables/repositories exist.
 - Evidence requires `DataProfile`, `AnalysisFrame`, and `ExecutionRun` references.
 - Discovery requires Evidence and `validity_basis`.
+- Repository guards enforce one Task to one Hypothesis and one Hypothesis to one Discovery for fresh local stores.
 - Executor contracts can return Evidence/Discovery drafts.
 - Executor nodes are stubs.
 
@@ -141,9 +146,10 @@ Target design:
 Current implementation:
 
 - `Discovery` exists.
-- No conflict-review implementation was found.
+- `AssumptionRepository.flag_for_contradiction()` can mark an Assumption `flagged` and record the contradicting Discovery id without rewriting the Assumption.
+- No automatic conflict-review planner implementation was found.
 
-Status: Mostly not implemented.
+Status: Partially implemented.
 
 ### 9. Workspace Closure
 
