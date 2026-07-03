@@ -1,23 +1,25 @@
-"""Core analytical artifact models for CogniEDA."""
+"""Core research-state models for CogniEDA."""
 
 from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from pydantic import Field, NonNegativeInt
+from pydantic import Field, NonNegativeInt, model_validator
+
 from schemas.common import (
     AssumptionContextSummary,
     BaselineSummary,
     CogniEDABaseModel,
-    DatasetContextSummary,
+    DataProfileContextSummary,
     DeadEndSummary,
-    DecisionContextSummary,
+    DiscoveryClaim,
+    DiscoveryContextSummary,
     EvidenceContextSummary,
     EvidenceProvenance,
     EvidenceResultSummary,
     HypothesisContextSummary,
-    HypothesisEvaluation,
+    ImmutableCogniEDABaseModel,
     InvalidationRule,
     LineageStep,
     MethodParameter,
@@ -25,160 +27,222 @@ from schemas.common import (
     QualityFlag,
     SchemaSummary,
     StaleContextMarker,
+    TaskContextSummary,
     ToolResultCacheSummary,
+    UserDecisionContextSummary,
+    ValidityBasis,
     utc_now,
 )
 from schemas.enums import (
     AssumptionStatus,
     ConfidenceLevel,
+    DataProfileLifecycleState,
     DataProfileMethod,
-    DatasetKind,
-    DatasetRole,
     DatasetSourceType,
-    DecisionStatus,
-    DecisionType,
+    DiscoveryEpistemicStatus,
+    EvidenceLifecycleState,
     EvidenceType,
     HypothesisStatus,
-    ProjectStatus,
+    ObjectiveStatus,
     SessionFrameStatus,
+    TaskKind,
+    TaskLifecycleState,
+    UserDecisionStatus,
+    UserDecisionType,
 )
 
 
-class Project(CogniEDABaseModel):
-    """Root analytical container for an investigation and its durable context."""
+class Objective(CogniEDABaseModel):
+    """Research intent for one workspace graph."""
 
-    project_id: UUID = Field(default_factory=uuid4)
-    name: NonEmptyStr
-    objective: NonEmptyStr
-    research_questions: list[NonEmptyStr] = Field(default_factory=list)
-    status: ProjectStatus = ProjectStatus.ACTIVE
+    objective_id: UUID = Field(default_factory=uuid4)
+    title: NonEmptyStr
+    statement: NonEmptyStr
+    status: ObjectiveStatus = ObjectiveStatus.ACTIVE
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
 
-class DatasetAsset(CogniEDABaseModel):
-    """Versioned reference to a raw or derived dataset used in analysis."""
-
-    dataset_id: UUID = Field(default_factory=uuid4)
-    project_id: UUID
-    name: NonEmptyStr
-    source_type: DatasetSourceType
-    location: NonEmptyStr
-    version: NonEmptyStr
-    kind: DatasetKind
-    role: DatasetRole = DatasetRole.PRIMARY
-    upstream_dataset_ids: list[UUID] = Field(default_factory=list)
-    lineage_steps: list[LineageStep] = Field(default_factory=list)
-    description: str | None = None
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
-
-
-class DataProfile(CogniEDABaseModel):
-    """Reproducible structural and baseline summary for a dataset version."""
+class DataProfile(ImmutableCogniEDABaseModel):
+    """Immutable semantic profile for one dataset version."""
 
     profile_id: UUID = Field(default_factory=uuid4)
-    project_id: UUID
-    dataset_id: UUID
+    dataset_path: NonEmptyStr
+    source_type: DatasetSourceType = DatasetSourceType.FILE
+    dvc_hash: str | None = None
+    dvc_version_label: str | None = None
+    source_uri: str | None = None
+    source_description: str | None = None
     method: DataProfileMethod
     schema_summary: SchemaSummary
     baseline_summary: BaselineSummary
     row_count: NonNegativeInt
     column_count: NonNegativeInt
     quality_flags: list[QualityFlag] = Field(default_factory=list)
+    preprocessing_history: list[LineageStep] = Field(default_factory=list)
+    artifact_refs: list[NonEmptyStr] = Field(default_factory=list)
+    lifecycle_state: DataProfileLifecycleState = DataProfileLifecycleState.DRAFT
+    accepted_as_ground_truth: bool = False
     created_at: datetime = Field(default_factory=utc_now)
 
 
 class Assumption(CogniEDABaseModel):
-    """Provisional analytical statement used to guide investigation."""
+    """Provisional analytical statement used for planning, not inference."""
 
     assumption_id: UUID = Field(default_factory=uuid4)
-    project_id: UUID
     statement: NonEmptyStr
     basis: NonEmptyStr
     confidence: ConfidenceLevel
     status: AssumptionStatus = AssumptionStatus.ACTIVE
-    dataset_id: UUID | None = None
     profile_id: UUID | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class Task(CogniEDABaseModel):
+    """Durable workflow state. A Task is not scientific knowledge."""
+
+    task_id: UUID = Field(default_factory=uuid4)
+    title: NonEmptyStr
+    description: NonEmptyStr
+    lifecycle_state: TaskLifecycleState = TaskLifecycleState.ACTIVE
+    task_kind: TaskKind = TaskKind.ANALYTICAL
+    parent_task_id: UUID | None = None
+    profile_id: UUID | None = None
+    variables: list[NonEmptyStr] = Field(default_factory=list)
+    evidence_expectation: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+    @property
+    def is_terminal(self) -> bool:
+        """Return whether this task can be treated as a terminal analytical task."""
+
+        return self.parent_task_id is not None or self.task_kind == TaskKind.ANALYTICAL
+
+    def can_generate_hypothesis(self) -> bool:
+        """Return whether this Task satisfies local hypothesis-admission guards."""
+
+        return (
+            self.lifecycle_state == TaskLifecycleState.ACTIVE
+            and self.task_kind == TaskKind.ANALYTICAL
+            and self.profile_id is not None
+            and len(self.variables) > 0
+            and self.evidence_expectation is not None
+        )
+
+
 class Hypothesis(CogniEDABaseModel):
-    """Testable analytical claim with explicit validation state."""
+    """Atomic test contract created from one terminal analytical Task."""
 
     hypothesis_id: UUID = Field(default_factory=uuid4)
-    project_id: UUID
+    task_id: UUID
+    profile_id: UUID
     statement: NonEmptyStr
     variables: list[NonEmptyStr] = Field(default_factory=list)
     scope: NonEmptyStr
     validation_method: NonEmptyStr
+    evidence_expectation: NonEmptyStr
     status: HypothesisStatus = HypothesisStatus.PROPOSED
-    assumption_ids: list[UUID] = Field(default_factory=list)
-    dataset_ids: list[UUID] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
 
-class Evidence(CogniEDABaseModel):
-    """Reproducible analytical result with explicit provenance fields."""
+class Evidence(ImmutableCogniEDABaseModel):
+    """Directly observed analytical result, not interpretation."""
 
     evidence_id: UUID = Field(default_factory=uuid4)
-    project_id: UUID
-    dataset_id: UUID
+    hypothesis_id: UUID
+    profile_id: UUID
+    analysis_frame_ref: NonEmptyStr
+    execution_run_ref: NonEmptyStr
     evidence_type: EvidenceType
     method: NonEmptyStr
     parameters: list[MethodParameter] = Field(default_factory=list)
     provenance: EvidenceProvenance
     result_summary: EvidenceResultSummary
+    artifact_refs: list[NonEmptyStr] = Field(default_factory=list)
     limitations: list[NonEmptyStr] = Field(default_factory=list)
-    assumption_ids: list[UUID] = Field(default_factory=list)
-    hypothesis_evaluations: list[HypothesisEvaluation] = Field(default_factory=list)
-    decision_ids: list[UUID] = Field(default_factory=list)
+    lifecycle_state: EvidenceLifecycleState = EvidenceLifecycleState.ACTIVE
     created_at: datetime = Field(default_factory=utc_now)
 
+    @model_validator(mode="after")
+    def _provenance_matches_required_refs(self) -> Evidence:
+        if self.provenance.analysis_frame_ref != self.analysis_frame_ref:
+            raise ValueError("Evidence provenance must reference the same AnalysisFrame.")
+        if self.provenance.execution_run_ref != self.execution_run_ref:
+            raise ValueError("Evidence provenance must reference the same ExecutionRun.")
+        return self
 
-class DecisionLog(CogniEDABaseModel):
-    """Record of a meaningful analytical choice and its supporting rationale."""
+
+class Discovery(ImmutableCogniEDABaseModel):
+    """Evidence-bound claim produced from exactly one Hypothesis."""
+
+    discovery_id: UUID = Field(default_factory=uuid4)
+    hypothesis_id: UUID
+    evidence_ids: list[UUID]
+    claim: DiscoveryClaim
+    epistemic_status: DiscoveryEpistemicStatus
+    scope: NonEmptyStr
+    validity_basis: ValidityBasis
+    created_at: datetime = Field(default_factory=utc_now)
+
+    @model_validator(mode="after")
+    def _validate_evidence_bound_claim(self) -> Discovery:
+        if not self.evidence_ids:
+            raise ValueError("Discovery requires at least one Evidence reference.")
+        if self.validity_basis.hypothesis_id != self.hypothesis_id:
+            raise ValueError("Discovery validity_basis must reference the same Hypothesis.")
+        if set(self.validity_basis.evidence_ids) != set(self.evidence_ids):
+            raise ValueError("Discovery validity_basis must cover all supporting Evidence.")
+        if self.validity_basis.assumptions_excluded_from_inference is not True:
+            raise ValueError("Discovery inference must exclude Assumptions.")
+        return self
+
+
+class UserDecision(CogniEDABaseModel):
+    """Typed provenance record for a user decision."""
 
     decision_id: UUID = Field(default_factory=uuid4)
-    project_id: UUID
-    decision_type: DecisionType
+    decision_type: UserDecisionType
     decision: NonEmptyStr
     rationale: NonEmptyStr
-    status: DecisionStatus = DecisionStatus.ACTIVE
+    status: UserDecisionStatus = UserDecisionStatus.ACTIVE
     alternatives_considered: list[NonEmptyStr] = Field(default_factory=list)
-    assumption_ids: list[UUID] = Field(default_factory=list)
-    hypothesis_ids: list[UUID] = Field(default_factory=list)
+    related_task_ids: list[UUID] = Field(default_factory=list)
+    related_hypothesis_ids: list[UUID] = Field(default_factory=list)
     superseded_by_decision_id: UUID | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
 
 class SessionFrame(CogniEDABaseModel):
-    """Concrete persisted context frame for session continuity and handoff."""
+    """Concrete active-context frame for session continuity and handoff."""
 
     session_frame_id: UUID = Field(default_factory=uuid4)
-    project_id: UUID
     frame_topic: NonEmptyStr
     frame_status: SessionFrameStatus = SessionFrameStatus.ACTIVE
     objective_snapshot: NonEmptyStr
     frame_outcome: str | None = None
-    project_summary: str | None = None
+    objective_summary: str | None = None
     branch_key: str | None = None
     checkpoint_label: str | None = None
     parent_session_frame_id: UUID | None = None
     handoff_summary: str | None = None
-    dataset_summaries: list[DatasetContextSummary] = Field(default_factory=list)
-    active_dataset_refs: list[UUID] = Field(default_factory=list)
+    data_profile_summaries: list[DataProfileContextSummary] = Field(default_factory=list)
+    active_data_profile_refs: list[UUID] = Field(default_factory=list)
+    active_tasks: list[TaskContextSummary] = Field(default_factory=list)
+    active_task_refs: list[UUID] = Field(default_factory=list)
     active_assumptions: list[AssumptionContextSummary] = Field(default_factory=list)
     active_assumption_refs: list[UUID] = Field(default_factory=list)
     active_hypotheses: list[HypothesisContextSummary] = Field(default_factory=list)
     active_hypothesis_refs: list[UUID] = Field(default_factory=list)
-    strongest_evidence: list[EvidenceContextSummary] = Field(default_factory=list)
-    strongest_evidence_refs: list[UUID] = Field(default_factory=list)
-    recent_decisions: list[DecisionContextSummary] = Field(default_factory=list)
-    recent_decision_refs: list[UUID] = Field(default_factory=list)
+    relevant_discoveries: list[DiscoveryContextSummary] = Field(default_factory=list)
+    relevant_discovery_refs: list[UUID] = Field(default_factory=list)
+    supporting_evidence: list[EvidenceContextSummary] = Field(default_factory=list)
+    supporting_evidence_refs: list[UUID] = Field(default_factory=list)
+    recent_user_decisions: list[UserDecisionContextSummary] = Field(default_factory=list)
+    recent_user_decision_refs: list[UUID] = Field(default_factory=list)
     pending_tasks: list[NonEmptyStr] = Field(default_factory=list)
     open_questions: list[NonEmptyStr] = Field(default_factory=list)
     key_warnings: list[NonEmptyStr] = Field(default_factory=list)
