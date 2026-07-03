@@ -14,9 +14,7 @@ Your highest priority is epistemic correctness: every conclusion must remain tra
 
 ## Current Implementation Warning
 
-The current codebase still uses an older artifact scaffold: `Project`, `DatasetAsset`, `DataProfile`, `Assumption`, `Hypothesis`, `Evidence`, `DecisionLog`, and `SessionFrame`.
-
-The target FCO design is narrower and different. Future code changes should converge toward the target architecture unless the project owner explicitly revises the design.
+The local schema and persistence layer now use the target FCO names, but several runtime pieces remain scaffold-level: planner nodes are mostly stubs, executable DVC integration is not implemented, and full `PlannerOperation`, `AnalysisFrame`, `ExecutionRun`, and cache persistence records are still missing.
 
 ## Target FCO Set
 
@@ -56,7 +54,7 @@ Do not introduce these as FCOs unless explicitly instructed by the project owner
 - `DataProfile` is immutable.
 - `Evidence` is immutable.
 - `Discovery` cannot exist without `Evidence`.
-- `Discovery` must have a `ValidityEnvelope`.
+- `Discovery` must have structured `claim`, `scope`, and `validity_basis`.
 - `Assumption` may guide planning but must be excluded from Conclusion Context.
 - Proposed `Task`s cannot execute.
 - Only active terminal analytical `Task`s can generate `Hypothesis` objects.
@@ -90,7 +88,7 @@ Conclusion Context must exclude `Assumption` objects and rely only on:
 - parameters
 - decision rule
 - uncertainty
-- `ValidityEnvelope`
+- validity basis
 - necessary provenance
 
 Do not retrieve rejected `Task`s, completed `Hypothesis` objects, raw chat history, failed reasoning chains, or unverified `GeneratedView`s into Conclusion Context by default.
