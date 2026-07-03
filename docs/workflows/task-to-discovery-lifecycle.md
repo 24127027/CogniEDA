@@ -48,9 +48,9 @@ Partially implemented scaffold.
 
 Current `Hypothesis` and `Evidence` repositories support:
 
-- hypothesis creation and status updates
-- links from hypotheses to assumptions and datasets
-- evidence creation
+- hypothesis creation and lifecycle/status updates
+- hypothesis listing by task/profile/status
+- evidence creation and retrieval by hypothesis/profile
 - typed evidence-to-hypothesis evaluation outcomes
 - evidence lookup by dataset, assumption, hypothesis, and decision
 
