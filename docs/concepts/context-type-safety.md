@@ -9,12 +9,12 @@ Context Type Safety means relevance is insufficient. Retrieved context must also
 Planning Context may include:
 
 - `Objective`
-- proposed or active `Task`s
-- active `DataProfile`
+- active `Task`s and proposed task operations
+- active `DataProfile` summaries
 - active `Assumption`s
 - relevant `Discovery` objects
 - relevant `Evidence` summaries
-- `SessionFrame` pinned items
+- `SessionFrame` pins
 
 Assumptions may guide planning.
 
@@ -24,55 +24,44 @@ Conclusion Context must include only evidence-valid inputs:
 
 - `Hypothesis`
 - `DataProfile`
-- `AnalysisFrame` provenance
+- `AnalysisFrame` provenance/reference
 - `Evidence`
 - method metadata
 - parameters
 - decision rule
 - uncertainty
-- `ValidityEnvelope`
-- necessary provenance
+- validity basis
+- necessary execution provenance
 
 Conclusion Context must exclude by default:
 
 - `Assumption`
-- rejected `Task`
+- rejected or inactive `Task`
 - completed `Hypothesis`
 - raw chat turns
 - failed reasoning chains
 - unverified `GeneratedView`
-- old `DataProfile` unless explicitly requested
+- generic summaries
 
 ## Current Implementation
 
 Current code provides:
 
-- `SessionFrame` summaries with active assumptions, active hypotheses, evidence summaries, stale context, dead ends, and cached tool results.
+- `SessionFrame` summaries with DataProfiles, Tasks, active assumptions, active hypotheses, Discoveries, Evidence, user-decision provenance, stale context, dead ends, and cached tool results.
 - `SessionContextBuilder`, which projects a `SessionFrame` into `planning` or `conclusion` context bundles.
-- Planning context includes active assumptions when their memory status is eligible.
-- Conclusion context excludes assumptions, recent decisions, pending tasks, open questions, stale context, dead ends, and cached tool-result summaries.
-- Conclusion context also filters out stale, superseded, rejected, archived, dead-end, overruled, and review-only memory statuses.
+- Planning context includes active assumptions.
+- Conclusion context excludes assumptions, tasks, user decisions, pending tasks, open questions, stale context, dead ends, and cached tool-result summaries.
+- Conclusion context filters by safe memory status and active profile/evidence lifecycle.
 - no retrieval engine
 - no graph retrieval context mode selector
 - no graph-level Conclusion Context constructor
-- no epistemic-role field on current artifact models
 
 ## Implementation Status
 
 Partially implemented.
 
-The current code enforces a basic Planning Context vs Conclusion Context split for `SessionFrame` snapshots. Full target Context Type Safety remains incomplete because there is no typed retrieval engine, graph policy, `Discovery`, `Task`, `AnalysisFrame`, or epistemic-role field across all artifacts.
+The current code enforces a basic Planning Context vs Conclusion Context split for `SessionFrame` snapshots. Full target Context Type Safety remains incomplete because there is no typed graph retrieval engine or retrieval policy.
 
 ## Architectural Risk
 
 If an LLM prompt is built from the raw `SessionFrame` instead of `SessionContextBuilder`, active assumptions can still appear beside evidence summaries. That is acceptable for planning but unsafe for conclusion generation.
-
-## Required Tests When Implemented
-
-Add tests that verify:
-
-- Planning Context may include active assumptions. Implemented for `SessionFrame` projection.
-- Conclusion Context excludes assumptions. Implemented for `SessionFrame` projection.
-- Rejected tasks do not enter Conclusion Context.
-- Completed hypotheses are not retrieved as current knowledge by default.
-- Stale evidence and stale data summaries are excluded unless the user requests audit/history. Implemented for `SessionFrame` projection.
