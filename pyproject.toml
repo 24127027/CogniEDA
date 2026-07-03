@@ -17,6 +17,7 @@ dependencies = [
     "typer>=0.16,<1.0",
     "pydantic-ai>=1.107.0",
     "langgraph>=1.2.6",
+    "pydantic-ai-skills>=1.1.0",
 ]
 
 [project.scripts]

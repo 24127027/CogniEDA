@@ -1,0 +1,20 @@
+# MCP Server Configuration
+# Define external tool servers that agents can connect to
+
+# Filesystem access via MCP
+# [filesystem]
+# transport = "stdio"
+# command = "uvx"
+# args = ["mcp-server-filesystem"]
+
+# Neo4j graph database access via MCP
+# [neo4j]
+# transport = "http"
+# url = "http://localhost:8000/mcp"
+
+# Example: Custom MCP server with environment variables
+# [custom_service]
+# transport = "stdio"
+# command = "python"
+# args = ["-m", "custom_mcp_server"]
+# env = { "API_KEY" = "your-key-here" }

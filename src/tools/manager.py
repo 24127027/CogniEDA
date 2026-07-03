@@ -4,8 +4,10 @@ from typing import TypedDict
 
 from pydantic_ai import FunctionToolset
 from pydantic_ai.mcp import MCPToolset
+from pydantic_ai_skills import SkillsCapability
 
 from .mcp.loader import load_mcp_toolsets
+from .skills.loader import load_skills
 from .registry import registry
 
 # from .builtin.graph import search_graph
@@ -13,12 +15,14 @@ from .registry import registry
 
 # Example configuration for agents.toml:
 # [planner]
+# skills = ["planner"]      # Points to skills/planner/# 
 # mcp = [
 #     "filesystem",
 #     "neo4j",
 # ]
 
 # [graph_miner]
+# skills = ["graph_miner"] 
 # mcp = [
 #     "neo4j",
 # ]
@@ -43,6 +47,7 @@ WORKER_BUILTIN_TOOLS = {
 
 
 class WorkerConfig(TypedDict, total=False):
+    skills: list[str]
     mcp: list[str]
 
 
@@ -52,15 +57,18 @@ class ToolManager:
         self,
         config: dict[str, WorkerConfig],
         mcp_toolsets: dict[str, MCPToolset],
+        skills: dict[str, SkillsCapability]
     ):
         self.config = config
         self.mcp_toolsets = mcp_toolsets
+        self.skills = skills
 
     @classmethod
     def from_config_path(
         cls,
         path: str | Path = "config/agents.toml",
         mcp_path: str | Path = "config/mcp.toml",
+        skills_path: str | Path = "config/skills.toml"
     ) -> "ToolManager":
         config: dict[str, WorkerConfig] = {}
         try:
@@ -73,7 +81,11 @@ class ToolManager:
         if Path(mcp_path).exists():
             mcp_toolsets = load_mcp_toolsets(mcp_path)
 
-        return cls(config=config, mcp_toolsets=mcp_toolsets)
+        skills: dict[str, SkillsCapability] = {}
+        if Path(skills_path).exists():
+            skills = load_skills(skills_path)
+
+        return cls(config=config, mcp_toolsets=mcp_toolsets, skills=skills)
 
     def toolsets_for(
         self,
@@ -112,12 +124,25 @@ class ToolManager:
 
         return toolsets
 
+    def skills_for(self, worker: str) -> list[SkillsCapability]:
+        """Get skills for the given worker."""
+        worker_cfg = self.config.get(worker, {})
+        configured_skills = worker_cfg.get("skills", [])
+
+        return [self.skills[skill] for skill in configured_skills]
+
+        
 tool_manager: ToolManager | None = None
 
 
 def initialize_tool_manager(
     path: str | Path = "config/agents.toml",
     mcp_path: str | Path = "config/mcp.toml",
+    skills_path: str | Path = "config/skills.toml"
 ) -> None:
     global tool_manager
-    tool_manager = ToolManager.from_config_path(path=path, mcp_path=mcp_path)
+    tool_manager = ToolManager.from_config_path(
+        path=path, 
+        mcp_path=mcp_path,
+          skills_path=skills_path
+    )
