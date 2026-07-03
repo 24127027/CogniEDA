@@ -1,112 +1,146 @@
 # CogniEDA Agent Guide
 
-## Project Purpose
+CogniEDA is a governed research-state system for analytical investigation. Do not treat this project as a generic chat-memory, notebook, or vector-retrieval app.
 
-CogniEDA helps users explore data through structured memory, hypothesis generation, validation, and traceable evidence.
+Your highest priority is epistemic correctness: every conclusion must remain traceable, valid within scope, and protected from the wrong kind of memory entering reasoning.
 
-The system has two core goals:
+## Source Of Truth
 
-1. Reduce context rot through durable, structured analytical artifacts.
-2. Support iterative data investigation through assumptions, hypotheses, validation, evidence, decisions, and session continuity.
+- Use source code as the source of truth for what currently exists.
+- Use `first-class-object.txt` as the canonical target architecture when available.
+- Use `user-agent-workflow.txt` as the target user-facing workflow when available.
+- Use `src/agents/planner/nodes.py` and `src/agents/planner/graph.py` for current planner scaffolding and intended node names.
+- If design docs and code conflict, document the conflict. Do not silently resolve it.
 
-The memory model is agent-agnostic. It is not only for one coding agent or one EDA workflow. The current concrete persisted implementation of the broader `Context Frame` idea is `SessionFrame`.
+## Current Implementation Warning
 
-## Non-Goals
+The local schema and persistence layer now use the target FCO names, but several runtime pieces remain scaffold-level: planner nodes are mostly stubs, executable DVC integration is not implemented, and full `PlannerOperation`, `AnalysisFrame`, `ExecutionRun`, and cache persistence records are still missing.
 
-- CogniEDA is not a generic chatbot.
-- CogniEDA is not a free-form conversational memory store.
-- CogniEDA is not an unstructured notebook replacement.
-- CogniEDA is not a system that silently mutates raw data.
-- CogniEDA is not a system that treats interpretation as fact.
+## Target FCO Set
 
-## Core Artifact Types
+Only these are target First-Class Objects:
 
-The following artifact types are first-class repository concepts and future code must preserve them explicitly:
-
-- `Project`
-- `DatasetAsset`
+- `Objective`
 - `DataProfile`
 - `Assumption`
+- `Task`
 - `Hypothesis`
 - `Evidence`
-- `DecisionLog`
+- `Discovery`
 - `SessionFrame`
 
-See [docs/artifacts.md](/D:/mduy/source/repos/CogniEDA/docs/artifacts.md) for the canonical artifact contract.
+Do not introduce these as FCOs unless explicitly instructed by the project owner:
 
-## Memory Discipline
+- `Workspace`
+- `Question`
+- `AnalysisFrame`
+- `GeneratedView`
+- `PlannerOperation`
+- `ExecutionRun`
+- `EvidenceCacheEntry`
 
-- Prefer structured artifacts over chat summaries.
-- Reconstruct working context from active artifacts, not from conversation history.
-- Separate durable facts from transient reasoning.
-- Mark superseded, archived, rejected, and active states explicitly.
-- When context is carried forward, preserve memory status, provenance, and invalidation rules where the contract allows them.
-- Preserve provenance for every material analytical conclusion.
-- Do not compress away evidence lineage or dataset/version references.
-- Treat session continuity as an artifact problem, not a prompt-length problem.
-- Keep stale, overruled, and dead-end context historically visible without letting it silently influence active reasoning.
-- Treat checkpoints, branch labels, and cached tool results as explicit context data when they matter.
+## Target Non-FCO Boundaries
 
-## Hypothesis, Evidence, and Decision Discipline
+- `Workspace` is a filesystem/runtime boundary, not an FCO.
+- `Question` is UI input that becomes a `Task`, not an FCO.
+- `AnalysisFrame` is provenance/data-view, not an FCO.
+- `GeneratedView` is runtime/provenance output, not `Discovery`.
+- `PlannerOperation` is pending mutation, not an FCO.
+- `ExecutionRun` is provenance, not an FCO.
+- `EvidenceCacheEntry` is cache, not an FCO.
 
-- Hypotheses must be testable and tied to explicit variables, scope, and validation method.
-- Evidence must record dataset/version, method, parameters, result summary, limitations, and references to related assumptions and hypotheses.
-- Decisions must record what was chosen, why it was chosen, what evidence supported it, and what alternatives were rejected.
-- No claim of validation is acceptable without linked evidence.
-- Interpretations must remain distinct from observations and recorded results.
-- Inconclusive results remain evidence; they do not justify silent promotion of a hypothesis to supported or refuted.
+## Target Invariants
 
-## Data Safety Rules
+- `DataProfile` is immutable.
+- `Evidence` is immutable.
+- `Discovery` cannot exist without `Evidence`.
+- `Discovery` must have structured `claim`, `scope`, and `validity_basis`.
+- `Assumption` may guide planning but must be excluded from Conclusion Context.
+- Proposed `Task`s cannot execute.
+- Only active terminal analytical `Task`s can generate `Hypothesis` objects.
+- One terminal analytical `Task` generates exactly one `Hypothesis`.
+- One `Hypothesis` produces exactly one `Discovery`.
+- Parent `Task`s do not produce `Discovery` objects.
+- Planner nodes produce operations; `commit` persists approved operations atomically.
 
-- Never overwrite raw data.
-- Prefer versioned or reversible transformations.
-- Record row drops, column drops, imputations, filters, joins, and derived datasets explicitly.
-- Preserve lineage from derived datasets back to source datasets.
-- Flag leakage risks, missingness risks, confounding risks, sample-size instability, and suspicious shortcuts.
-- If a transformation cannot be explained and reproduced, it is not acceptable.
+## Epistemic Discipline
 
-## Architectural Preferences
+- Keep research intent, workflow state, data state, assumptions, hypothesis/test contracts, observed evidence, evidence-bound discoveries, active context, provenance, and cache separate.
+- A `Task` is workflow state, not scientific knowledge.
+- `Evidence` is observed analytical result, not interpretation.
+- `Discovery` is an evidence-bound claim, not a paragraph summary.
+- `Assumption` cannot be used as an inference premise.
+- Fail-to-reject and inconclusive results still produce knowledge, but phrase them correctly.
+- Do not write "there is no relationship" unless evidence supports that stronger claim.
+- Prefer: "available evidence is insufficient to reject independence within scope S using method M on DataProfile V."
 
-- Python-first implementation managed with `uv`.
-- Source code should follow a `src/`-oriented layout.
-- Pydantic models should define artifact contracts once implementation begins.
-- Prefer modular services and repositories over monolithic orchestration.
-- Prefer deterministic utilities where possible.
-- Preserve explicit artifact relationships rather than relying on inferred state.
-- Keep CLI or orchestration layers thin relative to reusable domain logic.
+## Context Type Safety
 
-## Testing Expectations
+Planning Context may include `Assumption` objects.
 
-- Unit tests should cover deterministic artifact logic, controlled vocabularies, and validation rules.
-- Integration tests should cover artifact persistence and workflow boundaries once those layers exist.
-- Tests should verify traceability, state transitions, and reproducibility, not only happy-path outputs.
-- Evidence-producing logic should be testable without hidden global state.
-- Future tests must distinguish facts, assumptions, hypotheses, evidence, and interpretations in assertions.
+Conclusion Context must exclude `Assumption` objects and rely only on:
 
-## Repo Structure Guidance
+- `Hypothesis`
+- `DataProfile`
+- `AnalysisFrame` provenance
+- `Evidence`
+- method metadata
+- parameters
+- decision rule
+- uncertainty
+- validity basis
+- necessary provenance
 
-Target structure guidance for future implementation:
+Do not retrieve rejected `Task`s, completed `Hypothesis` objects, raw chat history, failed reasoning chains, or unverified `GeneratedView`s into Conclusion Context by default.
 
-- `src/`: domain artifacts, services, repositories, orchestration, and CLI/app entrypoints.
-- `docs/`: durable architecture and artifact references.
-- `tests/`: unit and integration coverage.
-- `data/` or equivalent future location: versioned local data assets and derived outputs, if introduced later.
+## Mutation And Lifecycle Rules
 
-Current storage split:
+- If cleaning or preprocessing changes data, create a new dataset version and a new `DataProfile`. Do not overwrite an existing `DataProfile`.
+- If analytical output is wrong, stale, or superseded, create new `Evidence` and mark old `Evidence` as superseded or invalidated. Do not manually edit `Evidence`.
+- After `Discovery` is created, it may be compared with `Assumption` objects to flag contradiction. Do not automatically rewrite or delete `Assumption` objects.
+- Flagging is not mutation of truth. It is a review signal.
 
-- The local SQLModel store is the runtime persistence surface for all first-class artifacts.
-- `artifacts/dataset_assets/` and `artifacts/data_profiles/` are Git-tracked metadata mirrors for reviewable dataset lineage and profile snapshots.
-- Other first-class artifacts are currently DB-backed in the scaffold unless an explicit export/import flow is added later.
+## Planner Pipeline Target
 
-This is guidance for the intended shape of the repository. Step 3 does not require all directories or modules to exist yet.
+Preserve this pipeline unless the project owner changes the design:
 
-## Hard Rules for Agents
+```text
+understand_request
+route_intent
+answer_question
+propose_questions
+expand_plan
+manage_tasks
+select_task
+prepare_execution
+dispatch_executor
+review_execution
+review_conflicts
+manage_objective
+manage_assumptions
+request_user_input
+pause
+process_decision
+commit
+```
 
-- Do not invent evidence.
-- Do not present assumptions or interpretations as facts.
-- Do not bypass artifact creation or update rules in implementation.
-- Do not create hidden mutable state outside explicit artifacts.
-- Do not continue from stale context when active artifacts disagree.
-- Do not silently mutate raw inputs, lineage, or artifact status.
-- Do not collapse distinct artifact types into generic notes or free text.
-- Do not treat a user prompt alone as durable project state when an artifact should exist instead.
+Planner nodes should produce operations rather than directly mutating persistent graph state. The commit step should atomically persist approved operations.
+
+## Documentation Rules
+
+- Inspect code before editing docs.
+- Label `Current implementation`, `Target design`, `Implementation status`, `Known deviation`, and `Not yet implemented` explicitly.
+- Update [docs/architecture/implementation-gap-analysis.md](docs/architecture/implementation-gap-analysis.md) when drift is found.
+- Do not turn design targets into false implementation claims.
+- Do not treat generated summaries as architectural truth.
+- Update `README.md` only with verified commands and implemented features.
+
+## Implementation Rules
+
+- Classify new features before implementation: FCO, workflow state, provenance, cache, filesystem artifact, or generated view.
+- Default uncertain durable objects to provenance or generated view rather than promoting them into durable knowledge.
+- Prefer explicit schemas, validators, lifecycle guards, and tests over informal conventions.
+- Make the smallest coherent change that preserves the FCO model.
+- Add or update tests for every invariant touched.
+
+After completing a task, report what changed, which invariant was protected, what tests were run, and any unresolved architectural risk.

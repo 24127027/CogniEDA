@@ -1,17 +1,21 @@
-from ..base_agent import BaseAgent
-from .graph import build_graph
-from .types import PlannerRequest, PlannerResult, PlannerState
-class Planner(BaseAgent[PlannerRequest, PlannerResult, PlannerState]):
-    def __init__(self, *args, **kwargs):
-        super().__init__(
-            graph=build_graph()
-        )
-        # Initialize any additional attributes specific to the Planner here
+"""Planner agent wrapper."""
 
-    async def before_run(self, input: PlannerRequest) -> PlannerState:
-        # Implement any preprocessing or setup before the main run method
+from __future__ import annotations
+
+from agents.base_agent import BaseAgent
+
+from .graph import build_graph
+from .types import PlannerInput, PlannerOutput, PlannerState
+
+
+class Planner(BaseAgent[PlannerInput, PlannerOutput, PlannerState]):
+    """Planner orchestrator. It produces operations, not Evidence or Discovery."""
+
+    def __init__(self) -> None:
+        super().__init__(graph=build_graph())
+
+    async def before_run(self, input: PlannerInput) -> PlannerState:
         raise NotImplementedError("Planner.before_run is not implemented yet.")
 
-    async def after_run(self, output: PlannerState) -> PlannerResult:
-        # Implement any postprocessing or conversion of the output to the expected format
+    async def after_run(self, output: PlannerState) -> PlannerOutput:
         raise NotImplementedError("Planner.after_run is not implemented yet.")

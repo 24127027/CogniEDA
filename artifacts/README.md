@@ -1,14 +1,9 @@
-# Artifact Metadata Layout
+# Artifact Mirrors
 
-This directory stores Git-tracked analytical metadata files that describe dataset state independently of the physical files under `data/`.
+This directory contains reviewable metadata mirror templates. Runtime truth is the workspace-local graph database, not these files.
 
-## Subdirectories
+Current mirror surface:
 
-- `artifacts/dataset_assets/`: `DatasetAsset` JSON mirrors for concrete dataset versions
-- `artifacts/data_profiles/`: `DataProfile` JSON snapshots tied to one dataset version and one profiling method
+- `artifacts/data_profiles/`: `DataProfile` JSON mirror templates for profiled dataset versions.
 
-## Current Scope Clarification
-
-- These Git-tracked files are intentionally separate from DVC-managed data so that code review can inspect lineage, version labels, upstream dependencies, and profiling metadata without pulling large files.
-- The current scaffold mirrors only `DatasetAsset` and `DataProfile` here by default.
-- The full first-class artifact set still includes `Project`, `Assumption`, `Hypothesis`, `Evidence`, `DecisionLog`, and `SessionFrame`, but those are currently persisted operationally through the local SQLModel store rather than as Git-tracked JSON files.
+DataProfile mirrors store dataset identity directly. There is no separate dataset artifact in the research ontology.

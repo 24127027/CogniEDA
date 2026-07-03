@@ -5,28 +5,28 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from repositories import AssumptionRepository, ProjectRepository
-from schemas.artifacts import Assumption, Project
-from schemas.enums import ConfidenceLevel
+from repositories import EvidenceRepository
+from schemas.artifacts import Evidence
+from schemas.common import EvidenceProvenance, EvidenceResultSummary
+from schemas.enums import EvidenceType
 
 
-def test_sqlite_foreign_keys_are_enforced(db_session) -> None:
-    project = ProjectRepository(db_session).create(
-        Project(
-            name="FK test",
-            objective="Validate SQLite foreign key enforcement.",
-        )
-    )
-
-    repository = AssumptionRepository(db_session)
+def test_sqlite_foreign_keys_are_enforced_without_project_fco(db_session) -> None:
+    repository = EvidenceRepository(db_session)
 
     with pytest.raises(IntegrityError):
         repository.create(
-            Assumption(
-                project_id=project.project_id,
-                statement="Assumption with invalid dataset reference.",
-                basis="Should fail on foreign key enforcement.",
-                confidence=ConfidenceLevel.LOW,
-                dataset_id=uuid4(),
+            Evidence(
+                hypothesis_id=uuid4(),
+                profile_id=uuid4(),
+                analysis_frame_ref="analysis-frame:missing",
+                execution_run_ref="execution-run:missing",
+                evidence_type=EvidenceType.STATISTICAL_TEST,
+                method="chi_square",
+                provenance=EvidenceProvenance(
+                    analysis_frame_ref="analysis-frame:missing",
+                    execution_run_ref="execution-run:missing",
+                ),
+                result_summary=EvidenceResultSummary(summary="Invalid orphan evidence."),
             )
         )

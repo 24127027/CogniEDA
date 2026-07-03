@@ -2,161 +2,262 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from memory import SessionFrameBuilder
-from schemas.artifacts import DatasetAsset, Evidence, Hypothesis, Project
+from memory import ContextMode, SessionContextBuilder, SessionFrameBuilder
+from schemas.artifacts import (
+    Assumption,
+    DataProfile,
+    Discovery,
+    Evidence,
+    Hypothesis,
+    Objective,
+    Task,
+)
 from schemas.common import (
-    DeadEndSummary,
+    BaselineSummary,
+    DiscoveryClaim,
     EvidenceProvenance,
     EvidenceResultSummary,
-    HypothesisEvaluation,
-    InvalidationRule,
-    StaleContextMarker,
+    MethodParameter,
+    SchemaSummary,
     ToolResultCacheSummary,
+    ValidityBasis,
 )
 from schemas.enums import (
-    DatasetKind,
-    DatasetRole,
-    DatasetSourceType,
+    AssumptionStatus,
+    ConfidenceLevel,
+    DataProfileLifecycleState,
+    DataProfileMethod,
+    DiscoveryEpistemicStatus,
+    EvidenceLifecycleState,
     EvidenceType,
-    HypothesisEvidenceOutcome,
     HypothesisStatus,
-    InvalidationTrigger,
     MemoryStatus,
+    ObjectiveStatus,
     SessionFrameStatus,
+    TaskKind,
+    TaskLifecycleState,
 )
 
 
-def test_session_frame_builder_uses_evidence_links_and_evidence_only_dataset_context() -> None:
-    project = Project(
-        name="EDA Project",
-        objective="Understand conversion behavior.",
-    )
-    dataset = DatasetAsset(
-        project_id=project.project_id,
-        name="events",
-        source_type=DatasetSourceType.FILE,
-        location="data/events.csv",
-        version="v1",
-        kind=DatasetKind.RAW,
-        role=DatasetRole.PRIMARY,
-    )
-    hypothesis = Hypothesis(
-        project_id=project.project_id,
-        statement="Longer sessions increase conversion.",
-        variables=["session_length", "converted"],
-        scope="Web sessions in Q1",
-        validation_method="logistic_regression",
-        status=HypothesisStatus.PROPOSED,
-        dataset_ids=[dataset.dataset_id],
-    )
-    evidence = Evidence(
-        project_id=project.project_id,
-        dataset_id=dataset.dataset_id,
-        evidence_type=EvidenceType.STATISTICAL_TEST,
-        method="logistic_regression",
-        provenance=EvidenceProvenance(
-            source_profile_id=uuid4(),
-            execution_label="run-001",
-        ),
-        result_summary=EvidenceResultSummary(
-            summary="Session length is positively associated with conversion.",
-        ),
-        hypothesis_evaluations=[
-            HypothesisEvaluation(
-                hypothesis_id=hypothesis.hypothesis_id,
-                outcome=HypothesisEvidenceOutcome.SUPPORTS,
-            )
-        ],
+def build_objective() -> Objective:
+    return Objective(
+        title="Retention Investigation",
+        statement="Explain retention differences.",
+        status=ObjectiveStatus.ACTIVE,
     )
 
+
+def build_profile() -> DataProfile:
+    return DataProfile(
+        dataset_path="data/retention.csv",
+        dvc_hash="md5:retention-v1",
+        dvc_version_label="retention-v1",
+        method=DataProfileMethod.BASELINE_SUMMARY,
+        schema_summary=SchemaSummary(column_order=["segment", "retained"]),
+        baseline_summary=BaselineSummary(column_names=["segment", "retained"]),
+        row_count=100,
+        column_count=2,
+        lifecycle_state=DataProfileLifecycleState.ACTIVE,
+        accepted_as_ground_truth=True,
+    )
+
+
+def build_task(profile_id) -> Task:
+    return Task(
+        title="Test segment retention",
+        description="Evaluate whether segment and retention are associated.",
+        lifecycle_state=TaskLifecycleState.ACTIVE,
+        task_kind=TaskKind.ANALYTICAL,
+        profile_id=profile_id,
+        variables=["segment", "retained"],
+        evidence_expectation="Chi-square result.",
+    )
+
+
+def build_hypothesis(task_id, profile_id, **overrides: object) -> Hypothesis:
+    payload: dict[str, object] = {
+        "task_id": task_id,
+        "profile_id": profile_id,
+        "statement": "Enterprise accounts retain longer than self-serve accounts.",
+        "variables": ["segment", "retained"],
+        "scope": "Accounts active in Q1",
+        "validation_method": "chi_square",
+        "evidence_expectation": "Chi-square test outcome.",
+        "status": HypothesisStatus.TESTING,
+    }
+    payload.update(overrides)
+    return Hypothesis(**payload)
+
+
+def build_evidence(hypothesis_id, profile_id, **overrides: object) -> Evidence:
+    payload: dict[str, object] = {
+        "hypothesis_id": hypothesis_id,
+        "profile_id": profile_id,
+        "analysis_frame_ref": "analysis-frame:retention:v1:segment",
+        "execution_run_ref": "execution-run:retention-001",
+        "evidence_type": EvidenceType.STATISTICAL_TEST,
+        "method": "chi_square",
+        "provenance": EvidenceProvenance(
+            analysis_frame_ref="analysis-frame:retention:v1:segment",
+            execution_run_ref="execution-run:retention-001",
+        ),
+        "result_summary": EvidenceResultSummary(
+            summary="Segment and retention are associated within the profiled scope.",
+        ),
+        "limitations": ["Domain semantics have not been validated yet."],
+    }
+    payload.update(overrides)
+    return Evidence(**payload)
+
+
+def build_discovery(hypothesis_id, profile_id, evidence_id) -> Discovery:
+    return Discovery(
+        hypothesis_id=hypothesis_id,
+        evidence_ids=[evidence_id],
+        claim=DiscoveryClaim(
+            statement="Segment and retention are associated.",
+            scope="Accounts active in Q1.",
+        ),
+        epistemic_status=DiscoveryEpistemicStatus.SUPPORTED,
+        scope="Accounts active in Q1.",
+        validity_basis=ValidityBasis(
+            data_profile_id=profile_id,
+            analysis_frame_refs=["analysis-frame:retention:v1:segment"],
+            hypothesis_id=hypothesis_id,
+            evidence_ids=[evidence_id],
+            method="chi_square",
+            parameters=[MethodParameter(name="alpha", value=0.05)],
+            decision_rule="p_value < alpha",
+            uncertainty="p_value=0.03",
+        ),
+    )
+
+
+def test_session_frame_builder_uses_profile_and_evidence_context() -> None:
+    objective = build_objective()
+    profile = build_profile()
+    task = build_task(profile.profile_id)
+    hypothesis = build_hypothesis(task.task_id, profile.profile_id)
+    evidence = build_evidence(hypothesis.hypothesis_id, profile.profile_id)
+    discovery = build_discovery(hypothesis.hypothesis_id, profile.profile_id, evidence.evidence_id)
+
     frame = SessionFrameBuilder().build(
-        project=project,
-        frame_topic="conversion-investigation-frame",
+        objective=objective,
+        frame_topic="retention-frame",
         frame_status=SessionFrameStatus.CHECKPOINT,
-        frame_outcome="Evidence supports the current conversion hypothesis.",
-        datasets=[dataset],
+        frame_outcome="Evidence supports the current retention hypothesis.",
+        data_profiles=[profile],
+        tasks=[task],
         hypotheses=[hypothesis],
         evidence=[evidence],
-        stale_context=[
-            StaleContextMarker(
-                artifact_type="Hypothesis",
-                reason="Previous baseline hypothesis was superseded.",
-            )
-        ],
-        dead_ends=[
-            DeadEndSummary(
-                summary="Grouped by user instead of session.",
-                reason="The dataset grain is session-level, not user-level.",
-            )
-        ],
+        discoveries=[discovery],
         cached_tool_results=[
             ToolResultCacheSummary(
-                cache_key="events_v1.profile",
-                summary="Baseline profile for events v1.",
+                cache_key="retention_v1.profile",
+                summary="Baseline profile for retention v1.",
                 status=MemoryStatus.PINNED,
                 created_at=evidence.created_at,
-                invalidation_rules=[
-                    InvalidationRule(
-                        trigger=InvalidationTrigger.DATASET_VERSION_CHANGE,
-                        detail="Drop the cache when the events dataset version changes.",
-                    )
-                ],
             )
         ],
     )
 
-    assert frame.frame_topic == "conversion-investigation-frame"
-    assert frame.frame_status == SessionFrameStatus.CHECKPOINT
-    assert frame.frame_outcome == "Evidence supports the current conversion hypothesis."
-    assert frame.active_dataset_refs == [dataset.dataset_id]
-    assert frame.strongest_evidence_refs == [evidence.evidence_id]
+    assert frame.frame_topic == "retention-frame"
+    assert frame.active_data_profile_refs == [profile.profile_id]
+    assert frame.active_task_refs == [task.task_id]
     assert frame.active_hypotheses[0].linked_evidence_count == 1
-    assert frame.strongest_evidence[0].memory_status == MemoryStatus.VALIDATED
-    assert frame.cached_tool_results[0].cache_key == "events_v1.profile"
-    assert frame.stale_context[0].artifact_type == "Hypothesis"
+    assert frame.supporting_evidence_refs == [evidence.evidence_id]
+    assert frame.relevant_discovery_refs == [discovery.discovery_id]
+    assert any(
+        "Domain semantics have not been validated yet." in item for item in frame.key_warnings
+    )
 
 
-def test_session_frame_builder_keeps_dataset_visible_when_only_evidence_exists() -> None:
-    project = Project(
-        name="EDA Project",
-        objective="Assess a newly ingested dataset.",
+def test_session_context_builder_separates_planning_and_conclusion_context() -> None:
+    objective = build_objective()
+    profile = build_profile()
+    task = build_task(profile.profile_id)
+    assumption = Assumption(
+        statement="Each row represents one account-month.",
+        basis="Provided by the source-system owner.",
+        confidence=ConfidenceLevel.MEDIUM,
+        status=AssumptionStatus.ACTIVE,
+        profile_id=profile.profile_id,
     )
-    dataset = DatasetAsset(
-        project_id=project.project_id,
-        name="customers",
-        source_type=DatasetSourceType.FILE,
-        location="data/customers.csv",
-        version="v1",
-        kind=DatasetKind.RAW,
-        role=DatasetRole.PRIMARY,
+    hypothesis = build_hypothesis(task.task_id, profile.profile_id)
+    evidence = build_evidence(hypothesis.hypothesis_id, profile.profile_id)
+    discovery = build_discovery(hypothesis.hypothesis_id, profile.profile_id, evidence.evidence_id)
+
+    frame = SessionFrameBuilder().build(
+        objective=objective,
+        data_profiles=[profile],
+        tasks=[task],
+        assumptions=[assumption],
+        hypotheses=[hypothesis],
+        evidence=[evidence],
+        discoveries=[discovery],
+        pending_tasks=["Review account-month grain before deeper modeling."],
+        open_questions=["Does retention exclude trial accounts?"],
     )
-    evidence = Evidence(
-        project_id=project.project_id,
-        dataset_id=dataset.dataset_id,
-        evidence_type=EvidenceType.DATA_QUALITY_CHECK,
-        method="baseline_profile_quality_scan",
-        provenance=EvidenceProvenance(
-            execution_label="profile-001",
-        ),
-        result_summary=EvidenceResultSummary(
-            summary="Profile detected missing values that need review.",
-        ),
-        limitations=["Domain semantics have not been validated yet."],
+
+    context_builder = SessionContextBuilder()
+    planning_context = context_builder.build(frame, mode=ContextMode.PLANNING)
+    conclusion_context = context_builder.build(frame, mode=ContextMode.CONCLUSION)
+
+    assert planning_context.assumption_refs == (assumption.assumption_id,)
+    assert planning_context.task_refs == (task.task_id,)
+    assert planning_context.pending_tasks == (
+        "Review account-month grain before deeper modeling.",
+    )
+
+    assert conclusion_context.assumptions == ()
+    assert conclusion_context.assumption_refs == ()
+    assert conclusion_context.tasks == ()
+    assert conclusion_context.task_refs == ()
+    assert conclusion_context.user_decisions == ()
+    assert conclusion_context.pending_tasks == ()
+    assert conclusion_context.open_questions == ()
+    assert conclusion_context.cached_tool_results == ()
+    assert conclusion_context.data_profile_refs == (profile.profile_id,)
+    assert conclusion_context.hypothesis_refs == (hypothesis.hypothesis_id,)
+    assert conclusion_context.evidence_refs == (evidence.evidence_id,)
+    assert conclusion_context.discovery_refs == (discovery.discovery_id,)
+    assert "Assumptions are excluded" in conclusion_context.exclusion_notes[0]
+
+
+def test_conclusion_context_filters_stale_rejected_or_completed_items() -> None:
+    objective = build_objective()
+    profile = build_profile()
+    task = build_task(profile.profile_id)
+    hypothesis = build_hypothesis(
+        task.task_id,
+        profile.profile_id,
+    )
+    completed_hypothesis = build_hypothesis(
+        task.task_id,
+        profile.profile_id,
+        status=HypothesisStatus.COMPLETED,
+    )
+    evidence = build_evidence(hypothesis.hypothesis_id, profile.profile_id)
+    superseded_evidence = build_evidence(
+        hypothesis.hypothesis_id,
+        profile.profile_id,
+        evidence_id=uuid4(),
+        lifecycle_state=EvidenceLifecycleState.SUPERSEDED,
     )
 
     frame = SessionFrameBuilder().build(
-        project=project,
-        datasets=[dataset],
-        evidence=[evidence],
+        objective=objective,
+        data_profiles=[profile],
+        tasks=[task],
+        hypotheses=[hypothesis, completed_hypothesis],
+        evidence=[evidence, superseded_evidence],
     )
+    frame.data_profile_summaries[0].memory_status = MemoryStatus.STALE
+    frame.active_hypotheses[0].memory_status = MemoryStatus.REJECTED
 
-    assert frame.frame_topic == project.name
-    assert frame.active_dataset_refs == [dataset.dataset_id]
-    assert frame.strongest_evidence_refs == [evidence.evidence_id]
-    assert frame.dataset_summaries[0].invalidation_rules[0].trigger == (
-        InvalidationTrigger.DATASET_VERSION_CHANGE
-    )
-    assert any(
-        "Domain semantics have not been validated yet." in item
-        for item in frame.key_warnings
-    )
+    conclusion_context = SessionContextBuilder().build(frame, mode=ContextMode.CONCLUSION)
+
+    assert conclusion_context.data_profile_summaries == ()
+    assert conclusion_context.hypotheses == ()
+    assert conclusion_context.evidence_refs == (evidence.evidence_id,)
+    assert superseded_evidence.evidence_id not in conclusion_context.evidence_refs

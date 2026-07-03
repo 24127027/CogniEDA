@@ -4,8 +4,9 @@ Place reproducible outputs here when they are material analytical inputs or outp
 
 Every derived dataset should have:
 
-- a parent `DatasetAsset` reference
 - an explicit transform or provenance note
-- its own version identifier
+- a reproducible source path or upstream `DataProfile` reference in preprocessing history
+- its own version identity
+- a fresh `DataProfile`
 
 If the derivation cannot be explained and reproduced, it should not be stored as a durable dataset version.

@@ -1,23 +1,26 @@
-from pydantic import BaseModel
+"""Thin shared envelopes for agent graph contracts."""
+
+from __future__ import annotations
+
 from typing import Any
 
-class AgentRequest(BaseModel):
-    """
-    Input model for the agent.
-    """
-    context: str
-    user_query: str
+from pydantic import BaseModel
 
-class AgentResult(BaseModel):
-    """
-    Output model for the agent.
-    """
-    payload: Any
-    
+
+class AgentEnvelope(BaseModel):
+    """Minimal shared run envelope across orchestration and execution agents."""
+
+    run_id: str | None = None
+    session_id: str | None = None
+    trace_id: str | None = None
+    workspace_ref: str | None = None
+
+
 class BaseState(BaseModel):
-    """
-    Base class for all states in the agent graph.
-    This class is intended to be subclassed by specific state implementations.
-    """
+    """Base class for graph state objects."""
 
-    ...
+
+class RuntimePayload(BaseModel):
+    """Opaque payload for infrastructure-only handoff points."""
+
+    payload: Any

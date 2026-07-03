@@ -1,108 +1,83 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy.exc import IntegrityError
+from pydantic import ValidationError
 
+from db.init_db import init_db
+from db.session import create_db_engine, get_session
 from repositories import (
     AssumptionRepository,
     AssumptionUpdate,
     DataProfileRepository,
-    DatasetAssetRepository,
-    DatasetAssetUpdate,
-    DecisionLogRepository,
-    DecisionLogUpdate,
+    DiscoveryRepository,
     EvidenceRepository,
     HypothesisRepository,
     HypothesisUpdate,
-    ProjectRepository,
-    ProjectUpdate,
+    ObjectiveRepository,
+    ObjectiveUpdate,
     SessionFrameRepository,
+    TaskRepository,
+    TaskUpdate,
+    UserDecisionRepository,
 )
 from schemas.artifacts import (
     Assumption,
     DataProfile,
-    DatasetAsset,
-    DecisionLog,
+    Discovery,
     Evidence,
     Hypothesis,
-    Project,
+    Objective,
     SessionFrame,
+    Task,
+    UserDecision,
 )
 from schemas.common import (
-    AssumptionContextSummary,
     BaselineSummary,
-    ContextProvenance,
-    DatasetContextSummary,
-    DeadEndSummary,
-    DecisionContextSummary,
-    EvidenceContextSummary,
+    DiscoveryClaim,
     EvidenceProvenance,
     EvidenceResultSummary,
-    HypothesisContextSummary,
-    HypothesisEvaluation,
-    InvalidationRule,
-    LineageStep,
     MethodParameter,
     QualityFlag,
     SchemaSummary,
-    StaleContextMarker,
-    ToolResultCacheSummary,
+    ValidityBasis,
 )
 from schemas.enums import (
     AssumptionStatus,
     ConfidenceLevel,
+    DataProfileLifecycleState,
     DataProfileMethod,
-    DatasetKind,
-    DatasetRole,
-    DatasetSourceType,
-    DecisionStatus,
-    DecisionType,
+    DiscoveryEpistemicStatus,
     EvidenceType,
-    HypothesisEvidenceOutcome,
+    FirstClassObjectType,
     HypothesisStatus,
-    InvalidationTrigger,
-    LineageOperationType,
-    MemorySourceType,
-    MemoryStatus,
-    ProjectStatus,
+    ObjectiveStatus,
     QualityFlagSeverity,
     SessionFrameStatus,
+    TaskKind,
+    TaskLifecycleState,
+    UserDecisionType,
 )
 
 
-def build_project(**overrides: object) -> Project:
+def build_objective(**overrides: object) -> Objective:
     payload: dict[str, object] = {
-        "name": "Churn Investigation",
-        "objective": "Understand customer churn drivers.",
-        "research_questions": ["What segments churn most?"],
-        "status": ProjectStatus.ACTIVE,
+        "title": "Churn Investigation",
+        "statement": "Understand customer churn drivers.",
+        "status": ObjectiveStatus.ACTIVE,
     }
     payload.update(overrides)
-    return Project(**payload)
+    return Objective(**payload)
 
 
-def build_dataset_asset(project_id: UUID, **overrides: object) -> DatasetAsset:
+def build_data_profile(**overrides: object) -> DataProfile:
     payload: dict[str, object] = {
-        "project_id": project_id,
-        "name": "customers",
-        "source_type": DatasetSourceType.FILE,
-        "location": "data/customers.csv",
-        "version": "v1",
-        "kind": DatasetKind.RAW,
-        "role": DatasetRole.PRIMARY,
-        "description": "Raw customer extract.",
-    }
-    payload.update(overrides)
-    return DatasetAsset(**payload)
-
-
-def build_data_profile(project_id: UUID, dataset_id: UUID, **overrides: object) -> DataProfile:
-    payload: dict[str, object] = {
-        "project_id": project_id,
-        "dataset_id": dataset_id,
+        "dataset_path": "data/customers.csv",
+        "dvc_hash": "md5:customers-v1",
+        "dvc_version_label": "customers-v1",
         "method": DataProfileMethod.BASELINE_SUMMARY,
         "schema_summary": SchemaSummary(column_order=["customer_id"]),
         "baseline_summary": BaselineSummary(column_names=["customer_id"]),
@@ -116,14 +91,15 @@ def build_data_profile(project_id: UUID, dataset_id: UUID, **overrides: object) 
                 column_name="country",
             )
         ],
+        "lifecycle_state": DataProfileLifecycleState.ACTIVE,
+        "accepted_as_ground_truth": True,
     }
     payload.update(overrides)
     return DataProfile(**payload)
 
 
-def build_assumption(project_id: UUID, **overrides: object) -> Assumption:
+def build_assumption(**overrides: object) -> Assumption:
     payload: dict[str, object] = {
-        "project_id": project_id,
         "statement": "Each row represents one customer.",
         "basis": "Derived from unique customer identifier checks.",
         "confidence": ConfidenceLevel.MEDIUM,
@@ -133,587 +109,323 @@ def build_assumption(project_id: UUID, **overrides: object) -> Assumption:
     return Assumption(**payload)
 
 
-def build_hypothesis(project_id: UUID, **overrides: object) -> Hypothesis:
+def build_task(profile_id: UUID | None, **overrides: object) -> Task:
     payload: dict[str, object] = {
-        "project_id": project_id,
+        "title": "Test churn association",
+        "description": "Evaluate whether monthly spend relates to churn.",
+        "lifecycle_state": TaskLifecycleState.ACTIVE,
+        "task_kind": TaskKind.ANALYTICAL,
+        "profile_id": profile_id,
+        "variables": ["monthly_spend", "churned"],
+        "evidence_expectation": "A statistical test over the accepted DataProfile.",
+    }
+    payload.update(overrides)
+    return Task(**payload)
+
+
+def build_hypothesis(task_id: UUID, profile_id: UUID, **overrides: object) -> Hypothesis:
+    payload: dict[str, object] = {
+        "task_id": task_id,
+        "profile_id": profile_id,
         "statement": "Higher monthly spend is associated with lower churn.",
         "variables": ["monthly_spend", "churned"],
         "scope": "Active residential customers",
         "validation_method": "logistic_regression",
-        "status": HypothesisStatus.PROPOSED,
-        "assumption_ids": [],
-        "dataset_ids": [],
+        "evidence_expectation": "Regression coefficient and uncertainty.",
+        "status": HypothesisStatus.TESTING,
     }
     payload.update(overrides)
     return Hypothesis(**payload)
 
 
-def build_evidence(project_id: UUID, dataset_id: UUID, **overrides: object) -> Evidence:
+def build_evidence(hypothesis_id: UUID, profile_id: UUID, **overrides: object) -> Evidence:
     payload: dict[str, object] = {
-        "project_id": project_id,
-        "dataset_id": dataset_id,
+        "hypothesis_id": hypothesis_id,
+        "profile_id": profile_id,
+        "analysis_frame_ref": "analysis-frame:customers:v1:spend-churn",
+        "execution_run_ref": "execution-run:001",
         "evidence_type": EvidenceType.STATISTICAL_TEST,
-        "method": "chi_square",
+        "method": "logistic_regression",
         "parameters": [MethodParameter(name="alpha", value=0.05)],
         "provenance": EvidenceProvenance(
-            source_profile_id=uuid4(),
-            execution_label="run-001",
+            analysis_frame_ref="analysis-frame:customers:v1:spend-churn",
+            execution_run_ref="execution-run:001",
             code_reference="tests/evidence",
             artifact_paths=["reports/evidence.json"],
         ),
         "result_summary": EvidenceResultSummary(
-            summary="Association detected.",
-            key_findings=["p-value below threshold"],
+            summary="Available evidence supports a negative association within scope.",
+            key_findings=["coefficient below zero"],
             metric_name="p_value",
             metric_value=0.01,
         ),
         "limitations": ["Small validation sample."],
-        "assumption_ids": [],
-        "hypothesis_evaluations": [],
-        "decision_ids": [],
     }
     payload.update(overrides)
     return Evidence(**payload)
 
 
-def build_decision_log(project_id: UUID, **overrides: object) -> DecisionLog:
+def build_discovery(
+    hypothesis_id: UUID,
+    profile_id: UUID,
+    evidence_id: UUID,
+    **overrides: object,
+) -> Discovery:
     payload: dict[str, object] = {
-        "project_id": project_id,
-        "decision_type": DecisionType.VALIDATION_STRATEGY,
-        "decision": "Use stratified validation split.",
-        "rationale": "Protect minority churn cases.",
-        "status": DecisionStatus.ACTIVE,
-        "alternatives_considered": ["Random split"],
-        "assumption_ids": [],
-        "hypothesis_ids": [],
-    }
-    payload.update(overrides)
-    return DecisionLog(**payload)
-
-
-def build_session_frame(project_id: UUID, **overrides: object) -> SessionFrame:
-    created_at = datetime.now(UTC)
-    payload: dict[str, object] = {
-        "project_id": project_id,
-        "frame_topic": "missing-value-investigation-frame",
-        "frame_status": SessionFrameStatus.HANDOFF,
-        "objective_snapshot": "Understand customer churn drivers.",
-        "frame_outcome": "Need a validation split decision before proceeding.",
-        "project_summary": "Churn project summary.",
-        "branch_key": "main",
-        "checkpoint_label": "checkpoint-001",
-        "handoff_summary": "Resume from the latest churn investigation checkpoint.",
-        "dataset_summaries": [
-            DatasetContextSummary(
-                dataset_id=uuid4(),
-                name="customers",
-                version="v1",
-                kind=DatasetKind.RAW,
-                role=DatasetRole.PRIMARY,
-                row_count=10,
-                column_count=4,
-                warning_count=1,
-                provenance=[
-                    ContextProvenance(
-                        source_type=MemorySourceType.DATA_PROFILE,
-                        reference="profile-001",
-                    )
-                ],
-                invalidation_rules=[
-                    InvalidationRule(
-                        trigger=InvalidationTrigger.DATASET_VERSION_CHANGE,
-                        detail="Refresh if the customers dataset version changes.",
-                    )
-                ],
-            )
-        ],
-        "active_dataset_refs": [uuid4()],
-        "active_assumptions": [
-            AssumptionContextSummary(
-                assumption_id=uuid4(),
-                statement="Each row represents one customer.",
-                confidence=ConfidenceLevel.MEDIUM,
-                linked_evidence_count=1,
-                memory_status=MemoryStatus.PINNED,
-            )
-        ],
-        "active_assumption_refs": [uuid4()],
-        "active_hypotheses": [
-            HypothesisContextSummary(
-                hypothesis_id=uuid4(),
-                statement="Monthly spend reduces churn.",
-                status=HypothesisStatus.PROPOSED,
-                validation_method="logistic_regression",
-                linked_evidence_count=1,
-                invalidation_rules=[
-                    InvalidationRule(
-                        trigger=InvalidationTrigger.ASSUMPTION_REJECTED,
-                        detail="Re-evaluate if the row-granularity assumption is rejected.",
-                    )
-                ],
-            )
-        ],
-        "active_hypothesis_refs": [uuid4()],
-        "strongest_evidence": [
-            EvidenceContextSummary(
-                evidence_id=uuid4(),
-                evidence_type=EvidenceType.STATISTICAL_TEST,
-                method="chi_square",
-                summary="Association detected.",
-                created_at=created_at,
-                memory_status=MemoryStatus.VALIDATED,
-                provenance=[
-                    ContextProvenance(
-                        source_type=MemorySourceType.VALIDATION_RESULT,
-                        reference="run-001",
-                    )
-                ],
-            )
-        ],
-        "strongest_evidence_refs": [uuid4()],
-        "recent_decisions": [
-            DecisionContextSummary(
-                decision_id=uuid4(),
-                decision_type=DecisionType.VALIDATION_STRATEGY,
-                decision="Use stratified validation split.",
-                status=DecisionStatus.ACTIVE,
-                created_at=created_at,
-                memory_status=MemoryStatus.PINNED,
-            )
-        ],
-        "recent_decision_refs": [uuid4()],
-        "pending_tasks": ["Validate churn hypotheses."],
-        "open_questions": ["Do we need a time-based split?"],
-        "key_warnings": ["Small validation sample."],
-        "stale_context": [
-            StaleContextMarker(
-                artifact_type="Assumption",
-                reason="Old uniqueness assumption was rejected on dataset_v0.",
-            )
-        ],
-        "dead_ends": [
-            DeadEndSummary(
-                summary="Removed high spend outliers too early.",
-                reason="The earlier filter erased genuine churn signal.",
-                revived_only_if="Re-run with a documented leakage-safe outlier rule.",
-            )
-        ],
-        "cached_tool_results": [
-            ToolResultCacheSummary(
-                cache_key="dataset_v1.profile",
-                summary="Baseline profile for customers v1.",
-                status=MemoryStatus.PINNED,
-                source_type=MemorySourceType.TOOL_RESULT,
-                created_at=created_at,
-                expires_at=created_at + timedelta(days=1),
-                invalidation_rules=[
-                    InvalidationRule(
-                        trigger=InvalidationTrigger.DATASET_VERSION_CHANGE,
-                        detail="Drop the cache when customers moves off v1.",
-                    )
-                ],
-            )
-        ],
-        "frame_invalidation_rules": [
-            InvalidationRule(
-                trigger=InvalidationTrigger.COMMIT_SHA_CHANGE,
-                detail="Review code-linked context after a material code change.",
-            )
-        ],
-        "created_at": created_at,
-    }
-    payload.update(overrides)
-    return SessionFrame(**payload)
-
-
-def test_project_repository_crud_and_active_filter(db_session) -> None:
-    repository = ProjectRepository(db_session)
-
-    active_project = repository.create(build_project())
-    archived_project = repository.create(
-        build_project(name="Archived", status=ProjectStatus.ARCHIVED)
-    )
-
-    updated = repository.update(
-        active_project.project_id,
-        ProjectUpdate(
-            objective="Refined churn objective.",
-            research_questions=["What segments churn most?", "What predicts churn?"],
+        "hypothesis_id": hypothesis_id,
+        "evidence_ids": [evidence_id],
+        "claim": DiscoveryClaim(
+            statement="Higher monthly spend is associated with lower churn.",
+            scope="Active residential customers in the profiled dataset.",
+            conditions=["logistic_regression", "alpha=0.05"],
+            result="supported",
         ),
-    )
-
-    assert updated is not None
-    assert updated.objective == "Refined churn objective."
-    assert repository.get_by_id(active_project.project_id) == updated
-    assert [project.project_id for project in repository.list_active()] == [
-        active_project.project_id
-    ]
-    assert [project.project_id for project in repository.list(status=ProjectStatus.ARCHIVED)] == [
-        archived_project.project_id
-    ]
-
-
-def test_dataset_asset_repository_queries_and_update(db_session) -> None:
-    project = ProjectRepository(db_session).create(build_project())
-    repository = DatasetAssetRepository(db_session)
-
-    parent = repository.create(build_dataset_asset(project.project_id, name="customers"))
-    child = repository.create(
-        build_dataset_asset(
-            project.project_id,
-            name="customers_clean",
-            kind=DatasetKind.DERIVED,
-            role=DatasetRole.INTERMEDIATE,
-            upstream_dataset_ids=[parent.dataset_id],
-            lineage_steps=[
-                LineageStep(
-                    operation_type=LineageOperationType.COLUMN_DROP,
-                    description="Drop unused text column before modeling.",
-                    input_dataset_ids=[parent.dataset_id],
-                    column_names=["notes"],
-                )
-            ],
-            version="v2",
-        )
-    )
-
-    sibling = repository.create(
-        build_dataset_asset(
-            project.project_id,
-            name="events",
-            source_type=DatasetSourceType.QUERY,
-            role=DatasetRole.REFERENCE,
-        )
-    )
-
-    updated = repository.update(
-        sibling.dataset_id,
-        DatasetAssetUpdate(description=None, location="warehouse://events"),
-    )
-
-    assert updated is not None
-    assert updated.description is None
-    assert updated.location == "warehouse://events"
-    assert child.upstream_dataset_ids == [parent.dataset_id]
-    assert [item.dataset_id for item in repository.list_children(parent.dataset_id)] == [
-        child.dataset_id
-    ]
-    assert [item.dataset_id for item in repository.list_upstream(child.dataset_id)] == [
-        parent.dataset_id
-    ]
-    assert [
-        item.dataset_id
-        for item in repository.list_by_name(project.project_id, "customers")
-    ] == [
-        parent.dataset_id
-    ]
-    assert {
-        item.dataset_id
-        for item in repository.list(
-            project_id=project.project_id,
-            kind=DatasetKind.DERIVED,
-        )
-    } == {
-        child.dataset_id
+        "epistemic_status": DiscoveryEpistemicStatus.SUPPORTED,
+        "scope": "Active residential customers in the profiled dataset.",
+        "validity_basis": ValidityBasis(
+            data_profile_id=profile_id,
+            analysis_frame_refs=["analysis-frame:customers:v1:spend-churn"],
+            hypothesis_id=hypothesis_id,
+            evidence_ids=[evidence_id],
+            method="logistic_regression",
+            parameters=[MethodParameter(name="alpha", value=0.05)],
+            code_reference="tests/evidence",
+            environment_reference="pytest",
+            decision_rule="p_value < alpha",
+            strength="moderate",
+            uncertainty="p_value=0.01",
+            invalidators=["DataProfile superseded", "method implementation changes"],
+        ),
     }
-    assert {item.dataset_id for item in repository.list(role=DatasetRole.REFERENCE)} == {
-        sibling.dataset_id
+    payload.update(overrides)
+    return Discovery(**payload)
+
+
+def test_obsolete_domain_types_are_not_exported_or_fcos() -> None:
+    fcos = {item.value for item in FirstClassObjectType}
+
+    assert fcos == {
+        "objective",
+        "data_profile",
+        "assumption",
+        "task",
+        "hypothesis",
+        "evidence",
+        "discovery",
+        "session_frame",
     }
+    assert "project" not in fcos
+    assert "workspace" not in fcos
+    assert "dataset_asset" not in fcos
+    assert "decision_log" not in fcos
+
+    import schemas.artifacts as artifacts
+
+    assert not hasattr(artifacts, "Project")
+    assert not hasattr(artifacts, "DatasetAsset")
+    assert not hasattr(artifacts, "DecisionLog")
 
 
-def test_dataset_asset_repository_enforces_unique_project_name_version(db_session) -> None:
-    project = ProjectRepository(db_session).create(build_project())
-    repository = DatasetAssetRepository(db_session)
+def test_objective_task_profile_repositories_round_trip_without_project_ids(db_session) -> None:
+    objective_repository = ObjectiveRepository(db_session)
+    profile_repository = DataProfileRepository(db_session)
+    task_repository = TaskRepository(db_session)
 
-    repository.create(build_dataset_asset(project.project_id, name="customers", version="v1"))
-
-    with pytest.raises(IntegrityError):
-        repository.create(build_dataset_asset(project.project_id, name="customers", version="v1"))
-
-
-def test_data_profile_repository_queries_and_round_trip(db_session) -> None:
-    project = ProjectRepository(db_session).create(build_project())
-    dataset = DatasetAssetRepository(db_session).create(build_dataset_asset(project.project_id))
-    repository = DataProfileRepository(db_session)
-
-    older = repository.create(
-        build_data_profile(
-            project.project_id,
-            dataset.dataset_id,
-            created_at=datetime.now(UTC) - timedelta(days=1),
-        )
+    objective = objective_repository.create(build_objective())
+    updated_objective = objective_repository.update(
+        objective.objective_id,
+        ObjectiveUpdate(statement="Refined churn objective."),
     )
-    newer = repository.create(
-        build_data_profile(
-            project.project_id,
-            dataset.dataset_id,
-            method=DataProfileMethod.DATA_QUALITY_SCAN,
-        )
+    profile = profile_repository.create(build_data_profile())
+    task = task_repository.create(build_task(profile.profile_id))
+
+    updated_task = task_repository.update(
+        task.task_id,
+        TaskUpdate(lifecycle_state=TaskLifecycleState.PAUSED),
     )
 
-    loaded = repository.get_by_id(older.profile_id)
-
-    assert loaded is not None
-    assert loaded.quality_flags[0].severity == QualityFlagSeverity.INFO
-    assert repository.get_latest_for_dataset(dataset.dataset_id) == newer
-    assert repository.get_latest_for_dataset(
-        dataset.dataset_id,
-        method=DataProfileMethod.BASELINE_SUMMARY,
-    ) == older
-    assert [item.profile_id for item in repository.list_for_dataset(dataset.dataset_id)] == [
-        newer.profile_id,
-        older.profile_id,
-    ]
+    assert updated_objective is not None
+    assert updated_objective.statement == "Refined churn objective."
+    assert profile_repository.get_latest_for_dataset_path("data/customers.csv") == profile
+    assert profile_repository.list(dvc_hash="md5:customers-v1") == [profile]
+    assert updated_task is not None
+    assert updated_task.lifecycle_state == TaskLifecycleState.PAUSED
+    assert "project_id" not in DataProfile.model_fields
+    assert "workspace_id" not in DataProfile.model_fields
 
 
-def test_assumption_repository_queries_and_update(db_session) -> None:
-    project = ProjectRepository(db_session).create(build_project())
-    dataset = DatasetAssetRepository(db_session).create(build_dataset_asset(project.project_id))
-    profile = DataProfileRepository(db_session).create(
-        build_data_profile(project.project_id, dataset.dataset_id)
-    )
+def test_assumption_repository_is_planning_scoped_by_profile(db_session) -> None:
+    profile = DataProfileRepository(db_session).create(build_data_profile())
     repository = AssumptionRepository(db_session)
 
-    active = repository.create(
-        build_assumption(
-            project.project_id,
-            dataset_id=dataset.dataset_id,
-            profile_id=profile.profile_id,
-        )
-    )
-    repository.create(
-        build_assumption(
-            project.project_id,
-            statement="Archived assumption",
-            status=AssumptionStatus.ARCHIVED,
-        )
-    )
-
+    active = repository.create(build_assumption(profile_id=profile.profile_id))
+    repository.create(build_assumption(statement="Archived", status=AssumptionStatus.ARCHIVED))
     updated = repository.update(
         active.assumption_id,
-        AssumptionUpdate(
-            status=AssumptionStatus.VALIDATED,
-            profile_id=None,
-        ),
+        AssumptionUpdate(status=AssumptionStatus.VALIDATED),
     )
 
     assert updated is not None
     assert updated.status == AssumptionStatus.VALIDATED
-    assert updated.profile_id is None
-    assert repository.list_active(project_id=project.project_id) == []
-    assert [item.assumption_id for item in repository.list_for_dataset(dataset.dataset_id)] == [
-        active.assumption_id
-    ]
-    assert [item.assumption_id for item in repository.list(status=AssumptionStatus.ARCHIVED)] != []
+    assert repository.list_active() == []
+    assert repository.list_for_profile(profile.profile_id) == [updated]
 
 
-def test_hypothesis_repository_queries_and_typed_update(db_session) -> None:
-    project = ProjectRepository(db_session).create(build_project())
-    dataset = DatasetAssetRepository(db_session).create(build_dataset_asset(project.project_id))
-    assumption = AssumptionRepository(db_session).create(build_assumption(project.project_id))
-    repository = HypothesisRepository(db_session)
+def test_hypothesis_evidence_discovery_are_traceable_and_evidence_bound(db_session) -> None:
+    profile = DataProfileRepository(db_session).create(build_data_profile())
+    task = TaskRepository(db_session).create(build_task(profile.profile_id))
+    hypothesis_repository = HypothesisRepository(db_session)
+    evidence_repository = EvidenceRepository(db_session)
+    discovery_repository = DiscoveryRepository(db_session)
 
-    active = repository.create(
-        build_hypothesis(
-            project.project_id,
-            dataset_ids=[dataset.dataset_id],
-            assumption_ids=[assumption.assumption_id],
+    hypothesis = hypothesis_repository.create(build_hypothesis(task.task_id, profile.profile_id))
+    evidence = evidence_repository.create(
+        build_evidence(hypothesis.hypothesis_id, profile.profile_id)
+    )
+    discovery = discovery_repository.create(
+        build_discovery(hypothesis.hypothesis_id, profile.profile_id, evidence.evidence_id)
+    )
+    updated_hypothesis = hypothesis_repository.update(
+        hypothesis.hypothesis_id,
+        HypothesisUpdate(status=HypothesisStatus.COMPLETED),
+    )
+
+    assert evidence.profile_id == profile.profile_id
+    assert evidence.analysis_frame_ref == "analysis-frame:customers:v1:spend-churn"
+    assert evidence.execution_run_ref == "execution-run:001"
+    assert discovery.evidence_ids == [evidence.evidence_id]
+    assert discovery.validity_basis.data_profile_id == profile.profile_id
+    assert discovery.validity_basis.assumptions_excluded_from_inference is True
+    assert discovery_repository.list_for_hypothesis(hypothesis.hypothesis_id) == [discovery]
+    assert updated_hypothesis is not None
+    assert updated_hypothesis.status == HypothesisStatus.COMPLETED
+
+
+def test_data_profile_evidence_and_discovery_invariants_are_enforced() -> None:
+    profile = build_data_profile()
+    evidence = build_evidence(uuid4(), profile.profile_id)
+
+    with pytest.raises(ValidationError):
+        profile.row_count = 999
+
+    with pytest.raises(ValidationError):
+        evidence.result_summary = EvidenceResultSummary(summary="Edited interpretation.")
+
+    with pytest.raises(ValidationError):
+        Evidence(
+            **(
+                build_evidence(uuid4(), profile.profile_id)
+                .model_dump()
+                | {"provenance": EvidenceProvenance(
+                    analysis_frame_ref="different-frame",
+                    execution_run_ref="execution-run:001",
+                )}
+            )
         )
-    )
-    repository.create(
-        build_hypothesis(
-            project.project_id,
-            statement="Archived hypothesis",
-            status=HypothesisStatus.ARCHIVED,
-        )
-    )
 
-    updated = repository.update(
-        active.hypothesis_id,
-        HypothesisUpdate(
-            status=HypothesisStatus.VALIDATING,
-        ),
-    )
-
-    assert updated is not None
-    assert updated.status == HypothesisStatus.VALIDATING
-    assert [
-        item.hypothesis_id
-        for item in repository.list_active(project_id=project.project_id)
-    ] == [
-        active.hypothesis_id
-    ]
-    assert [item.hypothesis_id for item in repository.list_for_dataset(dataset.dataset_id)] == [
-        active.hypothesis_id
-    ]
-    assert [
-        item.hypothesis_id
-        for item in repository.list_for_assumption(assumption.assumption_id)
-    ] == [
-        active.hypothesis_id
-    ]
+    with pytest.raises(ValidationError):
+        build_discovery(uuid4(), profile.profile_id, uuid4(), evidence_ids=[])
 
 
-def test_evidence_repository_queries_and_nested_round_trip(db_session) -> None:
-    project = ProjectRepository(db_session).create(build_project())
-    dataset = DatasetAssetRepository(db_session).create(build_dataset_asset(project.project_id))
-    assumption = AssumptionRepository(db_session).create(build_assumption(project.project_id))
-    hypothesis = HypothesisRepository(db_session).create(build_hypothesis(project.project_id))
-    decision = DecisionLogRepository(db_session).create(build_decision_log(project.project_id))
-    repository = EvidenceRepository(db_session)
-
-    evidence = repository.create(
-        build_evidence(
-            project.project_id,
-            dataset.dataset_id,
-            assumption_ids=[assumption.assumption_id],
-            hypothesis_evaluations=[
-                HypothesisEvaluation(
-                    hypothesis_id=hypothesis.hypothesis_id,
-                    outcome=HypothesisEvidenceOutcome.SUPPORTS,
-                    note="Observed association aligns with the claim.",
-                )
-            ],
-            decision_ids=[decision.decision_id],
+def test_user_decision_is_typed_provenance_not_scientific_knowledge(db_session) -> None:
+    repository = UserDecisionRepository(db_session)
+    decision = repository.create(
+        UserDecision(
+            decision_type=UserDecisionType.VALIDATION_STRATEGY,
+            decision="Use stratified validation split.",
+            rationale="Protect minority churn cases.",
+            alternatives_considered=["Random split"],
         )
     )
 
-    loaded = repository.get_by_id(evidence.evidence_id)
-
-    assert loaded is not None
-    assert loaded.parameters[0].name == "alpha"
-    assert loaded.result_summary.metric_value == 0.01
-    assert loaded.assumption_ids == [assumption.assumption_id]
-    assert loaded.hypothesis_evaluations[0].outcome == HypothesisEvidenceOutcome.SUPPORTS
-    assert [item.evidence_id for item in repository.list_for_dataset(dataset.dataset_id)] == [
-        evidence.evidence_id
-    ]
-    assert [
-        item.evidence_id
-        for item in repository.list_for_assumption(assumption.assumption_id)
-    ] == [
-        evidence.evidence_id
-    ]
-    assert [
-        item.evidence_id
-        for item in repository.list_for_hypothesis(hypothesis.hypothesis_id)
-    ] == [
-        evidence.evidence_id
-    ]
-    assert [
-        item.evidence_id
-        for item in repository.list_for_hypothesis(
-            hypothesis.hypothesis_id,
-            outcome=HypothesisEvidenceOutcome.SUPPORTS,
-        )
-    ] == [
-        evidence.evidence_id
-    ]
-    assert [item.evidence_id for item in repository.list_for_decision(decision.decision_id)] == [
-        evidence.evidence_id
-    ]
+    assert repository.list(decision_type=UserDecisionType.VALIDATION_STRATEGY) == [decision]
+    assert not hasattr(decision, "project_id")
 
 
-def test_decision_log_repository_filters_and_update(db_session) -> None:
-    project = ProjectRepository(db_session).create(build_project())
-    assumption = AssumptionRepository(db_session).create(build_assumption(project.project_id))
-    hypothesis = HypothesisRepository(db_session).create(build_hypothesis(project.project_id))
-    repository = DecisionLogRepository(db_session)
-
-    older = repository.create(
-        build_decision_log(
-            project.project_id,
-            decision="Older decision",
-            created_at=datetime.now(UTC) - timedelta(days=1),
-            updated_at=datetime.now(UTC) - timedelta(days=1),
-        )
-    )
-    active = repository.create(
-        build_decision_log(
-            project.project_id,
-            assumption_ids=[assumption.assumption_id],
-            hypothesis_ids=[hypothesis.hypothesis_id],
+def test_session_frame_repository_round_trip_is_workspace_local(db_session) -> None:
+    objective = build_objective()
+    frame = SessionFrameRepository(db_session).create(
+        SessionFrame(
+            frame_topic="churn-frame",
+            frame_status=SessionFrameStatus.HANDOFF,
+            objective_snapshot=objective.statement,
+            created_at=datetime.now(UTC),
         )
     )
 
-    updated = repository.update(
-        active.decision_id,
-        DecisionLogUpdate(
-            status=DecisionStatus.SUPERSEDED,
-            superseded_by_decision_id=older.decision_id,
-        ),
-    )
-
-    assert updated is not None
-    assert updated.status == DecisionStatus.SUPERSEDED
-    assert updated.superseded_by_decision_id == older.decision_id
-    assert [item.decision_id for item in repository.list(status=DecisionStatus.SUPERSEDED)] == [
-        active.decision_id
-    ]
-    assert [item.decision_id for item in repository.list_active(project_id=project.project_id)] == [
-        older.decision_id
-    ]
-    assert [
-        item.decision_id
-        for item in repository.list_recent(project_id=project.project_id, limit=1)
-    ] == [
-        older.decision_id
-    ]
-    assert [
-        item.decision_id
-        for item in repository.list_recent(
-            project_id=project.project_id,
-            limit=1,
-            active_only=False,
-        )
-    ] == [
-        active.decision_id
-    ]
+    assert SessionFrameRepository(db_session).get_latest() == frame
+    assert SessionFrameRepository(db_session).list_recent(limit=1) == [frame]
+    assert "project_id" not in SessionFrame.model_fields
 
 
-def test_session_frame_repository_queries_and_nested_round_trip(db_session) -> None:
-    project = ProjectRepository(db_session).create(build_project())
-    repository = SessionFrameRepository(db_session)
+def test_workspace_databases_are_isolated(tmp_path: Path) -> None:
+    first_url = f"sqlite:///{(tmp_path / 'first.sqlite3').as_posix()}"
+    second_url = f"sqlite:///{(tmp_path / 'second.sqlite3').as_posix()}"
+    create_db_engine.cache_clear()
+    init_db(first_url)
+    init_db(second_url)
 
-    older = repository.create(
-        build_session_frame(
-            project.project_id,
-            created_at=datetime.now(UTC) - timedelta(hours=1),
-        )
-    )
-    latest = repository.create(
-        build_session_frame(
-            project.project_id,
-            parent_session_frame_id=older.session_frame_id,
-        )
-    )
+    first_session = get_session(first_url)
+    second_session = get_session(second_url)
+    try:
+        created = ObjectiveRepository(first_session).create(build_objective(title="First"))
 
-    loaded = repository.get_by_id(latest.session_frame_id)
-
-    assert loaded is not None
-    assert loaded.frame_topic == "missing-value-investigation-frame"
-    assert loaded.frame_status == SessionFrameStatus.HANDOFF
-    assert loaded.parent_session_frame_id == older.session_frame_id
-    assert loaded.dataset_summaries[0].warning_count == 1
-    assert loaded.dataset_summaries[0].provenance[0].source_type == MemorySourceType.DATA_PROFILE
-    assert loaded.active_dataset_refs
-    assert loaded.active_assumptions[0].memory_status == MemoryStatus.PINNED
-    assert loaded.stale_context[0].artifact_type == "Assumption"
-    assert loaded.cached_tool_results[0].cache_key == "dataset_v1.profile"
-    assert repository.get_latest(project.project_id) == latest
-    assert [
-        item.session_frame_id
-        for item in repository.list_recent(project.project_id, limit=1)
-    ] == [
-        latest.session_frame_id
-    ]
-    assert [item.session_frame_id for item in repository.list(project_id=project.project_id)] == [
-        latest.session_frame_id,
-        older.session_frame_id,
-    ]
+        assert ObjectiveRepository(first_session).get_by_id(created.objective_id) == created
+        assert ObjectiveRepository(second_session).get_by_id(created.objective_id) is None
+        assert ObjectiveRepository(second_session).list() == []
+    finally:
+        first_session.close()
+        second_session.close()
+        create_db_engine.cache_clear()
 
 
-def test_append_only_and_immutable_repositories_do_not_expose_update(db_session) -> None:
+def test_append_only_repositories_do_not_expose_update(db_session) -> None:
     assert not hasattr(DataProfileRepository(db_session), "update")
     assert not hasattr(EvidenceRepository(db_session), "update")
+    assert not hasattr(DiscoveryRepository(db_session), "update")
     assert not hasattr(SessionFrameRepository(db_session), "update")
+
+
+def test_task_and_non_fco_generated_view_guards() -> None:
+    inactive_task = build_task(uuid4(), lifecycle_state=TaskLifecycleState.PAUSED)
+    parent_task = build_task(
+        uuid4(),
+        task_kind=TaskKind.ORGANIZING,
+        variables=[],
+        evidence_expectation=None,
+    )
+
+    assert "proposed" not in {item.value for item in TaskLifecycleState}
+    assert inactive_task.can_generate_hypothesis() is False
+    assert parent_task.can_generate_hypothesis() is False
+    assert "generated_view" not in {item.value for item in FirstClassObjectType}
+
+
+def test_planner_and_executor_authoring_contracts() -> None:
+    from agents.hypothesis_analyst.types import ExecutorOutput
+    from agents.planner.types import PlannerOutput
+
+    planner_fields = set(PlannerOutput.model_fields)
+    executor_fields = set(ExecutorOutput.model_fields)
+
+    assert "evidence_drafts" not in planner_fields
+    assert "discovery_drafts" not in planner_fields
+    assert {"planner_operations", "executor_dispatch_ref"} <= planner_fields
+    assert {"evidence_drafts", "discovery_drafts", "execution_run_ref"} <= executor_fields
+
+
+def test_repository_queries_do_not_require_project_fco(db_session) -> None:
+    older = DataProfileRepository(db_session).create(
+        build_data_profile(created_at=datetime.now(UTC) - timedelta(days=1))
+    )
+    newer = DataProfileRepository(db_session).create(
+        build_data_profile(
+            dvc_hash="md5:customers-v2",
+            dvc_version_label="customers-v2",
+        )
+    )
+
+    assert DataProfileRepository(db_session).list_for_dataset_path("data/customers.csv") == [
+        newer,
+        older,
+    ]

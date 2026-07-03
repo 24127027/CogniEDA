@@ -1,18 +1,23 @@
-"""Enumerations for CogniEDA analytical artifacts."""
+"""Enumerations for CogniEDA research-state objects and provenance records."""
 
 from enum import StrEnum
 
 
-class ProjectStatus(StrEnum):
-    """Lifecycle states for a project."""
+class FirstClassObjectType(StrEnum):
+    """The target CogniEDA first-class object set."""
 
-    ACTIVE = "active"
-    PAUSED = "paused"
-    ARCHIVED = "archived"
+    OBJECTIVE = "objective"
+    DATA_PROFILE = "data_profile"
+    ASSUMPTION = "assumption"
+    TASK = "task"
+    HYPOTHESIS = "hypothesis"
+    EVIDENCE = "evidence"
+    DISCOVERY = "discovery"
+    SESSION_FRAME = "session_frame"
 
 
 class MemoryStatus(StrEnum):
-    """Lifecycle states for memory items inside an active context frame."""
+    """Lifecycle states for items selected into an active context frame."""
 
     ACTIVE = "active"
     PINNED = "pinned"
@@ -28,14 +33,22 @@ class MemoryStatus(StrEnum):
     UNRESOLVED = "unresolved"
 
 
+class ContextMode(StrEnum):
+    """Typed context views used to protect epistemic-role boundaries."""
+
+    PLANNING = "planning"
+    CONCLUSION = "conclusion"
+
+
 class MemorySourceType(StrEnum):
-    """Provenance sources for durable analytical memory items."""
+    """Provenance sources for context-frame items."""
 
     USER_CONFIRMATION = "user_confirmation"
     TOOL_RESULT = "tool_result"
     DATA_PROFILE = "data_profile"
     STATISTICAL_TEST = "statistical_test"
-    AGENT_INFERENCE = "agent_inference"
+    EXECUTION_RUN = "execution_run"
+    ANALYSIS_FRAME = "analysis_frame"
     EXTERNAL_DOCUMENTATION = "external_documentation"
     CODE_INSPECTION = "code_inspection"
     PREVIOUS_FRAME = "previous_frame"
@@ -43,47 +56,43 @@ class MemorySourceType(StrEnum):
 
 
 class InvalidationTrigger(StrEnum):
-    """Events that make cached or summarized context stale."""
+    """Events that make cached, summarized, or evidence-bound context stale."""
 
+    DATA_PROFILE_SUPERSEDED = "data_profile_superseded"
     DATASET_VERSION_CHANGE = "dataset_version_change"
     SOURCE_HASH_CHANGE = "source_hash_change"
     SCHEMA_CHANGE = "schema_change"
     METRIC_DEFINITION_CHANGE = "metric_definition_change"
-    ASSUMPTION_REJECTED = "assumption_rejected"
+    METHOD_VERSION_CHANGE = "method_version_change"
+    PARAMETER_CHANGE = "parameter_change"
+    CODE_VERSION_CHANGE = "code_version_change"
+    ENVIRONMENT_CHANGE = "environment_change"
+    SEED_CHANGE = "seed_change"
     USER_OVERRULE = "user_overrule"
     TTL_EXPIRED = "ttl_expired"
-    COMMIT_SHA_CHANGE = "commit_sha_change"
     MANUAL_REVIEW = "manual_review"
 
 
-class SessionFrameStatus(StrEnum):
-    """Operational states for a persisted context frame snapshot."""
+class ObjectiveStatus(StrEnum):
+    """Lifecycle states for an Objective."""
 
     ACTIVE = "active"
-    CHECKPOINT = "checkpoint"
-    HANDOFF = "handoff"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    ARCHIVED = "archived"
+
+
+class DataProfileLifecycleState(StrEnum):
+    """Lifecycle states for immutable DataProfile snapshots."""
+
+    DRAFT = "draft"
+    ACTIVE = "active"
     SUPERSEDED = "superseded"
     ARCHIVED = "archived"
 
 
-class DatasetKind(StrEnum):
-    """High-level lineage role for a dataset asset."""
-
-    RAW = "raw"
-    DERIVED = "derived"
-
-
-class DatasetRole(StrEnum):
-    """Analytical role a dataset plays within a project."""
-
-    PRIMARY = "primary"
-    REFERENCE = "reference"
-    INTERMEDIATE = "intermediate"
-    VALIDATION = "validation"
-
-
 class DatasetSourceType(StrEnum):
-    """Origin type for a dataset asset."""
+    """Origin type for a profiled dataset source."""
 
     FILE = "file"
     DATABASE = "database"
@@ -94,7 +103,7 @@ class DatasetSourceType(StrEnum):
 
 
 class LineageOperationType(StrEnum):
-    """Explicit transformation steps recorded in dataset lineage."""
+    """Explicit transformation steps recorded in profile lineage."""
 
     FILTER = "filter"
     ROW_DROP = "row_drop"
@@ -109,7 +118,7 @@ class LineageOperationType(StrEnum):
 
 
 class DataProfileMethod(StrEnum):
-    """Profiling strategies used to summarize a dataset."""
+    """Profiling strategies used to summarize a dataset version."""
 
     INFERRED_SCHEMA = "inferred_schema"
     BASELINE_SUMMARY = "baseline_summary"
@@ -126,7 +135,7 @@ class ConfidenceLevel(StrEnum):
 
 
 class AssumptionStatus(StrEnum):
-    """Lifecycle states for an assumption."""
+    """Lifecycle states for an Assumption."""
 
     ACTIVE = "active"
     VALIDATED = "validated"
@@ -134,15 +143,31 @@ class AssumptionStatus(StrEnum):
     ARCHIVED = "archived"
 
 
+class TaskLifecycleState(StrEnum):
+    """Durable Task lifecycle states."""
+
+    ACTIVE = "active"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class TaskKind(StrEnum):
+    """Task categories used to guard hypothesis creation."""
+
+    ANALYTICAL = "analytical"
+    ORGANIZING = "organizing"
+    REVIEW = "review"
+
+
 class HypothesisStatus(StrEnum):
-    """Lifecycle states for a hypothesis."""
+    """Lifecycle states for a Hypothesis test contract."""
 
     PROPOSED = "proposed"
-    PLANNED = "planned"
-    VALIDATING = "validating"
-    SUPPORTED = "supported"
-    REFUTED = "refuted"
-    INCONCLUSIVE = "inconclusive"
+    TESTING = "testing"
+    COMPLETED = "completed"
+    INVALIDATED = "invalidated"
     ARCHIVED = "archived"
 
 
@@ -150,12 +175,13 @@ class HypothesisEvidenceOutcome(StrEnum):
     """Typed outcome of one evidence record against one hypothesis."""
 
     SUPPORTS = "supports"
-    REFUTES = "refutes"
+    CONTRADICTS = "contradicts"
     INCONCLUSIVE = "inconclusive"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
 
 
 class EvidenceType(StrEnum):
-    """Evidence categories for analytical results."""
+    """Evidence categories for directly observed analytical results."""
 
     PROFILE = "profile"
     SUMMARY_STATISTIC = "summary_statistic"
@@ -166,23 +192,51 @@ class EvidenceType(StrEnum):
     EXPERIMENT_RESULT = "experiment_result"
 
 
-class DecisionType(StrEnum):
-    """Decision categories captured in the analytical decision log."""
+class EvidenceLifecycleState(StrEnum):
+    """Allowed lifecycle states for immutable Evidence records."""
+
+    ACTIVE = "active"
+    SUPERSEDED = "superseded"
+    INVALIDATED = "invalidated"
+
+
+class DiscoveryEpistemicStatus(StrEnum):
+    """Epistemic status of an evidence-bound Discovery claim."""
+
+    SUPPORTED = "supported"
+    CONTRADICTED = "contradicted"
+    INCONCLUSIVE = "inconclusive"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+
+
+class UserDecisionType(StrEnum):
+    """Typed provenance categories for user decisions."""
 
     DATA_SELECTION = "data_selection"
     PREPROCESSING = "preprocessing"
+    TASK_MANAGEMENT = "task_management"
     HYPOTHESIS_MANAGEMENT = "hypothesis_management"
     VALIDATION_STRATEGY = "validation_strategy"
-    INTERPRETATION = "interpretation"
+    INTERPRETATION_REVIEW = "interpretation_review"
     REPORTING = "reporting"
 
 
-class DecisionStatus(StrEnum):
-    """Lifecycle states for a decision record."""
+class UserDecisionStatus(StrEnum):
+    """Lifecycle states for user-decision provenance records."""
 
     ACTIVE = "active"
     SUPERSEDED = "superseded"
     REJECTED = "rejected"
+    ARCHIVED = "archived"
+
+
+class SessionFrameStatus(StrEnum):
+    """Operational states for a persisted context frame snapshot."""
+
+    ACTIVE = "active"
+    CHECKPOINT = "checkpoint"
+    HANDOFF = "handoff"
+    SUPERSEDED = "superseded"
     ARCHIVED = "archived"
 
 

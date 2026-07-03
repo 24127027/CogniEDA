@@ -1,11 +1,18 @@
-# DataProfile Records
+# DataProfile Mirrors
 
-Store append-only profiling snapshots as Git-tracked JSON mirrors.
+This directory is a reviewable mirror/template surface for `DataProfile` records.
 
-Recommended naming:
+Runtime truth is the workspace-local graph database. Files here should not be treated as a second source of truth unless an explicit import/export workflow is added.
 
-- `<dataset-name>_<method>_<version>.json`
+Each mirror should align with `schemas.artifacts.DataProfile` and store dataset-version identity directly:
 
-Each record should align with `schemas.artifacts.DataProfile` and should reference exactly one `dataset_id`.
+- `dataset_path`
+- optional `dvc_hash`
+- optional `dvc_version_label`
+- optional source metadata
+- schema and baseline summaries
+- preprocessing history
+- lifecycle state
+- `accepted_as_ground_truth`
 
-These files are reviewable metadata mirrors. The runtime repository layer can also persist the same artifact contract in the local operational store.
+`DataProfile` records are immutable. Cleaning or preprocessing that changes data should create a new dataset version and a new `DataProfile`.
