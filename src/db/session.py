@@ -13,11 +13,11 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, create_engine
 
-DEFAULT_SQLITE_PATH = Path(__file__).resolve().parents[2] / ".local" / "cognieda_artifacts.sqlite3"
+DEFAULT_SQLITE_PATH = Path(__file__).resolve().parents[2] / ".local" / "cognieda_graph.sqlite3"
 
 
 def get_default_sqlite_url() -> str:
-    """Return the default local SQLite URL for artifact persistence."""
+    """Return the default workspace-local SQLite URL for graph persistence."""
 
     return f"sqlite:///{DEFAULT_SQLITE_PATH.as_posix()}"
 
@@ -52,7 +52,7 @@ def ensure_sqlite_directory(database_url: str) -> None:
 
 @lru_cache(maxsize=4)
 def create_db_engine(database_url: str | None = None) -> Engine:
-    """Create and cache a SQLModel engine for the configured artifact store."""
+    """Create and cache a SQLModel engine for the configured workspace graph."""
 
     resolved_url = database_url or get_database_url()
     ensure_sqlite_directory(resolved_url)
@@ -79,7 +79,7 @@ def _enable_sqlite_foreign_keys(engine: Engine) -> None:
 
 
 def get_session(database_url: str | None = None) -> Session:
-    """Create a database session for the configured artifact store."""
+    """Create a database session for the configured workspace graph."""
 
     return Session(create_db_engine(database_url))
 
