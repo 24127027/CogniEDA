@@ -1,22 +1,30 @@
-from ..types import AgentRequest, AgentResult, BaseState
+"""Planner-specific graph contracts."""
 
-class PlannerRequest(AgentRequest):
-    """
-    Represents a request to the Planner agent.
-    This class can be extended to include specific fields required for planning tasks.
-    """
-    pass
+from __future__ import annotations
 
-class PlannerResult(AgentResult):
-    """
-    Represents the result from the Planner agent.
-    This class can be extended to include specific fields that represent the outcome of planning tasks.
-    """
-    pass
+from pydantic import Field
+
+from agents.types import AgentEnvelope, BaseState
+
+
+class PlannerInput(AgentEnvelope):
+    """Input accepted by the Planner orchestrator."""
+
+    user_request: str
+    planning_context: str | None = None
+
+
+class PlannerOutput(AgentEnvelope):
+    """Planner output: operations and routing, not scientific knowledge."""
+
+    route: str | None = None
+    planner_operations: list[str] = Field(default_factory=list)
+    executor_dispatch_ref: str | None = None
+
 
 class PlannerState(BaseState):
-    """
-    Represents the state of the Planner agent.
-    This class can be extended to include specific fields that represent the internal state of the planner.
-    """
-    pass
+    """Internal Planner state."""
+
+    input: PlannerInput | None = None
+    output: PlannerOutput | None = None
+    pending_operations: list[str] = Field(default_factory=list)
