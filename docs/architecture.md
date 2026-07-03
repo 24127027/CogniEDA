@@ -12,8 +12,8 @@ Use these pages for implementation-oriented architecture:
 
 ## Current Status
 
-The current implementation is a scaffold with Pydantic schemas, SQLModel persistence, repositories, profiling utilities, `SessionFrame` snapshots, and planner graph stubs.
+The current implementation is a scaffold with target FCO schemas, SQLModel persistence, repositories, profiling utilities, `SessionFrame` snapshots, and planner/executor graph stubs.
 
-The final target architecture defines exactly these FCOs: `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, and `SessionFrame`.
+The architecture defines exactly these FCOs: `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, and `SessionFrame`.
 
-The current code still uses older scaffold artifacts such as `Project`, `DatasetAsset`, and `DecisionLog`. See the gap analysis before making architecture changes.
+The largest remaining gaps are runtime behavior: operation-before-commit planner persistence, full execution/provenance records, executable DVC integration, graph retrieval policy, and evidence-cache services.
