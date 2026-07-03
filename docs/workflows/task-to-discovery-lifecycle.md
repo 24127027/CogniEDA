@@ -32,30 +32,38 @@ Objective
 
 Current implementation:
 
-- `Task` does not exist.
-- `Objective` does not exist.
-- `Discovery` does not exist.
+- `Objective`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, and `SessionFrame` schemas, SQLModel tables, and repositories exist.
+- `TaskLifecycleState` includes `proposed`, `active`, `paused`, `completed`, `failed`, `rejected`, and `cancelled`.
+- `Task.can_generate_hypothesis()` rejects proposed, rejected, paused, failed, cancelled, non-analytical, unscoped, and under-specified Tasks.
+- `HypothesisRepository.create()` rejects Hypotheses unless the source Task exists, is active, analytical, has no child Tasks, uses an active accepted DataProfile, matches the Hypothesis profile, and has no existing Hypothesis.
+- The database schema adds a unique constraint for one Task to one Hypothesis in fresh databases.
+- `DiscoveryRepository.create()` rejects Discoveries unless the Hypothesis exists, all Evidence exists, all Evidence is active, all Evidence belongs to the same Hypothesis, and the Hypothesis has no existing Discovery.
+- The database schema adds a unique constraint for one Hypothesis to one Discovery in fresh databases.
 - `GeneratedView` does not exist.
-- `Hypothesis` exists but is not tied to a source task.
 - `Evidence` exists as an immutable schema/table/repository and requires `analysis_frame_ref` and `execution_run_ref`.
+- `analysis_frame_ref` and `execution_run_ref` are string provenance references; full `AnalysisFrame` and `ExecutionRun` provenance records are not persisted yet.
 - Planner nodes for task selection, execution preparation, dispatch, review, conflict review, and commit are stubs.
 
 ## Implementation Status
 
-Partially implemented scaffold.
+Partially implemented local schema and repository enforcement.
 
 ## Current Partial Support
 
-Current `Hypothesis` and `Evidence` repositories support:
+Current `Task`, `Hypothesis`, `Evidence`, and `Discovery` repositories support:
 
+- proposed/active/paused/completed/failed/rejected/cancelled Task lifecycle persistence
+- terminal analytical Task admission checks before Hypothesis creation
+- one Task to one Hypothesis guard at repository and fresh-database schema level
 - hypothesis creation and lifecycle/status updates
 - hypothesis listing by task/profile/status
 - evidence creation and retrieval by hypothesis/profile
 - typed evidence-to-hypothesis evaluation outcomes
-- evidence lookup by dataset, assumption, hypothesis, and decision
+- Discovery creation and retrieval by Hypothesis/status
+- one Hypothesis to one Discovery guard at repository and fresh-database schema level
 
-This is useful scaffold behavior, but it does not enforce target lifecycle cardinality.
+This is useful local enforcement, but planner execution and commit still do not drive this lifecycle end to end.
 
 ## Architectural Risk
 
-If future code allows direct Hypothesis or Evidence creation without a terminal Task and without a Discovery validity envelope, the system can accumulate analytical outputs without a governed path from intent to evidence-bound knowledge.
+The main remaining lifecycle risk is not local repository admission; it is orchestration. Planner nodes still do not produce typed pending operations, `commit` does not atomically persist approved operations, and full `AnalysisFrame`/`ExecutionRun` provenance records are still missing.

@@ -12,8 +12,8 @@ Current enums in `src/schemas/enums.py`:
 | --- | --- | --- |
 | `Objective` | `active`, `paused`, `completed`, `archived` | Implemented locally. |
 | `DataProfile` | `draft`, `active`, `superseded`, `archived` | Implemented locally; records are immutable. |
-| `Assumption` | `active`, `validated`, `rejected`, `archived` | Partially implemented. |
-| `Task` | `active`, `paused`, `completed`, `failed`, `cancelled` | Implemented locally. Durable proposed/rejected Task states are not used. |
+| `Assumption` | `proposed`, `active`, `flagged`, `retained`, `replaced`, `archived` | Partially implemented; source, testability, scope, scoped DataProfiles, contradiction refs, and replacement refs exist. |
+| `Task` | `proposed`, `active`, `paused`, `completed`, `failed`, `rejected`, `cancelled` | Implemented locally. Proposed Tasks can appear in planning SessionFrame context but cannot generate Hypotheses. |
 | `Hypothesis` | `proposed`, `testing`, `completed`, `invalidated`, `archived` | Implemented locally. |
 | `Evidence` | `active`, `superseded`, `invalidated` | Implemented locally; records are immutable. |
 | `Discovery` | Epistemic status: `supported`, `contradicted`, `inconclusive`, `insufficient_evidence` | Implemented locally; lifecycle flagging is not yet modeled. |
@@ -24,12 +24,17 @@ Current enums in `src/schemas/enums.py`:
 No code was found for:
 
 - planner operation approval before durable Task creation
-- database uniqueness for one Task to one Hypothesis
-- database uniqueness for one Hypothesis to one Discovery
 - Discovery invalidation/flagging lifecycle
 - DataProfile supersession propagation
 - Evidence supersession propagation
-- Assumption contradiction review after Discovery creation
+- automatic Assumption contradiction review after Discovery creation
+- migration of older local databases to the current uniqueness constraints
+
+Current local guards found:
+
+- `HypothesisRepository.create()` enforces active terminal analytical Task admission and one Task to one Hypothesis.
+- `DiscoveryRepository.create()` enforces active same-Hypothesis Evidence and one Hypothesis to one Discovery.
+- `AssumptionRepository.flag_for_contradiction()` flags an Assumption for review and records the contradicting Discovery id without rewriting the assumption statement.
 
 ## Development Guidance
 

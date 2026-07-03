@@ -62,16 +62,18 @@ def build_profile() -> DataProfile:
     )
 
 
-def build_task(profile_id) -> Task:
-    return Task(
-        title="Test segment retention",
-        description="Evaluate whether segment and retention are associated.",
-        lifecycle_state=TaskLifecycleState.ACTIVE,
-        task_kind=TaskKind.ANALYTICAL,
-        profile_id=profile_id,
-        variables=["segment", "retained"],
-        evidence_expectation="Chi-square result.",
-    )
+def build_task(profile_id, **overrides: object) -> Task:
+    payload: dict[str, object] = {
+        "title": "Test segment retention",
+        "description": "Evaluate whether segment and retention are associated.",
+        "lifecycle_state": TaskLifecycleState.ACTIVE,
+        "task_kind": TaskKind.ANALYTICAL,
+        "profile_id": profile_id,
+        "variables": ["segment", "retained"],
+        "evidence_expectation": "Chi-square result.",
+    }
+    payload.update(overrides)
+    return Task(**payload)
 
 
 def build_hypothesis(task_id, profile_id, **overrides: object) -> Hypothesis:
@@ -178,10 +180,11 @@ def test_session_context_builder_separates_planning_and_conclusion_context() -> 
     task = build_task(profile.profile_id)
     assumption = Assumption(
         statement="Each row represents one account-month.",
+        scope="Retention source data grain.",
         basis="Provided by the source-system owner.",
         confidence=ConfidenceLevel.MEDIUM,
         status=AssumptionStatus.ACTIVE,
-        profile_id=profile.profile_id,
+        scoped_data_profile_ids=[profile.profile_id],
     )
     hypothesis = build_hypothesis(task.task_id, profile.profile_id)
     evidence = build_evidence(hypothesis.hypothesis_id, profile.profile_id)
@@ -202,6 +205,7 @@ def test_session_context_builder_separates_planning_and_conclusion_context() -> 
     context_builder = SessionContextBuilder()
     planning_context = context_builder.build(frame, mode=ContextMode.PLANNING)
     conclusion_context = context_builder.build(frame, mode=ContextMode.CONCLUSION)
+    answer_context = context_builder.build(frame, mode=ContextMode.ANSWER)
 
     assert planning_context.assumption_refs == (assumption.assumption_id,)
     assert planning_context.task_refs == (task.task_id,)
@@ -220,7 +224,8 @@ def test_session_context_builder_separates_planning_and_conclusion_context() -> 
     assert conclusion_context.data_profile_refs == (profile.profile_id,)
     assert conclusion_context.hypothesis_refs == (hypothesis.hypothesis_id,)
     assert conclusion_context.evidence_refs == (evidence.evidence_id,)
-    assert conclusion_context.discovery_refs == (discovery.discovery_id,)
+    assert conclusion_context.discovery_refs == ()
+    assert answer_context.discovery_refs == (discovery.discovery_id,)
     assert "Assumptions are excluded" in conclusion_context.exclusion_notes[0]
 
 
@@ -261,3 +266,31 @@ def test_conclusion_context_filters_stale_rejected_or_completed_items() -> None:
     assert conclusion_context.hypotheses == ()
     assert conclusion_context.evidence_refs == (evidence.evidence_id,)
     assert superseded_evidence.evidence_id not in conclusion_context.evidence_refs
+
+
+def test_session_frame_keeps_proposed_tasks_for_planning_only() -> None:
+    objective = build_objective()
+    profile = build_profile()
+    proposed_task = build_task(
+        profile.profile_id,
+        lifecycle_state=TaskLifecycleState.PROPOSED,
+    )
+    rejected_task = build_task(
+        profile.profile_id,
+        lifecycle_state=TaskLifecycleState.REJECTED,
+    )
+
+    frame = SessionFrameBuilder().build(
+        objective=objective,
+        data_profiles=[profile],
+        tasks=[proposed_task, rejected_task],
+    )
+
+    context_builder = SessionContextBuilder()
+    planning_context = context_builder.build(frame, mode=ContextMode.PLANNING)
+    synthesis_context = context_builder.build(frame, mode=ContextMode.DISCOVERY_SYNTHESIS)
+
+    assert frame.active_task_refs == [proposed_task.task_id]
+    assert planning_context.task_refs == (proposed_task.task_id,)
+    assert rejected_task.task_id not in planning_context.task_refs
+    assert synthesis_context.task_refs == ()

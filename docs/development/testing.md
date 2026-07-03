@@ -23,9 +23,14 @@ Current tests cover:
 - append-only repository surfaces for `DataProfile`, `Evidence`, `Discovery`, and `SessionFrame`
 - DataProfile and Evidence immutability
 - Discovery requires Evidence and validity basis
+- Task admission guards before Hypothesis creation
+- database uniqueness/repository guards for one terminal Task to one Hypothesis
+- database uniqueness/repository guards for one Hypothesis to one Discovery
+- Assumption testability admission and contradiction flagging without statement rewrite
+- protected Discovery Synthesis Context excludes Assumptions, Tasks, existing Discoveries, stale context, and caches
 - baseline profiling semantic dtype behavior
 - `SessionFrameBuilder` profile/evidence/discovery selection behavior
-- `SessionContextBuilder` planning-vs-conclusion projection and assumption exclusion
+- `SessionContextBuilder` planning/answer/discovery-synthesis projection and assumption exclusion
 - planner/executor authoring contract separation
 
 ## Important Gaps
@@ -33,12 +38,11 @@ Current tests cover:
 No tests were found for these runtime or graph-level invariants:
 
 - planner operation approval before durable Task creation
-- database uniqueness for one terminal Task to one Hypothesis
-- database uniqueness for one Hypothesis to one Discovery
+- migration coverage for applying uniqueness constraints to older local SQLite files
 - full `AnalysisFrame` provenance records
 - full `ExecutionRun` provenance records
 - operation-before-commit planner mutation
-- graph-retrieved Planning Context vs Conclusion Context exclusion rules
+- graph-retrieved Planning Context vs Discovery Synthesis Context exclusion rules
 - Evidence supersession/invalidation propagation
 - DataProfile supersession propagation
 - evidence cache validity keys

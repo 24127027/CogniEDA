@@ -40,7 +40,9 @@ from schemas.common import (
     ValidityBasis,
 )
 from schemas.enums import (
+    AssumptionSource,
     AssumptionStatus,
+    AssumptionTestability,
     ConfidenceLevel,
     ContextMode,
     DataProfileLifecycleState,
@@ -69,7 +71,9 @@ from schemas.enums import (
 __all__ = [
     "Assumption",
     "AssumptionContextSummary",
+    "AssumptionSource",
     "AssumptionStatus",
+    "AssumptionTestability",
     "BaselineSummary",
     "CategoricalColumnSummary",
     "ColumnSchemaSummary",

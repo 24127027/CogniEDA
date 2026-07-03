@@ -46,11 +46,14 @@ from schemas.common import (
     ValidityBasis,
 )
 from schemas.enums import (
+    AssumptionSource,
     AssumptionStatus,
+    AssumptionTestability,
     ConfidenceLevel,
     DataProfileLifecycleState,
     DataProfileMethod,
     DiscoveryEpistemicStatus,
+    EvidenceLifecycleState,
     EvidenceType,
     FirstClassObjectType,
     HypothesisStatus,
@@ -98,12 +101,20 @@ def build_data_profile(**overrides: object) -> DataProfile:
     return DataProfile(**payload)
 
 
-def build_assumption(**overrides: object) -> Assumption:
+def build_assumption(
+    *,
+    profile_id: UUID | None = None,
+    **overrides: object,
+) -> Assumption:
     payload: dict[str, object] = {
         "statement": "Each row represents one customer.",
+        "scope": "Customer-level churn analysis.",
+        "source": AssumptionSource.USER,
+        "testability": AssumptionTestability.UNTESTABLE_IN_PROJECT,
         "basis": "Derived from unique customer identifier checks.",
         "confidence": ConfidenceLevel.MEDIUM,
         "status": AssumptionStatus.ACTIVE,
+        "scoped_data_profile_ids": [profile_id] if profile_id is not None else [],
     }
     payload.update(overrides)
     return Assumption(**payload)
@@ -260,15 +271,43 @@ def test_assumption_repository_is_planning_scoped_by_profile(db_session) -> None
 
     active = repository.create(build_assumption(profile_id=profile.profile_id))
     repository.create(build_assumption(statement="Archived", status=AssumptionStatus.ARCHIVED))
+    task = TaskRepository(db_session).create(build_task(profile.profile_id))
+    hypothesis = HypothesisRepository(db_session).create(
+        build_hypothesis(task.task_id, profile.profile_id)
+    )
+    evidence = EvidenceRepository(db_session).create(
+        build_evidence(hypothesis.hypothesis_id, profile.profile_id)
+    )
+    discovery = DiscoveryRepository(db_session).create(
+        build_discovery(hypothesis.hypothesis_id, profile.profile_id, evidence.evidence_id)
+    )
+    flagged = repository.flag_for_contradiction(
+        active.assumption_id,
+        discovery_id=discovery.discovery_id,
+    )
     updated = repository.update(
         active.assumption_id,
-        AssumptionUpdate(status=AssumptionStatus.VALIDATED),
+        AssumptionUpdate(status=AssumptionStatus.RETAINED),
     )
 
+    assert flagged is not None
+    assert flagged.status == AssumptionStatus.FLAGGED
+    assert flagged.statement == active.statement
+    assert flagged.contradicted_by_discovery_ids == [discovery.discovery_id]
     assert updated is not None
-    assert updated.status == AssumptionStatus.VALIDATED
+    assert updated.status == AssumptionStatus.RETAINED
     assert repository.list_active() == []
     assert repository.list_for_profile(profile.profile_id) == [updated]
+
+
+def test_assumption_admission_and_update_do_not_rewrite_truth() -> None:
+    with pytest.raises(ValidationError):
+        build_assumption(
+            testability=AssumptionTestability.TESTABLE_CLAIM_REJECTED_AS_ASSUMPTION,
+        )
+
+    with pytest.raises(ValidationError):
+        AssumptionUpdate(statement="Rewrite the assumption statement.")
 
 
 def test_hypothesis_evidence_discovery_are_traceable_and_evidence_bound(db_session) -> None:
@@ -285,6 +324,10 @@ def test_hypothesis_evidence_discovery_are_traceable_and_evidence_bound(db_sessi
     discovery = discovery_repository.create(
         build_discovery(hypothesis.hypothesis_id, profile.profile_id, evidence.evidence_id)
     )
+    with pytest.raises(ValueError):
+        discovery_repository.create(
+            build_discovery(hypothesis.hypothesis_id, profile.profile_id, evidence.evidence_id)
+        )
     updated_hypothesis = hypothesis_repository.update(
         hypothesis.hypothesis_id,
         HypothesisUpdate(status=HypothesisStatus.COMPLETED),
@@ -325,6 +368,129 @@ def test_data_profile_evidence_and_discovery_invariants_are_enforced() -> None:
 
     with pytest.raises(ValidationError):
         build_discovery(uuid4(), profile.profile_id, uuid4(), evidence_ids=[])
+
+    with pytest.raises(ValidationError):
+        EvidenceResultSummary(summary="There is no relationship between spend and churn.")
+
+    careful_summary = EvidenceResultSummary(
+        summary=(
+            "Available evidence is insufficient to reject independence within scope "
+            "using method M."
+        )
+    )
+    assert "insufficient" in careful_summary.summary
+
+    with pytest.raises(ValidationError):
+        DiscoveryClaim(
+            statement="No relationship exists between spend and churn.",
+            scope="Active residential customers.",
+        )
+
+
+def test_hypothesis_repository_enforces_task_admission_and_cardinality(db_session) -> None:
+    profile = DataProfileRepository(db_session).create(build_data_profile())
+    draft_profile = DataProfileRepository(db_session).create(
+        build_data_profile(
+            dvc_hash="md5:customers-draft",
+            dvc_version_label="customers-draft",
+            lifecycle_state=DataProfileLifecycleState.DRAFT,
+            accepted_as_ground_truth=False,
+        )
+    )
+    task_repository = TaskRepository(db_session)
+    hypothesis_repository = HypothesisRepository(db_session)
+
+    proposed_task = task_repository.create(
+        build_task(profile.profile_id, lifecycle_state=TaskLifecycleState.PROPOSED)
+    )
+    with pytest.raises(ValueError):
+        hypothesis_repository.create(
+            build_hypothesis(proposed_task.task_id, profile.profile_id)
+        )
+
+    draft_profile_task = task_repository.create(build_task(draft_profile.profile_id))
+    with pytest.raises(ValueError):
+        hypothesis_repository.create(
+            build_hypothesis(draft_profile_task.task_id, draft_profile.profile_id)
+        )
+
+    parent_task = task_repository.create(build_task(profile.profile_id))
+    task_repository.create(build_task(profile.profile_id, parent_task_id=parent_task.task_id))
+    with pytest.raises(ValueError):
+        hypothesis_repository.create(build_hypothesis(parent_task.task_id, profile.profile_id))
+
+    terminal_task = task_repository.create(build_task(profile.profile_id))
+    hypothesis_repository.create(build_hypothesis(terminal_task.task_id, profile.profile_id))
+    with pytest.raises(ValueError):
+        hypothesis_repository.create(build_hypothesis(terminal_task.task_id, profile.profile_id))
+
+
+def test_discovery_repository_enforces_evidence_ownership_and_cardinality(db_session) -> None:
+    profile = DataProfileRepository(db_session).create(build_data_profile())
+    task_repository = TaskRepository(db_session)
+    hypothesis_repository = HypothesisRepository(db_session)
+    evidence_repository = EvidenceRepository(db_session)
+    discovery_repository = DiscoveryRepository(db_session)
+
+    first_task = task_repository.create(build_task(profile.profile_id))
+    second_task = task_repository.create(build_task(profile.profile_id))
+    first_hypothesis = hypothesis_repository.create(
+        build_hypothesis(first_task.task_id, profile.profile_id)
+    )
+    second_hypothesis = hypothesis_repository.create(
+        build_hypothesis(second_task.task_id, profile.profile_id)
+    )
+    first_evidence = evidence_repository.create(
+        build_evidence(first_hypothesis.hypothesis_id, profile.profile_id)
+    )
+    second_evidence = evidence_repository.create(
+        build_evidence(second_hypothesis.hypothesis_id, profile.profile_id)
+    )
+
+    with pytest.raises(ValueError):
+        discovery_repository.create(
+            build_discovery(
+                first_hypothesis.hypothesis_id,
+                profile.profile_id,
+                second_evidence.evidence_id,
+            )
+        )
+
+    discovery_repository.create(
+        build_discovery(
+            first_hypothesis.hypothesis_id,
+            profile.profile_id,
+            first_evidence.evidence_id,
+        )
+    )
+    with pytest.raises(ValueError):
+        discovery_repository.create(
+            build_discovery(
+                first_hypothesis.hypothesis_id,
+                profile.profile_id,
+                first_evidence.evidence_id,
+            )
+        )
+
+    third_task = task_repository.create(build_task(profile.profile_id))
+    third_hypothesis = hypothesis_repository.create(
+        build_hypothesis(third_task.task_id, profile.profile_id)
+    )
+    superseded_evidence = evidence_repository.create(
+        build_evidence(
+            third_hypothesis.hypothesis_id,
+            profile.profile_id,
+            lifecycle_state=EvidenceLifecycleState.SUPERSEDED,
+        )
+    )
+    with pytest.raises(ValueError):
+        discovery_repository.create(
+            build_discovery(
+                third_hypothesis.hypothesis_id,
+                profile.profile_id,
+                superseded_evidence.evidence_id,
+            )
+        )
 
 
 def test_user_decision_is_typed_provenance_not_scientific_knowledge(db_session) -> None:
@@ -388,6 +554,8 @@ def test_append_only_repositories_do_not_expose_update(db_session) -> None:
 
 def test_task_and_non_fco_generated_view_guards() -> None:
     inactive_task = build_task(uuid4(), lifecycle_state=TaskLifecycleState.PAUSED)
+    proposed_task = build_task(uuid4(), lifecycle_state=TaskLifecycleState.PROPOSED)
+    rejected_task = build_task(uuid4(), lifecycle_state=TaskLifecycleState.REJECTED)
     parent_task = build_task(
         uuid4(),
         task_kind=TaskKind.ORGANIZING,
@@ -395,8 +563,11 @@ def test_task_and_non_fco_generated_view_guards() -> None:
         evidence_expectation=None,
     )
 
-    assert "proposed" not in {item.value for item in TaskLifecycleState}
+    assert {"proposed", "rejected"} <= {item.value for item in TaskLifecycleState}
     assert inactive_task.can_generate_hypothesis() is False
+    assert proposed_task.can_generate_hypothesis() is False
+    assert rejected_task.can_generate_hypothesis() is False
+    assert build_task(uuid4()).can_generate_hypothesis(has_child_tasks=True) is False
     assert parent_task.can_generate_hypothesis() is False
     assert "generated_view" not in {item.value for item in FirstClassObjectType}
 

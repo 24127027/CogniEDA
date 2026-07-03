@@ -7,10 +7,10 @@ from uuid import UUID
 
 from sqlmodel import Session, desc, select
 
-from db.models import DiscoveryRecord
+from db.models import DiscoveryRecord, EvidenceRecord, HypothesisRecord
 from repositories.common import record_to_schema, schema_to_record_payload
 from schemas.artifacts import Discovery
-from schemas.enums import DiscoveryEpistemicStatus
+from schemas.enums import DiscoveryEpistemicStatus, EvidenceLifecycleState
 
 DISCOVERY_JSON_FIELDS = {"evidence_ids", "claim", "validity_basis"}
 
@@ -24,6 +24,7 @@ class DiscoveryRepository:
     def create(self, discovery: Discovery) -> Discovery:
         """Persist and return a new Discovery."""
 
+        self._validate_discovery_admission(discovery)
         record = DiscoveryRecord(
             **schema_to_record_payload(discovery, json_fields=DISCOVERY_JSON_FIELDS)
         )
@@ -31,6 +32,29 @@ class DiscoveryRepository:
         self._session.commit()
         self._session.refresh(record)
         return record_to_schema(Discovery, record)
+
+    def _validate_discovery_admission(self, discovery: Discovery) -> None:
+        if self._session.get(HypothesisRecord, discovery.hypothesis_id) is None:
+            raise ValueError("Discovery creation requires an existing Hypothesis.")
+
+        duplicate = self._session.exec(
+            select(DiscoveryRecord).where(
+                DiscoveryRecord.hypothesis_id == discovery.hypothesis_id
+            )
+        ).first()
+        if duplicate is not None:
+            raise ValueError("A Hypothesis can produce exactly one Discovery.")
+
+        for evidence_id in discovery.evidence_ids:
+            evidence_record = self._session.get(EvidenceRecord, evidence_id)
+            if evidence_record is None:
+                raise ValueError("Discovery requires existing Evidence references.")
+            if evidence_record.hypothesis_id != discovery.hypothesis_id:
+                raise ValueError(
+                    "Discovery Evidence references must belong to the same Hypothesis."
+                )
+            if evidence_record.lifecycle_state != EvidenceLifecycleState.ACTIVE:
+                raise ValueError("Discovery can only synthesize active Evidence.")
 
     def get_by_id(self, discovery_id: UUID) -> Discovery | None:
         """Return a Discovery by primary id if it exists."""

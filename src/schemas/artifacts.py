@@ -34,7 +34,9 @@ from schemas.common import (
     utc_now,
 )
 from schemas.enums import (
+    AssumptionSource,
     AssumptionStatus,
+    AssumptionTestability,
     ConfidenceLevel,
     DataProfileLifecycleState,
     DataProfileMethod,
@@ -91,12 +93,28 @@ class Assumption(CogniEDABaseModel):
 
     assumption_id: UUID = Field(default_factory=uuid4)
     statement: NonEmptyStr
-    basis: NonEmptyStr
-    confidence: ConfidenceLevel
+    scope: NonEmptyStr
+    source: AssumptionSource = AssumptionSource.USER
+    testability: AssumptionTestability = AssumptionTestability.UNTESTABLE_IN_PROJECT
+    basis: NonEmptyStr | None = None
+    confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM
     status: AssumptionStatus = AssumptionStatus.ACTIVE
-    profile_id: UUID | None = None
+    scoped_data_profile_ids: list[UUID] = Field(default_factory=list)
+    contradicted_by_discovery_ids: list[UUID] = Field(default_factory=list)
+    replacement_assumption_id: UUID | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+    @model_validator(mode="after")
+    def _reject_testable_claim_as_assumption(self) -> Assumption:
+        if (
+            self.testability
+            == AssumptionTestability.TESTABLE_CLAIM_REJECTED_AS_ASSUMPTION
+        ):
+            raise ValueError(
+                "Testable claims must become Task/Hypothesis candidates, not Assumptions."
+            )
+        return self
 
 
 class Task(CogniEDABaseModel):
@@ -114,20 +132,22 @@ class Task(CogniEDABaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
-    @property
-def is_terminal(self) -> bool:
-    """Return whether this task can be treated as a terminal analytical task."""
-
-    return self.parent_task_id is not None and self.task_kind == TaskKind.ANALYTICAL
-    def can_generate_hypothesis(self) -> bool:
+    def can_generate_hypothesis(
+        self,
+        *,
+        has_child_tasks: bool = False,
+        data_profile_accepted: bool = True,
+    ) -> bool:
         """Return whether this Task satisfies local hypothesis-admission guards."""
 
         return (
             self.lifecycle_state == TaskLifecycleState.ACTIVE
             and self.task_kind == TaskKind.ANALYTICAL
+            and not has_child_tasks
+            and data_profile_accepted
             and self.profile_id is not None
             and len(self.variables) > 0
-            and self.evidence_expectation is not None
+            and bool(self.evidence_expectation)
         )
 
 

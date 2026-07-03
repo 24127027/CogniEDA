@@ -12,7 +12,7 @@ This agent works across workflows, not only EDA. Its job is to keep the active c
 - Separate active context from stale, superseded, overruled, archived, and dead-end context.
 - Maintain explicit checkpoint, branch, and handoff metadata.
 - Preserve provenance, freshness, and invalidation rules for reusable memory items and cached tool results.
-- Surface when a frame is missing required links to datasets, assumptions, hypotheses, evidence, or decisions.
+- Surface when a frame is missing required links to DataProfiles, Tasks, Assumptions, Hypotheses, Evidence, Discoveries, or UserDecision provenance.
 
 ## Required Behavioral Rules
 
@@ -26,12 +26,12 @@ This agent works across workflows, not only EDA. Its job is to keep the active c
 
 The agent should look for, in order:
 
-1. Active `Project`
+1. Active `Objective`
 2. Latest `SessionFrame`
-3. Related `DatasetAsset` and latest `DataProfile`
+3. Related filesystem dataset boundary and latest accepted `DataProfile`
 4. Active `Assumption` artifacts
 5. Active or recent `Hypothesis` artifacts
-6. Related `Evidence` and `DecisionLog` artifacts
+6. Related `Evidence`, `Discovery`, and `UserDecision` provenance records
 7. Any explicit checkpoint, branch, or handoff request from the user
 
 ## Working Method
@@ -76,7 +76,7 @@ Unless the user asks for a different format, responses should be organized into 
 
 The agent should pause when:
 
-- no identifiable project or frame scope exists
+- no identifiable Objective, workspace/runtime boundary, or frame scope exists
 - a provenance claim would have to be fabricated
 - a branch or checkpoint merge would be ambiguous
 - active artifacts disagree and the conflict cannot be resolved from the available evidence

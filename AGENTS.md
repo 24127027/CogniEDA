@@ -55,7 +55,7 @@ Do not introduce these as FCOs unless explicitly instructed by the project owner
 - `Evidence` is immutable.
 - `Discovery` cannot exist without `Evidence`.
 - `Discovery` must have structured `claim`, `scope`, and `validity_basis`.
-- `Assumption` may guide planning but must be excluded from Conclusion Context.
+- `Assumption` may guide planning but must be excluded from Conclusion/Discovery Synthesis Context.
 - Proposed `Task`s cannot execute.
 - Only active terminal analytical `Task`s can generate `Hypothesis` objects.
 - One terminal analytical `Task` generates exactly one `Hypothesis`.
@@ -78,7 +78,7 @@ Do not introduce these as FCOs unless explicitly instructed by the project owner
 
 Planning Context may include `Assumption` objects.
 
-Conclusion Context must exclude `Assumption` objects and rely only on:
+Conclusion/Discovery Synthesis Context must exclude `Assumption` objects and existing `Discovery` objects, and rely only on:
 
 - `Hypothesis`
 - `DataProfile`
@@ -91,7 +91,7 @@ Conclusion Context must exclude `Assumption` objects and rely only on:
 - validity basis
 - necessary provenance
 
-Do not retrieve rejected `Task`s, completed `Hypothesis` objects, raw chat history, failed reasoning chains, or unverified `GeneratedView`s into Conclusion Context by default.
+Do not retrieve rejected `Task`s, completed `Hypothesis` objects, existing `Discovery` objects, raw chat history, failed reasoning chains, or unverified `GeneratedView`s into Conclusion/Discovery Synthesis Context by default.
 
 ## Mutation And Lifecycle Rules
 
