@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
-from uuid import UUID
 
 import pandas as pd
 from pandas.api import types as pd_types
@@ -42,16 +41,22 @@ class DatasetProfiler:
         self,
         loaded_dataset: LoadedDataset,
         *,
-        project_id: UUID,
-        dataset_id: UUID,
+        dataset_path: str,
+        dvc_hash: str | None = None,
+        dvc_version_label: str | None = None,
+        source_uri: str | None = None,
+        source_description: str | None = None,
         method: DataProfileMethod = DataProfileMethod.BASELINE_SUMMARY,
     ) -> DataProfile:
         """Profile a loaded dataset and return a typed `DataProfile`."""
 
         return self._build_profile(
             loaded_dataset.dataframe,
-            project_id=project_id,
-            dataset_id=dataset_id,
+            dataset_path=dataset_path,
+            dvc_hash=dvc_hash,
+            dvc_version_label=dvc_version_label,
+            source_uri=source_uri,
+            source_description=source_description,
             method=method,
         )
 
@@ -59,16 +64,22 @@ class DatasetProfiler:
         self,
         dataframe: pd.DataFrame,
         *,
-        project_id: UUID,
-        dataset_id: UUID,
+        dataset_path: str,
+        dvc_hash: str | None = None,
+        dvc_version_label: str | None = None,
+        source_uri: str | None = None,
+        source_description: str | None = None,
         method: DataProfileMethod = DataProfileMethod.BASELINE_SUMMARY,
     ) -> DataProfile:
         """Profile an in-memory dataframe."""
 
         return self._build_profile(
             dataframe,
-            project_id=project_id,
-            dataset_id=dataset_id,
+            dataset_path=dataset_path,
+            dvc_hash=dvc_hash,
+            dvc_version_label=dvc_version_label,
+            source_uri=source_uri,
+            source_description=source_description,
             method=method,
         )
 
@@ -76,8 +87,10 @@ class DatasetProfiler:
         self,
         path: str,
         *,
-        project_id: UUID,
-        dataset_id: UUID,
+        dvc_hash: str | None = None,
+        dvc_version_label: str | None = None,
+        source_uri: str | None = None,
+        source_description: str | None = None,
         method: DataProfileMethod = DataProfileMethod.BASELINE_SUMMARY,
     ) -> DataProfile:
         """Load and profile a dataset path in one step."""
@@ -85,8 +98,11 @@ class DatasetProfiler:
         loaded_dataset = load_dataset(path)
         return self.profile_loaded_dataset(
             loaded_dataset,
-            project_id=project_id,
-            dataset_id=dataset_id,
+            dataset_path=path,
+            dvc_hash=dvc_hash,
+            dvc_version_label=dvc_version_label,
+            source_uri=source_uri,
+            source_description=source_description,
             method=method,
         )
 
@@ -94,8 +110,11 @@ class DatasetProfiler:
         self,
         dataframe: pd.DataFrame,
         *,
-        project_id: UUID,
-        dataset_id: UUID,
+        dataset_path: str,
+        dvc_hash: str | None,
+        dvc_version_label: str | None,
+        source_uri: str | None,
+        source_description: str | None,
         method: DataProfileMethod,
     ) -> DataProfile:
         dataframe = validate_profile_input_frame(dataframe.copy())
@@ -169,8 +188,11 @@ class DatasetProfiler:
         )
 
         return DataProfile(
-            project_id=project_id,
-            dataset_id=dataset_id,
+            dataset_path=dataset_path,
+            dvc_hash=dvc_hash,
+            dvc_version_label=dvc_version_label,
+            source_uri=source_uri,
+            source_description=source_description,
             method=method,
             schema_summary=schema_summary,
             baseline_summary=baseline_summary,
@@ -293,11 +315,11 @@ class DatasetProfiler:
 
     @staticmethod
     def _is_datetime_column(series: pd.Series) -> bool:
-        return pd_types.is_datetime64_any_dtype(series)
+        return bool(pd_types.is_datetime64_any_dtype(series))
 
     @staticmethod
     def _is_boolean_column(series: pd.Series) -> bool:
-        return pd_types.is_bool_dtype(series)
+        return bool(pd_types.is_bool_dtype(series))
 
     @classmethod
     def _is_categorical_like_column(cls, series: pd.Series) -> bool:
@@ -332,8 +354,11 @@ class DatasetProfiler:
 def profile_dataframe(
     dataframe: pd.DataFrame,
     *,
-    project_id: UUID,
-    dataset_id: UUID,
+    dataset_path: str,
+    dvc_hash: str | None = None,
+    dvc_version_label: str | None = None,
+    source_uri: str | None = None,
+    source_description: str | None = None,
     method: DataProfileMethod = DataProfileMethod.BASELINE_SUMMARY,
     options: ProfilingOptions | None = None,
 ) -> DataProfile:
@@ -342,8 +367,11 @@ def profile_dataframe(
     profiler = DatasetProfiler(options=options)
     return profiler.profile_dataframe(
         dataframe,
-        project_id=project_id,
-        dataset_id=dataset_id,
+        dataset_path=dataset_path,
+        dvc_hash=dvc_hash,
+        dvc_version_label=dvc_version_label,
+        source_uri=source_uri,
+        source_description=source_description,
         method=method,
     )
 
@@ -351,12 +379,21 @@ def profile_dataframe(
 def profile_path(
     path: str,
     *,
-    project_id: UUID,
-    dataset_id: UUID,
+    dvc_hash: str | None = None,
+    dvc_version_label: str | None = None,
+    source_uri: str | None = None,
+    source_description: str | None = None,
     method: DataProfileMethod = DataProfileMethod.BASELINE_SUMMARY,
     options: ProfilingOptions | None = None,
 ) -> DataProfile:
     """Convenience wrapper for loading and profiling a dataset path."""
 
     profiler = DatasetProfiler(options=options)
-    return profiler.profile_path(path, project_id=project_id, dataset_id=dataset_id, method=method)
+    return profiler.profile_path(
+        path,
+        dvc_hash=dvc_hash,
+        dvc_version_label=dvc_version_label,
+        source_uri=source_uri,
+        source_description=source_description,
+        method=method,
+    )
