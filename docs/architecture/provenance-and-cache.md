@@ -19,7 +19,7 @@ Target provenance records include:
 - user decisions
 - raw interaction traces when needed for audit
 
-Target cache is `EvidenceCacheEntry`, keyed by:
+Target cache is an evidence-cache index keyed by:
 
 - hypothesis signature hash
 - `DataProfile`
@@ -34,28 +34,28 @@ Cache can reuse Evidence, but it must not create Discovery by itself.
 
 ## Current Implementation
 
-Current provenance exists only in embedded or adjacent forms:
+Current provenance exists in typed but incomplete forms:
 
-- `Evidence.provenance` includes `source_profile_id`, `execution_label`, `code_reference`, and artifact paths.
-- `DatasetAsset.lineage_steps` records transformation descriptions.
-- `DecisionLog` persists decision records as a current artifact.
+- `Evidence` requires `analysis_frame_ref`, `execution_run_ref`, code/environment references where available, parameters, artifact refs, and result payload.
+- `Discovery.validity_basis` records evidence, data profile, analysis frame refs, method, parameters, code/environment identity, decision rule, uncertainty, assumptions-excluded flag, and invalidators.
+- `UserDecision` persists typed user-decision provenance.
+- `DataProfile.preprocessing_history` records transformation steps.
 - `SessionFrame` can store stale context markers, dead ends, cached tool results, and invalidation rules.
-- SQLModel relationships track links among current artifacts.
 
-No dedicated provenance store or target provenance records were found.
+Dedicated `AnalysisFrame`, `ExecutionRun`, `PlannerOperation`, and cache tables are not implemented.
 
 ## Implementation Status
 
 | Concept | Status | Current implementation note |
 | --- | --- | --- |
-| `AnalysisFrame` | Not implemented | No exact analytical-view record exists. |
-| `ExecutionRun` | Not implemented | No execution-attempt provenance record exists. |
-| `PlannerOperation` | Not implemented | Planner node docs mention operations, but no schema/table/repository exists. |
-| `ObjectiveRevision` | Not implemented | No target `Objective` exists. |
-| Evidence provenance | Partially implemented | Embedded evidence provenance exists, but lacks target analysis frame, environment hash, parameter hash, and execution run identity. |
-| Cleaning provenance | Partially implemented | `DatasetAsset.lineage_steps` exists; no full cleaning decision ledger exists. |
-| Evidence cache | Not implemented | `ToolResultCacheSummary` is a session-frame summary, not target `EvidenceCacheEntry`. |
+| `AnalysisFrame` | Partially implemented | Evidence and Discovery validity use references; no full analytical-view record exists. |
+| `ExecutionRun` | Partially implemented | Evidence and executor output use references; no execution-attempt provenance record exists. |
+| `PlannerOperation` | Partially implemented | Planner contracts expose operation identifiers; no schema/table/repository exists. |
+| `ObjectiveRevision` | Not implemented | Objective changes update the current Objective; revision provenance is missing. |
+| Evidence provenance | Implemented locally | Required fields exist, but referenced provenance records are not persisted. |
+| Cleaning provenance | Partially implemented | DataProfile preprocessing history exists; no full cleaning decision ledger exists. |
+| Evidence cache | Not implemented | `ToolResultCacheSummary` is a session-frame summary, not a cache service. |
 
 ## Architectural Risk
 
-Without `AnalysisFrame` and `ExecutionRun`, Evidence cannot fully answer which rows, variables, filters, missing-data policy, method version, and environment produced the result. That limits reproducibility and blocks full `ValidityEnvelope` enforcement.
+Until full `AnalysisFrame` and `ExecutionRun` records exist, Evidence can identify provenance references but cannot fully answer which rows, filters, missing-data policy, method version, and environment produced the result.
