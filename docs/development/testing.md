@@ -16,34 +16,32 @@ uv run mypy src
 
 Current tests cover:
 
-- repository CRUD and query behavior for current artifacts
+- target FCO admission exclusions for non-FCO names
+- repository CRUD and query behavior for current FCOs and user-decision provenance
+- workspace/database isolation by separate SQLite URLs
 - SQL foreign-key enforcement in SQLite
-- dataset asset uniqueness by `project_id + name + version`
-- normalized relationship round trips for dataset lineage, hypotheses, evidence, and decisions
-- append-only repository surfaces for `DataProfile`, `Evidence`, and `SessionFrame`
+- append-only repository surfaces for `DataProfile`, `Evidence`, `Discovery`, and `SessionFrame`
+- DataProfile and Evidence immutability
+- Discovery requires Evidence and validity basis
 - baseline profiling semantic dtype behavior
-- `SessionFrameBuilder` evidence and dataset selection behavior
-- `SessionContextBuilder` planning-vs-conclusion projection for `SessionFrame` snapshots
+- `SessionFrameBuilder` profile/evidence/discovery selection behavior
+- `SessionContextBuilder` planning-vs-conclusion projection and assumption exclusion
+- planner/executor authoring contract separation
 
 ## Important Gaps
 
-No tests were found for these target-only or graph-level invariants:
+No tests were found for these runtime or graph-level invariants:
 
-- target FCO admission rules
-- `Objective` lifecycle
-- `Task` lifecycle and terminal analytical readiness
-- proposed Task cannot execute
-- one terminal Task generates exactly one Hypothesis
-- one Hypothesis produces exactly one Discovery
-- parent Tasks do not produce Discoveries
-- `Discovery` validity envelope
-- `AnalysisFrame` provenance requirements
+- planner operation approval before durable Task creation
+- database uniqueness for one terminal Task to one Hypothesis
+- database uniqueness for one Hypothesis to one Discovery
+- full `AnalysisFrame` provenance records
+- full `ExecutionRun` provenance records
 - operation-before-commit planner mutation
 - graph-retrieved Planning Context vs Conclusion Context exclusion rules
-- full Assumption quarantine outside `SessionFrame` projection
 - Evidence supersession/invalidation propagation
 - DataProfile supersession propagation
-- Evidence cache validity keys
+- evidence cache validity keys
 
 ## Testing Guidance
 
