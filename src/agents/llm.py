@@ -35,4 +35,13 @@ def create_agent(worker: str, config: ModelConfig) -> Agent:
     )    
     model = OpenAIChatModel(model_name=config.model_name, provider=provider)
 
-    return Agent(model=model, toolsets=tool_manager.toolsets_for(worker))
+    # Get toolsets (MCP and builtin tools)
+    toolsets = tool_manager.toolsets_for(worker)
+    
+    # Get skills (high-level capabilities)
+    skills = tool_manager.skills_for(worker)
+    
+    # Create agent with both toolsets and skills
+    agent = Agent(model=model, toolsets=toolsets, capabilities=skills)
+
+    return agent

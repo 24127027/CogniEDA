@@ -1,0 +1,36 @@
+# Skills Configuration
+# Skills are loaded from directories via pydantic_ai_skills
+# Each entry configures a SkillsCapability that loads skills from specified directories
+
+[memory_management]
+id = "memory_management"
+directories = ["./skills/memory"]
+description = "Manage session frames, assumptions, and context artifacts"
+defer_loading = false
+validate = true
+max_depth = 3
+auto_reload = false
+
+[task_planning]
+id = "task_planning"
+directories = ["./skills/planning"]
+description = "Break down analytical goals into executable tasks"
+defer_loading = false
+validate = true
+max_depth = 3
+
+[graph_analysis]
+id = "graph_analysis"
+directories = ["./skills/graph"]
+description = "Mine and analyze knowledge graphs"
+defer_loading = false
+validate = true
+max_depth = 3
+
+[statistical_analysis]
+id = "statistical_analysis"
+directories = ["./skills/statistics"]
+description = "Perform hypothesis testing and statistical validation"
+defer_loading = false
+validate = true
+max_depth = 3

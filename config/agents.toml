@@ -1,0 +1,23 @@
+# Agent Configuration
+# Define which tools and skills each worker agent has access to
+
+[planner]
+# Skills are loaded from skills.toml and provide high-level capabilities
+skills = ["memory_management", "task_planning"]
+
+# MCP servers are loaded from mcp.toml and provide low-level tool access
+mcp = [
+    "filesystem",
+]
+
+[graph_miner]
+skills = ["graph_analysis"]
+mcp = [
+    "neo4j",
+]
+
+[hypothesis_analyst]
+skills = ["statistical_analysis"]
+mcp = [
+    "filesystem",
+]
