@@ -38,6 +38,8 @@ class ContextMode(StrEnum):
 
     PLANNING = "planning"
     CONCLUSION = "conclusion"
+    DISCOVERY_SYNTHESIS = "discovery_synthesis"
+    ANSWER = "answer"
 
 
 class MemorySourceType(StrEnum):
@@ -137,19 +139,40 @@ class ConfidenceLevel(StrEnum):
 class AssumptionStatus(StrEnum):
     """Lifecycle states for an Assumption."""
 
+    PROPOSED = "proposed"
     ACTIVE = "active"
-    VALIDATED = "validated"
-    REJECTED = "rejected"
+    FLAGGED = "flagged"
+    RETAINED = "retained"
+    REPLACED = "replaced"
     ARCHIVED = "archived"
+
+
+class AssumptionSource(StrEnum):
+    """Source categories for planning-only assumptions."""
+
+    USER = "user"
+    DOMAIN_EXPERTISE = "domain_expertise"
+    LITERATURE = "literature"
+    PREVIOUS_PROJECT = "previous_project"
+    SYSTEM_SUGGESTED = "system_suggested"
+
+
+class AssumptionTestability(StrEnum):
+    """Admission categories for claims proposed as assumptions."""
+
+    UNTESTABLE_IN_PROJECT = "untestable_in_project"
+    TESTABLE_CLAIM_REJECTED_AS_ASSUMPTION = "testable_claim_rejected_as_assumption"
 
 
 class TaskLifecycleState(StrEnum):
     """Durable Task lifecycle states."""
 
+    PROPOSED = "proposed"
     ACTIVE = "active"
     PAUSED = "paused"
     COMPLETED = "completed"
     FAILED = "failed"
+    REJECTED = "rejected"
     CANCELLED = "cancelled"
 
 

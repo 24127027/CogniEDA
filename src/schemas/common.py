@@ -6,7 +6,14 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat, NonNegativeInt
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    NonNegativeFloat,
+    NonNegativeInt,
+    field_validator,
+)
 
 from schemas.enums import (
     ConfidenceLevel,
@@ -30,10 +37,43 @@ type NonEmptyStr = Annotated[str, Field(min_length=1)]
 type ScalarParameterValue = str | int | float | bool | None
 
 
+_UNQUALIFIED_ABSENCE_PHRASES = (
+    "there is no relationship",
+    "there is no association",
+    "no relationship exists",
+    "no association exists",
+)
+
+_INSUFFICIENT_EVIDENCE_QUALIFIERS = (
+    "insufficient",
+    "not sufficient",
+    "fail to reject",
+    "failed to reject",
+)
+
+
 def utc_now() -> datetime:
     """Return a timezone-aware UTC timestamp."""
 
     return datetime.now(UTC)
+
+
+def reject_unqualified_absence_claim(value: str) -> str:
+    """Reject over-strong absence wording for inconclusive analytical results."""
+
+    normalized = value.lower()
+    has_absence_phrase = any(
+        phrase in normalized for phrase in _UNQUALIFIED_ABSENCE_PHRASES
+    )
+    has_qualifier = any(
+        qualifier in normalized for qualifier in _INSUFFICIENT_EVIDENCE_QUALIFIERS
+    )
+    if has_absence_phrase and not has_qualifier:
+        raise ValueError(
+            "Use scoped insufficient-evidence wording instead of an unqualified "
+            "'no relationship' claim."
+        )
+    return value
 
 
 class CogniEDABaseModel(BaseModel):
@@ -174,6 +214,16 @@ class EvidenceResultSummary(CogniEDABaseModel):
     metric_value: ScalarParameterValue = None
     metric_unit: str | None = None
 
+    @field_validator("summary")
+    @classmethod
+    def _summary_avoids_unqualified_absence_claim(cls, value: str) -> str:
+        return reject_unqualified_absence_claim(value)
+
+    @field_validator("key_findings")
+    @classmethod
+    def _findings_avoid_unqualified_absence_claim(cls, values: list[str]) -> list[str]:
+        return [reject_unqualified_absence_claim(value) for value in values]
+
 
 class DiscoveryClaim(CogniEDABaseModel):
     """Structured evidence-bound claim content."""
@@ -182,6 +232,11 @@ class DiscoveryClaim(CogniEDABaseModel):
     scope: NonEmptyStr
     conditions: list[NonEmptyStr] = Field(default_factory=list)
     result: str | None = None
+
+    @field_validator("statement")
+    @classmethod
+    def _statement_avoids_unqualified_absence_claim(cls, value: str) -> str:
+        return reject_unqualified_absence_claim(value)
 
 
 class ValidityBasis(CogniEDABaseModel):
