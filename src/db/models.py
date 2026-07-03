@@ -6,11 +6,13 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, Column, Text
+from sqlalchemy import JSON, Column, Text, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 from schemas.enums import (
+    AssumptionSource,
     AssumptionStatus,
+    AssumptionTestability,
     ConfidenceLevel,
     DataProfileLifecycleState,
     DataProfileMethod,
@@ -100,10 +102,28 @@ class AssumptionRecord(TimestampedRecord, table=True):
 
     assumption_id: UUID = Field(default_factory=uuid4, primary_key=True)
     statement: str = Field(sa_column=Column(Text, nullable=False))
-    basis: str = Field(sa_column=Column(Text, nullable=False))
-    confidence: ConfidenceLevel = Field(nullable=False, index=True)
+    scope: str = Field(sa_column=Column(Text, nullable=False))
+    source: AssumptionSource = Field(default=AssumptionSource.USER, nullable=False, index=True)
+    testability: AssumptionTestability = Field(
+        default=AssumptionTestability.UNTESTABLE_IN_PROJECT,
+        nullable=False,
+        index=True,
+    )
+    basis: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    confidence: ConfidenceLevel = Field(default=ConfidenceLevel.MEDIUM, nullable=False, index=True)
     status: AssumptionStatus = Field(default=AssumptionStatus.ACTIVE, nullable=False, index=True)
-    profile_id: UUID | None = Field(default=None, foreign_key="data_profiles.profile_id")
+    scoped_data_profile_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    contradicted_by_discovery_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    replacement_assumption_id: UUID | None = Field(
+        default=None,
+        foreign_key="assumptions.assumption_id",
+    )
 
 
 class TaskRecord(TimestampedRecord, table=True):
@@ -130,6 +150,7 @@ class HypothesisRecord(TimestampedRecord, table=True):
     """Persisted Hypothesis FCO."""
 
     __tablename__ = "hypotheses"
+    __table_args__ = (UniqueConstraint("task_id", name="uq_hypotheses_task_id"),)
 
     hypothesis_id: UUID = Field(default_factory=uuid4, primary_key=True)
     task_id: UUID = Field(foreign_key="tasks.task_id", nullable=False, index=True)
@@ -177,6 +198,7 @@ class DiscoveryRecord(SQLModel, table=True):
     """Persisted immutable Discovery FCO."""
 
     __tablename__ = "discoveries"
+    __table_args__ = (UniqueConstraint("hypothesis_id", name="uq_discoveries_hypothesis_id"),)
 
     discovery_id: UUID = Field(default_factory=uuid4, primary_key=True)
     hypothesis_id: UUID = Field(foreign_key="hypotheses.hypothesis_id", nullable=False, index=True)
