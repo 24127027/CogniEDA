@@ -9,10 +9,10 @@ from uuid import UUID
 from pydantic import BaseModel
 from sqlmodel import Session, desc, select
 
-from db.models import HypothesisRecord
+from db.models import DataProfileRecord, HypothesisRecord, TaskRecord
 from repositories.common import apply_update, record_to_schema, schema_to_record_payload
-from schemas.artifacts import Hypothesis
-from schemas.enums import HypothesisStatus
+from schemas.artifacts import Hypothesis, Task
+from schemas.enums import DataProfileLifecycleState, HypothesisStatus
 
 HYPOTHESIS_JSON_FIELDS = {"variables"}
 
@@ -38,6 +38,7 @@ class HypothesisRepository:
     def create(self, hypothesis: Hypothesis) -> Hypothesis:
         """Persist and return a new Hypothesis."""
 
+        self._validate_hypothesis_admission(hypothesis)
         record = HypothesisRecord(
             **schema_to_record_payload(hypothesis, json_fields=HYPOTHESIS_JSON_FIELDS)
         )
@@ -45,6 +46,44 @@ class HypothesisRepository:
         self._session.commit()
         self._session.refresh(record)
         return record_to_schema(Hypothesis, record)
+
+    def _validate_hypothesis_admission(self, hypothesis: Hypothesis) -> None:
+        task_record = self._session.get(TaskRecord, hypothesis.task_id)
+        if task_record is None:
+            raise ValueError("Hypothesis creation requires an existing source Task.")
+
+        task = record_to_schema(Task, task_record)
+        if task.profile_id != hypothesis.profile_id:
+            raise ValueError("Hypothesis profile_id must match its source Task profile_id.")
+
+        profile_record = self._session.get(DataProfileRecord, hypothesis.profile_id)
+        if profile_record is None:
+            raise ValueError("Hypothesis creation requires an existing DataProfile.")
+        data_profile_accepted = (
+            profile_record.lifecycle_state == DataProfileLifecycleState.ACTIVE
+            and profile_record.accepted_as_ground_truth
+        )
+
+        has_child_tasks = (
+            self._session.exec(
+                select(TaskRecord).where(TaskRecord.parent_task_id == hypothesis.task_id)
+            ).first()
+            is not None
+        )
+        if not task.can_generate_hypothesis(
+            has_child_tasks=has_child_tasks,
+            data_profile_accepted=data_profile_accepted,
+        ):
+            raise ValueError(
+                "Only active terminal analytical Tasks using an accepted DataProfile "
+                "can generate a Hypothesis."
+            )
+
+        duplicate = self._session.exec(
+            select(HypothesisRecord).where(HypothesisRecord.task_id == hypothesis.task_id)
+        ).first()
+        if duplicate is not None:
+            raise ValueError("A Task can generate exactly one Hypothesis.")
 
     def get_by_id(self, hypothesis_id: UUID) -> Hypothesis | None:
         """Return a hypothesis by primary id if it exists."""
