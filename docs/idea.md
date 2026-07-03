@@ -1019,7 +1019,7 @@ Frame memory:
 
 Information relevant to a bounded task or topic.
 
-Project memory:
+Workspace-level memory:
 
 Long-lived goals, constraints, and decisions for the whole project.
 
@@ -1216,7 +1216,7 @@ It should be small and high-value.
 
 Examples of pinned memory for CogniEDA:
 
-- DatasetAsset is not Evidence.
+- DataProfile is not Evidence.
 - Do not trust datasets without evidence.
 - Every conclusion must trace to dataset version.
 - Assumptions must be tracked and can become stale.
@@ -1431,8 +1431,7 @@ CogniEDA should treat memory as a graph, not just a list.
 
 Possible nodes:
 
-- DatasetAsset,
-- DatasetProfile,
+- DataProfile,
 - Evidence,
 - Assumption,
 - Hypothesis,
