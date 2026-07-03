@@ -42,7 +42,7 @@ Current implementation:
 
 ## Implementation Status
 
-Design target / not implemented.
+Partially implemented scaffold.
 
 ## Current Partial Support
 
