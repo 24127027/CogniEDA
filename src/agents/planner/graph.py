@@ -1,12 +1,12 @@
 from langgraph.graph.state import StateGraph, CompiledStateGraph
 from langgraph.graph import START, END
 
-from .types import PlannerState
+from .types import State, Context
 from .nodes import registry, R
 
 
-def build_graph() -> CompiledStateGraph:
-    builder = StateGraph(PlannerState)
+def build_graph() -> CompiledStateGraph[State, Context, State, State]:
+    builder = StateGraph(State, context_schema=Context)
 
     # --------------------------------------------------
     # Register all nodes
