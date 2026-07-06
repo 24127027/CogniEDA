@@ -1,26 +1,22 @@
 """Thin shared envelopes for agent graph contracts."""
-
-from __future__ import annotations
-
 from typing import Any
 
 from pydantic import BaseModel
-
-
-class AgentEnvelope(BaseModel):
-    """Minimal shared run envelope across orchestration and execution agents."""
-
-    run_id: str | None = None
-    session_id: str | None = None
-    trace_id: str | None = None
-    workspace_ref: str | None = None
-
-
-class BaseState(BaseModel):
-    """Base class for graph state objects."""
-
-
+    
+# TODO: Put whatever application runtime need here
+# Agent needs to extract the information from the graph state to return to the runtime
 class RuntimePayload(BaseModel):
-    """Opaque payload for infrastructure-only handoff points."""
+    """
+    The information an agent returns to the runtime after completing a single
+    execution iteration.
 
-    payload: Any
+    This payload is the stable contract between agents and the runtime. It
+    contains externally observable outcomes (such as messages, operations,
+    execution requests, or artifacts) while hiding the agent's internal
+    workflow state.
+
+    The runtime interprets this payload to persist changes, dispatch further
+    execution, update the user interface, or continue orchestration.
+    """
+    payload: Any # Placeholder for the actual payload data. This can be any type of data that the agent wants to return to the runtime.
+    
