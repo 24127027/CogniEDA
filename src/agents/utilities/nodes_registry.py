@@ -1,22 +1,21 @@
 from typing import Dict, TypeVar, Generic
 from types import SimpleNamespace
+
 from langgraph.graph.state import StateNode
-
-from ..types import BaseState
-
-StateT = TypeVar("StateT", bound=BaseState)
-
-class NodeRegistry(Generic[StateT]):
+from pydantic import BaseModel
+StateT = TypeVar("StateT", bound=BaseModel)  # Type variable for the state type
+ContextT = TypeVar("ContextT", bound=BaseModel)  # Type variable for the context type
+class NodeRegistry(Generic[StateT, ContextT]):
     """
     A registry for LangGraph nodes, allowing for automatic registration of node functions.
     How to use:
         In nodes.py:
             from ..utilities.nodes_registry import NodeRegistry
-            registry = NodeRegistry[PlannerState]()  # Specify the state type for type checking
+            registry = NodeRegistry[PlannerState, PlannerContext]()  # Specify the state and context types for type checking
             R = registry.R  # Shortcut export for graph.py to use dot-notation
 
             @registry.register()
-            def my_node(state: PlannerState):
+            def my_node(state: PlannerState, context: PlannerContext):
                 pass
         
         In graph.py:
@@ -30,12 +29,12 @@ class NodeRegistry(Generic[StateT]):
     """
 
     def __init__(self):
-        self._registry: dict[str, StateNode[StateT, None]] = {}
+        self._registry: dict[str, StateNode[StateT, StateT]] = {}
         self.R = SimpleNamespace()
 
     def register(self, name: str | None = None):
         """Decorator to automatically register LangGraph nodes."""
-        def decorator(func: StateNode[StateT, None]):
+        def decorator(func: StateNode[StateT, StateT]):
             node_name = name if name else func.__name__ #type: ignore
             
             if node_name in self._registry:
@@ -47,6 +46,6 @@ class NodeRegistry(Generic[StateT]):
         return decorator
 
     @property
-    def nodes(self) -> Dict[str, StateNode[StateT, None]]:
+    def nodes(self) -> Dict[str, StateNode[StateT, StateT]]:
         """Returns the dictionary mapping string names to functions for graph.add_node()."""
         return dict(self._registry)
