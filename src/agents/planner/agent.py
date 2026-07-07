@@ -1,21 +1,35 @@
 """Planner agent wrapper."""
 
-from __future__ import annotations
-
-from agents.base_agent import BaseAgent
-
 from .graph import build_graph
-from .types import PlannerInput, PlannerOutput, PlannerState
+from .types import Context, State
+from ..types import RuntimePayload
 
-
-class Planner(BaseAgent[PlannerInput, PlannerOutput, PlannerState]):
+class Planner():
     """Planner orchestrator. It produces operations, not Evidence or Discovery."""
 
     def __init__(self) -> None:
-        super().__init__(graph=build_graph())
+        self.graph = build_graph()
 
-    async def before_run(self, input: PlannerInput) -> PlannerState:
-        raise NotImplementedError("Planner.before_run is not implemented yet.")
+    async def run(self, query: str, session_frame: ...) -> RuntimePayload:
+        """Run the Planner agent with the given query and session frame."""
 
-    async def after_run(self, output: PlannerState) -> PlannerOutput:
-        raise NotImplementedError("Planner.after_run is not implemented yet.")
+        input = State(
+            query=query
+        )
+        context = self.prepare_context(session_frame)
+        final_state_dict = await self.graph.ainvoke(input, context=context)
+        final_state = State(**final_state_dict)
+
+        payload = self.prepare_payload(final_state)
+        return payload
+        
+    def prepare_payload(self, state: State) -> RuntimePayload:
+        """Extract the necessary information from the state
+        to prepare the payload returned to the runtime
+        """
+        raise NotImplementedError("The prepare_payload method needs to be implemented with the actual payload preparation logic.")
+    
+    def prepare_context(self, session_frame: ...) -> Context:
+        """Prepare the context for the Planner agent based on the session frame."""
+        return session_frame
+    
