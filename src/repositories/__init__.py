@@ -6,6 +6,7 @@ from repositories.discovery_repository import DiscoveryRepository
 from repositories.evidence_repository import EvidenceRepository
 from repositories.hypothesis_repository import HypothesisRepository, HypothesisUpdate
 from repositories.objective_repository import ObjectiveRepository, ObjectiveUpdate
+from repositories.planner_operation_repository import PlannerOperationRepository
 from repositories.session_frame_repository import SessionFrameRepository
 from repositories.task_repository import TaskRepository, TaskUpdate
 from repositories.user_decision_repository import UserDecisionRepository, UserDecisionUpdate
@@ -20,6 +21,7 @@ __all__ = [
     "HypothesisUpdate",
     "ObjectiveRepository",
     "ObjectiveUpdate",
+    "PlannerOperationRepository",
     "SessionFrameRepository",
     "TaskRepository",
     "TaskUpdate",

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlmodel import Session, desc, select
 
 from db.models import TaskRecord
@@ -18,6 +18,8 @@ TASK_JSON_FIELDS = {"variables"}
 
 class TaskUpdate(BaseModel):
     """Typed mutable fields for Task workflow-state changes."""
+
+    model_config = ConfigDict(extra="forbid")
 
     title: str | None = None
     description: str | None = None

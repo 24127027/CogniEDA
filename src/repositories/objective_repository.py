@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlmodel import Session, desc, select
 
 from db.models import ObjectiveRecord
@@ -16,6 +16,8 @@ from schemas.enums import ObjectiveStatus
 
 class ObjectiveUpdate(BaseModel):
     """Typed mutable fields for Objective lifecycle and wording changes."""
+
+    model_config = ConfigDict(extra="forbid")
 
     title: str | None = None
     statement: str | None = None
