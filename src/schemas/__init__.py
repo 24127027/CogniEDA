@@ -60,6 +60,9 @@ from schemas.enums import (
     MemorySourceType,
     MemoryStatus,
     ObjectiveStatus,
+    PlannerNodeName,
+    PlannerOperationApprovalState,
+    PlannerOperationType,
     QualityFlagSeverity,
     SessionFrameStatus,
     TaskKind,
@@ -67,6 +70,7 @@ from schemas.enums import (
     UserDecisionStatus,
     UserDecisionType,
 )
+from schemas.planner_operations import PlannerCommitResult, PlannerOperation
 
 __all__ = [
     "Assumption",
@@ -113,6 +117,11 @@ __all__ = [
     "NumericColumnSummary",
     "Objective",
     "ObjectiveStatus",
+    "PlannerCommitResult",
+    "PlannerNodeName",
+    "PlannerOperation",
+    "PlannerOperationApprovalState",
+    "PlannerOperationType",
     "QualityFlag",
     "QualityFlagSeverity",
     "SchemaSummary",
