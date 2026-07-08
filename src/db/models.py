@@ -22,6 +22,9 @@ from schemas.enums import (
     EvidenceType,
     HypothesisStatus,
     ObjectiveStatus,
+    PlannerNodeName,
+    PlannerOperationApprovalState,
+    PlannerOperationType,
     SessionFrameStatus,
     TaskKind,
     TaskLifecycleState,
@@ -243,6 +246,30 @@ class UserDecisionRecord(TimestampedRecord, table=True):
         default=None,
         foreign_key="user_decisions.decision_id",
     )
+
+
+class PlannerOperationRecord(SQLModel, table=True):
+    """Persisted pending mutation produced by planner nodes."""
+
+    __tablename__ = "planner_operations"
+
+    operation_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    session_id: str | None = Field(default=None, index=True)
+    operation_type: PlannerOperationType = Field(nullable=False, index=True)
+    target_object_id: UUID | None = Field(default=None, index=True)
+    target_object_type: str | None = Field(default=None, index=True)
+    payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+    produced_by_node: PlannerNodeName = Field(nullable=False, index=True)
+    requires_user_approval: bool = Field(default=True, nullable=False, index=True)
+    approval_state: PlannerOperationApprovalState = Field(
+        default=PlannerOperationApprovalState.PENDING,
+        nullable=False,
+        index=True,
+    )
+    created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
+    approved_at: datetime | None = Field(default=None, nullable=True)
+    committed_at: datetime | None = Field(default=None, nullable=True)
+    error_message: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
 
 
 class SessionFrameRecord(SQLModel, table=True):
