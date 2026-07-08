@@ -1,6 +1,9 @@
-from pydantic import BaseModel
+from collections.abc import Sequence
+from typing import Any
+
+from pydantic import BaseModel, Field
 from pydantic_ai.messages import ModelMessage
-from typing import Sequence
+
 
 class Task(BaseModel):
     """Placeholder for a Task object. 
@@ -30,3 +33,11 @@ class ExecutionRequest(BaseModel):
 class ExecutionResult(BaseModel):
     """Result of executing a task."""
     ...
+
+
+class ExecutorOutput(BaseModel):
+    """Executor payload contract returned to the runtime."""
+
+    evidence_drafts: list[Any] = Field(default_factory=list)
+    discovery_drafts: list[Any] = Field(default_factory=list)
+    execution_run_ref: str | None = None
