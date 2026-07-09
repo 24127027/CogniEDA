@@ -1,6 +1,7 @@
+from collections.abc import Callable
 from types import SimpleNamespace
 
-from langgraph.graph.state import StateNode
+from langgraph.graph.state import StateNode  # type: ignore[attr-defined]
 from pydantic import BaseModel
 
 
@@ -32,10 +33,13 @@ class NodeRegistry[StateT: BaseModel, ContextT: BaseModel | None]:
         self._registry: dict[str, StateNode[StateT, ContextT]] = {}
         self.R = SimpleNamespace()
 
-    def register(self, name: str | None = None):
+    def register(
+        self,
+        name: str | None = None,
+    ) -> Callable[[StateNode[StateT, ContextT]], StateNode[StateT, ContextT]]:
         """Decorator to automatically register LangGraph nodes."""
 
-        def decorator(func: StateNode[StateT, ContextT]):
+        def decorator(func: StateNode[StateT, ContextT]) -> StateNode[StateT, ContextT]:
             fallback_name = getattr(func, "__name__", type(func).__name__)
             node_name = name if name else fallback_name
 
