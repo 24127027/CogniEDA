@@ -22,7 +22,7 @@ The design explicitly excludes `Workspace`, `Question`, `AnalysisFrame`, `Genera
 | Concept | Status | Current implementation |
 | --- | --- | --- |
 | `Objective` | Implemented | Schema, SQLModel table, and repository exist for workspace-local research intent. |
-| `DataProfile` | Implemented locally | Immutable schema, table, repository, and profiler exist. It stores dataset path, optional DVC identity, source metadata, summaries, preprocessing history, lifecycle state, and ground-truth acceptance. |
+| `DataProfile` | Implemented locally | Immutable schema, table, repository, and profiler exist. It stores dataset path, optional DVC identity, source metadata, summaries, preprocessing history, lifecycle state, replacement profile id when superseded, and ground-truth acceptance. |
 | `Assumption` | Partially implemented | Schema, table, and repository exist. Assumptions are planning context only and are excluded from conclusion projection. |
 | `Task` | Partially implemented | Schema, table, repository, lifecycle, and local hypothesis-readiness guard exist. Planner operation integration is still missing. |
 | `Hypothesis` | Partially implemented | Schema, table, and repository exist. It references one Task and one DataProfile. Admission cardinality is not database-enforced. |
@@ -35,9 +35,9 @@ The design explicitly excludes `Workspace`, `Question`, `AnalysisFrame`, `Genera
 | Concept | Status | Implementation note |
 | --- | --- | --- |
 | Workspace | Valid infrastructure | Represented by filesystem path and database URL, not by a research graph object. |
-| AnalysisFrame | Valid provenance | Referenced by Evidence as `analysis_frame_ref`; no full provenance table yet. |
-| ExecutionRun | Valid provenance | Referenced by Evidence and executor output; no full provenance table yet. |
-| PlannerOperation | Valid workflow/provenance | Planner contracts produce operation identifiers; no persistence table yet. |
+| AnalysisFrame | Valid provenance | Minimal non-FCO schema/table/repository exists; full analytical-view provenance is not implemented. |
+| ExecutionRun | Valid provenance | Minimal non-FCO schema/table/repository exists; executor runtime provenance is not implemented. |
+| PlannerOperation | Valid workflow/provenance | Minimal non-FCO schema/table/repository and skeleton commit boundary exist; approval/rollback machinery is not implemented. |
 | UserDecision | Valid provenance | Typed provenance record, not an FCO. |
 | Evidence cache | Not implemented | Must remain an optimization index and must not create Discovery. |
 
