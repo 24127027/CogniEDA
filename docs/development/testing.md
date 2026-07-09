@@ -26,6 +26,8 @@ Current tests cover:
 - Task admission guards before Hypothesis creation
 - database uniqueness/repository guards for one terminal Task to one Hypothesis
 - database uniqueness/repository guards for one Hypothesis to one Discovery
+- repository-level Evidence supersession/invalidation flagging for dependent Discoveries
+- repository-level DataProfile supersession and historical scoping for dependent Evidence/Discovery
 - Assumption testability admission and contradiction flagging without statement rewrite
 - protected Discovery Synthesis Context excludes Assumptions, Tasks, existing Discoveries, stale context, and caches
 - baseline profiling semantic dtype behavior
@@ -43,8 +45,8 @@ No tests were found for these runtime or graph-level invariants:
 - full `ExecutionRun` provenance records
 - operation-before-commit planner mutation
 - graph-retrieved Planning Context vs Discovery Synthesis Context exclusion rules
-- Evidence supersession/invalidation propagation
-- DataProfile supersession propagation
+- runtime propagation and user-review workflow after Evidence supersession/invalidation
+- runtime propagation and retrieval policy after DataProfile supersession
 - evidence cache validity keys
 
 ## Testing Guidance
