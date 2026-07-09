@@ -30,8 +30,8 @@ The current implementation is a Python scaffold managed with `uv`. It contains:
 | Planner workflow | Partially implemented | Planner contracts and node names exist, but most nodes are stubs and operation persistence is missing. |
 | Executor workflow | Partially implemented | Executor contracts can return Evidence/Discovery drafts, but executor graph bodies are stubs. |
 | Context type safety | Partially implemented | `SessionContextBuilder` enforces Planning, Answer, and Discovery Synthesis filtering for `SessionFrame` snapshots; graph retrieval policy does not exist. |
-| Validity basis | Implemented locally | `Discovery.validity_basis` records dependency and invalidation metadata. Full provenance records are still missing. |
-| AnalysisFrame provenance | Partially implemented | Evidence requires `analysis_frame_ref`; no full `AnalysisFrame` provenance table exists. |
+| Validity basis | Implemented locally | `Discovery.validity_basis` records dependency and invalidation metadata. Full provenance records remain incomplete. |
+| AnalysisFrame provenance | Partially implemented | Evidence requires `analysis_frame_ref`; a minimal `AnalysisFrame` table exists, but no full analytical-view provenance exists. |
 | Evidence cache | Not implemented | No evidence-cache service exists. |
 
 ## Known Deviation
