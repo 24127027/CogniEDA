@@ -135,7 +135,7 @@ The executor dispatch layer does not yet exist. Current state:
 ## Known Deviations
 
 - The current `ExecutionRequest.executor_name` field reflects the older "name the executor" model. This will be replaced by `capability`.
-- No `PlannerOperation` schema exists yet, so `prepare_execution` cannot produce a proper operation record — it will directly construct the `ExecutionRequest` in planner state for now.
+- A minimal `PlannerOperation` schema/table exists, but `prepare_execution` still does not produce execution operations. It should stay skeleton-only until the planner/executor approval contract is designed.
 - `review_execution` cannot persist `Evidence` or `Discovery` because those persistence paths are not yet implemented. The `ExecutionResult` will carry drafts that `review_execution` can inspect but not yet commit.
 
 ## Related Documents
