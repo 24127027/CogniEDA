@@ -43,8 +43,8 @@ The SQLModel store currently persists tables for:
 | Filesystem workspace | Partially implemented | Repo has data/artifact folders and workspace-local DB default, but no workspace initializer or registry. |
 | SQLModel runtime store | Implemented | `src/db/session.py` and `src/db/init_db.py` provide local DB setup. |
 | Research graph/database | Partially implemented | The current store is relational SQLModel rather than a graph database, but it stores the target FCO set. |
-| Workflow store | Partially implemented | Tasks and SessionFrames exist; planner operation persistence is missing. |
-| Provenance store | Partially implemented | `UserDecision` exists and Evidence carries AnalysisFrame/ExecutionRun refs; full provenance records are missing. |
+| Workflow store | Partially implemented | Tasks, SessionFrames, minimal PlannerOperations, and a skeleton commit boundary exist; full planner runtime and approval UX are missing. |
+| Provenance store | Partially implemented | `UserDecision`, minimal `AnalysisFrame`, minimal `ExecutionRun`, and Evidence provenance refs exist; full reproducibility records are missing. |
 | Evidence cache | Not implemented | No cache lookup service exists. |
 | DVC integration | Partially implemented | `DvcAdapter` defines the boundary and raises explicit not-implemented behavior. Executable DVC support is not declared as a runtime dependency. |
 
