@@ -219,8 +219,18 @@ class EvidenceLifecycleState(StrEnum):
     """Allowed lifecycle states for immutable Evidence records."""
 
     ACTIVE = "active"
+    HISTORICALLY_SCOPED = "historically_scoped"
     SUPERSEDED = "superseded"
     INVALIDATED = "invalidated"
+
+
+class DiscoveryLifecycleState(StrEnum):
+    """Lifecycle states for Discovery review metadata."""
+
+    ACTIVE = "active"
+    FLAGGED = "flagged"
+    INVALIDATED = "invalidated"
+    DEPRECATED = "deprecated"
 
 
 class DiscoveryEpistemicStatus(StrEnum):

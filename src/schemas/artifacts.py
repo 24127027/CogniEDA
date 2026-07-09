@@ -6,7 +6,6 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from pydantic import Field, NonNegativeInt, model_validator
-
 from schemas.common import (
     AssumptionContextSummary,
     BaselineSummary,
@@ -42,6 +41,7 @@ from schemas.enums import (
     DataProfileMethod,
     DatasetSourceType,
     DiscoveryEpistemicStatus,
+    DiscoveryLifecycleState,
     EvidenceLifecycleState,
     EvidenceType,
     HypothesisStatus,
@@ -84,6 +84,7 @@ class DataProfile(ImmutableCogniEDABaseModel):
     preprocessing_history: list[LineageStep] = Field(default_factory=list)
     artifact_refs: list[NonEmptyStr] = Field(default_factory=list)
     lifecycle_state: DataProfileLifecycleState = DataProfileLifecycleState.DRAFT
+    superseded_by_data_profile_id: UUID | None = None
     accepted_as_ground_truth: bool = False
     created_at: datetime = Field(default_factory=utc_now)
 
@@ -173,6 +174,8 @@ class Evidence(ImmutableCogniEDABaseModel):
     evidence_id: UUID = Field(default_factory=uuid4)
     hypothesis_id: UUID
     profile_id: UUID
+    # Skeleton stage: these are string identifiers for provenance records.
+    # EvidenceRepository can strictly dereference them when provenance repos are wired.
     analysis_frame_ref: NonEmptyStr
     execution_run_ref: NonEmptyStr
     evidence_type: EvidenceType
@@ -183,6 +186,8 @@ class Evidence(ImmutableCogniEDABaseModel):
     artifact_refs: list[NonEmptyStr] = Field(default_factory=list)
     limitations: list[NonEmptyStr] = Field(default_factory=list)
     lifecycle_state: EvidenceLifecycleState = EvidenceLifecycleState.ACTIVE
+    superseded_by_evidence_id: UUID | None = None
+    lifecycle_reason: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
 
     @model_validator(mode="after")
@@ -204,6 +209,9 @@ class Discovery(ImmutableCogniEDABaseModel):
     epistemic_status: DiscoveryEpistemicStatus
     scope: NonEmptyStr
     validity_basis: ValidityBasis
+    lifecycle_state: DiscoveryLifecycleState = DiscoveryLifecycleState.ACTIVE
+    review_reasons: list[NonEmptyStr] = Field(default_factory=list)
+    flagged_by_evidence_ids: list[UUID] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
 
     @model_validator(mode="after")
