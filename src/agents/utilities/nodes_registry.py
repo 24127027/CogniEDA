@@ -36,7 +36,7 @@ class NodeRegistry[StateT: BaseModel, ContextT: BaseModel | None]:
     def register(
         self,
         name: str | None = None,
-    ) -> Callable[[StateNode[StateT, ContextT]], StateNode[StateT, ContextT]]:
+    ):
         """Decorator to automatically register LangGraph nodes."""
 
         def decorator(func: StateNode[StateT, ContextT]) -> StateNode[StateT, ContextT]:
@@ -53,6 +53,6 @@ class NodeRegistry[StateT: BaseModel, ContextT: BaseModel | None]:
         return decorator
 
     @property
-    def nodes(self) -> dict[str, StateNode[StateT, ContextT]]:
+    def nodes(self):
         """Returns the dictionary mapping string names to functions for graph.add_node()."""
         return dict(self._registry)
