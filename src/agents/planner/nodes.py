@@ -1,11 +1,10 @@
-from langgraph.runtime import Runtime
-from sqlmodel import Session
-
 from application.orchestrator.planner_commit import commit_planner_operations
 from db.session import get_session
+from langgraph.runtime import Runtime
 from repositories import PlannerOperationRepository
 from schemas.enums import PlannerNodeName, PlannerOperationType
 from schemas.planner_operations import PlannerOperation
+from sqlmodel import Session
 
 from ..utilities.nodes_registry import NodeRegistry
 from .types import Context, State
@@ -19,7 +18,7 @@ R = registry.R
 
 
 @registry.register()
-def understand_request(state: State, runtime: Runtime[Context]):
+def understand_request(state: State, runtime: Runtime[Context]) -> None:
     """
     LLM interprets the user's latest message.
 
@@ -46,7 +45,7 @@ def route_intent(state: State, runtime: Runtime[Context]) -> str:
 
 
 @registry.register()
-def answer_question(state: State, runtime: Runtime[Context]):
+def answer_question(state: State, runtime: Runtime[Context]) -> None:
     """LLM answers the user's question
 
     The LLM is provided with context from the session, so it can answer the question more
@@ -61,7 +60,7 @@ def answer_question(state: State, runtime: Runtime[Context]):
 
 
 @registry.register()
-def propose_questions(state: State, runtime: Runtime[Context]):
+def propose_questions(state: State, runtime: Runtime[Context]) -> None:
     """
     LLM proposes possible research directions, open questions, or
     investigation ideas based on the current research context.
@@ -70,7 +69,7 @@ def propose_questions(state: State, runtime: Runtime[Context]):
 
 
 @registry.register()
-def expand_plan(state: State, runtime: Runtime[Context]):
+def expand_plan(state: State, runtime: Runtime[Context]) -> None:
     """
     LLM expands an approved research direction into executable Tasks.
 
@@ -86,15 +85,12 @@ def expand_plan(state: State, runtime: Runtime[Context]):
 # --------------------
 
 @registry.register()
-def manage_tasks(state: State, runtime: Runtime[Context]):
+def manage_tasks(state: State, runtime: Runtime[Context]) -> State:
     """
-    Apply user-authorized modifications to the Task hierarchy.
+    Draft Task operations without directly mutating persistent Task records.
 
-    Supported operations include creating, updating, deleting,
-    and changing Task state.
-
-    Should produce operations that later apply to the Task hierarchy, but does not directly
-    modify it.
+    Later workflow code can decide which operations require user approval before
+    commit applies them.
     """
     session_id = _session_id(state, runtime)
     for task in state.task_create_payloads:
@@ -102,31 +98,31 @@ def manage_tasks(state: State, runtime: Runtime[Context]):
             PlannerOperation(
                 session_id=session_id,
                 operation_type=PlannerOperationType.CREATE_TASK,
-                target_object_id=task.task_id,
-                target_object_type="task",
                 payload=task.model_dump(mode="json"),
                 produced_by_node=PlannerNodeName.MANAGE_TASKS,
             )
         )
-    for draft in state.task_update_payloads:
+    for task_update in state.task_update_payloads:
         state.planner_operations.append(
             PlannerOperation(
                 session_id=session_id,
                 operation_type=PlannerOperationType.UPDATE_TASK,
-                target_object_id=draft.require_target_object_id(),
-                target_object_type="task",
-                payload=draft.operation_payload(),
+                payload=task_update.operation_payload().model_dump(
+                    mode="json",
+                    exclude_unset=True,
+                ),
                 produced_by_node=PlannerNodeName.MANAGE_TASKS,
             )
         )
-    for draft in state.task_state_change_payloads:
+    for task_state_change in state.task_state_change_payloads:
         state.planner_operations.append(
             PlannerOperation(
                 session_id=session_id,
                 operation_type=PlannerOperationType.CHANGE_TASK_STATE,
-                target_object_id=draft.require_target_object_id(),
-                target_object_type="task",
-                payload=draft.operation_payload(),
+                payload=task_state_change.operation_payload().model_dump(
+                    mode="json",
+                    exclude_unset=True,
+                ),
                 produced_by_node=PlannerNodeName.MANAGE_TASKS,
             )
         )
@@ -134,7 +130,7 @@ def manage_tasks(state: State, runtime: Runtime[Context]):
 
 
 @registry.register()
-def select_task(state: State, runtime: Runtime[Context]):
+def select_task(state: State, runtime: Runtime[Context]) -> None:
     """
     Determine which task to execute 
     Planner resolves which Task object this refers to.
@@ -148,22 +144,29 @@ def select_task(state: State, runtime: Runtime[Context]):
 
 
 @registry.register()
-def prepare_execution(state: State, runtime: Runtime[Context]):
+def prepare_execution(state: State, runtime: Runtime[Context]) -> None:
     """ 
-    Choose the appropriate executor for the task and prepare the execution context.
+    Compile an active terminal analytical Task into execution context.
+
+    Later runtime work will prepare the single Hypothesis associated with the
+    selected terminal Task. This skeleton does not execute or mutate state.
     """
     pass
 
 
 @registry.register()
-def dispatch_executor(state: State, runtime: Runtime[Context]):
-    """Delegate to another specialist agent."""
+def dispatch_executor(state: State, runtime: Runtime[Context]) -> None:
+    """Placeholder for delegating to an executor agent."""
     pass
 
 
 @registry.register()
-def review_execution(state: State, runtime: Runtime[Context]):
-    """Review the results of the execution and update the state accordingly."""
+def review_execution(state: State, runtime: Runtime[Context]) -> None:
+    """Review executor results.
+
+    Later implementation will produce Evidence and Discovery operations from
+    executor output. This skeleton does not synthesize discoveries.
+    """
     pass
 
 
@@ -173,9 +176,10 @@ def review_execution(state: State, runtime: Runtime[Context]):
 
 
 @registry.register()
-def review_conflicts(state: State, runtime: Runtime[Context]):
-    """Determine whether new results contradict existing knowledge
-    and prepare user review.
+def review_conflicts(state: State, runtime: Runtime[Context]) -> State:
+    """Draft review flags when Discoveries contradict Assumptions.
+
+    Flagging is a user-review signal; it does not rewrite Assumption truth.
     """
     session_id = _session_id(state, runtime)
     for draft in state.conflict_flag_payloads:
@@ -183,9 +187,10 @@ def review_conflicts(state: State, runtime: Runtime[Context]):
             PlannerOperation(
                 session_id=session_id,
                 operation_type=PlannerOperationType.FLAG_OBJECT,
-                target_object_id=draft.require_target_object_id(),
-                target_object_type=draft.target_object_type,
-                payload=draft.operation_payload(),
+                payload=draft.operation_payload().model_dump(
+                    mode="json",
+                    exclude_unset=True,
+                ),
                 produced_by_node=PlannerNodeName.REVIEW_CONFLICTS,
             )
         )
@@ -193,17 +198,18 @@ def review_conflicts(state: State, runtime: Runtime[Context]):
 
 
 @registry.register()
-def manage_objective(state: State, runtime: Runtime[Context]):
-    """Apply changes to the objective, such as updating, refining, or clarifying it."""
+def manage_objective(state: State, runtime: Runtime[Context]) -> State:
+    """Draft Objective update operations without mutating the Objective directly."""
     session_id = _session_id(state, runtime)
     for draft in state.objective_update_payloads:
         state.planner_operations.append(
             PlannerOperation(
                 session_id=session_id,
                 operation_type=PlannerOperationType.UPDATE_OBJECTIVE,
-                target_object_id=draft.require_target_object_id(),
-                target_object_type="objective",
-                payload=draft.operation_payload(),
+                payload=draft.operation_payload().model_dump(
+                    mode="json",
+                    exclude_unset=True,
+                ),
                 produced_by_node=PlannerNodeName.MANAGE_OBJECTIVE,
             )
         )
@@ -211,16 +217,14 @@ def manage_objective(state: State, runtime: Runtime[Context]):
 
 
 @registry.register()
-def manage_assumptions(state: State, runtime: Runtime[Context]):
-    """Apply changes to the assumptions, such as updating, refining, or clarifying them."""
+def manage_assumptions(state: State, runtime: Runtime[Context]) -> State:
+    """Draft Assumption operations without using Assumptions as inference premises."""
     session_id = _session_id(state, runtime)
     for assumption in state.assumption_create_payloads:
         state.planner_operations.append(
             PlannerOperation(
                 session_id=session_id,
                 operation_type=PlannerOperationType.CREATE_ASSUMPTION,
-                target_object_id=assumption.assumption_id,
-                target_object_type="assumption",
                 payload=assumption.model_dump(mode="json"),
                 produced_by_node=PlannerNodeName.MANAGE_ASSUMPTIONS,
             )
@@ -230,9 +234,10 @@ def manage_assumptions(state: State, runtime: Runtime[Context]):
             PlannerOperation(
                 session_id=session_id,
                 operation_type=PlannerOperationType.UPDATE_ASSUMPTION_STATE,
-                target_object_id=draft.require_target_object_id(),
-                target_object_type="assumption",
-                payload=draft.operation_payload(),
+                payload=draft.operation_payload().model_dump(
+                    mode="json",
+                    exclude_unset=True,
+                ),
                 produced_by_node=PlannerNodeName.MANAGE_ASSUMPTIONS,
             )
         )
@@ -245,13 +250,13 @@ def manage_assumptions(state: State, runtime: Runtime[Context]):
 
 
 @registry.register()
-def request_user_input(state: State, runtime: Runtime[Context]):
+def request_user_input(state: State, runtime: Runtime[Context]) -> None:
     """Prepare a request for clarification or other user input."""
     pass
 
 
 @registry.register()
-def pause(state: State, runtime: Runtime[Context]):
+def pause(state: State, runtime: Runtime[Context]) -> None:
     """Pause the current process and wait for user input or confirmation before proceeding."""
 
     pass
@@ -272,12 +277,12 @@ def process_decision(state: State, runtime: Runtime[Context]) -> str:
 
 
 @registry.register()
-def commit(state: State, runtime: Runtime[Context]):
+def commit(state: State, runtime: Runtime[Context]) -> State:
     """
-    Atomically persist all planner state changes.
+    Persist approved planner operations at the commit boundary.
 
-    This includes updating Tasks, Objectives, Assumptions, Session Frame,
-    and any other modified planner state before ending the iteration.
+    Future work will make approval, transaction, and rollback behavior explicit
+    here. Planner nodes must keep producing operations rather than mutating FCOs.
     """
     context = _runtime_context(runtime)
     if context is None or context.database_url is None:
@@ -286,16 +291,18 @@ def commit(state: State, runtime: Runtime[Context]):
     session = get_session(context.database_url)
     try:
         _persist_planner_operations(session, state.planner_operations)
-        operation_ids = state.operation_ids_to_commit
-        if operation_ids is None and state.planner_operations:
-            operation_ids = [
-                operation.operation_id for operation in state.planner_operations
-            ]
-        state.commit_result = commit_planner_operations(
-            session,
-            session_id=context.session_id or state.session_id,
-            operation_ids=operation_ids,
-        )
+        if state.operation_ids_to_commit is not None:
+            state.commit_result = commit_planner_operations(
+                session,
+                session_id=context.session_id or state.session_id,
+                operation_ids=state.operation_ids_to_commit,
+            )
+        else:
+            state.commit_result = commit_planner_operations(
+                session,
+                operations=state.planner_operations,
+                session_id=context.session_id or state.session_id,
+            )
     finally:
         session.close()
     return state
