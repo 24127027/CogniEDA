@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -33,8 +34,7 @@ from schemas.common import (
 from schemas.enums import (
     AssumptionStatus,
     ContextMode,
-    DataProfileLifecycleState,
-    EvidenceLifecycleState,
+    FirstClassObjectType,
     HypothesisStatus,
     InvalidationTrigger,
     MemorySourceType,
@@ -43,6 +43,8 @@ from schemas.enums import (
     TaskLifecycleState,
     UserDecisionStatus,
 )
+
+from .retrieval_policy import exclusion_reason, is_allowed_in_context
 
 _CONCLUSION_SAFE_MEMORY_STATUSES = {
     MemoryStatus.ACTIVE,
@@ -114,21 +116,72 @@ class SessionContextBuilder:
         raise ValueError(f"Unsupported context mode: {mode}")
 
     def _planning_context(self, session_frame: SessionFrame) -> ContextBundle:
+        profiles = tuple(
+            item
+            for item in session_frame.data_profile_summaries
+            if is_allowed_in_context(
+                FirstClassObjectType.DATA_PROFILE,
+                item.lifecycle_state,
+                ContextMode.PLANNING,
+            )
+        )
+        tasks = tuple(
+            item
+            for item in session_frame.active_tasks
+            if is_allowed_in_context(
+                FirstClassObjectType.TASK,
+                item.lifecycle_state,
+                ContextMode.PLANNING,
+            )
+        )
+        assumptions = tuple(
+            item
+            for item in session_frame.active_assumptions
+            if item.memory_status in _CONCLUSION_SAFE_MEMORY_STATUSES
+            and is_allowed_in_context(
+                FirstClassObjectType.ASSUMPTION,
+                AssumptionStatus.ACTIVE,
+                ContextMode.PLANNING,
+            )
+        )
+        hypotheses = tuple(
+            item
+            for item in session_frame.active_hypotheses
+            if item.memory_status in _CONCLUSION_SAFE_MEMORY_STATUSES
+            and is_allowed_in_context(
+                FirstClassObjectType.HYPOTHESIS,
+                item.status,
+                ContextMode.PLANNING,
+            )
+        )
+        discoveries, discovery_exclusion_notes = self._project_discoveries(
+            session_frame.relevant_discoveries,
+            mode=ContextMode.PLANNING,
+        )
+        evidence = tuple(
+            item
+            for item in session_frame.supporting_evidence
+            if is_allowed_in_context(
+                FirstClassObjectType.EVIDENCE,
+                item.lifecycle_state,
+                ContextMode.PLANNING,
+            )
+        )
         return ContextBundle(
             mode=ContextMode.PLANNING,
             objective_snapshot=session_frame.objective_snapshot,
-            data_profile_summaries=tuple(session_frame.data_profile_summaries),
-            data_profile_refs=tuple(session_frame.active_data_profile_refs),
-            tasks=tuple(session_frame.active_tasks),
-            task_refs=tuple(session_frame.active_task_refs),
-            assumptions=tuple(session_frame.active_assumptions),
-            assumption_refs=tuple(session_frame.active_assumption_refs),
-            hypotheses=tuple(session_frame.active_hypotheses),
-            hypothesis_refs=tuple(session_frame.active_hypothesis_refs),
-            discoveries=tuple(session_frame.relevant_discoveries),
-            discovery_refs=tuple(session_frame.relevant_discovery_refs),
-            evidence=tuple(session_frame.supporting_evidence),
-            evidence_refs=tuple(session_frame.supporting_evidence_refs),
+            data_profile_summaries=profiles,
+            data_profile_refs=tuple(item.profile_id for item in profiles),
+            tasks=tasks,
+            task_refs=tuple(item.task_id for item in tasks),
+            assumptions=assumptions,
+            assumption_refs=tuple(item.assumption_id for item in assumptions),
+            hypotheses=hypotheses,
+            hypothesis_refs=tuple(item.hypothesis_id for item in hypotheses),
+            discoveries=discoveries,
+            discovery_refs=tuple(item.discovery_id for item in discoveries),
+            evidence=evidence,
+            evidence_refs=tuple(item.evidence_id for item in evidence),
             user_decisions=tuple(session_frame.recent_user_decisions),
             user_decision_refs=tuple(session_frame.recent_user_decision_refs),
             pending_tasks=tuple(session_frame.pending_tasks),
@@ -136,7 +189,8 @@ class SessionContextBuilder:
             key_warnings=tuple(session_frame.key_warnings),
             stale_context=tuple(session_frame.stale_context),
             dead_ends=tuple(session_frame.dead_ends),
-            cached_tool_results=tuple(session_frame.cached_tool_results),
+            cached_tool_results=(),
+            exclusion_notes=discovery_exclusion_notes,
         )
 
     def _discovery_synthesis_context(
@@ -149,20 +203,32 @@ class SessionContextBuilder:
             item
             for item in session_frame.data_profile_summaries
             if item.memory_status in _CONCLUSION_SAFE_MEMORY_STATUSES
-            and item.lifecycle_state == DataProfileLifecycleState.ACTIVE
+            and is_allowed_in_context(
+                FirstClassObjectType.DATA_PROFILE,
+                item.lifecycle_state,
+                mode,
+            )
             and item.accepted_as_ground_truth
         )
         hypotheses = tuple(
             item
             for item in session_frame.active_hypotheses
             if item.memory_status in _CONCLUSION_SAFE_MEMORY_STATUSES
-            and item.status == HypothesisStatus.TESTING
+            and is_allowed_in_context(
+                FirstClassObjectType.HYPOTHESIS,
+                item.status,
+                mode,
+            )
         )
         evidence = tuple(
             item
             for item in session_frame.supporting_evidence
             if item.memory_status in _CONCLUSION_SAFE_MEMORY_STATUSES
-            and item.lifecycle_state == EvidenceLifecycleState.ACTIVE
+            and is_allowed_in_context(
+                FirstClassObjectType.EVIDENCE,
+                item.lifecycle_state,
+                mode,
+            )
         )
         return ContextBundle(
             mode=mode,
@@ -185,24 +251,47 @@ class SessionContextBuilder:
         )
 
     def _answer_context(self, session_frame: SessionFrame) -> ContextBundle:
-        discoveries = tuple(
+        profiles = tuple(
             item
-            for item in session_frame.relevant_discoveries
+            for item in session_frame.data_profile_summaries
             if item.memory_status in _CONCLUSION_SAFE_MEMORY_STATUSES
+            and is_allowed_in_context(
+                FirstClassObjectType.DATA_PROFILE,
+                item.lifecycle_state,
+                ContextMode.ANSWER,
+            )
+        )
+        hypotheses = tuple(
+            item
+            for item in session_frame.active_hypotheses
+            if item.memory_status in _CONCLUSION_SAFE_MEMORY_STATUSES
+            and is_allowed_in_context(
+                FirstClassObjectType.HYPOTHESIS,
+                item.status,
+                ContextMode.ANSWER,
+            )
+        )
+        discoveries, discovery_exclusion_notes = self._project_discoveries(
+            session_frame.relevant_discoveries,
+            mode=ContextMode.ANSWER,
         )
         evidence = tuple(
             item
             for item in session_frame.supporting_evidence
             if item.memory_status in _CONCLUSION_SAFE_MEMORY_STATUSES
-            and item.lifecycle_state == EvidenceLifecycleState.ACTIVE
+            and is_allowed_in_context(
+                FirstClassObjectType.EVIDENCE,
+                item.lifecycle_state,
+                ContextMode.ANSWER,
+            )
         )
         return ContextBundle(
             mode=ContextMode.ANSWER,
             objective_snapshot=session_frame.objective_snapshot,
-            data_profile_summaries=tuple(session_frame.data_profile_summaries),
-            data_profile_refs=tuple(session_frame.active_data_profile_refs),
-            hypotheses=tuple(session_frame.active_hypotheses),
-            hypothesis_refs=tuple(session_frame.active_hypothesis_refs),
+            data_profile_summaries=profiles,
+            data_profile_refs=tuple(item.profile_id for item in profiles),
+            hypotheses=hypotheses,
+            hypothesis_refs=tuple(item.hypothesis_id for item in hypotheses),
             discoveries=discoveries,
             discovery_refs=tuple(item.discovery_id for item in discoveries),
             evidence=evidence,
@@ -211,7 +300,55 @@ class SessionContextBuilder:
             exclusion_notes=(
                 "Answer Context may include existing Discoveries for user Q&A.",
                 "Assumptions remain excluded from answer synthesis unless explicitly requested.",
+                *discovery_exclusion_notes,
             ),
+        )
+
+    @staticmethod
+    def _project_discoveries(
+        summaries: Sequence[DiscoveryContextSummary],
+        *,
+        mode: ContextMode,
+    ) -> tuple[tuple[DiscoveryContextSummary, ...], tuple[str, ...]]:
+        projected: list[DiscoveryContextSummary] = []
+        exclusion_notes: list[str] = []
+
+        for summary in summaries:
+            reason = exclusion_reason(
+                FirstClassObjectType.DISCOVERY,
+                summary.memory_status,
+                mode,
+            )
+            if reason is None:
+                reason = exclusion_reason(
+                    FirstClassObjectType.DISCOVERY,
+                    summary.lifecycle_state,
+                    mode,
+                )
+            if reason is None:
+                projected.append(summary)
+                continue
+            exclusion_notes.append(
+                SessionContextBuilder._discovery_exclusion_note(
+                    summary,
+                    mode=mode,
+                    reason=reason,
+                )
+            )
+
+        return tuple(projected), tuple(exclusion_notes)
+
+    @staticmethod
+    def _discovery_exclusion_note(
+        summary: DiscoveryContextSummary,
+        *,
+        mode: ContextMode,
+        reason: str,
+    ) -> str:
+        return (
+            f"Discovery {summary.discovery_id} excluded from {mode.value} context: "
+            f"memory_status={summary.memory_status.value}; "
+            f"lifecycle_state={summary.lifecycle_state.value}; {reason}"
         )
 
 
@@ -423,6 +560,7 @@ class SessionFrameBuilder:
             epistemic_status=discovery.epistemic_status,
             scope=discovery.scope,
             evidence_ids=discovery.evidence_ids,
+            lifecycle_state=discovery.lifecycle_state,
             provenance=[
                 ContextProvenance(
                     source_type=MemorySourceType.VALIDATION_RESULT,
