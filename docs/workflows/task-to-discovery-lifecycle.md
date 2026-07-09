@@ -58,8 +58,10 @@ Current `Task`, `Hypothesis`, `Evidence`, and `Discovery` repositories support:
 - hypothesis creation and lifecycle/status updates
 - hypothesis listing by task/profile/status
 - evidence creation and retrieval by hypothesis/profile
+- evidence supersession/invalidation helpers with optional dependent-Discovery review flagging
 - typed evidence-to-hypothesis evaluation outcomes
-- Discovery creation and retrieval by Hypothesis/status
+- Discovery creation and retrieval by Hypothesis/status/review state
+- repository-level Discovery review flagging after referenced Evidence changes
 - one Hypothesis to one Discovery guard at repository and fresh-database schema level
 
 This is useful local enforcement, but planner execution and commit still do not drive this lifecycle end to end.

@@ -22,6 +22,8 @@ Implemented:
 - Profiling records row count, column count, column order, inferred logical dtypes, missingness, duplicate rows, categorical top values, numeric summaries, primary-key candidate, time-column candidates, and quality flags.
 - `DataProfile` stores `dataset_path`, optional `dvc_hash`, optional `dvc_version_label`, optional source metadata, preprocessing history, artifacts, lifecycle state, and `accepted_as_ground_truth`.
 - `DataProfileRepository` supports create, get, list, list-for-dataset-path, and latest-for-dataset-path.
+- `DataProfileRepository.supersede()` can mark a replaced profile as `superseded`, record the replacement DataProfile id, and optionally ask Evidence and Discovery repositories to mark dependent records as historically scoped or review-flagged.
+- Old Evidence and Discovery records remain traceable. They are not rewritten for, or automatically valid for, the replacement DataProfile.
 - Repositories do not expose `DataProfileRepository.update()`.
 - `DvcAdapter` defines the integration boundary and raises explicit not-implemented behavior until executable DVC support is added.
 
@@ -31,7 +33,7 @@ Not implemented:
 - Cleaning execution service.
 - User-reviewed cleaning decision loop.
 - Automated derived dataset creation.
-- Propagation rules when a `DataProfile` is superseded.
+- Runtime propagation, retrieval policy, and user-review workflow after `DataProfile` supersession.
 
 ## Implementation Status
 
