@@ -1,3 +1,6 @@
+from typing import Any
+
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 
@@ -5,7 +8,9 @@ from .nodes import R, registry, route_intent
 from .types import Context, State
 
 
-def build_graph() -> CompiledStateGraph[State, Context, State, State]:
+def build_graph(
+    *, checkpointer: BaseCheckpointSaver[Any] | None = None
+) -> CompiledStateGraph[State, Context, State, State]:
     builder = StateGraph(State, context_schema=Context)
 
     # --------------------------------------------------
@@ -62,11 +67,9 @@ def build_graph() -> CompiledStateGraph[State, Context, State, State]:
     # --------------------------------------------------
 
     builder.add_edge(R.select_task, R.prepare_execution)
-    builder.add_edge(R.prepare_execution, R.request_user_input)
-
+    builder.add_edge(R.prepare_execution, R.dispatch_executor)
     builder.add_edge(R.dispatch_executor, R.review_execution)
-    builder.add_edge(R.review_execution, R.review_conflicts)
-    builder.add_edge(R.review_conflicts, R.request_user_input)
+    builder.add_edge(R.review_execution, R.commit)
 
     # --------------------------------------------------
     # Knowledge management
@@ -103,7 +106,7 @@ def build_graph() -> CompiledStateGraph[State, Context, State, State]:
     builder.add_edge(R.invalid_request, END)
     builder.add_edge(R.commit, END)
 
-    return builder.compile()
+    return builder.compile(checkpointer=checkpointer)
 
 # if __name__ == "__main__":
 #     agent_graph = build_graph()
