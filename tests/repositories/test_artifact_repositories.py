@@ -5,9 +5,10 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
+from pydantic import ValidationError
+
 from db.init_db import init_db
 from db.session import create_db_engine, get_session
-from pydantic import ValidationError
 from repositories import (
     AnalysisFrameRepository,
     AssumptionRepository,
@@ -427,6 +428,48 @@ def test_objective_update_with_revision_repository_creates_revision(
     assert revision.created_by == "test"
 
 
+def test_objective_update_rejects_revision_repository_from_different_session(
+    tmp_path: Path,
+) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'objective_sessions.sqlite3').as_posix()}"
+    create_db_engine.cache_clear()
+    init_db(database_url)
+    objective_session = get_session(database_url)
+    revision_session = get_session(database_url)
+    try:
+        objective_repository = ObjectiveRepository(objective_session)
+        revision_repository = ObjectiveRevisionRepository(revision_session)
+        objective = objective_repository.create(build_objective())
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                "Objective update and ObjectiveRevision creation must share "
+                "the same SQLModel session"
+            ),
+        ):
+            objective_repository.update(
+                objective.objective_id,
+                ObjectiveUpdate(statement="This update must be rejected."),
+                revision_repository=revision_repository,
+            )
+
+        reloaded = objective_repository.get_by_id(objective.objective_id)
+
+        assert reloaded is not None
+        assert reloaded.title == objective.title
+        assert reloaded.statement == objective.statement
+        assert reloaded.status == objective.status
+        assert ObjectiveRevisionRepository(objective_session).list_for_objective(
+            objective.objective_id
+        ) == []
+        assert revision_repository.list_for_objective(objective.objective_id) == []
+    finally:
+        objective_session.close()
+        revision_session.close()
+        create_db_engine.cache_clear()
+
+
 def test_objective_update_without_revision_repository_preserves_behavior(
     db_session,
 ) -> None:
@@ -525,7 +568,7 @@ def test_data_profile_supersede_with_repositories_marks_historical_scope(
     original_evidence_payload = evidence_without_lifecycle_metadata(evidence)
     original_discovery_payload = discovery_without_review_metadata(discovery)
 
-    profile_repository.supersede(
+    superseded_profile = profile_repository.supersede(
         old_profile.profile_id,
         replacement_profile.profile_id,
         reason="Cleaning produced a replacement DataProfile.",
@@ -540,6 +583,9 @@ def test_data_profile_supersede_with_repositories_marks_historical_scope(
         unrelated_discovery.discovery_id
     )
 
+    assert superseded_profile is not None
+    assert superseded_profile.lifecycle_state == DataProfileLifecycleState.SUPERSEDED
+    assert superseded_profile.superseded_by_data_profile_id == replacement_profile.profile_id
     assert historically_scoped is not None
     assert historically_scoped.lifecycle_state == EvidenceLifecycleState.HISTORICALLY_SCOPED
     assert historically_scoped.lifecycle_reason is not None
@@ -570,6 +616,215 @@ def test_data_profile_supersede_with_repositories_marks_historical_scope(
     assert unaffected_discovery is not None
     assert unaffected_discovery.lifecycle_state == DiscoveryLifecycleState.ACTIVE
     assert unaffected_discovery.review_reasons == []
+
+
+def test_data_profile_supersede_with_only_evidence_repository_marks_historical_scope(
+    db_session,
+) -> None:
+    profile_repository = DataProfileRepository(db_session)
+    old_profile = profile_repository.create(build_data_profile())
+    replacement_profile = profile_repository.create(
+        build_data_profile(
+            dataset_path="data/customers-cleaned.csv",
+            dvc_hash="md5:customers-v2",
+            dvc_version_label="customers-v2",
+        )
+    )
+    _, evidence, discovery = create_evidence_bound_discovery_for_profile(
+        db_session,
+        profile=old_profile,
+    )
+    evidence_repository = EvidenceRepository(db_session)
+    discovery_repository = DiscoveryRepository(db_session)
+
+    profile_repository.supersede(
+        old_profile.profile_id,
+        replacement_profile.profile_id,
+        evidence_repository=evidence_repository,
+    )
+
+    superseded_profile = profile_repository.get_by_id(old_profile.profile_id)
+    historically_scoped = evidence_repository.get_by_id(evidence.evidence_id)
+    unchanged_discovery = discovery_repository.get_by_id(discovery.discovery_id)
+
+    assert superseded_profile is not None
+    assert superseded_profile.lifecycle_state == DataProfileLifecycleState.SUPERSEDED
+    assert superseded_profile.superseded_by_data_profile_id == replacement_profile.profile_id
+    assert historically_scoped is not None
+    assert historically_scoped.lifecycle_state == EvidenceLifecycleState.HISTORICALLY_SCOPED
+    assert unchanged_discovery is not None
+    assert unchanged_discovery.lifecycle_state == DiscoveryLifecycleState.ACTIVE
+    assert unchanged_discovery.review_reasons == []
+
+
+def test_data_profile_supersede_with_only_discovery_repository_flags_review(
+    db_session,
+) -> None:
+    profile_repository = DataProfileRepository(db_session)
+    old_profile = profile_repository.create(build_data_profile())
+    replacement_profile = profile_repository.create(
+        build_data_profile(
+            dataset_path="data/customers-cleaned.csv",
+            dvc_hash="md5:customers-v2",
+            dvc_version_label="customers-v2",
+        )
+    )
+    _, evidence, discovery = create_evidence_bound_discovery_for_profile(
+        db_session,
+        profile=old_profile,
+    )
+    evidence_repository = EvidenceRepository(db_session)
+    discovery_repository = DiscoveryRepository(db_session)
+
+    profile_repository.supersede(
+        old_profile.profile_id,
+        replacement_profile.profile_id,
+        discovery_repository=discovery_repository,
+    )
+
+    superseded_profile = profile_repository.get_by_id(old_profile.profile_id)
+    unchanged_evidence = evidence_repository.get_by_id(evidence.evidence_id)
+    flagged_discovery = discovery_repository.get_by_id(discovery.discovery_id)
+
+    assert superseded_profile is not None
+    assert superseded_profile.lifecycle_state == DataProfileLifecycleState.SUPERSEDED
+    assert superseded_profile.superseded_by_data_profile_id == replacement_profile.profile_id
+    assert unchanged_evidence is not None
+    assert unchanged_evidence.lifecycle_state == EvidenceLifecycleState.ACTIVE
+    assert unchanged_evidence.lifecycle_reason is None
+    assert flagged_discovery is not None
+    assert flagged_discovery.lifecycle_state == DiscoveryLifecycleState.FLAGGED
+    assert len(flagged_discovery.review_reasons) == 1
+
+
+def test_data_profile_supersede_rejects_evidence_repository_from_different_session(
+    tmp_path: Path,
+) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'data_profile_evidence_sessions.sqlite3').as_posix()}"
+    create_db_engine.cache_clear()
+    init_db(database_url)
+    profile_session = get_session(database_url)
+    evidence_session = get_session(database_url)
+    verification_session = get_session(database_url)
+    try:
+        profile_repository = DataProfileRepository(profile_session)
+        old_profile = profile_repository.create(build_data_profile())
+        replacement_profile = profile_repository.create(
+            build_data_profile(
+                dataset_path="data/customers-cleaned.csv",
+                dvc_hash="md5:customers-v2",
+                dvc_version_label="customers-v2",
+            )
+        )
+        _, evidence, discovery = create_evidence_bound_discovery_for_profile(
+            profile_session,
+            profile=old_profile,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                "DataProfile supersession and dependent Evidence/Discovery propagation "
+                "must share the same SQLModel session"
+            ),
+        ):
+            profile_repository.supersede(
+                old_profile.profile_id,
+                replacement_profile.profile_id,
+                evidence_repository=EvidenceRepository(evidence_session),
+                discovery_repository=DiscoveryRepository(profile_session),
+            )
+
+        persisted_profile = DataProfileRepository(verification_session).get_by_id(
+            old_profile.profile_id
+        )
+        persisted_evidence = EvidenceRepository(verification_session).get_by_id(
+            evidence.evidence_id
+        )
+        persisted_discovery = DiscoveryRepository(verification_session).get_by_id(
+            discovery.discovery_id
+        )
+
+        assert persisted_profile is not None
+        assert persisted_evidence is not None
+        assert persisted_discovery is not None
+        assert persisted_profile.lifecycle_state == DataProfileLifecycleState.ACTIVE
+        assert persisted_profile.superseded_by_data_profile_id is None
+        assert persisted_evidence.lifecycle_state == EvidenceLifecycleState.ACTIVE
+        assert persisted_evidence.lifecycle_reason is None
+        assert persisted_discovery.lifecycle_state == DiscoveryLifecycleState.ACTIVE
+        assert persisted_discovery.review_reasons == []
+        assert persisted_discovery.flagged_by_evidence_ids == []
+    finally:
+        profile_session.close()
+        evidence_session.close()
+        verification_session.close()
+        create_db_engine.cache_clear()
+
+
+def test_data_profile_supersede_rejects_discovery_repository_from_different_session(
+    tmp_path: Path,
+) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'data_profile_discovery_sessions.sqlite3').as_posix()}"
+    create_db_engine.cache_clear()
+    init_db(database_url)
+    profile_session = get_session(database_url)
+    discovery_session = get_session(database_url)
+    verification_session = get_session(database_url)
+    try:
+        profile_repository = DataProfileRepository(profile_session)
+        old_profile = profile_repository.create(build_data_profile())
+        replacement_profile = profile_repository.create(
+            build_data_profile(
+                dataset_path="data/customers-cleaned.csv",
+                dvc_hash="md5:customers-v2",
+                dvc_version_label="customers-v2",
+            )
+        )
+        _, evidence, discovery = create_evidence_bound_discovery_for_profile(
+            profile_session,
+            profile=old_profile,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                "DataProfile supersession and dependent Evidence/Discovery propagation "
+                "must share the same SQLModel session"
+            ),
+        ):
+            profile_repository.supersede(
+                old_profile.profile_id,
+                replacement_profile.profile_id,
+                evidence_repository=EvidenceRepository(profile_session),
+                discovery_repository=DiscoveryRepository(discovery_session),
+            )
+
+        persisted_profile = DataProfileRepository(verification_session).get_by_id(
+            old_profile.profile_id
+        )
+        persisted_evidence = EvidenceRepository(verification_session).get_by_id(
+            evidence.evidence_id
+        )
+        persisted_discovery = DiscoveryRepository(verification_session).get_by_id(
+            discovery.discovery_id
+        )
+
+        assert persisted_profile is not None
+        assert persisted_evidence is not None
+        assert persisted_discovery is not None
+        assert persisted_profile.lifecycle_state == DataProfileLifecycleState.ACTIVE
+        assert persisted_profile.superseded_by_data_profile_id is None
+        assert persisted_evidence.lifecycle_state == EvidenceLifecycleState.ACTIVE
+        assert persisted_evidence.lifecycle_reason is None
+        assert persisted_discovery.lifecycle_state == DiscoveryLifecycleState.ACTIVE
+        assert persisted_discovery.review_reasons == []
+        assert persisted_discovery.flagged_by_evidence_ids == []
+    finally:
+        profile_session.close()
+        discovery_session.close()
+        verification_session.close()
+        create_db_engine.cache_clear()
 
 
 def test_repeated_data_profile_supersession_is_rejected(db_session) -> None:
@@ -1032,6 +1287,69 @@ def test_evidence_supersede_with_discovery_repository_flags_dependent_discovery(
     assert superseded.result_summary == evidence.result_summary
 
 
+def test_evidence_supersede_rejects_discovery_repository_from_different_session(
+    tmp_path: Path,
+) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'evidence_supersede_sessions.sqlite3').as_posix()}"
+    create_db_engine.cache_clear()
+    init_db(database_url)
+    evidence_session = get_session(database_url)
+    discovery_session = get_session(database_url)
+    verification_session = get_session(database_url)
+    try:
+        profile, hypothesis, evidence, discovery = create_evidence_bound_discovery(
+            evidence_session
+        )
+        evidence_repository = EvidenceRepository(evidence_session)
+        replacement = evidence_repository.create(
+            build_evidence(
+                hypothesis.hypothesis_id,
+                profile.profile_id,
+                execution_run_ref="execution-run:replacement",
+                provenance=EvidenceProvenance(
+                    analysis_frame_ref="analysis-frame:customers:v1:spend-churn",
+                    execution_run_ref="execution-run:replacement",
+                    code_reference="tests/evidence",
+                ),
+            )
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                "Evidence lifecycle mutation and dependent Discovery flagging must "
+                "use the same SQLModel session"
+            ),
+        ):
+            evidence_repository.supersede(
+                evidence.evidence_id,
+                replacement.evidence_id,
+                reason="This mutation must be rejected.",
+                discovery_repository=DiscoveryRepository(discovery_session),
+            )
+
+        persisted_evidence = EvidenceRepository(verification_session).get_by_id(
+            evidence.evidence_id
+        )
+        persisted_discovery = DiscoveryRepository(verification_session).get_by_id(
+            discovery.discovery_id
+        )
+
+        assert persisted_evidence is not None
+        assert persisted_discovery is not None
+        assert persisted_evidence.lifecycle_state == EvidenceLifecycleState.ACTIVE
+        assert persisted_evidence.superseded_by_evidence_id is None
+        assert persisted_evidence.lifecycle_reason is None
+        assert persisted_discovery.lifecycle_state == DiscoveryLifecycleState.ACTIVE
+        assert persisted_discovery.review_reasons == []
+        assert persisted_discovery.flagged_by_evidence_ids == []
+    finally:
+        evidence_session.close()
+        discovery_session.close()
+        verification_session.close()
+        create_db_engine.cache_clear()
+
+
 def test_evidence_invalidate_with_discovery_repository_flags_dependent_discovery(
     db_session,
 ) -> None:
@@ -1054,6 +1372,54 @@ def test_evidence_invalidate_with_discovery_repository_flags_dependent_discovery
     assert str(evidence.evidence_id) in flagged.review_reasons[0]
     assert "change_type=invalidated" in flagged.review_reasons[0]
     assert "replacement_evidence_id" not in flagged.review_reasons[0]
+
+
+def test_evidence_invalidate_rejects_discovery_repository_from_different_session(
+    tmp_path: Path,
+) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'evidence_invalidate_sessions.sqlite3').as_posix()}"
+    create_db_engine.cache_clear()
+    init_db(database_url)
+    evidence_session = get_session(database_url)
+    discovery_session = get_session(database_url)
+    verification_session = get_session(database_url)
+    try:
+        _, _, evidence, discovery = create_evidence_bound_discovery(evidence_session)
+        evidence_repository = EvidenceRepository(evidence_session)
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                "Evidence lifecycle mutation and dependent Discovery flagging must "
+                "use the same SQLModel session"
+            ),
+        ):
+            evidence_repository.invalidate(
+                evidence.evidence_id,
+                reason="This mutation must be rejected.",
+                discovery_repository=DiscoveryRepository(discovery_session),
+            )
+
+        persisted_evidence = EvidenceRepository(verification_session).get_by_id(
+            evidence.evidence_id
+        )
+        persisted_discovery = DiscoveryRepository(verification_session).get_by_id(
+            discovery.discovery_id
+        )
+
+        assert persisted_evidence is not None
+        assert persisted_discovery is not None
+        assert persisted_evidence.lifecycle_state == EvidenceLifecycleState.ACTIVE
+        assert persisted_evidence.superseded_by_evidence_id is None
+        assert persisted_evidence.lifecycle_reason is None
+        assert persisted_discovery.lifecycle_state == DiscoveryLifecycleState.ACTIVE
+        assert persisted_discovery.review_reasons == []
+        assert persisted_discovery.flagged_by_evidence_ids == []
+    finally:
+        evidence_session.close()
+        discovery_session.close()
+        verification_session.close()
+        create_db_engine.cache_clear()
 
 
 def test_evidence_lifecycle_without_discovery_repository_preserves_discovery_review_state(
