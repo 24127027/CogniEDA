@@ -5,21 +5,39 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
+from sqlmodel import Session, asc, select
+
 from db.models import (
+    AnalysisFrameRecord,
     AssumptionRecord,
+    ExecutionRunRecord,
+    HypothesisRecord,
     ObjectiveRecord,
     ObjectiveRevisionRecord,
     PlannerOperationRecord,
     SessionFrameRecord,
     TaskRecord,
 )
+from repositories.analysis_frame_repository import AnalysisFrameRepository
 from repositories.assumption_repository import ASSUMPTION_JSON_FIELDS, AssumptionUpdate
 from repositories.common import apply_update, record_to_schema, schema_to_record_payload
+from repositories.discovery_repository import DiscoveryRepository
+from repositories.evidence_repository import EvidenceRepository
+from repositories.execution_run_repository import ExecutionRunRepository
+from repositories.hypothesis_repository import HypothesisRepository, HypothesisUpdate
 from repositories.objective_repository import ObjectiveUpdate, build_objective_revision
 from repositories.objective_revision_repository import OBJECTIVE_REVISION_JSON_FIELDS
 from repositories.session_frame_repository import SESSION_FRAME_JSON_FIELDS
 from repositories.task_repository import TASK_JSON_FIELDS, TaskUpdate
-from schemas.artifacts import Assumption, Objective, SessionFrame, Task
+from schemas.artifacts import (
+    Assumption,
+    Discovery,
+    Evidence,
+    Hypothesis,
+    Objective,
+    SessionFrame,
+    Task,
+)
 from schemas.enums import (
     AssumptionStatus,
     PlannerOperationApprovalState,
@@ -27,11 +45,19 @@ from schemas.enums import (
     TaskLifecycleState,
 )
 from schemas.planner_operations import PlannerCommitResult, PlannerOperation
-from sqlmodel import Session, asc, select
+from schemas.provenance import AnalysisFrame, ExecutionRun
 
 _COMMITTABLE_STATES = {
     PlannerOperationApprovalState.APPROVED,
     PlannerOperationApprovalState.NOT_REQUIRED,
+}
+_EXECUTION_OPERATION_TYPES = {
+    PlannerOperationType.CREATE_HYPOTHESIS,
+    PlannerOperationType.CHANGE_HYPOTHESIS_STATE,
+    PlannerOperationType.CREATE_ANALYSIS_FRAME,
+    PlannerOperationType.CREATE_EXECUTION_RUN,
+    PlannerOperationType.CREATE_EVIDENCE,
+    PlannerOperationType.CREATE_DISCOVERY,
 }
 
 
@@ -57,6 +83,9 @@ def commit_planner_operations(
             session_id=session_id,
             operation_ids=operation_ids,
         )
+
+    if _is_execution_bundle(candidate_operations):
+        return _commit_execution_bundle(session, candidate_operations)
 
     result = PlannerCommitResult()
     committed_at = datetime.now(UTC)
@@ -109,6 +138,58 @@ def _load_candidate_operations(
     return [record_to_schema(PlannerOperation, record) for record in records]
 
 
+def _is_execution_bundle(operations: list[PlannerOperation]) -> bool:
+    """Identify the Stage 2 ordered analytical mutation bundle."""
+
+    return any(operation.operation_type in _EXECUTION_OPERATION_TYPES for operation in operations)
+
+
+def _commit_execution_bundle(
+    session: Session,
+    operations: list[PlannerOperation],
+) -> PlannerCommitResult:
+    """Apply an analytical bundle in one session commit or roll back all target changes."""
+
+    result = PlannerCommitResult()
+    committable = [
+        operation
+        for operation in operations
+        if operation.approval_state in _COMMITTABLE_STATES
+    ]
+    result.skipped_operation_ids.extend(
+        operation.operation_id
+        for operation in operations
+        if operation.approval_state not in _COMMITTABLE_STATES
+    )
+    committed_at = datetime.now(UTC)
+    current_operation: PlannerOperation | None = None
+    try:
+        for current_operation in committable:
+            _apply_operation(session, current_operation)
+            # Surface FK/uniqueness errors before marking any operation successful.
+            session.flush()
+        for operation in committable:
+            operation.approval_state = PlannerOperationApprovalState.COMMITTED
+            operation.committed_at = committed_at
+            _mark_persisted_operation_committed(
+                session,
+                operation.operation_id,
+                committed_at=committed_at,
+            )
+        session.commit()
+    except Exception as exc:
+        session.rollback()
+        if current_operation is not None:
+            result.failed_operation_ids.append(current_operation.operation_id)
+            result.errors[current_operation.operation_id] = str(exc)
+        result.message = _result_message(result)
+        return result
+
+    result.committed_operation_ids.extend(operation.operation_id for operation in committable)
+    result.message = _result_message(result)
+    return result
+
+
 def _apply_operation(session: Session, operation: PlannerOperation) -> None:
     match operation.operation_type:
         case PlannerOperationType.CREATE_TASK:
@@ -121,6 +202,18 @@ def _apply_operation(session: Session, operation: PlannerOperation) -> None:
             _apply_create_assumption(session, operation)
         case PlannerOperationType.UPDATE_ASSUMPTION_STATE:
             _apply_update_assumption_state(session, operation)
+        case PlannerOperationType.CREATE_HYPOTHESIS:
+            _apply_create_hypothesis(session, operation)
+        case PlannerOperationType.CHANGE_HYPOTHESIS_STATE:
+            _apply_change_hypothesis_state(session, operation)
+        case PlannerOperationType.CREATE_ANALYSIS_FRAME:
+            _apply_create_analysis_frame(session, operation)
+        case PlannerOperationType.CREATE_EXECUTION_RUN:
+            _apply_create_execution_run(session, operation)
+        case PlannerOperationType.CREATE_EVIDENCE:
+            _apply_create_evidence(session, operation)
+        case PlannerOperationType.CREATE_DISCOVERY:
+            _apply_create_discovery(session, operation)
         case PlannerOperationType.UPDATE_OBJECTIVE:
             _apply_update_objective(session, operation)
         case PlannerOperationType.UPDATE_SESSION_FRAME:
@@ -174,6 +267,46 @@ def _apply_create_assumption(session: Session, operation: PlannerOperation) -> N
             **schema_to_record_payload(assumption, json_fields=ASSUMPTION_JSON_FIELDS)
         )
     )
+
+
+def _apply_create_hypothesis(session: Session, operation: PlannerOperation) -> None:
+    hypothesis = Hypothesis(**operation.payload)
+    if session.get(HypothesisRecord, hypothesis.hypothesis_id) is not None:
+        raise ValueError(f"Hypothesis already exists: {hypothesis.hypothesis_id}")
+    HypothesisRepository(session).stage_create(hypothesis)
+
+
+def _apply_change_hypothesis_state(session: Session, operation: PlannerOperation) -> None:
+    hypothesis_id = _require_payload_uuid(operation, "hypothesis_id")
+    record = _require_record(session, HypothesisRecord, hypothesis_id, "Hypothesis")
+    if "status" not in operation.payload:
+        raise ValueError("change_hypothesis_state requires status in payload.")
+    apply_update(record, HypothesisUpdate(status=operation.payload["status"]))
+    session.add(record)
+
+
+def _apply_create_analysis_frame(session: Session, operation: PlannerOperation) -> None:
+    analysis_frame = AnalysisFrame(**operation.payload)
+    if session.get(AnalysisFrameRecord, analysis_frame.analysis_frame_id) is not None:
+        raise ValueError(f"AnalysisFrame already exists: {analysis_frame.analysis_frame_id}")
+    AnalysisFrameRepository(session).stage_create(analysis_frame)
+
+
+def _apply_create_execution_run(session: Session, operation: PlannerOperation) -> None:
+    execution_run = ExecutionRun(**operation.payload)
+    if session.get(ExecutionRunRecord, execution_run.execution_run_id) is not None:
+        raise ValueError(f"ExecutionRun already exists: {execution_run.execution_run_id}")
+    ExecutionRunRepository(session).stage_create(execution_run)
+
+
+def _apply_create_evidence(session: Session, operation: PlannerOperation) -> None:
+    evidence = Evidence(**operation.payload)
+    EvidenceRepository(session, strict_provenance_validation=True).stage_create(evidence)
+
+
+def _apply_create_discovery(session: Session, operation: PlannerOperation) -> None:
+    discovery = Discovery(**operation.payload)
+    DiscoveryRepository(session).stage_create(discovery)
 
 
 def _apply_update_assumption_state(session: Session, operation: PlannerOperation) -> None:
