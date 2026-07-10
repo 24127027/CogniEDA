@@ -6,6 +6,9 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from sqlalchemy import JSON, Column, Text, UniqueConstraint
+from sqlmodel import Field, SQLModel
+
 from schemas.enums import (
     AssumptionSource,
     AssumptionStatus,
@@ -29,8 +32,6 @@ from schemas.enums import (
     UserDecisionStatus,
     UserDecisionType,
 )
-from sqlalchemy import JSON, Column, Text, UniqueConstraint
-from sqlmodel import Field, SQLModel
 
 
 def utc_now() -> datetime:
@@ -188,6 +189,10 @@ class TaskRecord(TimestampedRecord, table=True):
     profile_id: UUID | None = Field(default=None, foreign_key="data_profiles.profile_id")
     variables: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     evidence_expectation: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    analytical_specification: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSON, nullable=True),
+    )
 
 
 class HypothesisRecord(TimestampedRecord, table=True):
