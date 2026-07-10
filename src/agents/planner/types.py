@@ -3,15 +3,32 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Literal
+from secrets import token_urlsafe
+from typing import Literal, Protocol, runtime_checkable
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
 
 from schemas.artifacts import Assumption, Task
-from schemas.enums import AssumptionStatus, ObjectiveStatus, TaskKind, TaskLifecycleState
-from schemas.planner_operations import PlannerCommitResult, PlannerOperation
+from schemas.common import EvidenceResultSummary, MethodParameter
+from schemas.enums import (
+    AssumptionStatus,
+    EvidenceType,
+    HypothesisEvidenceOutcome,
+    ObjectiveStatus,
+    TaskKind,
+    TaskLifecycleState,
+)
+from schemas.planner_operations import (
+    AssumptionStateUpdateOperationPayload,
+    ConflictFlagOperationPayload,
+    ObjectiveUpdateOperationPayload,
+    PlannerCommitResult,
+    PlannerOperation,
+    TaskStateChangeOperationPayload,
+    TaskUpdateOperationPayload,
+)
 
 PlannerIntent = Literal[
     "answer",
@@ -78,149 +95,220 @@ class RequestUnderstandingModel(ABC):
         """Return a structured classification for the supplied request-only prompt."""
 
 
-class _TargetedOperationDraft(BaseModel):
-    """Shared target id handling for planner operation drafts."""
+def new_local_reference(object_type: str) -> str:
+    """Create a graph-local handle that agents may exchange without durable UUIDs."""
 
-    model_config = ConfigDict(extra="forbid")
-
-    target_object_id: UUID | None = None
-
-    def require_target_object_id(self) -> UUID:
-        """Return the target object id or fail before a PlannerOperation is created."""
-
-        if self.target_object_id is None:
-            raise ValueError("Planner operation draft requires target_object_id.")
-        return self.target_object_id
+    return f"{object_type}:{token_urlsafe(9)}"
 
 
-class TaskUpdateOperationPayload(BaseModel):
-    """Explicit PlannerOperation payload for Task field updates."""
+class TaskSelection(BaseModel):
+    """Transient, deterministic result of resolving one execution Task reference."""
 
-    model_config = ConfigDict(extra="forbid")
-
-    task_id: UUID
-    title: str | None = None
-    description: str | None = None
-    lifecycle_state: TaskLifecycleState | None = None
-    task_kind: TaskKind | None = None
-    parent_task_id: UUID | None = None
-    profile_id: UUID | None = None
-    variables: list[str] | None = None
-    evidence_expectation: str | None = None
+    task_ref: str | None = None
+    selected: bool = False
+    error_code: str | None = None
+    error_message: str | None = None
 
 
-class TaskStateChangeOperationPayload(BaseModel):
-    """Explicit PlannerOperation payload for Task lifecycle changes."""
+class HypothesisDraft(BaseModel):
+    """Transient hypothesis contract without a durable Hypothesis identity."""
 
-    model_config = ConfigDict(extra="forbid")
-
-    task_id: UUID
-    lifecycle_state: TaskLifecycleState
-
-
-class ObjectiveUpdateOperationPayload(BaseModel):
-    """Explicit PlannerOperation payload for Objective updates."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    objective_id: UUID
-    title: str | None = None
-    statement: str | None = None
-    status: ObjectiveStatus | None = None
-    revision_reason: str | None = None
-    user_decision_id: str | None = None
-    created_by: str | None = None
+    statement: str
+    variables: list[str] = Field(default_factory=list)
+    scope: str
+    validation_method: str
+    evidence_expectation: str
 
 
-class AssumptionStateUpdateOperationPayload(BaseModel):
-    """Explicit PlannerOperation payload for Assumption lifecycle updates."""
+class ExecutionSpecification(BaseModel):
+    """Executor-facing analytical method contract without persistent FCO references."""
 
-    model_config = ConfigDict(extra="forbid")
-
-    assumption_id: UUID
-    status: AssumptionStatus | None = None
-    contradicted_by_discovery_ids: list[UUID] | None = None
-    replacement_assumption_id: UUID | None = None
-
-
-class ConflictFlagOperationPayload(BaseModel):
-    """Explicit PlannerOperation payload for user-review conflict flags."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    assumption_id: UUID
-    target_object_type: str = "assumption"
-    discovery_id: UUID | None = None
-    contradicted_by_discovery_id: UUID | None = None
-    reason: str | None = None
+    claim_type: Literal["association"]
+    variable_bindings: list[str] = Field(default_factory=list)
+    scope: str
+    evidence_expectation: str
+    decision_rule: str
+    validation_method: str
+    executor_id: str
+    method_parameters: list[MethodParameter] = Field(default_factory=list)
 
 
-class TaskUpdateDraft(_TargetedOperationDraft):
-    """Typed planner draft for Task field updates."""
+class PreparedExecution(BaseModel):
+    """Typed executor input linked by local references, not durable UUIDs."""
 
-    task_id: UUID | None = None
-    title: str | None = None
-    description: str | None = None
-    lifecycle_state: TaskLifecycleState | None = None
-    task_kind: TaskKind | None = None
-    parent_task_id: UUID | None = None
-    profile_id: UUID | None = None
-    variables: list[str] | None = None
-    evidence_expectation: str | None = None
+    execution_ref: str = Field(default_factory=lambda: new_local_reference("execution"))
+    task_ref: str
+    data_profile_ref: str
+    task_title: str
+    dataset_path: str
+    hypothesis: HypothesisDraft
+    specification: ExecutionSpecification
+    deterministic_seed: int | None = None
+
+
+class AnalysisFrameObservation(BaseModel):
+    """Executor-provided analysis-view facts before provenance is materialized."""
+
+    frame_hash: str | None = None
+    frame_ref: str | None = None
+    column_refs: list[str] = Field(default_factory=list)
+    row_filter_description: str | None = None
 
     @model_validator(mode="after")
-    def _resolve_target_alias(self) -> TaskUpdateDraft:
-        if self.target_object_id is None:
-            self.target_object_id = self.task_id
-        if self.target_object_id is None:
-            raise ValueError("TaskUpdateDraft requires task_id or target_object_id.")
+    def _has_frame_identity(self) -> AnalysisFrameObservation:
+        if self.frame_hash is None and self.frame_ref is None:
+            raise ValueError("Analysis frame observation requires frame_hash or frame_ref.")
         return self
 
-    def operation_payload(self) -> TaskUpdateOperationPayload:
+
+class ExecutionRunObservation(BaseModel):
+    """Executor-provided run facts before durable provenance is materialized."""
+
+    executor_type: str | None = None
+    method_id: str | None = None
+    parameter_hash: str | None = None
+    status: str = "pending"
+
+
+class EvidenceObservation(BaseModel):
+    """Observed result returned by an executor before Evidence is authored at review."""
+
+    evidence_type: EvidenceType
+    method: str
+    parameters: list[MethodParameter] = Field(default_factory=list)
+    result_summary: EvidenceResultSummary
+    artifact_refs: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    code_reference: str | None = None
+    environment_reference: str | None = None
+
+
+class HypothesisEvaluationDraft(BaseModel):
+    """Executor evaluation linked to the current local execution rather than a UUID."""
+
+    outcome: HypothesisEvidenceOutcome
+    note: str | None = None
+
+
+class ExecutorResult(BaseModel):
+    """Typed executor outcome; failures cannot carry observed Evidence."""
+
+    status: Literal["completed", "failed"]
+    analysis_frame: AnalysisFrameObservation
+    execution_run: ExecutionRunObservation
+    evidence_observation: EvidenceObservation | None = None
+    evaluation: HypothesisEvaluationDraft | None = None
+    error_message: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_completed_result(self) -> ExecutorResult:
+        if self.execution_run.status != self.status:
+            raise ValueError(
+                "Executor result status must match its ExecutionRun observation status."
+            )
+        if self.status == "completed" and (
+            self.evidence_observation is None or self.evaluation is None
+        ):
+            raise ValueError("Completed executor results require Evidence and evaluation.")
+        if self.status == "failed":
+            if self.evidence_observation is not None:
+                raise ValueError("Failed executor results must not carry observed Evidence.")
+            if not self.error_message:
+                raise ValueError("Failed executor results require failure information.")
+        return self
+
+
+@runtime_checkable
+class AnalyticalExecutor(Protocol):
+    """Injected boundary for Stage 2 analytical execution."""
+
+    def execute(self, request: PreparedExecution) -> ExecutorResult:
+        """Execute one prepared analytical request without planner context."""
+
+
+class ExecutionPreparation(BaseModel):
+    """Controlled readiness result retained only in planner state."""
+
+    prepared: bool = False
+    error_code: str | None = None
+    error_message: str | None = None
+
+
+class ExecutionReviewResult(BaseModel):
+    """Controlled outcome of reviewing executor output into mutation operations."""
+
+    reviewed: bool = False
+    succeeded: bool = False
+    error_code: str | None = None
+    error_message: str | None = None
+
+
+class TaskUpdateDraft(BaseModel):
+    """Planner Task-update draft addressed by a graph-local Task reference."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    task_ref: str
+    title: str | None = None
+    description: str | None = None
+    lifecycle_state: TaskLifecycleState | None = None
+    task_kind: TaskKind | None = None
+    parent_task_ref: str | None = None
+    data_profile_ref: str | None = None
+    variables: list[str] | None = None
+    evidence_expectation: str | None = None
+
+    def operation_payload(
+        self,
+        *,
+        task_id: UUID,
+        parent_task_id: UUID | None = None,
+        profile_id: UUID | None = None,
+    ) -> TaskUpdateOperationPayload:
         """Return the typed operation payload for this Task update."""
 
         payload = self.model_dump(
             mode="python",
-            exclude={"task_id", "target_object_id"},
+            exclude={"task_ref", "parent_task_ref", "data_profile_ref"},
             exclude_unset=True,
         )
+        if "parent_task_ref" in self.model_fields_set:
+            payload["parent_task_id"] = parent_task_id
+        if "data_profile_ref" in self.model_fields_set:
+            payload["profile_id"] = profile_id
         return TaskUpdateOperationPayload(
-            task_id=self.require_target_object_id(),
+            task_id=task_id,
             **payload,
         )
 
 
-class TaskStateChangeDraft(_TargetedOperationDraft):
-    """Typed planner draft for Task lifecycle changes."""
+class TaskStateChangeDraft(BaseModel):
+    """Planner Task-state draft addressed by a graph-local Task reference."""
 
-    task_id: UUID | None = None
+    model_config = ConfigDict(extra="forbid")
+
+    task_ref: str
     lifecycle_state: TaskLifecycleState
 
-    @model_validator(mode="after")
-    def _resolve_target_alias(self) -> TaskStateChangeDraft:
-        if self.target_object_id is None:
-            self.target_object_id = self.task_id
-        if self.target_object_id is None:
-            raise ValueError("TaskStateChangeDraft requires task_id or target_object_id.")
-        return self
-
-    def operation_payload(self) -> TaskStateChangeOperationPayload:
+    def operation_payload(self, *, task_id: UUID) -> TaskStateChangeOperationPayload:
         """Return the typed operation payload for this Task state change."""
 
         payload = self.model_dump(
             mode="python",
-            exclude={"task_id", "target_object_id"},
+            exclude={"task_ref"},
         )
         return TaskStateChangeOperationPayload(
-            task_id=self.require_target_object_id(),
+            task_id=task_id,
             **payload,
         )
 
 
-class ObjectiveUpdateDraft(_TargetedOperationDraft):
-    """Typed planner draft for Objective updates."""
+class ObjectiveUpdateDraft(BaseModel):
+    """Planner Objective-update draft addressed by a graph-local Objective reference."""
 
-    objective_id: UUID | None = None
+    model_config = ConfigDict(extra="forbid")
+
+    objective_ref: str
     title: str | None = None
     statement: str | None = None
     status: ObjectiveStatus | None = None
@@ -228,87 +316,85 @@ class ObjectiveUpdateDraft(_TargetedOperationDraft):
     user_decision_id: str | None = None
     created_by: str | None = None
 
-    @model_validator(mode="after")
-    def _resolve_target_alias(self) -> ObjectiveUpdateDraft:
-        if self.target_object_id is None:
-            self.target_object_id = self.objective_id
-        if self.target_object_id is None:
-            raise ValueError("ObjectiveUpdateDraft requires objective_id or target_object_id.")
-        return self
-
-    def operation_payload(self) -> ObjectiveUpdateOperationPayload:
+    def operation_payload(self, *, objective_id: UUID) -> ObjectiveUpdateOperationPayload:
         """Return the typed operation payload for this Objective update."""
 
         payload = self.model_dump(
             mode="python",
-            exclude={"objective_id", "target_object_id"},
+            exclude={"objective_ref"},
             exclude_unset=True,
         )
         return ObjectiveUpdateOperationPayload(
-            objective_id=self.require_target_object_id(),
+            objective_id=objective_id,
             **payload,
         )
 
 
-class AssumptionStateUpdateDraft(_TargetedOperationDraft):
-    """Typed planner draft for Assumption lifecycle review updates."""
+class AssumptionStateUpdateDraft(BaseModel):
+    """Planner Assumption review draft addressed by local object references."""
 
-    assumption_id: UUID | None = None
+    model_config = ConfigDict(extra="forbid")
+
+    assumption_ref: str
     status: AssumptionStatus | None = None
-    contradicted_by_discovery_ids: list[UUID] | None = None
-    replacement_assumption_id: UUID | None = None
+    contradicted_by_discovery_refs: list[str] | None = None
+    replacement_assumption_ref: str | None = None
 
-    @model_validator(mode="after")
-    def _resolve_target_alias(self) -> AssumptionStateUpdateDraft:
-        if self.target_object_id is None:
-            self.target_object_id = self.assumption_id
-        if self.target_object_id is None:
-            raise ValueError(
-                "AssumptionStateUpdateDraft requires assumption_id or target_object_id."
-            )
-        return self
-
-    def operation_payload(self) -> AssumptionStateUpdateOperationPayload:
+    def operation_payload(
+        self,
+        *,
+        assumption_id: UUID,
+        contradicted_by_discovery_ids: list[UUID] | None = None,
+        replacement_assumption_id: UUID | None = None,
+    ) -> AssumptionStateUpdateOperationPayload:
         """Return the typed operation payload for this Assumption update."""
 
         payload = self.model_dump(
             mode="python",
-            exclude={"assumption_id", "target_object_id"},
+            exclude={
+                "assumption_ref",
+                "contradicted_by_discovery_refs",
+                "replacement_assumption_ref",
+            },
             exclude_unset=True,
         )
         return AssumptionStateUpdateOperationPayload(
-            assumption_id=self.require_target_object_id(),
+            assumption_id=assumption_id,
+            contradicted_by_discovery_ids=contradicted_by_discovery_ids,
+            replacement_assumption_id=replacement_assumption_id,
             **payload,
         )
 
 
-class ConflictFlagDraft(_TargetedOperationDraft):
-    """Typed planner draft for flagging an object for user review."""
+class ConflictFlagDraft(BaseModel):
+    """Planner conflict flag addressed by graph-local object references."""
 
-    assumption_id: UUID | None = None
+    model_config = ConfigDict(extra="forbid")
+
+    assumption_ref: str
     target_object_type: str = "assumption"
-    discovery_id: UUID | None = None
-    contradicted_by_discovery_id: UUID | None = None
+    discovery_ref: str | None = None
+    contradicted_by_discovery_ref: str | None = None
     reason: str | None = None
 
-    @model_validator(mode="after")
-    def _resolve_target_alias(self) -> ConflictFlagDraft:
-        if self.target_object_id is None:
-            self.target_object_id = self.assumption_id
-        if self.target_object_id is None:
-            raise ValueError("ConflictFlagDraft requires assumption_id or target_object_id.")
-        return self
-
-    def operation_payload(self) -> ConflictFlagOperationPayload:
+    def operation_payload(
+        self,
+        *,
+        assumption_id: UUID,
+        discovery_id: UUID | None = None,
+        contradicted_by_discovery_id: UUID | None = None,
+    ) -> ConflictFlagOperationPayload:
         """Return the typed operation payload for this conflict flag."""
 
         payload = self.model_dump(
             mode="python",
-            exclude={"assumption_id", "target_object_id"},
+            exclude={"assumption_ref", "discovery_ref", "contradicted_by_discovery_ref"},
             exclude_none=True,
         )
         return ConflictFlagOperationPayload(
-            assumption_id=self.require_target_object_id(),
+            assumption_id=assumption_id,
+            discovery_id=discovery_id,
+            contradicted_by_discovery_id=contradicted_by_discovery_id,
             **payload,
         )
 
@@ -318,7 +404,13 @@ class State(BaseModel):
 
     query: str
     request_understanding: RequestUnderstanding | None = None
+    task_selection: TaskSelection | None = None
+    execution_preparation: ExecutionPreparation | None = None
+    prepared_execution: PreparedExecution | None = None
+    executor_result: ExecutorResult | None = None
+    execution_review: ExecutionReviewResult | None = None
     session_id: str | None = None
+    object_reference_index: dict[str, str] = Field(default_factory=dict)
     history: list[ModelMessage] = Field(default_factory=list)
     task_create_payloads: list[Task] = Field(default_factory=list)
     task_update_payloads: list[TaskUpdateDraft] = Field(default_factory=list)
@@ -330,8 +422,26 @@ class State(BaseModel):
     )
     conflict_flag_payloads: list[ConflictFlagDraft] = Field(default_factory=list)
     planner_operations: list[PlannerOperation] = Field(default_factory=list)
-    operation_ids_to_commit: list[UUID] | None = None
+    operation_ids_to_commit: list[str] | None = None
     commit_result: PlannerCommitResult | None = None
+
+    def bind_object_reference(self, object_type: str, persistent_id: str) -> str:
+        """Return a local handle while retaining the durable id in runtime state only."""
+
+        for reference, known_id in self.object_reference_index.items():
+            if known_id == persistent_id:
+                return reference
+        reference = new_local_reference(object_type)
+        self.object_reference_index[reference] = persistent_id
+        return reference
+
+    def resolve_object_reference(self, reference: str) -> str:
+        """Resolve a local handle at a persistence or repository boundary."""
+
+        try:
+            return self.object_reference_index[reference]
+        except KeyError as exc:
+            raise ValueError(f"Unknown local object reference: {reference}") from exc
 
 
 class Context(BaseModel):
@@ -342,6 +452,7 @@ class Context(BaseModel):
     database_url: str | None = None
     session_id: str | None = None
     request_understanding_model: RequestUnderstandingModel | None = None
+    analytical_executor: AnalyticalExecutor | None = None
 
 
 class PlannerOutput(BaseModel):
