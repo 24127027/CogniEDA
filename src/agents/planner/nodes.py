@@ -1,13 +1,22 @@
+from langgraph.runtime import Runtime
+from pydantic import ValidationError
+from sqlmodel import Session
+
 from application.orchestrator.planner_commit import commit_planner_operations
 from db.session import get_session
-from langgraph.runtime import Runtime
 from repositories import PlannerOperationRepository
 from schemas.enums import PlannerNodeName, PlannerOperationType
 from schemas.planner_operations import PlannerOperation
-from sqlmodel import Session
 
 from ..utilities.nodes_registry import NodeRegistry
-from .types import Context, State
+from .types import (
+    COMMAND_TO_INTENT,
+    Context,
+    RequestUnderstanding,
+    RequestUnderstandingModel,
+    State,
+    parse_explicit_command,
+)
 
 registry = NodeRegistry[State, Context]()
 R = registry.R
@@ -17,8 +26,72 @@ R = registry.R
 # --------------------
 
 
+class _ConfiguredRequestUnderstandingModel(RequestUnderstandingModel):
+    """Adapter over the repository LLM factory for request-only classification."""
+
+    def __init__(self) -> None:
+        from agents.llm import ModelConfig, create_agent
+
+        self._agent = create_agent("planner", ModelConfig())
+
+    def understand(self, prompt: str) -> RequestUnderstanding:
+        result = self._agent.run_sync(prompt, output_type=RequestUnderstanding)
+        return RequestUnderstanding.model_validate(result.output)
+
+
+def _request_understanding_prompt(query: str) -> str:
+    """Build the request-only prompt used for deterministic-stage LLM classification."""
+
+    intent_definitions = "\n".join(
+        f"- {intent}: classify requests that should be routed to {intent}."
+        for intent in COMMAND_TO_INTENT.values()
+    )
+    return (
+        "Classify only the latest raw user request into one allowed planner intent.\n"
+        "Return structured output with `intent` and `request_text`.\n"
+        "Do not invent IDs, Assumptions, Evidence, Discoveries, factual project state, "
+        "or any other research objects. Do not use prior conversation, SessionFrame, "
+        "or retrieved research context.\n"
+        "Allowed intents:\n"
+        f"{intent_definitions}\n\n"
+        f"Latest raw user request:\n{query}"
+    )
+
+
+def _invalid_command_understanding(
+    original_command: str,
+    request_text: str,
+) -> RequestUnderstanding:
+    supported_commands = tuple(f"/{command}" for command in COMMAND_TO_INTENT)
+    return RequestUnderstanding(
+        intent=None,
+        request_text=request_text,
+        source="invalid_command",
+        explicit_command=original_command,
+        requires_user_correction=True,
+        error_message=(
+            f"Unsupported command '{original_command}'. Supported commands: "
+            f"{', '.join(supported_commands)}."
+        ),
+        supported_commands=supported_commands,
+    )
+
+
+def _invalid_llm_understanding(query: str) -> RequestUnderstanding:
+    return RequestUnderstanding(
+        intent=None,
+        request_text=query,
+        source="invalid_llm",
+        requires_user_correction=True,
+        error_message=(
+            "Unable to classify the request. Please restate it or use a supported command."
+        ),
+        supported_commands=tuple(f"/{command}" for command in COMMAND_TO_INTENT),
+    )
+
+
 @registry.register()
-def understand_request(state: State, runtime: Runtime[Context]) -> None:
+def understand_request(state: State, runtime: Runtime[Context]) -> State:
     """
     LLM interprets the user's latest message.
 
@@ -27,16 +100,55 @@ def understand_request(state: State, runtime: Runtime[Context]) -> None:
     consume Session Frame context so intent recognition is based solely
     on the user's request.
     """
-    pass
+    command = parse_explicit_command(state.query)
+    if command is not None:
+        intent = COMMAND_TO_INTENT.get(command.command)
+        if intent is None:
+            state.request_understanding = _invalid_command_understanding(
+                command.original_command,
+                command.request_text,
+            )
+        else:
+            state.request_understanding = RequestUnderstanding(
+                intent=intent,
+                request_text=command.request_text,
+                source="explicit_command",
+                explicit_command=command.command,
+            )
+        return state
+
+    context = _runtime_context(runtime)
+    model = (
+        context.request_understanding_model
+        if context is not None and context.request_understanding_model is not None
+        else _ConfiguredRequestUnderstandingModel()
+    )
+    try:
+        state.request_understanding = RequestUnderstanding.model_validate(
+            model.understand(_request_understanding_prompt(state.query))
+        )
+    except (TypeError, ValueError, ValidationError):
+        state.request_understanding = _invalid_llm_understanding(state.query)
+    return state
+
+
+def route_intent(state: State, runtime: Runtime[Context]) -> str:
+    """Route the user's intent to the appropriate node and return a routing key."""
+    understanding = state.request_understanding
+    if (
+        understanding is None
+        or understanding.requires_user_correction
+        or understanding.intent is None
+    ):
+        return "invalid_request"
+    return understanding.intent
 
 
 @registry.register()
-def route_intent(state: State, runtime: Runtime[Context]) -> str:
-    """Route the user's intent to the appropriate node and return a routing key."""
-    raise NotImplementedError(
-        "route_intent must return one of: answer, suggest, manage_task, execute, "
-        "objective, assumption."
-    )
+def invalid_request(state: State, runtime: Runtime[Context]) -> State:
+    """Terminal controlled route for unsupported or unclassifiable requests."""
+
+    return state
 
 
 # --------------------

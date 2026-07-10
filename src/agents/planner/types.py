@@ -2,13 +2,80 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
+
 from schemas.artifacts import Assumption, Task
 from schemas.enums import AssumptionStatus, ObjectiveStatus, TaskKind, TaskLifecycleState
 from schemas.planner_operations import PlannerCommitResult, PlannerOperation
+
+PlannerIntent = Literal[
+    "answer",
+    "suggest",
+    "manage_task",
+    "execute",
+    "objective",
+    "assumption",
+]
+
+COMMAND_TO_INTENT: dict[str, PlannerIntent] = {
+    "answer": "answer",
+    "suggest": "suggest",
+    "manage_task": "manage_task",
+    "execute": "execute",
+    "objective": "objective",
+    "assumption": "assumption",
+}
+
+
+class ExplicitCommandParseResult(BaseModel):
+    """The command token and payload parsed from a raw planner request."""
+
+    command: str
+    original_command: str
+    request_text: str
+
+
+def parse_explicit_command(query: str) -> ExplicitCommandParseResult | None:
+    """Parse a leading slash command without interpreting ordinary request text."""
+
+    stripped_query = query.lstrip()
+    if not stripped_query.startswith("/"):
+        return None
+
+    tokens = stripped_query.split(maxsplit=1)
+    command_token = tokens[0]
+    payload = tokens[1] if len(tokens) == 2 else ""
+
+    return ExplicitCommandParseResult(
+        command=command_token[1:].lower(),
+        original_command=command_token,
+        request_text=payload.strip(),
+    )
+
+
+class RequestUnderstanding(BaseModel):
+    """Transient classification of the latest planner request."""
+
+    intent: PlannerIntent | None
+    request_text: str
+    source: Literal["explicit_command", "llm", "invalid_command", "invalid_llm"]
+    explicit_command: str | None = None
+    requires_user_correction: bool = False
+    error_message: str | None = None
+    supported_commands: tuple[str, ...] = ()
+
+
+class RequestUnderstandingModel(ABC):
+    """Injectable structured model used only to classify the latest request."""
+
+    @abstractmethod
+    def understand(self, prompt: str) -> RequestUnderstanding:
+        """Return a structured classification for the supplied request-only prompt."""
 
 
 class _TargetedOperationDraft(BaseModel):
@@ -250,6 +317,7 @@ class State(BaseModel):
     """Internal Planner state."""
 
     query: str
+    request_understanding: RequestUnderstanding | None = None
     session_id: str | None = None
     history: list[ModelMessage] = Field(default_factory=list)
     task_create_payloads: list[Task] = Field(default_factory=list)
@@ -269,8 +337,11 @@ class State(BaseModel):
 class Context(BaseModel):
     """Context for the Planner agent."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     database_url: str | None = None
     session_id: str | None = None
+    request_understanding_model: RequestUnderstandingModel | None = None
 
 
 class PlannerOutput(BaseModel):

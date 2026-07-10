@@ -1,7 +1,7 @@
 from langgraph.graph import END, START
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 
-from .nodes import R, registry
+from .nodes import R, registry, route_intent
 from .types import Context, State
 
 
@@ -20,15 +20,14 @@ def build_graph() -> CompiledStateGraph[State, Context, State, State]:
     # --------------------------------------------------
 
     builder.add_edge(START, R.understand_request)
-    builder.add_edge(R.understand_request, R.route_intent)
 
     # --------------------------------------------------
     # Intent routing
     # --------------------------------------------------
 
     builder.add_conditional_edges(
-        R.route_intent,
-        registry.nodes[R.route_intent],
+        R.understand_request,
+        route_intent,
         {
             "answer": R.answer_question,
             "suggest": R.propose_questions,
@@ -36,6 +35,7 @@ def build_graph() -> CompiledStateGraph[State, Context, State, State]:
             "execute": R.select_task,
             "objective": R.manage_objective,
             "assumption": R.manage_assumptions,
+            "invalid_request": R.invalid_request,
         },
     )
 
@@ -100,10 +100,11 @@ def build_graph() -> CompiledStateGraph[State, Context, State, State]:
     # Finish
     # --------------------------------------------------
 
+    builder.add_edge(R.invalid_request, END)
     builder.add_edge(R.commit, END)
 
     return builder.compile()
 
 # if __name__ == "__main__":
-    # agent_graph = build_graph()
-    # agent_graph.get_graph().draw_mermaid_png(output_file_path="graph.png")
+#     agent_graph = build_graph()
+#     agent_graph.get_graph().draw_mermaid_png(output_file_path="graph.png")
