@@ -6,13 +6,14 @@ import builtins
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from sqlmodel import Session, desc, select
+
 from db.models import EvidenceRecord
 from repositories.analysis_frame_repository import AnalysisFrameRepository
 from repositories.common import record_to_schema, schema_to_record_payload
 from repositories.execution_run_repository import ExecutionRunRepository
 from schemas.artifacts import Evidence
 from schemas.enums import EvidenceLifecycleState
-from sqlmodel import Session, desc, select
 
 if TYPE_CHECKING:
     from repositories.discovery_repository import DiscoveryRepository
@@ -59,6 +60,11 @@ class EvidenceRepository:
         else:
             self._analysis_frame_repository = None
             self._execution_run_repository = None
+
+    def uses_session(self, session: Session) -> bool:
+        """Return whether this repository is bound to the supplied session object."""
+
+        return self._session is session
 
     def create(self, evidence: Evidence) -> Evidence:
         """Persist and return a new Evidence record."""
@@ -176,6 +182,7 @@ class EvidenceRepository:
     ) -> Evidence | None:
         """Mark Evidence superseded without editing the observed result payload."""
 
+        self._validate_discovery_repository_session(discovery_repository)
         record = self._session.get(EvidenceRecord, evidence_id)
         if record is None:
             return None
@@ -206,6 +213,7 @@ class EvidenceRepository:
     ) -> Evidence | None:
         """Mark Evidence invalidated without editing the observed result payload."""
 
+        self._validate_discovery_repository_session(discovery_repository)
         record = self._session.get(EvidenceRecord, evidence_id)
         if record is None:
             return None
@@ -258,6 +266,20 @@ class EvidenceRepository:
                 self._session.refresh(record)
 
         return [record_to_schema(Evidence, record) for record in affected_records]
+
+    def _validate_discovery_repository_session(
+        self,
+        discovery_repository: DiscoveryRepository | None,
+    ) -> None:
+        """Reject lifecycle propagation that would span separate SQLModel sessions."""
+
+        if discovery_repository is not None and not discovery_repository.uses_session(
+            self._session
+        ):
+            raise ValueError(
+                "Evidence lifecycle mutation and dependent Discovery flagging must use "
+                "the same SQLModel session."
+            )
 
     @staticmethod
     def _format_data_profile_historical_reason(

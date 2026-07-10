@@ -6,11 +6,12 @@ import builtins
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from sqlmodel import Session, desc, select
+
 from db.models import DataProfileRecord
 from repositories.common import record_to_schema, schema_to_record_payload
 from schemas.artifacts import DataProfile
 from schemas.enums import DataProfileLifecycleState, DataProfileMethod
-from sqlmodel import Session, desc, select
 
 if TYPE_CHECKING:
     from repositories.discovery_repository import DiscoveryRepository
@@ -113,6 +114,10 @@ class DataProfileRepository:
     ) -> DataProfile | None:
         """Mark a DataProfile superseded and optionally flag scoped dependents."""
 
+        self._validate_propagation_repository_sessions(
+            evidence_repository,
+            discovery_repository,
+        )
         if old_profile_id == new_profile_id:
             raise ValueError("A DataProfile cannot supersede itself.")
 
@@ -149,3 +154,24 @@ class DataProfileRepository:
             )
 
         return superseded
+
+    def _validate_propagation_repository_sessions(
+        self,
+        evidence_repository: EvidenceRepository | None,
+        discovery_repository: DiscoveryRepository | None,
+    ) -> None:
+        """Reject dependent propagation that would span SQLModel session objects."""
+
+        evidence_repository_matches = (
+            evidence_repository is None
+            or evidence_repository.uses_session(self._session)
+        )
+        discovery_repository_matches = (
+            discovery_repository is None
+            or discovery_repository.uses_session(self._session)
+        )
+        if not evidence_repository_matches or not discovery_repository_matches:
+            raise ValueError(
+                "DataProfile supersession and dependent Evidence/Discovery propagation "
+                "must share the same SQLModel session."
+            )

@@ -6,13 +6,14 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from db.models import ObjectiveRecord
 from pydantic import BaseModel, ConfigDict
+from sqlmodel import Session, desc, select
+
+from db.models import ObjectiveRecord
 from repositories.common import apply_update, record_to_schema, schema_to_record_payload
 from schemas.artifacts import Objective
 from schemas.enums import ObjectiveStatus
 from schemas.provenance import ObjectiveRevision
-from sqlmodel import Session, desc, select
 
 if TYPE_CHECKING:
     from repositories.objective_revision_repository import ObjectiveRevisionRepository
@@ -118,6 +119,14 @@ class ObjectiveRepository:
         created_by: str | None = None,
     ) -> Objective | None:
         """Apply an allowed Objective transition, optionally recording revision provenance."""
+
+        if revision_repository is not None and not revision_repository.uses_session(
+            self._session
+        ):
+            raise ValueError(
+                "Objective update and ObjectiveRevision creation must share the same "
+                "SQLModel session."
+            )
 
         record = self._session.get(ObjectiveRecord, objective_id)
         if record is None:

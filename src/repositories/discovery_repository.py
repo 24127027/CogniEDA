@@ -5,6 +5,8 @@ from __future__ import annotations
 import builtins
 from uuid import UUID
 
+from sqlmodel import Session, desc, select
+
 from db.models import DiscoveryRecord, EvidenceRecord, HypothesisRecord
 from repositories.common import (
     filter_records_by_related_id,
@@ -17,7 +19,6 @@ from schemas.enums import (
     DiscoveryLifecycleState,
     EvidenceLifecycleState,
 )
-from sqlmodel import Session, desc, select
 
 DISCOVERY_JSON_FIELDS = {
     "evidence_ids",
@@ -37,6 +38,11 @@ class DiscoveryRepository:
 
     def __init__(self, session: Session) -> None:
         self._session = session
+
+    def uses_session(self, session: Session) -> bool:
+        """Return whether this repository is bound to the supplied session object."""
+
+        return self._session is session
 
     def create(self, discovery: Discovery) -> Discovery:
         """Persist and return a new Discovery."""

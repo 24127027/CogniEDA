@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from sqlmodel import Session, asc, select
+
 from db.models import ObjectiveRevisionRecord
 from repositories.common import record_to_schema, schema_to_record_payload
 from schemas.provenance import ObjectiveRevision
-from sqlmodel import Session, asc, select
 
 OBJECTIVE_REVISION_JSON_FIELDS = {"changed_fields"}
 
@@ -17,6 +18,11 @@ class ObjectiveRevisionRepository:
 
     def __init__(self, session: Session) -> None:
         self._session = session
+
+    def uses_session(self, session: Session) -> bool:
+        """Return whether this repository is bound to the supplied session object."""
+
+        return self._session is session
 
     def create(self, revision: ObjectiveRevision) -> ObjectiveRevision:
         """Persist and return a new ObjectiveRevision record."""
