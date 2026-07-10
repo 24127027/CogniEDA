@@ -47,14 +47,20 @@ class DiscoveryRepository:
     def create(self, discovery: Discovery) -> Discovery:
         """Persist and return a new Discovery."""
 
+        record = self.stage_create(discovery)
+        self._session.commit()
+        self._session.refresh(record)
+        return record_to_schema(Discovery, record)
+
+    def stage_create(self, discovery: Discovery) -> DiscoveryRecord:
+        """Validate and add a Discovery without committing the shared session."""
+
         self._validate_discovery_admission(discovery)
         record = DiscoveryRecord(
             **schema_to_record_payload(discovery, json_fields=DISCOVERY_JSON_FIELDS)
         )
         self._session.add(record)
-        self._session.commit()
-        self._session.refresh(record)
-        return record_to_schema(Discovery, record)
+        return record
 
     def _validate_discovery_admission(self, discovery: Discovery) -> None:
         if self._session.get(HypothesisRecord, discovery.hypothesis_id) is None:

@@ -13,7 +13,7 @@ from repositories.common import apply_update, record_to_schema, schema_to_record
 from schemas.artifacts import Task
 from schemas.enums import TaskKind, TaskLifecycleState
 
-TASK_JSON_FIELDS = {"variables"}
+TASK_JSON_FIELDS = {"variables", "analytical_specification"}
 
 
 class TaskUpdate(BaseModel):
@@ -29,6 +29,7 @@ class TaskUpdate(BaseModel):
     profile_id: UUID | None = None
     variables: list[str] | None = None
     evidence_expectation: str | None = None
+    analytical_specification: dict[str, object] | None = None
     updated_at: datetime | None = None
 
 

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from sqlmodel import Session, desc, select
+
 from db.models import AnalysisFrameRecord
 from repositories.common import record_to_schema, schema_to_record_payload
 from schemas.provenance import AnalysisFrame
-from sqlmodel import Session, desc, select
 
 ANALYSIS_FRAME_JSON_FIELDS = {"column_refs"}
 
@@ -21,6 +22,14 @@ class AnalysisFrameRepository:
     def create(self, analysis_frame: AnalysisFrame) -> AnalysisFrame:
         """Persist and return a new AnalysisFrame record."""
 
+        record = self.stage_create(analysis_frame)
+        self._session.commit()
+        self._session.refresh(record)
+        return record_to_schema(AnalysisFrame, record)
+
+    def stage_create(self, analysis_frame: AnalysisFrame) -> AnalysisFrameRecord:
+        """Add provenance to a shared session without committing it."""
+
         record = AnalysisFrameRecord(
             **schema_to_record_payload(
                 analysis_frame,
@@ -28,9 +37,7 @@ class AnalysisFrameRepository:
             )
         )
         self._session.add(record)
-        self._session.commit()
-        self._session.refresh(record)
-        return record_to_schema(AnalysisFrame, record)
+        return record
 
     def get_by_id(self, analysis_frame_id: UUID) -> AnalysisFrame | None:
         """Return an AnalysisFrame by primary id if it exists."""

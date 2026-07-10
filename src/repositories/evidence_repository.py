@@ -8,7 +8,7 @@ from uuid import UUID
 
 from sqlmodel import Session, desc, select
 
-from db.models import EvidenceRecord
+from db.models import DataProfileRecord, EvidenceRecord, HypothesisRecord
 from repositories.analysis_frame_repository import AnalysisFrameRepository
 from repositories.common import record_to_schema, schema_to_record_payload
 from repositories.execution_run_repository import ExecutionRunRepository
@@ -69,15 +69,35 @@ class EvidenceRepository:
     def create(self, evidence: Evidence) -> Evidence:
         """Persist and return a new Evidence record."""
 
+        record = self.stage_create(evidence)
+        self._session.commit()
+        self._session.refresh(record)
+        return record_to_schema(Evidence, record)
+
+    def stage_create(self, evidence: Evidence) -> EvidenceRecord:
+        """Validate and add Evidence without committing the shared session."""
+
+        self._validate_evidence_admission(evidence)
         if self._strict_provenance_validation:
             self._validate_provenance_refs(evidence)
         record = EvidenceRecord(
             **schema_to_record_payload(evidence, json_fields=EVIDENCE_JSON_FIELDS)
         )
         self._session.add(record)
-        self._session.commit()
-        self._session.refresh(record)
-        return record_to_schema(Evidence, record)
+        return record
+
+    def _validate_evidence_admission(self, evidence: Evidence) -> None:
+        """Reject orphaned or cross-profile Evidence before it reaches persistence."""
+
+        hypothesis_record = self._session.get(HypothesisRecord, evidence.hypothesis_id)
+        if hypothesis_record is None:
+            raise ValueError("Evidence creation requires an existing Hypothesis.")
+        if self._session.get(DataProfileRecord, evidence.profile_id) is None:
+            raise ValueError("Evidence creation requires an existing DataProfile.")
+        if hypothesis_record.profile_id != evidence.profile_id:
+            raise ValueError(
+                "Evidence profile_id must match the referenced Hypothesis profile_id."
+            )
 
     def _validate_provenance_refs(self, evidence: Evidence) -> None:
         """Validate Evidence refs against minimal provenance repositories."""

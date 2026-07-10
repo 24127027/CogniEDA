@@ -38,14 +38,20 @@ class HypothesisRepository:
     def create(self, hypothesis: Hypothesis) -> Hypothesis:
         """Persist and return a new Hypothesis."""
 
+        record = self.stage_create(hypothesis)
+        self._session.commit()
+        self._session.refresh(record)
+        return record_to_schema(Hypothesis, record)
+
+    def stage_create(self, hypothesis: Hypothesis) -> HypothesisRecord:
+        """Validate and add a Hypothesis without committing the shared session."""
+
         self._validate_hypothesis_admission(hypothesis)
         record = HypothesisRecord(
             **schema_to_record_payload(hypothesis, json_fields=HYPOTHESIS_JSON_FIELDS)
         )
         self._session.add(record)
-        self._session.commit()
-        self._session.refresh(record)
-        return record_to_schema(Hypothesis, record)
+        return record
 
     def _validate_hypothesis_admission(self, hypothesis: Hypothesis) -> None:
         task_record = self._session.get(TaskRecord, hypothesis.task_id)
