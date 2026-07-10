@@ -23,7 +23,10 @@ Current implementation:
 - `Objective` schema/table/repository exist.
 - Default persistence is workspace-local SQLite.
 - No workspace initializer or registry exists.
-- No `ObjectiveRevision` provenance exists.
+- Minimal non-FCO `ObjectiveRevision` provenance exists for repository-level
+  Objective updates and approved `UPDATE_OBJECTIVE` commit operations. Direct
+  provenance-aware repository updates require a shared SQLModel session; this is
+  not objective merge policy or production transaction machinery.
 
 Status: Partially implemented.
 

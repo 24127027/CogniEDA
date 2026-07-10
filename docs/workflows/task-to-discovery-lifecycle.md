@@ -58,7 +58,7 @@ Current `Task`, `Hypothesis`, `Evidence`, and `Discovery` repositories support:
 - hypothesis creation and lifecycle/status updates
 - hypothesis listing by task/profile/status
 - evidence creation and retrieval by hypothesis/profile
-- evidence supersession/invalidation helpers with optional dependent-Discovery review flagging
+- evidence supersession/invalidation helpers with optional same-session dependent-Discovery review flagging
 - typed evidence-to-hypothesis evaluation outcomes
 - Discovery creation and retrieval by Hypothesis/status/review state
 - repository-level Discovery review flagging after referenced Evidence changes
