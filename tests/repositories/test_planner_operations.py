@@ -5,10 +5,8 @@ from uuid import UUID, uuid4
 from agents.planner.nodes import manage_tasks
 from agents.planner.types import (
     ConflictFlagDraft,
-    ConflictFlagOperationPayload,
     State,
     TaskUpdateDraft,
-    TaskUpdateOperationPayload,
 )
 from application.orchestrator.planner_commit import commit_planner_operations
 from repositories import (
@@ -33,7 +31,11 @@ from schemas.enums import (
     TaskKind,
     TaskLifecycleState,
 )
-from schemas.planner_operations import PlannerOperation
+from schemas.planner_operations import (
+    ConflictFlagOperationPayload,
+    PlannerOperation,
+    TaskUpdateOperationPayload,
+)
 
 
 def build_task_payload(task_id: UUID | None = None, **overrides: object) -> dict[str, object]:
@@ -193,15 +195,18 @@ def test_manage_tasks_produces_planner_operation_not_direct_mutation(db_session)
 def test_operation_payload_methods_return_named_payload_models() -> None:
     task_id = uuid4()
     assumption_id = uuid4()
+    state = State(query="local references")
+    task_ref = state.bind_object_reference("task", str(task_id))
+    assumption_ref = state.bind_object_reference("assumption", str(assumption_id))
 
     task_payload = TaskUpdateDraft(
-        task_id=task_id,
+        task_ref=task_ref,
         title="Refine churn task",
-    ).operation_payload()
+    ).operation_payload(task_id=UUID(state.resolve_object_reference(task_ref)))
     flag_payload = ConflictFlagDraft(
-        assumption_id=assumption_id,
+        assumption_ref=assumption_ref,
         reason="Discovery contradicts assumption.",
-    ).operation_payload()
+    ).operation_payload(assumption_id=UUID(state.resolve_object_reference(assumption_ref)))
 
     assert isinstance(task_payload, TaskUpdateOperationPayload)
     assert task_payload.task_id == task_id

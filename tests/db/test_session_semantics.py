@@ -3,7 +3,6 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from sqlalchemy.exc import IntegrityError
 
 from repositories import EvidenceRepository
 from schemas.artifacts import Evidence
@@ -11,10 +10,10 @@ from schemas.common import EvidenceProvenance, EvidenceResultSummary
 from schemas.enums import EvidenceType
 
 
-def test_sqlite_foreign_keys_are_enforced_without_project_fco(db_session) -> None:
+def test_evidence_repository_rejects_orphan_before_foreign_key_flush(db_session) -> None:
     repository = EvidenceRepository(db_session)
 
-    with pytest.raises(IntegrityError):
+    with pytest.raises(ValueError, match="existing Hypothesis"):
         repository.create(
             Evidence(
                 hypothesis_id=uuid4(),
@@ -30,3 +29,5 @@ def test_sqlite_foreign_keys_are_enforced_without_project_fco(db_session) -> Non
                 result_summary=EvidenceResultSummary(summary="Invalid orphan evidence."),
             )
         )
+
+    assert repository.list() == []
