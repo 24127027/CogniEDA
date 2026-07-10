@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID, uuid4
 
 from pydantic import Field, NonNegativeInt, model_validator
+
 from schemas.common import (
     AssumptionContextSummary,
     BaselineSummary,
@@ -130,6 +132,7 @@ class Task(CogniEDABaseModel):
     profile_id: UUID | None = None
     variables: list[NonEmptyStr] = Field(default_factory=list)
     evidence_expectation: str | None = None
+    analytical_specification: AnalyticalSpecification | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -150,6 +153,22 @@ class Task(CogniEDABaseModel):
             and len(self.variables) > 0
             and bool(self.evidence_expectation)
         )
+
+
+class AnalyticalSpecification(CogniEDABaseModel):
+    """Typed, non-FCO execution contract attached to an analytical Task."""
+
+    hypothesis_statement: NonEmptyStr
+    claim_type: Literal["association"]
+    data_profile_id: UUID
+    variable_bindings: list[NonEmptyStr] = Field(min_length=1)
+    scope: NonEmptyStr
+    evidence_expectation: NonEmptyStr
+    decision_rule: NonEmptyStr
+    validation_method: NonEmptyStr
+    executor_id: Literal["deterministic"]
+    method_parameters: list[MethodParameter] = Field(default_factory=list)
+    deterministic_seed: int | None = None
 
 
 class Hypothesis(CogniEDABaseModel):
