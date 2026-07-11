@@ -253,6 +253,49 @@ class UserDecisionStatus(StrEnum):
     ARCHIVED = "archived"
 
 
+class PlannerOperationType(StrEnum):
+    """Typed pending mutations produced by planner nodes."""
+
+    CREATE_TASK = "create_task"
+    UPDATE_TASK = "update_task"
+    DELETE_TASK = "delete_task"
+    CHANGE_TASK_STATE = "change_task_state"
+    CREATE_OBJECTIVE_REVISION = "create_objective_revision"
+    UPDATE_OBJECTIVE = "update_objective"
+    CREATE_ASSUMPTION = "create_assumption"
+    UPDATE_ASSUMPTION_STATE = "update_assumption_state"
+    CREATE_HYPOTHESIS = "create_hypothesis"
+    CREATE_EVIDENCE = "create_evidence"
+    CREATE_DISCOVERY = "create_discovery"
+    UPDATE_SESSION_FRAME = "update_session_frame"
+    FLAG_OBJECT = "flag_object"
+
+
+class PlannerNodeName(StrEnum):
+    """Planner nodes allowed to produce pending state-transition operations."""
+
+    PROPOSE_QUESTIONS = "propose_questions"
+    EXPAND_PLAN = "expand_plan"
+    MANAGE_TASKS = "manage_tasks"
+    PREPARE_EXECUTION = "prepare_execution"
+    REVIEW_EXECUTION = "review_execution"
+    REVIEW_CONFLICTS = "review_conflicts"
+    MANAGE_OBJECTIVE = "manage_objective"
+    MANAGE_ASSUMPTIONS = "manage_assumptions"
+    PROCESS_DECISION = "process_decision"
+
+
+class PlannerOperationApprovalState(StrEnum):
+    """Approval and commit lifecycle for PlannerOperation records."""
+
+    NOT_REQUIRED = "not_required"
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    COMMITTED = "committed"
+    FAILED = "failed"
+
+
 class SessionFrameStatus(StrEnum):
     """Operational states for a persisted context frame snapshot."""
 

@@ -22,14 +22,15 @@ This report compares the audited current implementation against the target archi
 ## Highest-Risk Remaining Gaps
 
 1. There is no migration path for older SQLite files that contain scaffold-era tables.
-2. `AnalysisFrame`, `ExecutionRun`, `PlannerOperation`, and cache records are references or contracts, not full provenance stores.
+2. `AnalysisFrame`, `ExecutionRun`, and cache records are references or contracts, not full provenance stores.
 3. Context type safety is local to `SessionFrame` projection; graph retrieval still needs policy enforcement.
-4. Planner nodes still do not produce typed pending operations or commit them atomically.
+4. Planner nodes have only structured-payload adapters for typed pending operations; full request interpretation, approval UX, and executor dispatch are still scaffold-level.
 5. DVC integration is an explicit interface, not executable integration.
 6. Executor capability registration, singleton resolution, and basic dispatch now exist, but planner integration, runnable default executor graphs, `DataExplorerExecutor`, typed execution-result drafts, caller-scoped authorization, and executor-to-executor delegation controls are not implemented.
 
 ## Owner Review Needed
 
 - Decide whether existing local databases should be migrated or discarded during this scaffold convergence.
-- Decide the concrete persisted shape for `PlannerOperation`, `ExecutionRun`, `AnalysisFrame`, cleaning decisions, and rejected task proposals.
+- Decide the concrete persisted shape for `ExecutionRun`, `AnalysisFrame`, cleaning decisions, and rejected task proposals.
+- Decide whether Phase 1 `PlannerOperation` payload adapters are sufficient for the next planner-runtime integration step or need a richer operation-draft contract.
 - Decide whether SQLModel remains the runtime store during convergence or whether/when a graph store is introduced.

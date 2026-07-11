@@ -1,16 +1,185 @@
 """Planner-specific graph contracts."""
 
-from pydantic import BaseModel, Field
+from __future__ import annotations
+
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
 
-from agents.executor.types import ExecutionRequest
+from schemas.artifacts import Assumption, Task
+from schemas.enums import AssumptionStatus, ObjectiveStatus, TaskKind, TaskLifecycleState
+from schemas.planner_operations import PlannerCommitResult, PlannerOperation
+
+
+class _TargetedOperationDraft(BaseModel):
+    """Shared target id handling for planner operation drafts."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    target_object_id: UUID | None = None
+
+    def require_target_object_id(self) -> UUID:
+        """Return the target object id or fail before a PlannerOperation is created."""
+
+        if self.target_object_id is None:
+            raise ValueError("Planner operation draft requires target_object_id.")
+        return self.target_object_id
+
+
+class TaskUpdateDraft(_TargetedOperationDraft):
+    """Typed planner draft for Task field updates."""
+
+    task_id: UUID | None = None
+    title: str | None = None
+    description: str | None = None
+    lifecycle_state: TaskLifecycleState | None = None
+    task_kind: TaskKind | None = None
+    parent_task_id: UUID | None = None
+    profile_id: UUID | None = None
+    variables: list[str] | None = None
+    evidence_expectation: str | None = None
+
+    @model_validator(mode="after")
+    def _resolve_target_alias(self) -> TaskUpdateDraft:
+        if self.target_object_id is None:
+            self.target_object_id = self.task_id
+        if self.target_object_id is None:
+            raise ValueError("TaskUpdateDraft requires task_id or target_object_id.")
+        return self
+
+    def operation_payload(self) -> dict[str, object]:
+        """Serialize only update fields for PlannerOperation.payload."""
+
+        return self.model_dump(
+            mode="json",
+            exclude={"task_id", "target_object_id"},
+            exclude_unset=True,
+        )
+
+
+class TaskStateChangeDraft(_TargetedOperationDraft):
+    """Typed planner draft for Task lifecycle changes."""
+
+    task_id: UUID | None = None
+    lifecycle_state: TaskLifecycleState
+
+    @model_validator(mode="after")
+    def _resolve_target_alias(self) -> TaskStateChangeDraft:
+        if self.target_object_id is None:
+            self.target_object_id = self.task_id
+        if self.target_object_id is None:
+            raise ValueError("TaskStateChangeDraft requires task_id or target_object_id.")
+        return self
+
+    def operation_payload(self) -> dict[str, object]:
+        """Serialize the lifecycle transition for PlannerOperation.payload."""
+
+        return self.model_dump(
+            mode="json",
+            exclude={"task_id", "target_object_id"},
+        )
+
+
+class ObjectiveUpdateDraft(_TargetedOperationDraft):
+    """Typed planner draft for Objective updates."""
+
+    objective_id: UUID | None = None
+    title: str | None = None
+    statement: str | None = None
+    status: ObjectiveStatus | None = None
+
+    @model_validator(mode="after")
+    def _resolve_target_alias(self) -> ObjectiveUpdateDraft:
+        if self.target_object_id is None:
+            self.target_object_id = self.objective_id
+        if self.target_object_id is None:
+            raise ValueError("ObjectiveUpdateDraft requires objective_id or target_object_id.")
+        return self
+
+    def operation_payload(self) -> dict[str, object]:
+        """Serialize Objective update fields for PlannerOperation.payload."""
+
+        return self.model_dump(
+            mode="json",
+            exclude={"objective_id", "target_object_id"},
+            exclude_unset=True,
+        )
+
+
+class AssumptionStateUpdateDraft(_TargetedOperationDraft):
+    """Typed planner draft for Assumption lifecycle review updates."""
+
+    assumption_id: UUID | None = None
+    status: AssumptionStatus | None = None
+    contradicted_by_discovery_ids: list[UUID] | None = None
+    replacement_assumption_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def _resolve_target_alias(self) -> AssumptionStateUpdateDraft:
+        if self.target_object_id is None:
+            self.target_object_id = self.assumption_id
+        if self.target_object_id is None:
+            raise ValueError(
+                "AssumptionStateUpdateDraft requires assumption_id or target_object_id."
+            )
+        return self
+
+    def operation_payload(self) -> dict[str, object]:
+        """Serialize Assumption update fields for PlannerOperation.payload."""
+
+        return self.model_dump(
+            mode="json",
+            exclude={"assumption_id", "target_object_id"},
+            exclude_unset=True,
+        )
+
+
+class ConflictFlagDraft(_TargetedOperationDraft):
+    """Typed planner draft for flagging an object for user review."""
+
+    assumption_id: UUID | None = None
+    target_object_type: str = "assumption"
+    discovery_id: UUID | None = None
+    contradicted_by_discovery_id: UUID | None = None
+    reason: str | None = None
+
+    @model_validator(mode="after")
+    def _resolve_target_alias(self) -> ConflictFlagDraft:
+        if self.target_object_id is None:
+            self.target_object_id = self.assumption_id
+        if self.target_object_id is None:
+            raise ValueError("ConflictFlagDraft requires assumption_id or target_object_id.")
+        return self
+
+    def operation_payload(self) -> dict[str, object]:
+        """Serialize flag metadata for PlannerOperation.payload."""
+
+        return self.model_dump(
+            mode="json",
+            exclude={"assumption_id", "target_object_id", "target_object_type"},
+            exclude_none=True,
+        )
 
 
 class State(BaseModel):
     """Internal Planner state."""
 
     query: str
+    session_id: str | None = None
     history: list[ModelMessage] = Field(default_factory=list)
+    task_create_payloads: list[Task] = Field(default_factory=list)
+    task_update_payloads: list[TaskUpdateDraft] = Field(default_factory=list)
+    task_state_change_payloads: list[TaskStateChangeDraft] = Field(default_factory=list)
+    objective_update_payloads: list[ObjectiveUpdateDraft] = Field(default_factory=list)
+    assumption_create_payloads: list[Assumption] = Field(default_factory=list)
+    assumption_state_update_payloads: list[AssumptionStateUpdateDraft] = Field(
+        default_factory=list
+    )
+    conflict_flag_payloads: list[ConflictFlagDraft] = Field(default_factory=list)
+    planner_operations: list[PlannerOperation] = Field(default_factory=list)
+    operation_ids_to_commit: list[UUID] | None = None
+    commit_result: PlannerCommitResult | None = None
 
 
 class Context(BaseModel):
