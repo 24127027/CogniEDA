@@ -587,6 +587,8 @@ class ControlledPlaceholderResult(BaseModel):
 
 class PlannerOutput(BaseModel):
     """Typed, user-visible public result for one Planner invocation."""
+    """PydanticAI output schema for planner-authored requests."""
+
 
     response_text: str | None = None
     session_frame_id: UUID | None = None
@@ -598,3 +600,5 @@ class PlannerOutput(BaseModel):
     planner_operations: list[PlannerOperation] = Field(default_factory=list)
     executor_dispatch_ref: str | None = None
     commit_result: PlannerCommitResult | None = None
+
+
