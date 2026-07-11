@@ -185,13 +185,8 @@ class State(BaseModel):
 class Context(BaseModel):
     """Context for the Planner agent."""
 
-    database_url: str | None = None
-    session_id: str | None = None
-
 
 class PlannerOutput(BaseModel):
-    """Planner payload contract returned to the runtime."""
+    """PydanticAI output schema for planner-authored requests."""
 
-    planner_operations: list[PlannerOperation] = Field(default_factory=list)
-    executor_dispatch_ref: str | None = None
-    commit_result: PlannerCommitResult | None = None
+

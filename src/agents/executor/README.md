@@ -1,142 +1,194 @@
-# Executor Dispatch — Implementation Plan
+# Executor Dispatch Architecture
 
-Step-by-step implementation of the capability-based executor dispatch layer. Follow phases in order; steps within a phase can run in parallel where noted.
+This document describes the executor dispatch code that exists now. Future
+planner or delegation behavior is labeled separately and should not be read as
+implemented runtime behavior.
 
-## Phase 1: Capability Contracts
+## What exists now
 
-### Step 1 — Define `Capability` enum
+Executor dispatch currently lives in `src/agents/executor/dispatcher.py`.
+It is a thin adapter around `ExecutorRegistry` and `ExecutionRequest`.
 
-**File**: `src/agents/executor/types.py`
+The implemented objects are:
 
-Add a `Capability` StrEnum with the initial capability set:
+| Object | Location | Current role |
+| --- | --- | --- |
+| `ExecutionRequest` | `src/agents/executor/types.py` | Pydantic request containing `capability`, `input`, and `context`. |
+| `ExecutionResult` | `src/agents/executor/types.py` | Validated executor return type; concrete draft/provenance fields are not implemented yet. |
+| `ExecutorRegistry` | `src/agents/executor/registry.py` | Stores capability specs, executor factories, and lazy singleton executor instances. |
+| `ExecutorDispatcher` | `src/agents/executor/dispatcher.py` | Resolves a capability id through the registry and calls the executor. |
+| `CapabilitySpec` / `Capability` | `src/agents/executor/capabilities.py` | Defines canonical capability ids and descriptions. |
 
-- `GRAPH_MINING = "graph_mining"`
-- `HYPOTHESIS_TESTING = "hypothesis_testing"`
-- `DATA_EXPLORATION = "data_exploration"`
+`ExecutionRequest` validates `capability` at the Pydantic boundary against
+`CAPABILITY_IDS`. That confirms the id is part of the canonical capability
+catalog. It does not prove an executor is registered or runnable for that id.
 
-Use `StrEnum` (same pattern as `FirstClassObjectType` and `TaskKind` in `src/schemas/enums.py`). Import `StrEnum` from `enum`.
+The current capability catalog and registration status are:
 
-### Step 2 — Update `ExecutionRequest`
+| Capability id | Catalog status | Registered executor |
+| --- | --- | --- |
+| `data_exploration` | Catalogued | Not registered |
+| `graph_mining` | Catalogued | `GraphMiner` |
+| `hypothesis_testing` | Catalogued | `HypothesisAnalyst` |
 
-**File**: `src/agents/executor/types.py`
+Concrete executors self-register in their agent modules with
+`@executor_registry.register(...)`:
 
-Replace `executor_name: str` with `capability: str`. The request now declares *what* is needed, not *who* should do it.
+- `GraphMiner` registers `graph_mining` in
+  `src/agents/executor/graph_miner/agent.py`.
+- `HypothesisAnalyst` registers `hypothesis_testing` in
+  `src/agents/executor/hypothesis_analyst/agent.py`.
 
-### Step 3 — Update `ExecutionResult`
+The registered wrappers exist, but their graph builders still raise
+`NotImplementedError`. Basic registry and dispatcher plumbing exists; the
+default executor graphs are scaffold-level.
 
-**File**: `src/agents/executor/types.py`
+Planner integration is also scaffold-level. `src/agents/planner/graph.py` has
+execution-shaped edges, but `prepare_execution`, `dispatch_executor`, and
+`review_execution` in `src/agents/planner/nodes.py` are stubs, and
+`src/agents/planner/types.py` does not define a dispatcher field on planner
+runtime `Context`.
 
-Replace the empty `...` body with structured fields for what executors produce:
+## How dispatch actually works
 
-```python
-class ExecutionResult(BaseModel):
-    evidence_drafts: list[dict] = Field(default_factory=list)
-    discovery_drafts: list[dict] = Field(default_factory=list)
-    execution_run_ref: str | None = None
-```
+`ExecutorDispatcher.dispatch(request)` performs only this flow:
 
-Use `dict` for drafts until `Evidence` and `Discovery` schemas are importable without circular dependencies. Add `Field` import from `pydantic`.
+1. Read `request.capability`.
+2. Resolve the capability id with `ExecutorRegistry.get(...)`.
+3. Call `executor.run(input=request.input, context=request.context)`.
+4. Return the `ExecutionResult`.
 
-## Phase 2: Executor Registry
-
-### Step 4 — Create `ExecutorRegistry`
-
-**File**: `src/agents/executor/registry.py` (new file)
-
-Create an `ExecutorRegistry` class following the `NodeRegistry` pattern in `src/agents/utilities/nodes_registry.py`.
-
-Key design points:
-- The decorator instantiates the executor class at registration time (executors are stateless).
-- Duplicate capability registration raises `ValueError`.
-- `get()` raises `CapabilityNotFoundError` for unknown capabilities.
-
-Create a module-level singleton `executor_registry = ExecutorRegistry()` for convenience.
-
-### Step 5 — Register existing executors
-
-**Files**:
-- `src/agents/executor/graph_miner/agent.py`
-- `src/agents/executor/hypothesis_analyst/agent.py`
-
-Annotate the executor classes:
-
-```python
-from ..registry import executor_registry
-from ..types import Capability
-
-@executor_registry.register(Capability.GRAPH_MINING)
-class GraphMiner(Executor):
-    ...
-```
-
-## Phase 3: Executor Dispatcher
-
-### Step 6 — Create `ExecutorDispatcher`
-
-**File**: `src/agents/executor/dispatcher.py` (new file)
-
-Thin implementation:
+The core implementation is:
 
 ```python
-class ExecutorDispatcher:
-    def __init__(self, registry: ExecutorRegistry):
-        self._registry = registry
+executor = self._registry.get(request.capability)
 
-    async def dispatch(self, request: ExecutionRequest) -> ExecutionResult:
-        executor = self._registry.get(request.capability)
-        return await executor.run(request.input, request.context)
+return await executor.run(
+    input=request.input,
+    context=request.context,
+)
 ```
 
-## Phase 4: Planner Node Implementation
+The dispatcher does not:
 
-Depends on Phase 1–3 completion.
+- choose among executors based on caller permissions
+- build `ExecutorInput`
+- build `ExecutorContext`
+- validate the full execution request beyond the `ExecutionRequest` model
+- authorize callers
+- route executor-to-executor delegation
+- trace delegation
+- retry failures
+- enforce cycle or depth limits
 
-### Step 7 — Implement `prepare_execution`
+`ExecutorRegistry.get(capability_id)` raises `KeyError` when the capability id
+has no registered executor. This can happen even when `ExecutionRequest`
+accepted the id, because `ExecutionRequest` validates against the capability
+catalog while the registry resolves only registered capabilities.
 
-**File**: `src/agents/planner/nodes.py`
+## What selection helpers do
 
-Map `TaskKind` to `Capability` and place an `ExecutionRequest` in planner state (`state.pending_execution_request`). Use a simple module-level mapping `TASK_KIND_TO_CAPABILITY`.
+The selection helpers constrain an LLM to choose one capability id from an
+allowed subset. They are only for capability choice.
 
-### Step 8 — Implement `dispatch_executor`
+`build_capability_selection_model(capabilities)` creates a Pydantic model with
+one field:
 
-**File**: `src/agents/planner/nodes.py`
+```python
+capability: Literal[<allowed capability ids>]
+```
 
-Call `await runtime.context.dispatcher.dispatch(request)` and store `state.last_execution_result`.
+That selection model does not validate or construct the full
+`ExecutionRequest`. The caller still builds `ExecutorInput` and
+`ExecutorContext` by hand.
 
-Update planner `Context` (`src/agents/planner/types.py`) to include `dispatcher: ExecutorDispatcher` and `State` to include `pending_execution_request` and `last_execution_result`.
+`build_capability_selection_instructions(capabilities)` creates prompt text
+that tells a model to choose exactly one capability id from the same allowed
+subset.
 
-## Phase 5: Tests
+Minimal usage pattern:
 
-### Step 9 — Test `ExecutorRegistry`
+```python
+from pydantic_ai import Agent
 
-Create `tests/agents/test_executor_registry.py` to verify registration, duplicate detection, and lookup behavior.
+from agents.executor import (
+    ExecutionRequest,
+    ExecutorContext,
+    ExecutorInput,
+    ExecutorDispatcher,
+    build_capability_selection_instructions,
+    build_capability_selection_model,
+    executor_registry,
+)
+from agents.executor.capabilities import Capability
 
-### Step 10 — Test `ExecutorDispatcher`
+# 1) Let the LLM choose only the capability.
+selection_model = build_capability_selection_model(executor_registry.list_specs())
+selection_instructions = build_capability_selection_instructions(
+    executor_registry.list_specs()
+)
 
-Create `tests/agents/test_executor_dispatcher.py` to verify dispatching and error handling.
+selector = Agent(
+    model=model,
+    result_type=selection_model,
+    system_prompt=selection_instructions,
+)
 
-### Step 11 — Integration test
+selection = await selector.run(
+    "Use the specialist that can analyze graph structure."
+)
 
-Create `tests/agents/test_executor_dispatch_integration.py` to verify end-to-end routing to `GraphMiner` and `HypothesisAnalyst`.
+# 2) Build the rest by hand.
+request = ExecutionRequest(
+    capability=selection.data.capability,
+    input=ExecutorInput(task=task),
+    context=ExecutorContext(),
+)
 
-## File Change Summary
+# 3) Dispatch.
+dispatcher = ExecutorDispatcher(executor_registry)
+result = await dispatcher.dispatch(request)
+```
 
-| File | Action |
-|---|---|
-| `src/agents/executor/types.py` | Add `Capability` enum, update `ExecutionRequest`, update `ExecutionResult` |
-| `src/agents/executor/registry.py` | Create — `ExecutorRegistry` |
-| `src/agents/executor/dispatcher.py` | Create — `ExecutorDispatcher` |
-| `src/agents/executor/graph_miner/agent.py` | Add `@executor_registry.register(Capability.GRAPH_MINING)` |
-| `src/agents/executor/hypothesis_analyst/agent.py` | Add `@executor_registry.register(Capability.HYPOTHESIS_TESTING)` |
-| `src/agents/planner/nodes.py` | Implement two nodes and mapping dict |
-| `tests/agents/*` | Create registry/dispatcher/integration tests |
+In this example, `executor_registry.list_specs()` limits selection to registered
+capability specs. With the default registry, that excludes catalogued but
+unregistered capabilities such as `data_exploration`.
 
-## Out of Scope
+## What is not implemented yet
 
-- Message bus / process isolation
-- Multi-executor-per-capability priority selection
-- Full `review_execution` persistence logic
+The following behavior is not live in the current code:
 
----
+- Planner runtime ownership of a dispatcher instance.
+- Implemented `prepare_execution`, `dispatch_executor`, or `review_execution`
+  planner node bodies.
+- Planner construction of `ExecutionRequest` from selected `Task` objects.
+- Planner persistence of dispatch requests or results through atomic
+  `PlannerOperation` records.
+- Caller-scoped dispatcher authorization.
+- Executor-to-executor delegation routing.
+- Delegation tracing.
+- Retry policy.
+- Cycle/depth protection.
+- Runnable default graphs for `GraphMiner` and `HypothesisAnalyst`.
+- Registered executor for `data_exploration`.
+- Concrete `ExecutionResult` fields for Evidence drafts, Discovery drafts, or
+  execution-run provenance.
 
-Follow this README for an incremental implementation. Implement phase-by-phase and run the new tests after each phase.
+## Target behavior / future work
+
+The target planner/executor design is for the planner to prepare an execution
+request for an approved analytical task, dispatch it by capability id, review
+the execution result, and commit any durable changes through the appropriate
+operation/provenance path.
+
+Future executor-to-executor delegation may use the same
+`ExecutionRequest -> ExecutionResult` shape, but no delegation routing,
+authorization, tracing, retry, or cycle/depth protection exists today. That work
+must be designed and implemented before executor chains are treated as supported
+runtime behavior.
+
+## Related documents
+
+- [Planner Workflow](planner-workflow.md)
+- [First-Class Objects](first-class-objects.md)
+- [Implementation Gap Analysis](implementation-gap-analysis.md)

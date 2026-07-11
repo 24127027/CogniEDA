@@ -573,7 +573,7 @@ def test_task_and_non_fco_generated_view_guards() -> None:
 
 
 def test_planner_and_executor_authoring_contracts() -> None:
-    from agents.hypothesis_analyst.types import ExecutorOutput
+    from agents.executor.types import ExecutorOutput
     from agents.planner.types import PlannerOutput
 
     planner_fields = set(PlannerOutput.model_fields)
