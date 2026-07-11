@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from enum import StrEnum
 from secrets import token_urlsafe
-from typing import Literal, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, runtime_checkable
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -17,6 +18,7 @@ from schemas.enums import (
     EvidenceType,
     HypothesisEvidenceOutcome,
     ObjectiveStatus,
+    PlannerCapability,
     TaskKind,
     TaskLifecycleState,
 )
@@ -36,8 +38,30 @@ PlannerIntent = Literal[
     "manage_task",
     "execute",
     "objective",
+    "register_dataset",
     "assumption",
+    "close_project",
+    "profile",
+    "review_profile",
+    "clean",
+    "accept_profile",
+    "review_result",
+    "review_conflict",
 ]
+PendingInteractionKind = Literal[
+    "research_direction_approval",
+    "planner_operation_approval",
+    "execution_approval",
+    "execution_failure_review",
+]
+
+
+class GovernanceMode(StrEnum):
+    """Small, explicit control setting for planner confirmation gates."""
+
+    ALWAYS_ASK = "always_ask"
+    RISK_BASED = "risk_based"
+    FULL_AUTONOMY = "full_autonomy"
 
 COMMAND_TO_INTENT: dict[str, PlannerIntent] = {
     "answer": "answer",
@@ -45,7 +69,15 @@ COMMAND_TO_INTENT: dict[str, PlannerIntent] = {
     "manage_task": "manage_task",
     "execute": "execute",
     "objective": "objective",
+    "register_dataset": "register_dataset",
     "assumption": "assumption",
+    "close_project": "close_project",
+    "profile": "profile",
+    "review_profile": "review_profile",
+    "clean": "clean",
+    "accept_profile": "accept_profile",
+    "review_result": "review_result",
+    "review_conflict": "review_conflict",
 }
 
 
@@ -139,11 +171,61 @@ class PreparedExecution(BaseModel):
     execution_ref: str = Field(default_factory=lambda: new_local_reference("execution"))
     task_ref: str
     data_profile_ref: str
+    hypothesis_ref: str | None = None
+    execution_run_ref: str | None = None
     task_title: str
     dataset_path: str
     hypothesis: HypothesisDraft
     specification: ExecutionSpecification
     deterministic_seed: int | None = None
+    contract_fingerprint: str
+
+
+class PendingUserInteraction(BaseModel):
+    """JSON-safe description of one planner interaction that must be resumed."""
+
+    kind: PendingInteractionKind
+    payload: dict[str, Any] = Field(default_factory=dict)
+    allowed_actions: list[str]
+    operation_ids: list[str] = Field(default_factory=list)
+    snapshot_hash: str | None = None
+    proposal_id: str | None = None
+
+
+class PlannerDecision(BaseModel):
+    """One normalized, transient answer to a pending planner interaction."""
+
+    action: Literal["approve", "cancel", "revise", "clarify"]
+    selected_ids: list[str] = Field(default_factory=list)
+    feedback: str | None = None
+    execution_ref: str | None = None
+    proposal_id: str | None = None
+
+
+class ExecutionAdmission(BaseModel):
+    """Transient references returned after the database admits an execution."""
+
+    admitted: bool = False
+    hypothesis_ref: str | None = None
+    execution_run_ref: str | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+
+
+class ExecutionRevalidation(BaseModel):
+    """Deterministic result of checking an approved contract after an interrupt."""
+
+    valid: bool = False
+    error_code: str | None = None
+    error_message: str | None = None
+
+
+class AuthorizationResult(BaseModel):
+    """Small local result from one approval boundary."""
+
+    approved: bool = False
+    terminated: bool = False
+    error_message: str | None = None
 
 
 class AnalysisFrameObservation(BaseModel):
@@ -241,6 +323,7 @@ class ExecutionReviewResult(BaseModel):
     succeeded: bool = False
     error_code: str | None = None
     error_message: str | None = None
+    failure_kind: str | None = None
 
 
 class TaskUpdateDraft(BaseModel):
@@ -403,13 +486,20 @@ class State(BaseModel):
     """Internal Planner state."""
 
     query: str
+    response_text: str | None = None
     request_understanding: RequestUnderstanding | None = None
     task_selection: TaskSelection | None = None
     execution_preparation: ExecutionPreparation | None = None
+    preparation_phase: Literal["draft", "claim"] = "draft"
+    execution_revalidation: ExecutionRevalidation | None = None
     prepared_execution: PreparedExecution | None = None
+    execution_admission: ExecutionAdmission | None = None
     executor_result: ExecutorResult | None = None
     execution_review: ExecutionReviewResult | None = None
     session_id: str | None = None
+    active_session_frame_id: UUID | None = None
+    requested_capability: PlannerCapability | None = None
+    controlled_placeholder: ControlledPlaceholderResult | None = None
     object_reference_index: dict[str, str] = Field(default_factory=dict)
     history: list[ModelMessage] = Field(default_factory=list)
     task_create_payloads: list[Task] = Field(default_factory=list)
@@ -423,6 +513,23 @@ class State(BaseModel):
     conflict_flag_payloads: list[ConflictFlagDraft] = Field(default_factory=list)
     planner_operations: list[PlannerOperation] = Field(default_factory=list)
     operation_ids_to_commit: list[str] | None = None
+    operation_batch_id: str | None = None
+    commit_purpose: Literal[
+        "normal_operations",
+        "execution_claim",
+        "execution_result",
+        "execution_failure",
+    ] = "normal_operations"
+    requested_interaction_kind: PendingInteractionKind | None = None
+    proposal_source: str | None = None
+    pending_interaction: PendingUserInteraction | None = None
+    resume_payload: dict[str, Any] | None = None
+    planner_decision: PlannerDecision | None = None
+    user_feedback: str | None = None
+    local_workflow_terminated: bool = False
+    interaction_error: str | None = None
+    hard_stop_code: str | None = None
+    hard_stop_message: str | None = None
     commit_result: PlannerCommitResult | None = None
 
     def bind_object_reference(self, object_type: str, persistent_id: str) -> str:
@@ -451,13 +558,43 @@ class Context(BaseModel):
 
     database_url: str | None = None
     session_id: str | None = None
+    session_frame_id: UUID | None = None
     request_understanding_model: RequestUnderstandingModel | None = None
     analytical_executor: AnalyticalExecutor | None = None
+    governance_mode: GovernanceMode = GovernanceMode.RISK_BASED
+
+
+class ControlledPlannerError(BaseModel):
+    """A user-visible controlled Planner failure without internal object handles."""
+
+    code: str
+    message: str
+
+
+class ControlledPlaceholderResult(BaseModel):
+    """Typed, user-visible result for an admitted but deferred capability."""
+
+    error_code: Literal[
+        "capability_not_implemented",
+        "capability_precondition_failed",
+    ]
+    capability: PlannerCapability
+    message: str
+    future_extension_boundary: str
+    unmet_requirements: tuple[str, ...] = ()
+    suggested_next_action: str | None = None
 
 
 class PlannerOutput(BaseModel):
-    """Planner payload contract returned to the runtime."""
+    """Typed, user-visible public result for one Planner invocation."""
 
+    response_text: str | None = None
+    session_frame_id: UUID | None = None
+    requested_capability: PlannerCapability | None = None
+    pending_interaction: PendingUserInteraction | None = None
+    controlled_error: ControlledPlannerError | None = None
+    controlled_placeholder: ControlledPlaceholderResult | None = None
+    committed_operation_ids: list[UUID] = Field(default_factory=list)
     planner_operations: list[PlannerOperation] = Field(default_factory=list)
     executor_dispatch_ref: str | None = None
     commit_result: PlannerCommitResult | None = None
