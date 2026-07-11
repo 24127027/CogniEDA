@@ -8,7 +8,6 @@ from pydantic_ai_skills import SkillsCapability
 
 from .mcp.loader import load_mcp_toolsets
 from .skills.loader import load_skills
-from .registry import registry
 
 # from .builtin.graph import search_graph
 # from .builtin.workspace import create_task, update_session_frame
@@ -103,7 +102,7 @@ class ToolManager:
         builtin = WORKER_BUILTIN_TOOLS.get(worker)
 
         if builtin:
-            toolsets.append(registry.create_toolset(builtin))
+            toolsets.append(FunctionToolset(builtin))
 
         #
         # MCP toolsets
