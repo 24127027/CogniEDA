@@ -1,5 +1,7 @@
 """Planner agent wrapper."""
 
+from tools.builtin_tools import AvailableBuiltinTools
+
 from ..types import RuntimePayload
 from .graph import build_graph
 from .types import AnalyticalExecutor, Context, PlannerOutput, State
@@ -7,6 +9,10 @@ from .types import AnalyticalExecutor, Context, PlannerOutput, State
 
 class Planner:
     """Planner orchestrator. It produces operations, not Evidence or Discovery."""
+
+    builtin_tools: tuple[AvailableBuiltinTools, ...] = (AvailableBuiltinTools.GRAPH,)
+
+    builtin_tools: tuple[AvailableBuiltinTools, ...] = (AvailableBuiltinTools.GRAPH,)
 
     def __init__(
         self,
