@@ -4,7 +4,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 
-from .nodes import R, registry, route_intent
+from .nodes import R, registry, route_intent, route_process_decision
 from .types import Context, State
 
 
@@ -34,7 +34,7 @@ def build_graph(
         R.understand_request,
         route_intent,
         {
-            "answer": R.answer_question,
+            "check_answerability": R.check_answerability,
             "suggest": R.propose_questions,
             "manage_task": R.manage_tasks,
             "execute": R.select_task,
@@ -48,6 +48,7 @@ def build_graph(
     # Question answering
     # --------------------------------------------------
 
+    builder.add_edge(R.check_answerability, R.answer_question)
     builder.add_edge(R.answer_question, R.commit)
 
     # --------------------------------------------------
@@ -67,9 +68,15 @@ def build_graph(
     # --------------------------------------------------
 
     builder.add_edge(R.select_task, R.prepare_execution)
-    builder.add_edge(R.prepare_execution, R.dispatch_executor)
+    # Execution is deliberately approval-gated.  A prepared contract is not a
+    # dispatch authorization until the decision node revalidates its snapshot.
+    builder.add_edge(R.prepare_execution, R.request_user_input)
+    builder.add_edge(R.commit_execution_contract, R.dispatch_executor)
     builder.add_edge(R.dispatch_executor, R.review_execution)
-    builder.add_edge(R.review_execution, R.commit)
+    builder.add_edge(R.review_execution, R.validate_evidence)
+    builder.add_edge(R.validate_evidence, R.evaluate_hypothesis)
+    builder.add_edge(R.evaluate_hypothesis, R.review_conflicts)
+    builder.add_edge(R.review_conflicts, R.commit)
 
     # --------------------------------------------------
     # Knowledge management
@@ -87,14 +94,14 @@ def build_graph(
 
     builder.add_conditional_edges(
         R.process_decision,
-        registry.nodes[R.process_decision],
+        route_process_decision,
         {
             "clarify": R.understand_request,
             "approved_questions": R.expand_plan,
             "approved_task": R.commit,
             "approved_plan": R.commit,
             "approved_conflict": R.commit,
-            "approved_execution": R.dispatch_executor,
+            "approved_execution": R.commit_execution_contract,
             "cancel": R.commit,
         },
     )
@@ -107,6 +114,7 @@ def build_graph(
     builder.add_edge(R.commit, END)
 
     return builder.compile(checkpointer=checkpointer)
+
 
 # if __name__ == "__main__":
 #     agent_graph = build_graph()
