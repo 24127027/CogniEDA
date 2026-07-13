@@ -15,10 +15,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from schemas.common import CogniEDABaseModel, NonEmptyStr, utc_now
 from schemas.enums import (
     AssumptionStatus,
+    ConflictRelationship,
     ObjectiveStatus,
     PlannerNodeName,
     PlannerOperationApprovalState,
     PlannerOperationType,
+    TaskDependencyType,
     TaskKind,
     TaskLifecycleState,
 )
@@ -35,6 +37,9 @@ class TaskUpdateOperationPayload(BaseModel):
     lifecycle_state: TaskLifecycleState | None = None
     task_kind: TaskKind | None = None
     parent_task_id: UUID | None = None
+    dependency_type: TaskDependencyType | None = None
+    blocked_reason: str | None = None
+    superseded_by_task_id: UUID | None = None
     profile_id: UUID | None = None
     variables: list[str] | None = None
     evidence_expectation: str | None = None
@@ -81,6 +86,7 @@ class ConflictFlagOperationPayload(BaseModel):
 
     assumption_id: UUID
     target_object_type: str = "assumption"
+    relationship_type: ConflictRelationship = ConflictRelationship.CONTRADICTS
     discovery_id: UUID | None = None
     contradicted_by_discovery_id: UUID | None = None
     reason: str | None = None
