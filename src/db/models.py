@@ -10,6 +10,7 @@ from sqlalchemy import JSON, Column, Text, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 from schemas.enums import (
+    AnalysisIntent,
     AssumptionSource,
     AssumptionStatus,
     AssumptionTestability,
@@ -27,6 +28,7 @@ from schemas.enums import (
     PlannerOperationApprovalState,
     PlannerOperationType,
     SessionFrameStatus,
+    TaskDependencyType,
     TaskKind,
     TaskLifecycleState,
     UserDecisionStatus,
@@ -55,6 +57,9 @@ class ObjectiveRecord(TimestampedRecord, table=True):
     objective_id: UUID = Field(default_factory=uuid4, primary_key=True)
     title: str = Field(index=True, min_length=1, nullable=False)
     statement: str = Field(sa_column=Column(Text, nullable=False))
+    analysis_intent: AnalysisIntent = Field(
+        default=AnalysisIntent.EXPLORATORY, nullable=False, index=True
+    )
     status: ObjectiveStatus = Field(default=ObjectiveStatus.ACTIVE, nullable=False, index=True)
 
 
@@ -147,6 +152,9 @@ class AssumptionRecord(TimestampedRecord, table=True):
 
     assumption_id: UUID = Field(default_factory=uuid4, primary_key=True)
     statement: str = Field(sa_column=Column(Text, nullable=False))
+    analysis_intent: AnalysisIntent = Field(
+        default=AnalysisIntent.EXPLORATORY, nullable=False, index=True
+    )
     scope: str = Field(sa_column=Column(Text, nullable=False))
     source: AssumptionSource = Field(default=AssumptionSource.USER, nullable=False, index=True)
     testability: AssumptionTestability = Field(
@@ -185,6 +193,11 @@ class TaskRecord(TimestampedRecord, table=True):
         index=True,
     )
     task_kind: TaskKind = Field(default=TaskKind.ANALYTICAL, nullable=False, index=True)
+    dependency_type: TaskDependencyType | None = Field(default=None, nullable=True, index=True)
+    blocked_reason: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    superseded_by_task_id: UUID | None = Field(
+        default=None, foreign_key="tasks.task_id", index=True
+    )
     parent_task_id: UUID | None = Field(default=None, foreign_key="tasks.task_id", index=True)
     profile_id: UUID | None = Field(default=None, foreign_key="data_profiles.profile_id")
     variables: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
@@ -205,6 +218,9 @@ class HypothesisRecord(TimestampedRecord, table=True):
     task_id: UUID = Field(foreign_key="tasks.task_id", nullable=False, index=True)
     profile_id: UUID = Field(foreign_key="data_profiles.profile_id", nullable=False, index=True)
     statement: str = Field(sa_column=Column(Text, nullable=False))
+    analysis_intent: AnalysisIntent = Field(
+        default=AnalysisIntent.EXPLORATORY, nullable=False, index=True
+    )
     variables: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     scope: str = Field(sa_column=Column(Text, nullable=False))
     validation_method: str = Field(sa_column=Column(Text, nullable=False))
@@ -305,9 +321,17 @@ class DiscoveryRecord(SQLModel, table=True):
     evidence_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     claim: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
     epistemic_status: DiscoveryEpistemicStatus = Field(nullable=False, index=True)
+    analysis_intent: AnalysisIntent = Field(
+        default=AnalysisIntent.EXPLORATORY, nullable=False, index=True
+    )
+    uncertainty: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     scope: str = Field(sa_column=Column(Text, nullable=False))
     validity_basis: dict[str, Any] = Field(
         default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    invalidators: list[str] = Field(
+        default_factory=list,
         sa_column=Column(JSON, nullable=False),
     )
     lifecycle_state: DiscoveryLifecycleState = Field(
@@ -456,6 +480,17 @@ class SessionFrameRecord(SQLModel, table=True):
         sa_column=Column(JSON, nullable=False),
     )
     pending_tasks: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    pending_proposals: list[str] = Field(
+        default_factory=list, sa_column=Column(JSON, nullable=False)
+    )
+    user_pins: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    user_exclusions: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    mandatory_dependencies: list[str] = Field(
+        default_factory=list, sa_column=Column(JSON, nullable=False)
+    )
+    inclusion_reasons: dict[str, str] = Field(
+        default_factory=dict, sa_column=Column(JSON, nullable=False)
+    )
     open_questions: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     key_warnings: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     stale_context: list[dict[str, Any]] = Field(
