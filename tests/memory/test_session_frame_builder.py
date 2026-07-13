@@ -165,11 +165,7 @@ def get_discovery_exclusion_note(
     context: ContextBundle,
     discovery: Discovery,
 ) -> str:
-    notes = [
-        note
-        for note in context.exclusion_notes
-        if str(discovery.discovery_id) in note
-    ]
+    notes = [note for note in context.exclusion_notes if str(discovery.discovery_id) in note]
 
     assert len(notes) == 1
     return notes[0]
@@ -276,9 +272,7 @@ def test_session_context_builder_separates_planning_and_conclusion_context() -> 
 
     assert planning_context.assumption_refs == (assumption.assumption_id,)
     assert planning_context.task_refs == (task.task_id,)
-    assert planning_context.pending_tasks == (
-        "Review account-month grain before deeper modeling.",
-    )
+    assert planning_context.pending_tasks == ("Review account-month grain before deeper modeling.",)
 
     assert conclusion_context.assumptions == ()
     assert conclusion_context.assumption_refs == ()
@@ -361,10 +355,7 @@ def test_planning_context_may_include_flagged_discovery_for_review() -> None:
     planning_context = SessionContextBuilder().build(frame, mode=ContextMode.PLANNING)
 
     assert planning_context.discovery_refs == (discovery.discovery_id,)
-    assert not any(
-        str(discovery.discovery_id) in note
-        for note in planning_context.exclusion_notes
-    )
+    assert not any(str(discovery.discovery_id) in note for note in planning_context.exclusion_notes)
 
 
 def test_discovery_exclusion_notes_do_not_mutate_original_summary() -> None:
@@ -417,7 +408,7 @@ def test_conclusion_context_filters_stale_rejected_or_completed_items() -> None:
     completed_hypothesis = build_hypothesis(
         task.task_id,
         profile.profile_id,
-        status=HypothesisStatus.COMPLETED,
+        status=HypothesisStatus.CONFIRMED,
     )
     evidence = build_evidence(hypothesis.hypothesis_id, profile.profile_id)
     superseded_evidence = build_evidence(

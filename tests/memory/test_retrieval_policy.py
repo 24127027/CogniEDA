@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from memory.retrieval_policy import exclusion_reason, is_allowed_in_context
 from schemas.enums import (
     AssumptionStatus,
@@ -32,7 +33,7 @@ def assert_excluded(
     [
         (FirstClassObjectType.ASSUMPTION, AssumptionStatus.ACTIVE),
         (FirstClassObjectType.DISCOVERY, DiscoveryLifecycleState.ACTIVE),
-        (FirstClassObjectType.HYPOTHESIS, HypothesisStatus.COMPLETED),
+        (FirstClassObjectType.HYPOTHESIS, HypothesisStatus.CONFIRMED),
         (FirstClassObjectType.TASK, TaskLifecycleState.REJECTED),
         (FirstClassObjectType.DATA_PROFILE, DataProfileLifecycleState.SUPERSEDED),
         (FirstClassObjectType.EVIDENCE, EvidenceLifecycleState.HISTORICALLY_SCOPED),

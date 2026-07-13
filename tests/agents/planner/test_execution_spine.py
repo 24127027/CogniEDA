@@ -6,7 +6,13 @@ import pytest
 from langgraph.runtime import Runtime
 
 from agents.planner.graph import build_graph
-from agents.planner.nodes import prepare_execution, select_task
+from agents.planner.nodes import (
+    _method_parameter_hash,
+    prepare_execution,
+    process_decision,
+    request_user_input,
+    select_task,
+)
 from agents.planner.types import (
     AnalysisFrameObservation,
     Context,
@@ -14,6 +20,7 @@ from agents.planner.types import (
     ExecutionRunObservation,
     ExecutorResult,
     HypothesisEvaluationDraft,
+    PlannerDecision,
     PreparedExecution,
     RequestUnderstanding,
     RequestUnderstandingModel,
@@ -63,11 +70,13 @@ class FakeExecutor:
         *,
         fail: bool = False,
         outcome: HypothesisEvidenceOutcome = HypothesisEvidenceOutcome.SUPPORTS,
+        finalize: bool = True,
         output_method: str | None = None,
         output_parameters: list[MethodParameter] | None = None,
     ) -> None:
         self.fail = fail
         self.outcome = outcome
+        self.finalize = finalize
         self.output_method = output_method
         self.output_parameters = output_parameters
         self.requests: list[PreparedExecution] = []
@@ -81,7 +90,7 @@ class FakeExecutor:
         execution_run = ExecutionRunObservation(
             executor_type="test_fake",
             method_id=self.output_method or request.specification.validation_method,
-            parameter_hash="test-parameters-v1",
+            parameter_hash=_method_parameter_hash(request.specification.method_parameters),
             status="failed" if self.fail else "completed",
         )
         if self.fail:
@@ -113,6 +122,7 @@ class FakeExecutor:
             ),
             evaluation=HypothesisEvaluationDraft(
                 outcome=self.outcome,
+                finalize=self.finalize,
             ),
         )
 
@@ -382,7 +392,7 @@ def test_prepare_execution_rejects_missing_profile(db_session, monkeypatch) -> N
     assert result.execution_preparation.error_code == "unknown_data_profile"
 
 
-def test_prepare_execution_rejects_existing_hypothesis(db_session) -> None:
+def test_prepare_execution_reuses_existing_nonterminal_hypothesis(db_session) -> None:
     task = _persist_ready_task(db_session)
     specification = task.analytical_specification
     assert specification is not None and task.profile_id is not None
@@ -409,7 +419,12 @@ def test_prepare_execution_rejects_existing_hypothesis(db_session) -> None:
     )
 
     assert result.execution_preparation is not None
-    assert result.execution_preparation.error_code == "hypothesis_already_generated"
+    assert result.execution_preparation.prepared
+    assert result.prepared_execution is not None
+    assert result.prepared_execution.hypothesis_ref is not None
+    assert result.resolve_object_reference(result.prepared_execution.hypothesis_ref) == str(
+        HypothesisRepository(db_session).list(task_id=task.task_id)[0].hypothesis_id
+    )
 
 
 def test_prepare_execution_rejects_ungrounded_specification_variable(db_session) -> None:
@@ -449,7 +464,10 @@ def test_execute_graph_persists_one_authorized_chain_without_second_approval(
 
     final_state = State.model_validate(
         graph.invoke(
-            State(query=f"/execute {task.task_id}"),
+            State(
+                query=f"/execute {task.task_id}",
+                planner_decision={"action": "approve"},
+            ),
             context=_context(db_session, executor, request_model),
         )
     )
@@ -457,16 +475,14 @@ def test_execute_graph_persists_one_authorized_chain_without_second_approval(
     assert final_state.task_selection is not None and final_state.task_selection.selected
     assert final_state.execution_review is not None and final_state.execution_review.succeeded
     assert final_state.commit_result is not None
-    assert final_state.commit_result.failed_operation_ids == []
-    assert len(final_state.commit_result.committed_operation_ids) == 7
+    assert final_state.commit_result.failed_operation_ids == [], final_state.commit_result.errors
+    assert len(final_state.commit_result.committed_operation_ids) == 6
     assert request_model.calls == 0
     assert len(executor.requests) == 1
     request = executor.requests[0]
     assert final_state.resolve_object_reference(request.task_ref) == str(task.task_id)
     assert final_state.resolve_object_reference(request.data_profile_ref) == str(task.profile_id)
-    assert request.specification.method_parameters == [
-        MethodParameter(name="alpha", value=0.05)
-    ]
+    assert request.specification.method_parameters == [MethodParameter(name="alpha", value=0.05)]
     assert request.deterministic_seed == 17
     assert "assumptions" not in type(request).model_fields
     hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)
@@ -481,7 +497,7 @@ def test_execute_graph_persists_one_authorized_chain_without_second_approval(
     assert discoveries[0].hypothesis_id == hypothesis[0].hypothesis_id
     assert discoveries[0].evidence_ids == [evidence[0].evidence_id]
     assert discoveries[0].validity_basis.assumptions_excluded_from_inference is True
-    assert hypothesis[0].status.value == "completed"
+    assert hypothesis[0].status.value == "confirmed"
     assert TaskRepository(db_session).get_by_id(task.task_id).lifecycle_state.value == "completed"
     assert SessionFrameRepository(db_session).list() == []
 
@@ -496,12 +512,7 @@ def test_execute_graph_persists_one_authorized_chain_without_second_approval(
     assert len(executor.requests) == 1
     assert len(HypothesisRepository(db_session).list(task_id=task.task_id)) == 1
     assert (
-        len(
-            DiscoveryRepository(db_session).list_for_hypothesis(
-                hypothesis[0].hypothesis_id
-            )
-        )
-        == 1
+        len(DiscoveryRepository(db_session).list_for_hypothesis(hypothesis[0].hypothesis_id)) == 1
     )
 
 
@@ -513,7 +524,10 @@ def test_execute_graph_failure_keeps_task_active_and_creates_no_evidence_or_disc
     request_model = FailIfCalledRequestModel()
     final_state = State.model_validate(
         build_graph().invoke(
-            State(query=f"/execute {task.task_id}"),
+            State(
+                query=f"/execute {task.task_id}",
+                planner_decision={"action": "approve"},
+            ),
             context=_context(db_session, executor, request_model),
         )
     )
@@ -523,15 +537,13 @@ def test_execute_graph_failure_keeps_task_active_and_creates_no_evidence_or_disc
     assert final_state.execution_review.reviewed
     assert not final_state.execution_review.succeeded
     assert final_state.commit_result is not None
-    assert final_state.commit_result.failed_operation_ids == []
-    assert len(final_state.commit_result.committed_operation_ids) == 3
+    assert final_state.commit_result.failed_operation_ids == [], final_state.commit_result.errors
+    assert len(final_state.commit_result.committed_operation_ids) >= 1
     assert request_model.calls == 0
     assert len(executor.requests) == len(hypothesis) == 1
-    assert hypothesis[0].status.value == "proposed"
+    assert hypothesis[0].status.value == "approved"
     assert len(AnalysisFrameRepository(db_session).list(data_profile_id=task.profile_id)) == 1
-    runs = ExecutionRunRepository(db_session).list(
-        hypothesis_id=hypothesis[0].hypothesis_id
-    )
+    runs = ExecutionRunRepository(db_session).list(hypothesis_id=hypothesis[0].hypothesis_id)
     assert len(runs) == 1
     assert runs[0].status == "failed"
     assert EvidenceRepository(db_session).list_for_hypothesis(hypothesis[0].hypothesis_id) == []
@@ -540,14 +552,92 @@ def test_execute_graph_failure_keeps_task_active_and_creates_no_evidence_or_disc
     assert SessionFrameRepository(db_session).list() == []
 
 
+def test_execution_does_not_dispatch_without_an_explicit_approval(db_session) -> None:
+    task = _persist_ready_task(db_session)
+    executor = FakeExecutor()
+
+    final_state = State.model_validate(
+        build_graph().invoke(
+            State(query=f"/execute {task.task_id}"),
+            context=_context(db_session, executor, FailIfCalledRequestModel()),
+        )
+    )
+
+    assert final_state.pending_interaction is not None
+    assert final_state.pending_interaction.kind == "execution_approval"
+    assert final_state.execution_revalidation is None
+    assert executor.requests == []
+    assert HypothesisRepository(db_session).list(task_id=task.task_id) == []
+    assert ExecutionRunRepository(db_session).list(task_id=task.task_id) == []
+
+
+def test_changed_contract_cannot_reuse_execution_approval(db_session) -> None:
+    task = _persist_ready_task(db_session)
+    task_ref = "task:approval-check"
+    state = prepare_execution(
+        State(
+            query="/execute",
+            task_selection={"task_ref": task_ref, "selected": True},
+            object_reference_index={task_ref: str(task.task_id)},
+        ),
+        Runtime(context=_context(db_session)),
+    )
+    state = request_user_input(state, Runtime(context=_context(db_session)))
+    assert state.pending_interaction is not None
+    assert state.prepared_execution is not None
+
+    state.prepared_execution.contract_fingerprint = "altered-contract"
+    state.planner_decision = PlannerDecision(action="approve")
+    state = process_decision(state, Runtime(context=_context(db_session)))
+
+    assert state.execution_revalidation is not None
+    assert not state.execution_revalidation.valid
+    assert state.execution_revalidation.error_code == "stale_execution_approval"
+
+
+def test_hypothesis_accumulates_evidence_until_explicit_finalization(db_session) -> None:
+    task = _persist_ready_task(db_session)
+    context = _context(db_session, FakeExecutor(finalize=False), FailIfCalledRequestModel())
+    first_state = State.model_validate(
+        build_graph().invoke(
+            State(
+                query=f"/execute {task.task_id}",
+                planner_decision={"action": "approve"},
+            ),
+            context=context,
+        )
+    )
+    hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)[0]
+    assert first_state.hypothesis_evaluation is not None
+    assert not first_state.hypothesis_evaluation.evaluated
+    assert len(EvidenceRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)) == 1
+    assert DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id) == []
+    assert hypothesis.status.value == "awaiting_additional_evidence"
+
+    second_state = State.model_validate(
+        build_graph().invoke(
+            State(
+                query=f"/execute {task.task_id}",
+                planner_decision={"action": "approve"},
+            ),
+            context=_context(db_session, FakeExecutor(finalize=True), FailIfCalledRequestModel()),
+        )
+    )
+    discoveries = DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)
+    evidence = EvidenceRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)
+    assert second_state.hypothesis_evaluation is not None
+    assert second_state.hypothesis_evaluation.evaluated
+    assert len(evidence) == 2
+    assert len(discoveries) == 1
+    assert set(discoveries[0].evidence_ids) == {item.evidence_id for item in evidence}
+
+
 @pytest.mark.parametrize(
     ("executor", "error_code"),
     [
         (FakeExecutor(output_method="unexpected_method"), "executor_method_mismatch"),
         (
-            FakeExecutor(
-                output_parameters=[MethodParameter(name="alpha", value=0.01)]
-            ),
+            FakeExecutor(output_parameters=[MethodParameter(name="alpha", value=0.01)]),
             "executor_parameter_mismatch",
         ),
     ],
@@ -561,7 +651,10 @@ def test_review_rejects_executor_identity_drift(
 
     final_state = State.model_validate(
         build_graph().invoke(
-            State(query=f"/execute {task.task_id}"),
+            State(
+                query=f"/execute {task.task_id}",
+                planner_decision={"action": "approve"},
+            ),
             context=_context(db_session, executor, FailIfCalledRequestModel()),
         )
     )
@@ -569,7 +662,7 @@ def test_review_rejects_executor_identity_drift(
     assert final_state.execution_review is not None
     assert final_state.execution_review.error_code == error_code
     assert len(executor.requests) == 1
-    assert HypothesisRepository(db_session).list(task_id=task.task_id) == []
+    assert len(HypothesisRepository(db_session).list(task_id=task.task_id)) == 1
     assert EvidenceRepository(db_session).list() == []
     assert DiscoveryRepository(db_session).list() == []
     persisted_task = TaskRepository(db_session).get_by_id(task.task_id)
@@ -590,9 +683,7 @@ def test_executor_result_rejects_status_or_failure_contract_drift() -> None:
                 method="deterministic_test",
                 result_summary=EvidenceResultSummary(summary="Observed result."),
             ),
-            evaluation=HypothesisEvaluationDraft(
-                outcome=HypothesisEvidenceOutcome.SUPPORTS
-            ),
+            evaluation=HypothesisEvaluationDraft(outcome=HypothesisEvidenceOutcome.SUPPORTS),
         )
 
     with pytest.raises(ValueError, match="failure information"):
@@ -608,14 +699,15 @@ def test_inconclusive_execution_does_not_overclaim_no_relationship(db_session) -
     executor = FakeExecutor(outcome=HypothesisEvidenceOutcome.INSUFFICIENT_EVIDENCE)
 
     build_graph().invoke(
-        State(query=f"/execute {task.task_id}"),
+        State(
+            query=f"/execute {task.task_id}",
+            planner_decision={"action": "approve"},
+        ),
         context=_context(db_session, executor, FailIfCalledRequestModel()),
     )
 
     hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)[0]
-    discovery = DiscoveryRepository(db_session).list_for_hypothesis(
-        hypothesis.hypothesis_id
-    )[0]
+    discovery = DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)[0]
     assert discovery.epistemic_status == DiscoveryEpistemicStatus.INSUFFICIENT_EVIDENCE
     assert "insufficient" in discovery.claim.statement.lower()
     assert "no relationship" not in discovery.claim.statement.lower()

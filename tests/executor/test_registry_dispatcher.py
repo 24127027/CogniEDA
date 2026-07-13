@@ -126,15 +126,13 @@ def test_execution_request_rejects_unknown_capability() -> None:
         )
 
 
-def test_planner_output_validates_nested_execution_request_capability() -> None:
-    with pytest.raises(ValidationError, match="Unknown executor capability"):
-        PlannerOutput(
-            execution_request={
-                "capability": "missing",
-                "input": {"task": {}},
-                "context": {},
-            }
-        )
+def test_planner_output_cannot_embed_an_executor_request() -> None:
+    """Planner model output must flow through planner admission, not executor dispatch."""
+
+    planner_fields = set(PlannerOutput.model_fields)
+
+    assert "execution_request" not in planner_fields
+    assert {"planner_operations", "executor_dispatch_ref"} <= planner_fields
 
 
 def test_capability_selection_model_restricts_to_explicit_subset() -> None:

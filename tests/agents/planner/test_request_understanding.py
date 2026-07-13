@@ -112,7 +112,14 @@ def test_unknown_command_requires_correction_without_model_fallback() -> None:
 
 @pytest.mark.parametrize(
     ("intent", "expected_route"),
-    [(intent, intent) for intent in COMMAND_TO_INTENT.values()],
+    [
+        ("answer", "check_answerability"),
+        ("suggest", "suggest"),
+        ("manage_task", "manage_task"),
+        ("execute", "execute"),
+        ("objective", "objective"),
+        ("assumption", "assumption"),
+    ],
 )
 def test_route_intent_is_deterministic(
     intent: str,
