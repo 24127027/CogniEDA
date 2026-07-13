@@ -152,9 +152,7 @@ def _commit_execution_bundle(
 
     result = PlannerCommitResult()
     committable = [
-        operation
-        for operation in operations
-        if operation.approval_state in _COMMITTABLE_STATES
+        operation for operation in operations if operation.approval_state in _COMMITTABLE_STATES
     ]
     result.skipped_operation_ids.extend(
         operation.operation_id
@@ -210,6 +208,8 @@ def _apply_operation(session: Session, operation: PlannerOperation) -> None:
             _apply_create_analysis_frame(session, operation)
         case PlannerOperationType.CREATE_EXECUTION_RUN:
             _apply_create_execution_run(session, operation)
+        case PlannerOperationType.UPDATE_EXECUTION_RUN:
+            _apply_update_execution_run(session, operation)
         case PlannerOperationType.CREATE_EVIDENCE:
             _apply_create_evidence(session, operation)
         case PlannerOperationType.CREATE_DISCOVERY:
@@ -263,9 +263,7 @@ def _apply_create_assumption(session: Session, operation: PlannerOperation) -> N
     if session.get(AssumptionRecord, assumption.assumption_id) is not None:
         raise ValueError(f"Assumption already exists: {assumption.assumption_id}")
     session.add(
-        AssumptionRecord(
-            **schema_to_record_payload(assumption, json_fields=ASSUMPTION_JSON_FIELDS)
-        )
+        AssumptionRecord(**schema_to_record_payload(assumption, json_fields=ASSUMPTION_JSON_FIELDS))
     )
 
 
@@ -297,6 +295,14 @@ def _apply_create_execution_run(session: Session, operation: PlannerOperation) -
     if session.get(ExecutionRunRecord, execution_run.execution_run_id) is not None:
         raise ValueError(f"ExecutionRun already exists: {execution_run.execution_run_id}")
     ExecutionRunRepository(session).stage_create(execution_run)
+
+
+def _apply_update_execution_run(session: Session, operation: PlannerOperation) -> None:
+    execution_run_id = _require_payload_uuid(operation, "execution_run_id")
+    record = _require_record(session, ExecutionRunRecord, execution_run_id, "ExecutionRun")
+    if "status" in operation.payload:
+        record.status = operation.payload["status"]
+    session.add(record)
 
 
 def _apply_create_evidence(session: Session, operation: PlannerOperation) -> None:
@@ -362,9 +368,7 @@ def _apply_update_session_frame(session: Session, operation: PlannerOperation) -
     if session.get(SessionFrameRecord, frame.session_frame_id) is not None:
         raise ValueError(f"SessionFrame already exists: {frame.session_frame_id}")
     session.add(
-        SessionFrameRecord(
-            **schema_to_record_payload(frame, json_fields=SESSION_FRAME_JSON_FIELDS)
-        )
+        SessionFrameRecord(**schema_to_record_payload(frame, json_fields=SESSION_FRAME_JSON_FIELDS))
     )
 
 
