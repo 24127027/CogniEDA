@@ -210,9 +210,9 @@ def _hypothesis_exclusion_reason(
     if mode_key in {ContextMode.CONCLUSION.value, ContextMode.DISCOVERY_SYNTHESIS.value}:
         if state_key == HypothesisStatus.TESTING.value:
             return None
-        if state_key == HypothesisStatus.COMPLETED.value:
+        if state_key == HypothesisStatus.CONFIRMED.value:
             return f"Completed Hypothesis is excluded by default from {context_label}."
-    if state_key == HypothesisStatus.COMPLETED.value:
+    if state_key == HypothesisStatus.CONFIRMED.value:
         return f"Completed Hypothesis is excluded by default from {context_label}."
     return _state_not_allowed("Hypothesis", state_key, context_label)
 
@@ -222,10 +222,15 @@ def _evidence_exclusion_reason(
     mode_key: str,
     context_label: str,
 ) -> str | None:
-    if mode_key == ContextMode.PLANNING.value and state_key in {
-        EvidenceLifecycleState.ACTIVE.value,
-        EvidenceLifecycleState.HISTORICALLY_SCOPED.value,
-    } | _ACTIVE_MEMORY_STATES:
+    if (
+        mode_key == ContextMode.PLANNING.value
+        and state_key
+        in {
+            EvidenceLifecycleState.ACTIVE.value,
+            EvidenceLifecycleState.HISTORICALLY_SCOPED.value,
+        }
+        | _ACTIVE_MEMORY_STATES
+    ):
         return None
     if state_key in _ACTIVE_MEMORY_STATES | {EvidenceLifecycleState.ACTIVE.value}:
         return None
@@ -243,10 +248,15 @@ def _discovery_exclusion_reason(
     mode_key: str,
     context_label: str,
 ) -> str | None:
-    if mode_key == ContextMode.PLANNING.value and state_key in {
-        DiscoveryLifecycleState.ACTIVE.value,
-        DiscoveryLifecycleState.FLAGGED.value,
-    } | _ACTIVE_OR_REVIEW_MEMORY_STATES:
+    if (
+        mode_key == ContextMode.PLANNING.value
+        and state_key
+        in {
+            DiscoveryLifecycleState.ACTIVE.value,
+            DiscoveryLifecycleState.FLAGGED.value,
+        }
+        | _ACTIVE_OR_REVIEW_MEMORY_STATES
+    ):
         return None
     if mode_key == ContextMode.ANSWER.value and state_key in (
         _ACTIVE_MEMORY_STATES | {DiscoveryLifecycleState.ACTIVE.value}
