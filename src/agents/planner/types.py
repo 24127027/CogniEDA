@@ -17,6 +17,7 @@ from schemas.enums import (
     AssumptionStatus,
     EvidenceType,
     HypothesisEvidenceOutcome,
+    HypothesisStatus,
     ObjectiveStatus,
     PlannerCapability,
     TaskKind,
@@ -62,6 +63,7 @@ class GovernanceMode(StrEnum):
     ALWAYS_ASK = "always_ask"
     RISK_BASED = "risk_based"
     FULL_AUTONOMY = "full_autonomy"
+
 
 COMMAND_TO_INTENT: dict[str, PlannerIntent] = {
     "answer": "answer",
@@ -270,6 +272,7 @@ class HypothesisEvaluationDraft(BaseModel):
 
     outcome: HypothesisEvidenceOutcome
     note: str | None = None
+    finalize: bool = False
 
 
 class ExecutorResult(BaseModel):
@@ -482,12 +485,79 @@ class ConflictFlagDraft(BaseModel):
         )
 
 
+class RequestGroundingContext(BaseModel):
+    """Context for resolving relative references in user requests."""
+
+    pass
+
+
+class PlanningContext(BaseModel):
+    """Context for planning Tasks and Hypotheses."""
+
+    pass
+
+
+class ExecutionPreparationContext(BaseModel):
+    """Context for preparing an execution run."""
+
+    pass
+
+
+class EvidenceValidationContext(BaseModel):
+    """Context for validating executor raw observation."""
+
+    pass
+
+
+class ConclusionContext(BaseModel):
+    """Context for synthesizing Discoveries."""
+
+    pass
+
+
+class AnswerContext(BaseModel):
+    """Context for answering user questions."""
+
+    pass
+
+
+class ConflictReviewContext(BaseModel):
+    """Context for conflict detection."""
+
+    pass
+
+
+class ContextualGrounding(BaseModel):
+    """Result of resolving intent against active context."""
+
+    resolved_query: str
+    target_task_refs: list[str] = Field(default_factory=list)
+    target_profile_refs: list[str] = Field(default_factory=list)
+
+
+class EvidenceAdmission(BaseModel):
+    """Result of structurally validating raw executor output."""
+
+    admitted: bool = False
+    evidence_ref: str | None = None
+    error_message: str | None = None
+
+
+class HypothesisEvaluation(BaseModel):
+    """Result of evaluating all admitted evidence for a Hypothesis."""
+
+    evaluated: bool = False
+    new_status: HypothesisStatus | None = None
+    discovery_draft: dict[str, Any] | None = None
+
+
 class State(BaseModel):
     """Internal Planner state."""
 
     query: str
     response_text: str | None = None
     request_understanding: RequestUnderstanding | None = None
+    contextual_grounding: ContextualGrounding | None = None
     task_selection: TaskSelection | None = None
     execution_preparation: ExecutionPreparation | None = None
     preparation_phase: Literal["draft", "claim"] = "draft"
@@ -495,6 +565,8 @@ class State(BaseModel):
     prepared_execution: PreparedExecution | None = None
     execution_admission: ExecutionAdmission | None = None
     executor_result: ExecutorResult | None = None
+    evidence_admission: EvidenceAdmission | None = None
+    hypothesis_evaluation: HypothesisEvaluation | None = None
     execution_review: ExecutionReviewResult | None = None
     session_id: str | None = None
     active_session_frame_id: UUID | None = None
@@ -507,9 +579,7 @@ class State(BaseModel):
     task_state_change_payloads: list[TaskStateChangeDraft] = Field(default_factory=list)
     objective_update_payloads: list[ObjectiveUpdateDraft] = Field(default_factory=list)
     assumption_create_payloads: list[Assumption] = Field(default_factory=list)
-    assumption_state_update_payloads: list[AssumptionStateUpdateDraft] = Field(
-        default_factory=list
-    )
+    assumption_state_update_payloads: list[AssumptionStateUpdateDraft] = Field(default_factory=list)
     conflict_flag_payloads: list[ConflictFlagDraft] = Field(default_factory=list)
     planner_operations: list[PlannerOperation] = Field(default_factory=list)
     operation_ids_to_commit: list[str] | None = None
@@ -587,8 +657,8 @@ class ControlledPlaceholderResult(BaseModel):
 
 class PlannerOutput(BaseModel):
     """Typed, user-visible public result for one Planner invocation."""
-    """PydanticAI output schema for planner-authored requests."""
 
+    """PydanticAI output schema for planner-authored requests."""
 
     response_text: str | None = None
     session_frame_id: UUID | None = None
@@ -600,5 +670,3 @@ class PlannerOutput(BaseModel):
     planner_operations: list[PlannerOperation] = Field(default_factory=list)
     executor_dispatch_ref: str | None = None
     commit_result: PlannerCommitResult | None = None
-
-

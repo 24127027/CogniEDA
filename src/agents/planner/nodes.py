@@ -1,3 +1,6 @@
+import json
+from hashlib import sha256
+from typing import Any
 from uuid import UUID
 
 from langgraph.runtime import Runtime
@@ -8,6 +11,8 @@ from application.orchestrator.planner_commit import commit_planner_operations
 from db.session import get_session
 from repositories import (
     DataProfileRepository,
+    DiscoveryRepository,
+    EvidenceRepository,
     HypothesisRepository,
     PlannerOperationRepository,
     TaskRepository,
@@ -33,11 +38,17 @@ from .types import (
     COMMAND_TO_INTENT,
     AnalysisFrameObservation,
     Context,
+    ContextualGrounding,
+    EvidenceAdmission,
+    ExecutionAdmission,
     ExecutionPreparation,
+    ExecutionRevalidation,
     ExecutionReviewResult,
     ExecutionRunObservation,
     ExecutionSpecification,
     HypothesisDraft,
+    HypothesisEvaluation,
+    PendingUserInteraction,
     PreparedExecution,
     RequestUnderstanding,
     RequestUnderstandingModel,
@@ -169,7 +180,26 @@ def route_intent(state: State, runtime: Runtime[Context]) -> str:
         or understanding.intent is None
     ):
         return "invalid_request"
+    if understanding.intent == "answer":
+        return "check_answerability"
     return understanding.intent
+
+
+@registry.register()
+def contextual_grounding(state: State, runtime: Runtime[Context]) -> State:
+    """Resolve relative references using SessionFrame."""
+    if state.request_understanding is None:
+        return state
+    state.contextual_grounding = ContextualGrounding(
+        resolved_query=state.request_understanding.request_text,
+    )
+    return state
+
+
+@registry.register()
+def check_answerability(state: State, runtime: Runtime[Context]) -> State:
+    """Gate: determine if we have adequate valid basis to answer a question."""
+    return state
 
 
 @registry.register()
@@ -223,6 +253,7 @@ def expand_plan(state: State, runtime: Runtime[Context]) -> None:
 # --------------------
 # Task management
 # --------------------
+
 
 @registry.register()
 def manage_tasks(state: State, runtime: Runtime[Context]) -> State:
@@ -290,9 +321,7 @@ def select_task(state: State, runtime: Runtime[Context]) -> State:
     """Resolve an external Task id once, then use only a local reference in the graph."""
 
     request_text = (
-        state.request_understanding.request_text
-        if state.request_understanding is not None
-        else ""
+        state.request_understanding.request_text if state.request_understanding is not None else ""
     )
     if not request_text:
         state.task_selection = TaskSelection(
@@ -404,6 +433,9 @@ def prepare_execution(state: State, runtime: Runtime[Context]) -> State:
     try:
         profile = DataProfileRepository(session).get_by_id(task.profile_id)
         existing_hypotheses = HypothesisRepository(session).list(task_id=task.task_id)
+        existing_discovery_hypothesis_ids = {
+            discovery.hypothesis_id for discovery in DiscoveryRepository(session).list()
+        }
     finally:
         session.close()
     if has_children:
@@ -452,12 +484,33 @@ def prepare_execution(state: State, runtime: Runtime[Context]) -> State:
             "task_not_execution_ready",
             "The Task does not satisfy the terminal analytical execution contract.",
         )
-    if existing_hypotheses:
+    existing_hypothesis = existing_hypotheses[0] if len(existing_hypotheses) == 1 else None
+    if len(existing_hypotheses) > 1:
         return _execution_not_prepared(
             state,
-            "hypothesis_already_generated",
-            "A Task can generate exactly one Hypothesis.",
+            "multiple_hypotheses_for_task",
+            "A Task has more than one Hypothesis and requires recovery review.",
         )
+    if existing_hypothesis is not None:
+        if existing_hypothesis.hypothesis_id in existing_discovery_hypothesis_ids:
+            return _execution_not_prepared(
+                state,
+                "hypothesis_already_finalized",
+                "The Task Hypothesis already has a final Discovery.",
+            )
+        if existing_hypothesis.status in {
+            HypothesisStatus.CONFIRMED,
+            HypothesisStatus.CONTRADICTED,
+            HypothesisStatus.INCONCLUSIVE,
+            HypothesisStatus.INSUFFICIENT_EVIDENCE,
+            HypothesisStatus.CANCELLED,
+            HypothesisStatus.ARCHIVED,
+        }:
+            return _execution_not_prepared(
+                state,
+                "hypothesis_not_retryable",
+                "The Task Hypothesis is terminal and cannot be dispatched again.",
+            )
 
     profile_ref = state.bind_object_reference("data_profile", str(profile.profile_id))
     hypothesis = HypothesisDraft(
@@ -484,8 +537,118 @@ def prepare_execution(state: State, runtime: Runtime[Context]) -> State:
             method_parameters=specification.method_parameters,
         ),
         deterministic_seed=specification.deterministic_seed,
+        hypothesis_ref=(
+            state.bind_object_reference("hypothesis", str(existing_hypothesis.hypothesis_id))
+            if existing_hypothesis is not None
+            else None
+        ),
+        contract_fingerprint=_execution_contract_fingerprint(task, profile, specification),
     )
     state.execution_preparation = ExecutionPreparation(prepared=True)
+    return state
+
+
+@registry.register()
+def commit_execution_contract(state: State, runtime: Runtime[Context]) -> State:
+    """Atomically persist Hypothesis and ExecutionRun before dispatch."""
+    session_id = _session_id(state, runtime)
+    prepared = state.prepared_execution
+    if prepared is None or state.execution_revalidation is None:
+        return state
+    if not state.execution_revalidation.valid:
+        state.hard_stop_code = state.execution_revalidation.error_code or "execution_not_authorized"
+        state.hard_stop_message = (
+            state.execution_revalidation.error_message
+            or "The execution contract has not been approved."
+        )
+        return state
+
+    try:
+        task_id = UUID(state.resolve_object_reference(prepared.task_ref))
+        profile_id = UUID(state.resolve_object_reference(prepared.data_profile_ref))
+    except ValueError as exc:
+        state.hard_stop_code = "unknown_execution_reference"
+        state.hard_stop_message = str(exc)
+        return state
+
+    context = _runtime_context(runtime)
+    if context is None or context.database_url is None:
+        state.hard_stop_code = "execution_store_unavailable"
+        state.hard_stop_message = "Execution requires a configured planner database."
+        return state
+
+    session = get_session(context.database_url)
+    try:
+        hypothesis: Hypothesis
+        if prepared.hypothesis_ref is None:
+            hypothesis = Hypothesis(
+                task_id=task_id,
+                profile_id=profile_id,
+                statement=prepared.hypothesis.statement,
+                variables=prepared.hypothesis.variables,
+                scope=prepared.hypothesis.scope,
+                validation_method=prepared.hypothesis.validation_method,
+                evidence_expectation=prepared.hypothesis.evidence_expectation,
+                status=HypothesisStatus.APPROVED,
+            )
+            hypothesis_operation = _execution_operation(
+                session_id,
+                PlannerOperationType.CREATE_HYPOTHESIS,
+                hypothesis,
+                PlannerNodeName.PREPARE_EXECUTION,
+            )
+        else:
+            hypothesis_id = UUID(state.resolve_object_reference(prepared.hypothesis_ref))
+            hypothesis = HypothesisRepository(session).get_by_id(hypothesis_id)
+            if hypothesis is None:
+                raise ValueError("Approved execution references a missing Hypothesis.")
+            hypothesis_operation = None
+
+        execution_run = ExecutionRun(
+            task_id=task_id,
+            hypothesis_id=hypothesis.hypothesis_id,
+            executor_type=prepared.specification.executor_id,
+            method_id=prepared.specification.validation_method,
+            parameter_hash=_method_parameter_hash(prepared.specification.method_parameters),
+            status="pending",
+        )
+        operations = [
+            operation
+            for operation in (
+                hypothesis_operation,
+                _execution_operation(
+                    session_id,
+                    PlannerOperationType.CREATE_EXECUTION_RUN,
+                    execution_run,
+                    PlannerNodeName.PREPARE_EXECUTION,
+                ),
+            )
+            if operation is not None
+        ]
+        _persist_planner_operations(session, operations)
+        result = commit_planner_operations(session, session_id=session_id, operations=operations)
+        if result.failed_operation_ids:
+            state.hard_stop_code = "execution_contract_commit_failed"
+            state.hard_stop_message = "; ".join(result.errors.values())
+            return state
+        state.planner_operations.extend(operations)
+        prepared.hypothesis_ref = state.bind_object_reference(
+            "hypothesis", str(hypothesis.hypothesis_id)
+        )
+        prepared.execution_run_ref = state.bind_object_reference(
+            "execution_run", str(execution_run.execution_run_id)
+        )
+        state.execution_admission = ExecutionAdmission(
+            admitted=True,
+            hypothesis_ref=prepared.hypothesis_ref,
+            execution_run_ref=prepared.execution_run_ref,
+        )
+    except Exception as exc:
+        session.rollback()
+        state.hard_stop_code = "execution_contract_commit_failed"
+        state.hard_stop_message = str(exc)
+    finally:
+        session.close()
     return state
 
 
@@ -494,7 +657,12 @@ def dispatch_executor(state: State, runtime: Runtime[Context]) -> State:
     """Invoke the injected deterministic executor once for a prepared execution."""
 
     prepared = state.prepared_execution
-    if state.execution_preparation is None or not state.execution_preparation.prepared:
+    if (
+        state.execution_preparation is None
+        or not state.execution_preparation.prepared
+        or state.execution_admission is None
+        or not state.execution_admission.admitted
+    ):
         return state
     context = _runtime_context(runtime)
     executor = context.analytical_executor if context is not None else None
@@ -517,7 +685,6 @@ def dispatch_executor(state: State, runtime: Runtime[Context]) -> State:
 @registry.register()
 def review_execution(state: State, runtime: Runtime[Context]) -> State:
     """Turn typed executor output into ordered PlannerOperations, without persistence."""
-
     prepared = state.prepared_execution
     result = state.executor_result
     if prepared is None or result is None:
@@ -530,94 +697,145 @@ def review_execution(state: State, runtime: Runtime[Context]) -> State:
 
     session_id = _session_id(state, runtime)
     try:
-        task_id = UUID(state.resolve_object_reference(prepared.task_ref))
         profile_id = UUID(state.resolve_object_reference(prepared.data_profile_ref))
+        execution_run_id = UUID(state.resolve_object_reference(prepared.execution_run_ref))
     except ValueError:
         state.execution_review = ExecutionReviewResult(
             error_code="unknown_execution_reference",
             error_message="The approved execution plan cannot resolve its durable references.",
         )
         return state
-    hypothesis = Hypothesis(
-        task_id=task_id,
-        profile_id=profile_id,
-        statement=prepared.hypothesis.statement,
-        variables=prepared.hypothesis.variables,
-        scope=prepared.hypothesis.scope,
-        validation_method=prepared.hypothesis.validation_method,
-        evidence_expectation=prepared.hypothesis.evidence_expectation,
-    )
+
     analysis_frame = _materialize_analysis_frame(result.analysis_frame, profile_id)
-    execution_run = _materialize_execution_run(
-        result.execution_run,
-        task_id=task_id,
-        hypothesis_id=hypothesis.hypothesis_id,
-        analysis_frame_id=analysis_frame.analysis_frame_id,
-    )
-    operations = [
-        _execution_operation(
-            session_id,
-            PlannerOperationType.CREATE_HYPOTHESIS,
-            hypothesis,
-            PlannerNodeName.REVIEW_EXECUTION,
-        ),
+    state.planner_operations.append(
         _execution_operation(
             session_id,
             PlannerOperationType.CREATE_ANALYSIS_FRAME,
             analysis_frame,
             PlannerNodeName.REVIEW_EXECUTION,
-        ),
-        _execution_operation(
-            session_id,
-            PlannerOperationType.CREATE_EXECUTION_RUN,
-            execution_run,
-            PlannerNodeName.REVIEW_EXECUTION,
-        ),
-    ]
+        )
+    )
+
+    # Store frame ref for later steps
+    state.bind_object_reference("analysis_frame", str(analysis_frame.analysis_frame_id))
+
     if result.status == "failed":
-        state.planner_operations.extend(operations)
+        state.planner_operations.append(
+            PlannerOperation(
+                session_id=session_id,
+                operation_type=PlannerOperationType.UPDATE_EXECUTION_RUN,
+                payload={
+                    "execution_run_id": str(execution_run_id),
+                    "status": "failed",
+                },
+                produced_by_node=PlannerNodeName.REVIEW_EXECUTION,
+                approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
+            )
+        )
         state.execution_review = ExecutionReviewResult(reviewed=True, succeeded=False)
         return state
 
-    observation = result.evidence_observation
-    evaluation = result.evaluation
-    if (
-        observation is None
-        or evaluation is None
-    ):
-        state.execution_review = ExecutionReviewResult(
-            error_code="invalid_completed_result",
-            error_message="Completed executor result must evaluate the prepared Hypothesis.",
-        )
+    state.execution_review = ExecutionReviewResult(reviewed=True, succeeded=True)
+    return state
+
+
+@registry.register()
+def validate_evidence(state: State, runtime: Runtime[Context]) -> State:
+    """Structurally validate the raw observation against the durable Hypothesis contract."""
+    result = state.executor_result
+    prepared = state.prepared_execution
+    if result is None or prepared is None or result.status == "failed":
         return state
+
+    observation = result.evidence_observation
+    if observation is None:
+        state.evidence_admission = EvidenceAdmission(admitted=False, error_message="No evidence")
+        return state
+
     if (
         observation.method != prepared.specification.validation_method
         or result.execution_run.method_id != prepared.specification.validation_method
     ):
+        state.evidence_admission = EvidenceAdmission(
+            admitted=False, error_message="Method mismatch"
+        )
         state.execution_review = ExecutionReviewResult(
+            reviewed=True,
+            succeeded=False,
             error_code="executor_method_mismatch",
-            error_message="Executor output method identity must match the prepared specification.",
+            error_message="Method mismatch",
         )
         return state
+
     if observation.parameters != prepared.specification.method_parameters:
+        state.evidence_admission = EvidenceAdmission(
+            admitted=False, error_message="Parameter mismatch"
+        )
         state.execution_review = ExecutionReviewResult(
+            reviewed=True,
+            succeeded=False,
             error_code="executor_parameter_mismatch",
-            error_message=(
-                "Executor Evidence parameters must match the prepared specification."
-            ),
+            error_message="Parameter mismatch",
         )
         return state
+    if result.analysis_frame.column_refs != prepared.specification.variable_bindings:
+        state.evidence_admission = EvidenceAdmission(
+            admitted=False, error_message="Variable binding mismatch"
+        )
+        state.execution_review = ExecutionReviewResult(
+            reviewed=True,
+            succeeded=False,
+            error_code="executor_variable_binding_mismatch",
+            error_message="Executor frame variables must match the prepared specification.",
+        )
+        return state
+    if result.execution_run.parameter_hash != _method_parameter_hash(
+        prepared.specification.method_parameters
+    ):
+        state.evidence_admission = EvidenceAdmission(
+            admitted=False, error_message="Parameter hash mismatch"
+        )
+        state.execution_review = ExecutionReviewResult(
+            reviewed=True,
+            succeeded=False,
+            error_code="executor_parameter_hash_mismatch",
+            error_message="Executor parameter hash must match the prepared specification.",
+        )
+        return state
+
+    session_id = _session_id(state, runtime)
+    try:
+        profile_id = UUID(state.resolve_object_reference(prepared.data_profile_ref))
+        hypothesis_id = UUID(state.resolve_object_reference(prepared.hypothesis_ref))
+        execution_run_id = UUID(state.resolve_object_reference(prepared.execution_run_ref))
+    except ValueError as exc:
+        state.evidence_admission = EvidenceAdmission(admitted=False, error_message=str(exc))
+        return state
+
+    frame_operations = [
+        operation
+        for operation in state.planner_operations
+        if operation.operation_type == PlannerOperationType.CREATE_ANALYSIS_FRAME
+    ]
+    if len(frame_operations) != 1:
+        state.evidence_admission = EvidenceAdmission(
+            admitted=False,
+            error_message="Evidence admission requires exactly one materialized AnalysisFrame.",
+        )
+        return state
+    analysis_frame_id = frame_operations[0].payload["analysis_frame_id"]
+
     evidence = Evidence(
-        hypothesis_id=hypothesis.hypothesis_id,
+        hypothesis_id=hypothesis_id,
         profile_id=profile_id,
-        analysis_frame_ref=str(analysis_frame.analysis_frame_id),
-        execution_run_ref=str(execution_run.execution_run_id),
+        analysis_frame_ref=analysis_frame_id,
+        execution_run_ref=str(execution_run_id),
         evidence_type=observation.evidence_type,
         method=observation.method,
         parameters=observation.parameters,
         provenance=EvidenceProvenance(
-            analysis_frame_ref=str(analysis_frame.analysis_frame_id),
-            execution_run_ref=str(execution_run.execution_run_id),
+            analysis_frame_ref=analysis_frame_id,
+            execution_run_ref=str(execution_run_id),
             code_reference=observation.code_reference,
             environment_reference=observation.environment_reference,
             artifact_paths=observation.artifact_refs,
@@ -626,38 +844,157 @@ def review_execution(state: State, runtime: Runtime[Context]) -> State:
         artifact_refs=observation.artifact_refs,
         limitations=observation.limitations,
     )
+    state.planner_operations.append(
+        _execution_operation(
+            session_id,
+            PlannerOperationType.CREATE_EVIDENCE,
+            evidence,
+            PlannerNodeName.VALIDATE_EVIDENCE,
+        )
+    )
+    state.planner_operations.append(
+        PlannerOperation(
+            session_id=session_id,
+            operation_type=PlannerOperationType.UPDATE_EXECUTION_RUN,
+            payload={"execution_run_id": str(execution_run_id), "status": "completed"},
+            produced_by_node=PlannerNodeName.VALIDATE_EVIDENCE,
+            approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
+        )
+    )
+    evidence_ref = state.bind_object_reference("evidence", str(evidence.evidence_id))
+    state.evidence_admission = EvidenceAdmission(admitted=True, evidence_ref=evidence_ref)
+    return state
+
+
+@registry.register()
+def evaluate_hypothesis(state: State, runtime: Runtime[Context]) -> State:
+    """Review all admitted Evidence for the active Hypothesis. Apply decision rules."""
+    result = state.executor_result
+    prepared = state.prepared_execution
+    if (
+        result is None
+        or prepared is None
+        or result.status == "failed"
+        or state.evidence_admission is None
+        or not state.evidence_admission.admitted
+    ):
+        return state
+    evaluation = result.evaluation
+    if evaluation is None:
+        return state
+    session_id = _session_id(state, runtime)
+    try:
+        hypothesis_id = UUID(state.resolve_object_reference(prepared.hypothesis_ref))
+        task_id = UUID(state.resolve_object_reference(prepared.task_ref))
+        evidence_id = UUID(state.resolve_object_reference(state.evidence_admission.evidence_ref))
+    except ValueError as exc:
+        state.execution_review = ExecutionReviewResult(
+            reviewed=True,
+            succeeded=False,
+            error_code="unknown_evidence_reference",
+            error_message=str(exc),
+        )
+        return state
+
+    evidence_operation = next(
+        (
+            operation
+            for operation in state.planner_operations
+            if operation.operation_type == PlannerOperationType.CREATE_EVIDENCE
+            and operation.payload.get("evidence_id") == str(evidence_id)
+        ),
+        None,
+    )
+    frame_operation = next(
+        (
+            operation
+            for operation in state.planner_operations
+            if operation.operation_type == PlannerOperationType.CREATE_ANALYSIS_FRAME
+        ),
+        None,
+    )
+    if evidence_operation is None or frame_operation is None:
+        return state
+
+    current_evidence = Evidence(**evidence_operation.payload)
+    analysis_frame_id = frame_operation.payload["analysis_frame_id"]
+    context = _runtime_context(runtime)
+    if context is None or context.database_url is None:
+        return state
+    session = get_session(context.database_url)
+    try:
+        hypothesis = HypothesisRepository(session).get_by_id(hypothesis_id)
+        admitted_evidence = EvidenceRepository(session).list_for_hypothesis(hypothesis_id)
+    finally:
+        session.close()
+    if hypothesis is None:
+        return state
+
+    if not evaluation.finalize:
+        state.planner_operations.append(
+            PlannerOperation(
+                session_id=session_id,
+                operation_type=PlannerOperationType.CHANGE_HYPOTHESIS_STATE,
+                payload={
+                    "hypothesis_id": str(hypothesis_id),
+                    "status": HypothesisStatus.AWAITING_ADDITIONAL_EVIDENCE.value,
+                },
+                produced_by_node=PlannerNodeName.EVALUATE_HYPOTHESIS,
+                approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
+            )
+        )
+        state.hypothesis_evaluation = HypothesisEvaluation(
+            evaluated=False,
+            new_status=HypothesisStatus.AWAITING_ADDITIONAL_EVIDENCE,
+        )
+        return state
+
+    observation = result.evidence_observation
     discovery = _discovery_from_evaluation(
         hypothesis=hypothesis,
-        evidence=evidence,
-        analysis_frame_ref=str(analysis_frame.analysis_frame_id),
+        evidence=current_evidence,
+        analysis_frame_ref=analysis_frame_id,
         decision_rule=prepared.specification.decision_rule,
         evaluation=evaluation.outcome,
         evaluation_note=evaluation.note,
         code_reference=observation.code_reference,
         environment_reference=observation.environment_reference,
     )
-    operations.extend(
-        [
-            _execution_operation(
-                session_id,
-                PlannerOperationType.CREATE_EVIDENCE,
-                evidence,
-                PlannerNodeName.REVIEW_EXECUTION,
+    evidence_ids = [
+        *(evidence.evidence_id for evidence in admitted_evidence),
+        current_evidence.evidence_id,
+    ]
+    discovery = discovery.model_copy(
+        update={
+            "evidence_ids": evidence_ids,
+            "validity_basis": discovery.validity_basis.model_copy(
+                update={"evidence_ids": evidence_ids}
             ),
+        }
+    )
+    status_by_outcome = {
+        HypothesisEvidenceOutcome.SUPPORTS: HypothesisStatus.CONFIRMED,
+        HypothesisEvidenceOutcome.CONTRADICTS: HypothesisStatus.CONTRADICTED,
+        HypothesisEvidenceOutcome.INCONCLUSIVE: HypothesisStatus.INCONCLUSIVE,
+        HypothesisEvidenceOutcome.INSUFFICIENT_EVIDENCE: HypothesisStatus.INSUFFICIENT_EVIDENCE,
+    }
+    final_status = status_by_outcome[evaluation.outcome]
+    state.planner_operations.extend(
+        [
             _execution_operation(
                 session_id,
                 PlannerOperationType.CREATE_DISCOVERY,
                 discovery,
-                PlannerNodeName.REVIEW_EXECUTION,
+                PlannerNodeName.EVALUATE_HYPOTHESIS,
             ),
             PlannerOperation(
                 session_id=session_id,
                 operation_type=PlannerOperationType.CHANGE_HYPOTHESIS_STATE,
                 payload={
-                    "hypothesis_id": str(hypothesis.hypothesis_id),
-                    "status": HypothesisStatus.COMPLETED.value,
+                    "hypothesis_id": str(hypothesis_id),
+                    "status": final_status.value,
                 },
-                produced_by_node=PlannerNodeName.REVIEW_EXECUTION,
+                produced_by_node=PlannerNodeName.EVALUATE_HYPOTHESIS,
                 approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
             ),
             PlannerOperation(
@@ -667,19 +1004,17 @@ def review_execution(state: State, runtime: Runtime[Context]) -> State:
                     "task_id": str(task_id),
                     "lifecycle_state": TaskLifecycleState.COMPLETED.value,
                 },
-                produced_by_node=PlannerNodeName.REVIEW_EXECUTION,
+                produced_by_node=PlannerNodeName.EVALUATE_HYPOTHESIS,
                 approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
             ),
         ]
     )
-    state.planner_operations.extend(operations)
-    state.execution_review = ExecutionReviewResult(reviewed=True, succeeded=True)
+
+    state.hypothesis_evaluation = HypothesisEvaluation(
+        evaluated=True,
+        new_status=final_status,
+    )
     return state
-
-
-# --------------------
-# Knowledge management
-# --------------------
 
 
 @registry.register()
@@ -792,7 +1127,24 @@ def manage_assumptions(state: State, runtime: Runtime[Context]) -> State:
 @registry.register()
 def request_user_input(state: State, runtime: Runtime[Context]) -> State:
     """Prepare a request for clarification or other user input."""
-
+    prepared = state.prepared_execution
+    if (
+        prepared is not None
+        and state.execution_preparation is not None
+        and state.execution_preparation.prepared
+    ):
+        state.pending_interaction = PendingUserInteraction(
+            kind="execution_approval",
+            payload={
+                "execution_ref": prepared.execution_ref,
+                "contract_fingerprint": prepared.contract_fingerprint,
+                "task_ref": prepared.task_ref,
+                "data_profile_ref": prepared.data_profile_ref,
+            },
+            allowed_actions=["approve", "cancel", "revise", "clarify"],
+            snapshot_hash=prepared.contract_fingerprint,
+            proposal_id=prepared.execution_ref,
+        )
     return state
 
 
@@ -804,13 +1156,43 @@ def pause(state: State, runtime: Runtime[Context]) -> State:
 
 
 @registry.register()
-def process_decision(state: State, runtime: Runtime[Context]) -> str:
-    """Interpret a future user response and return its planner routing key."""
+def process_decision(state: State, runtime: Runtime[Context]) -> State:
+    """Validate a user decision; routing is deliberately separate from state updates."""
 
-    raise NotImplementedError(
-        "process_decision must return one of: clarify, approved_questions, "
-        "approved_task, approved_plan, approved_conflict, approved_execution, cancel."
-    )
+    interaction = state.pending_interaction
+    decision = state.planner_decision
+    if interaction is None or decision is None:
+        state.interaction_error = "No user approval was supplied for the pending interaction."
+        return state
+    if decision.action != "approve":
+        return state
+    if interaction.kind != "execution_approval" or state.prepared_execution is None:
+        state.interaction_error = "The pending interaction is not an execution approval."
+        return state
+    prepared = state.prepared_execution
+    if (
+        interaction.snapshot_hash != prepared.contract_fingerprint
+        or interaction.payload.get("execution_ref") != prepared.execution_ref
+        or (decision.execution_ref is not None and decision.execution_ref != prepared.execution_ref)
+    ):
+        state.execution_revalidation = ExecutionRevalidation(
+            valid=False,
+            error_code="stale_execution_approval",
+            error_message="The approved execution contract no longer matches the current plan.",
+        )
+        return state
+    state.execution_revalidation = ExecutionRevalidation(valid=True)
+    return state
+
+
+def route_process_decision(state: State, runtime: Runtime[Context]) -> str:
+    """Route only after the decision node has recorded its validation result."""
+
+    if state.execution_revalidation is not None and state.execution_revalidation.valid:
+        return "approved_execution"
+    if state.planner_decision is not None and state.planner_decision.action == "clarify":
+        return "clarify"
+    return "cancel"
 
 
 # --------------------
@@ -875,6 +1257,37 @@ def _execution_not_prepared(
         error_message=error_message,
     )
     return state
+
+
+def _method_parameter_hash(parameters: list[Any]) -> str:
+    """Hash typed method parameters deterministically for contract/result comparison."""
+
+    payload = [
+        parameter.model_dump(mode="json") if isinstance(parameter, BaseModel) else parameter
+        for parameter in parameters
+    ]
+    return sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def _execution_contract_fingerprint(task: Any, profile: Any, specification: Any) -> str:
+    """Bind approval to the exact task, profile, method, variables, and parameters."""
+
+    payload = {
+        "task_id": str(task.task_id),
+        "task_updated_at": task.updated_at.isoformat(),
+        "profile_id": str(profile.profile_id),
+        "profile_version_at": getattr(profile, "updated_at", profile.created_at).isoformat(),
+        "profile_lifecycle_state": profile.lifecycle_state.value,
+        "profile_accepted": profile.accepted_as_ground_truth,
+        "variables": specification.variable_bindings,
+        "scope": specification.scope,
+        "method": specification.validation_method,
+        "parameters": [
+            parameter.model_dump(mode="json") for parameter in specification.method_parameters
+        ],
+        "decision_rule": specification.decision_rule,
+    }
+    return sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def _materialize_analysis_frame(
