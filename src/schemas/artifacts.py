@@ -35,6 +35,7 @@ from schemas.common import (
     utc_now,
 )
 from schemas.enums import (
+    AnalysisIntent,
     AssumptionSource,
     AssumptionStatus,
     AssumptionTestability,
@@ -49,6 +50,7 @@ from schemas.enums import (
     HypothesisStatus,
     ObjectiveStatus,
     SessionFrameStatus,
+    TaskDependencyType,
     TaskKind,
     TaskLifecycleState,
     UserDecisionStatus,
@@ -62,6 +64,7 @@ class Objective(CogniEDABaseModel):
     objective_id: UUID = Field(default_factory=uuid4)
     title: NonEmptyStr
     statement: NonEmptyStr
+    analysis_intent: AnalysisIntent = AnalysisIntent.EXPLORATORY
     status: ObjectiveStatus = ObjectiveStatus.ACTIVE
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
@@ -96,6 +99,7 @@ class Assumption(CogniEDABaseModel):
 
     assumption_id: UUID = Field(default_factory=uuid4)
     statement: NonEmptyStr
+    analysis_intent: AnalysisIntent = AnalysisIntent.EXPLORATORY
     scope: NonEmptyStr
     source: AssumptionSource = AssumptionSource.USER
     testability: AssumptionTestability = AssumptionTestability.UNTESTABLE_IN_PROJECT
@@ -110,10 +114,7 @@ class Assumption(CogniEDABaseModel):
 
     @model_validator(mode="after")
     def _reject_testable_claim_as_assumption(self) -> Assumption:
-        if (
-            self.testability
-            == AssumptionTestability.TESTABLE_CLAIM_REJECTED_AS_ASSUMPTION
-        ):
+        if self.testability == AssumptionTestability.TESTABLE_CLAIM_REJECTED_AS_ASSUMPTION:
             raise ValueError(
                 "Testable claims must become Task/Hypothesis candidates, not Assumptions."
             )
@@ -129,6 +130,9 @@ class Task(CogniEDABaseModel):
     lifecycle_state: TaskLifecycleState = TaskLifecycleState.ACTIVE
     task_kind: TaskKind = TaskKind.ANALYTICAL
     parent_task_id: UUID | None = None
+    dependency_type: TaskDependencyType | None = None
+    blocked_reason: str | None = None
+    superseded_by_task_id: UUID | None = None
     profile_id: UUID | None = None
     variables: list[NonEmptyStr] = Field(default_factory=list)
     evidence_expectation: str | None = None
@@ -160,6 +164,7 @@ class AnalyticalSpecification(CogniEDABaseModel):
 
     hypothesis_statement: NonEmptyStr
     claim_type: Literal["association"]
+    analysis_intent: AnalysisIntent = AnalysisIntent.EXPLORATORY
     data_profile_id: UUID
     variable_bindings: list[NonEmptyStr] = Field(min_length=1)
     scope: NonEmptyStr
@@ -178,6 +183,7 @@ class Hypothesis(CogniEDABaseModel):
     task_id: UUID
     profile_id: UUID
     statement: NonEmptyStr
+    analysis_intent: AnalysisIntent = AnalysisIntent.EXPLORATORY
     variables: list[NonEmptyStr] = Field(default_factory=list)
     scope: NonEmptyStr
     validation_method: NonEmptyStr
@@ -226,8 +232,11 @@ class Discovery(ImmutableCogniEDABaseModel):
     evidence_ids: list[UUID]
     claim: DiscoveryClaim
     epistemic_status: DiscoveryEpistemicStatus
+    analysis_intent: AnalysisIntent = AnalysisIntent.EXPLORATORY
+    uncertainty: str | None = None
     scope: NonEmptyStr
     validity_basis: ValidityBasis
+    invalidators: list[NonEmptyStr] = Field(default_factory=list)
     lifecycle_state: DiscoveryLifecycleState = DiscoveryLifecycleState.ACTIVE
     review_reasons: list[NonEmptyStr] = Field(default_factory=list)
     flagged_by_evidence_ids: list[UUID] = Field(default_factory=list)
@@ -290,6 +299,11 @@ class SessionFrame(CogniEDABaseModel):
     recent_user_decisions: list[UserDecisionContextSummary] = Field(default_factory=list)
     recent_user_decision_refs: list[UUID] = Field(default_factory=list)
     pending_tasks: list[NonEmptyStr] = Field(default_factory=list)
+    pending_proposals: list[NonEmptyStr] = Field(default_factory=list)
+    user_pins: list[NonEmptyStr] = Field(default_factory=list)
+    user_exclusions: list[NonEmptyStr] = Field(default_factory=list)
+    mandatory_dependencies: list[NonEmptyStr] = Field(default_factory=list)
+    inclusion_reasons: dict[str, str] = Field(default_factory=dict)
     open_questions: list[NonEmptyStr] = Field(default_factory=list)
     key_warnings: list[NonEmptyStr] = Field(default_factory=list)
     stale_context: list[StaleContextMarker] = Field(default_factory=list)

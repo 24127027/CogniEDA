@@ -188,9 +188,15 @@ class HypothesisStatus(StrEnum):
     """Lifecycle states for a Hypothesis test contract."""
 
     PROPOSED = "proposed"
+    APPROVED = "approved"
     TESTING = "testing"
-    COMPLETED = "completed"
-    INVALIDATED = "invalidated"
+    AWAITING_ADDITIONAL_EVIDENCE = "awaiting_additional_evidence"
+    READY_FOR_EVALUATION = "ready_for_evaluation"
+    CONFIRMED = "confirmed"
+    CONTRADICTED = "contradicted"
+    INCONCLUSIVE = "inconclusive"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    CANCELLED = "cancelled"
     ARCHIVED = "archived"
 
 
@@ -201,6 +207,48 @@ class HypothesisEvidenceOutcome(StrEnum):
     CONTRADICTS = "contradicts"
     INCONCLUSIVE = "inconclusive"
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+
+
+class AnalysisIntent(StrEnum):
+    """Epistemic intent for an analytical claim or contract."""
+
+    EXPLORATORY = "exploratory"
+    CONFIRMATORY = "confirmatory"
+    REPLICATION = "replication"
+
+
+class ConflictRelationship(StrEnum):
+    """Typed review relationships for conflict detection."""
+
+    CONTRADICTS = "contradicts"
+    SUPPORTS = "supports"
+    NARROWS = "narrows"
+    EXTENDS = "extends"
+    REPLICATES = "replicates"
+    FAILS_TO_REPLICATE = "fails_to_replicate"
+    SUPERSEDES = "supersedes"
+    INCOMPARABLE_SCOPE = "incomparable_scope"
+
+
+class AnswerabilityState(StrEnum):
+    """Gate status indicating whether a question can be validly answered."""
+
+    ANSWERABLE_FROM_DISCOVERY = "answerable_from_discovery"
+    ANSWERABLE_WITH_LIMITATIONS = "answerable_with_limitations"
+    ONLY_EVIDENCE = "only_evidence"
+    SCOPE_MISMATCH = "scope_mismatch"
+    FLAGGED_DISCOVERY = "flagged_discovery"
+    INSUFFICIENT_KNOWLEDGE = "insufficient_knowledge"
+    NEW_TASK_REQUIRED = "new_task_required"
+
+
+class TaskDependencyType(StrEnum):
+    """Dependency semantics between tasks."""
+
+    PREREQUISITE = "prerequisite"
+    OPTIONAL = "optional"
+    BLOCKED = "blocked"
+    ALTERNATIVE = "alternative"
 
 
 class EvidenceType(StrEnum):
@@ -278,6 +326,7 @@ class PlannerOperationType(StrEnum):
     CHANGE_HYPOTHESIS_STATE = "change_hypothesis_state"
     CREATE_ANALYSIS_FRAME = "create_analysis_frame"
     CREATE_EXECUTION_RUN = "create_execution_run"
+    UPDATE_EXECUTION_RUN = "update_execution_run"
     CREATE_EVIDENCE = "create_evidence"
     CREATE_DISCOVERY = "create_discovery"
     UPDATE_SESSION_FRAME = "update_session_frame"
@@ -292,6 +341,8 @@ class PlannerNodeName(StrEnum):
     MANAGE_TASKS = "manage_tasks"
     PREPARE_EXECUTION = "prepare_execution"
     REVIEW_EXECUTION = "review_execution"
+    VALIDATE_EVIDENCE = "validate_evidence"
+    EVALUATE_HYPOTHESIS = "evaluate_hypothesis"
     REVIEW_CONFLICTS = "review_conflicts"
     MANAGE_OBJECTIVE = "manage_objective"
     MANAGE_ASSUMPTIONS = "manage_assumptions"
@@ -334,3 +385,21 @@ class LogicalDtype(StrEnum):
     BOOLEAN = "boolean"
     DATETIME = "datetime"
     CATEGORICAL = "categorical"
+
+
+class PlannerCapability(StrEnum):
+    """Capabilities available for planner resolution."""
+
+    MANAGE_TASKS = "manage_tasks"
+    MANAGE_ASSUMPTIONS = "manage_assumptions"
+    EXECUTE_ANALYTICS = "execute_analytics"
+    ANSWER_QUESTION = "answer_question"
+    SUGGEST = "suggest"
+    REGISTER_DATASET = "register_dataset"
+    CLOSE_PROJECT = "close_project"
+    PROFILE_DATASET = "profile_dataset"
+    REVIEW_PROFILE = "review_profile"
+    CLEAN_DATASET = "clean_dataset"
+    ACCEPT_PROFILE = "accept_profile"
+    REVIEW_RESULT = "review_result"
+    REVIEW_CONFLICT = "review_conflict"
