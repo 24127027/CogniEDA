@@ -4,7 +4,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 
-from .nodes import R, registry, route_intent, route_process_decision
+from .nodes import R, registry, route_entry, route_intent, route_process_decision
 from .types import Context, State
 
 
@@ -24,7 +24,14 @@ def build_graph(
     # Entry
     # --------------------------------------------------
 
-    builder.add_edge(START, R.understand_request)
+    builder.add_conditional_edges(
+        START,
+        route_entry,
+        {
+            "understand_request": R.understand_request,
+            "resume_execution": R.resume_execution,
+        },
+    )
 
     # --------------------------------------------------
     # Intent routing
@@ -41,6 +48,15 @@ def build_graph(
             "objective": R.manage_objective,
             "assumption": R.manage_assumptions,
             "invalid_request": R.invalid_request,
+            # Map unsupported commands to invalid_request to avoid KeyError
+            "register_dataset": R.invalid_request,
+            "close_project": R.invalid_request,
+            "profile": R.invalid_request,
+            "review_profile": R.invalid_request,
+            "clean": R.invalid_request,
+            "accept_profile": R.invalid_request,
+            "review_result": R.invalid_request,
+            "review_conflict": R.invalid_request,
         },
     )
 
@@ -71,12 +87,10 @@ def build_graph(
     # Execution is deliberately approval-gated.  A prepared contract is not a
     # dispatch authorization until the decision node revalidates its snapshot.
     builder.add_edge(R.prepare_execution, R.request_user_input)
-    builder.add_edge(R.commit_execution_contract, R.dispatch_executor)
-    builder.add_edge(R.dispatch_executor, R.review_execution)
-    builder.add_edge(R.review_execution, R.validate_evidence)
-    builder.add_edge(R.validate_evidence, R.evaluate_hypothesis)
-    builder.add_edge(R.evaluate_hypothesis, R.review_conflicts)
-    builder.add_edge(R.review_conflicts, R.commit)
+    builder.add_edge(R.commit_execution_contract, END)
+
+    # The following nodes are bypassed in the durable execution topology:
+    # dispatch_executor, review_execution, validate_evidence, evaluate_hypothesis, review_conflicts
 
     # --------------------------------------------------
     # Knowledge management
@@ -91,6 +105,7 @@ def build_graph(
 
     builder.add_edge(R.request_user_input, R.pause)
     builder.add_edge(R.pause, R.process_decision)
+    builder.add_edge(R.resume_execution, R.process_decision)
 
     builder.add_conditional_edges(
         R.process_decision,
@@ -113,9 +128,10 @@ def build_graph(
     builder.add_edge(R.invalid_request, END)
     builder.add_edge(R.commit, END)
 
-    return builder.compile(checkpointer=checkpointer)
+    interrupt_before = ["pause"] if checkpointer is not None else None
+    return builder.compile(checkpointer=checkpointer, interrupt_before=interrupt_before)
 
 
-# if __name__ == "__main__":
-#     agent_graph = build_graph()
-#     agent_graph.get_graph().draw_mermaid_png(output_file_path="graph.png")
+if __name__ == "__main__":
+    agent_graph = build_graph()
+    agent_graph.get_graph().draw_mermaid_png(output_file_path="graph.png")

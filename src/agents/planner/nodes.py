@@ -1,27 +1,32 @@
 import json
 from hashlib import sha256
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from langgraph.runtime import Runtime
 from pydantic import BaseModel, ValidationError
 from sqlmodel import Session
 
 from application.orchestrator.planner_commit import commit_planner_operations
+from db.models import ExecutionApprovalRecord
 from db.session import get_session
+from memory.session_frame import SessionFrameBuilder
 from repositories import (
     DataProfileRepository,
     DiscoveryRepository,
     EvidenceRepository,
+    ExecutionApprovalRepository,
     HypothesisRepository,
     PlannerOperationRepository,
     TaskRepository,
 )
-from schemas.artifacts import Discovery, Evidence, Hypothesis
+from schemas.artifacts import Discovery, EvaluationThresholds, Evidence, Hypothesis, SessionFrame
 from schemas.common import DiscoveryClaim, EvidenceProvenance, ValidityBasis
 from schemas.enums import (
     DataProfileLifecycleState,
     DiscoveryEpistemicStatus,
+    ExecutionApprovalStatus,
+    ExecutionRunStatus,
     HypothesisEvidenceOutcome,
     HypothesisStatus,
     PlannerNodeName,
@@ -31,7 +36,13 @@ from schemas.enums import (
     TaskLifecycleState,
 )
 from schemas.planner_operations import PlannerOperation
-from schemas.provenance import AnalysisFrame, ExecutionRun
+from schemas.provenance import (
+    AnalysisFrame,
+    ExecutionApproval,
+    ExecutionInbox,
+    ExecutionOutbox,
+    ExecutionRun,
+)
 
 from ..utilities.nodes_registry import NodeRegistry
 from .types import (
@@ -39,6 +50,7 @@ from .types import (
     AnalysisFrameObservation,
     Context,
     ContextualGrounding,
+    ControlledPlannerError,
     EvidenceAdmission,
     ExecutionAdmission,
     ExecutionPreparation,
@@ -183,6 +195,12 @@ def route_intent(state: State, runtime: Runtime[Context]) -> str:
     if understanding.intent == "answer":
         return "check_answerability"
     return understanding.intent
+
+
+def route_entry(state: State, runtime: Runtime[Context]) -> str:
+    """Resume only through a durable approval identifier when one is supplied."""
+
+    return "resume_execution" if state.resume_approval_id is not None else "understand_request"
 
 
 @registry.register()
@@ -579,6 +597,39 @@ def commit_execution_contract(state: State, runtime: Runtime[Context]) -> State:
 
     session = get_session(context.database_url)
     try:
+        approval_id_text = (
+            state.pending_interaction.payload.get("execution_approval_id")
+            if state.pending_interaction is not None
+            else None
+        )
+        approval_id = UUID(str(approval_id_text))
+        approval_record = session.get(ExecutionApprovalRecord, approval_id)
+        if (
+            approval_record is None
+            or approval_record.session_id != (session_id or "default")
+            or approval_record.status != ExecutionApprovalStatus.APPROVED
+            or approval_record.contract_fingerprint != prepared.contract_fingerprint
+            or approval_record.task_id != task_id
+            or approval_record.profile_id != profile_id
+        ):
+            raise ValueError("The execution approval is stale or has already been consumed.")
+        task = TaskRepository(session).get_by_id(task_id)
+        profile = DataProfileRepository(session).get_by_id(profile_id)
+        if task is None or profile is None:
+            raise ValueError("Task or DataProfile missing during revalidation.")
+        if (
+            task.lifecycle_state != TaskLifecycleState.ACTIVE
+            or task.task_kind != TaskKind.ANALYTICAL
+            or task.profile_id != profile_id
+            or task.analytical_specification is None
+            or not profile.accepted_as_ground_truth
+            or profile.lifecycle_state != DataProfileLifecycleState.ACTIVE
+        ):
+            raise ValueError("The persisted Task or DataProfile is no longer execution-ready.")
+        current_fingerprint = _execution_contract_fingerprint(task, profile, prepared.specification)
+        if current_fingerprint != prepared.contract_fingerprint:
+            raise ValueError("The execution contract is stale (underlying data changed).")
+
         hypothesis: Hypothesis
         if prepared.hypothesis_ref is None:
             hypothesis = Hypothesis(
@@ -589,7 +640,7 @@ def commit_execution_contract(state: State, runtime: Runtime[Context]) -> State:
                 scope=prepared.hypothesis.scope,
                 validation_method=prepared.hypothesis.validation_method,
                 evidence_expectation=prepared.hypothesis.evidence_expectation,
-                status=HypothesisStatus.APPROVED,
+                status=HypothesisStatus.TESTING,
             )
             hypothesis_operation = _execution_operation(
                 session_id,
@@ -602,16 +653,39 @@ def commit_execution_contract(state: State, runtime: Runtime[Context]) -> State:
             hypothesis = HypothesisRepository(session).get_by_id(hypothesis_id)
             if hypothesis is None:
                 raise ValueError("Approved execution references a missing Hypothesis.")
-            hypothesis_operation = None
+            hypothesis_operation = PlannerOperation(
+                session_id=session_id,
+                operation_type=PlannerOperationType.CHANGE_HYPOTHESIS_STATE,
+                payload={
+                    "hypothesis_id": str(hypothesis.hypothesis_id),
+                    "status": HypothesisStatus.TESTING.value,
+                },
+                produced_by_node=PlannerNodeName.PREPARE_EXECUTION,
+                approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
+            )
 
+        dispatch_key = str(uuid4())
         execution_run = ExecutionRun(
             task_id=task_id,
             hypothesis_id=hypothesis.hypothesis_id,
             executor_type=prepared.specification.executor_id,
             method_id=prepared.specification.validation_method,
             parameter_hash=_method_parameter_hash(prepared.specification.method_parameters),
-            status="pending",
+            status=ExecutionRunStatus.ADMITTED,
+            dispatch_idempotency_key=dispatch_key,
         )
+
+        outbox = ExecutionOutbox(
+            execution_run_id=execution_run.execution_run_id,
+            dispatch_idempotency_key=dispatch_key,
+            executor_type=prepared.specification.executor_id,
+            method_id=prepared.specification.validation_method,
+            parameter_hash=execution_run.parameter_hash or "",
+            prepared_payload=prepared.model_dump(mode="json"),
+        )
+
+        approval_record.status = ExecutionApprovalStatus.CONSUMED
+        session.add(approval_record)
         operations = [
             operation
             for operation in (
@@ -620,6 +694,12 @@ def commit_execution_contract(state: State, runtime: Runtime[Context]) -> State:
                     session_id,
                     PlannerOperationType.CREATE_EXECUTION_RUN,
                     execution_run,
+                    PlannerNodeName.PREPARE_EXECUTION,
+                ),
+                _execution_operation(
+                    session_id,
+                    PlannerOperationType.CREATE_EXECUTION_OUTBOX,
+                    outbox,
                     PlannerNodeName.PREPARE_EXECUTION,
                 ),
             )
@@ -645,8 +725,12 @@ def commit_execution_contract(state: State, runtime: Runtime[Context]) -> State:
         )
     except Exception as exc:
         session.rollback()
-        state.hard_stop_code = "execution_contract_commit_failed"
+        state.hard_stop_code = "stale_execution_approval"
         state.hard_stop_message = str(exc)
+        state.controlled_error = ControlledPlannerError(
+            code=state.hard_stop_code,
+            message=state.hard_stop_message,
+        )
     finally:
         session.close()
     return state
@@ -654,31 +738,16 @@ def commit_execution_contract(state: State, runtime: Runtime[Context]) -> State:
 
 @registry.register()
 def dispatch_executor(state: State, runtime: Runtime[Context]) -> State:
-    """Invoke the injected deterministic executor once for a prepared execution."""
+    """Retired Planner-side dispatch node.
 
-    prepared = state.prepared_execution
-    if (
-        state.execution_preparation is None
-        or not state.execution_preparation.prepared
-        or state.execution_admission is None
-        or not state.execution_admission.admitted
-    ):
-        return state
-    context = _runtime_context(runtime)
-    executor = context.analytical_executor if context is not None else None
-    if prepared is None or executor is None:
-        state.executor_result = None
-        return _execution_not_prepared(
-            state, "executor_unavailable", "No executor is configured for this execution."
-        )
-    try:
-        state.executor_result = executor.execute(prepared)
-    except Exception as exc:  # executor boundary: retain controlled failure only
-        state.executor_result = None
-        state.execution_review = ExecutionReviewResult(
-            error_code="executor_exception",
-            error_message=str(exc),
-        )
+    Production terminates after durable admission.  Keeping this node
+    side-effect free prevents a direct graph invocation from reintroducing a
+    graph-local executor call; only the independent dispatcher consumes an
+    admitted outbox record.
+    """
+
+    if state.execution_admission is not None and state.execution_admission.admitted:
+        state.response_text = "Execution admitted and awaiting durable dispatch."
     return state
 
 
@@ -699,6 +768,7 @@ def review_execution(state: State, runtime: Runtime[Context]) -> State:
     try:
         profile_id = UUID(state.resolve_object_reference(prepared.data_profile_ref))
         execution_run_id = UUID(state.resolve_object_reference(prepared.execution_run_ref))
+        hypothesis_id = UUID(state.resolve_object_reference(prepared.hypothesis_ref))
     except ValueError:
         state.execution_review = ExecutionReviewResult(
             error_code="unknown_execution_reference",
@@ -726,16 +796,61 @@ def review_execution(state: State, runtime: Runtime[Context]) -> State:
                 operation_type=PlannerOperationType.UPDATE_EXECUTION_RUN,
                 payload={
                     "execution_run_id": str(execution_run_id),
-                    "status": "failed",
+                    "status": "execution_failed",
+                },
+                produced_by_node=PlannerNodeName.REVIEW_EXECUTION,
+                approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
+            )
+        )
+        state.planner_operations.append(
+            PlannerOperation(
+                session_id=session_id,
+                operation_type=PlannerOperationType.CHANGE_HYPOTHESIS_STATE,
+                payload={
+                    "hypothesis_id": str(hypothesis_id),
+                    "status": HypothesisStatus.APPROVED.value,
                 },
                 produced_by_node=PlannerNodeName.REVIEW_EXECUTION,
                 approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
             )
         )
         state.execution_review = ExecutionReviewResult(reviewed=True, succeeded=False)
-        return state
+    else:
+        state.execution_review = ExecutionReviewResult(reviewed=True, succeeded=True)
 
-    state.execution_review = ExecutionReviewResult(reviewed=True, succeeded=True)
+    lease_epoch = state.resume_payload.get("lease_epoch") if state.resume_payload else None
+    dispatch_key = None
+    session = _read_session(runtime)
+    if session:
+        try:
+            from db.models import ExecutionRunRecord
+            record = session.get(ExecutionRunRecord, execution_run_id)
+            if record:
+                if lease_epoch is None:
+                    lease_epoch = record.lease_epoch
+                dispatch_key = record.dispatch_idempotency_key
+        finally:
+            session.close()
+
+    inbox = ExecutionInbox(
+        execution_run_id=execution_run_id,
+        dispatch_idempotency_key=dispatch_key or str(uuid4()),
+        lease_epoch=lease_epoch or 0,
+        result_digest=sha256(result.model_dump_json().encode()).hexdigest(),
+        executor_status=result.status,
+        serialized_observations=result.model_dump(mode="json"),
+        method_id=prepared.specification.validation_method,
+    )
+
+    state.planner_operations.append(
+        _execution_operation(
+            session_id,
+            PlannerOperationType.CREATE_EXECUTION_INBOX,
+            inbox,
+            PlannerNodeName.REVIEW_EXECUTION,
+        )
+    )
+
     return state
 
 
@@ -765,6 +880,7 @@ def validate_evidence(state: State, runtime: Runtime[Context]) -> State:
             error_code="executor_method_mismatch",
             error_message="Method mismatch",
         )
+        _append_execution_failure(state, runtime)
         return state
 
     if observation.parameters != prepared.specification.method_parameters:
@@ -777,6 +893,7 @@ def validate_evidence(state: State, runtime: Runtime[Context]) -> State:
             error_code="executor_parameter_mismatch",
             error_message="Parameter mismatch",
         )
+        _append_execution_failure(state, runtime)
         return state
     if result.analysis_frame.column_refs != prepared.specification.variable_bindings:
         state.evidence_admission = EvidenceAdmission(
@@ -788,6 +905,7 @@ def validate_evidence(state: State, runtime: Runtime[Context]) -> State:
             error_code="executor_variable_binding_mismatch",
             error_message="Executor frame variables must match the prepared specification.",
         )
+        _append_execution_failure(state, runtime)
         return state
     if result.execution_run.parameter_hash != _method_parameter_hash(
         prepared.specification.method_parameters
@@ -801,6 +919,7 @@ def validate_evidence(state: State, runtime: Runtime[Context]) -> State:
             error_code="executor_parameter_hash_mismatch",
             error_message="Executor parameter hash must match the prepared specification.",
         )
+        _append_execution_failure(state, runtime)
         return state
 
     session_id = _session_id(state, runtime)
@@ -925,9 +1044,15 @@ def evaluate_hypothesis(state: State, runtime: Runtime[Context]) -> State:
     try:
         hypothesis = HypothesisRepository(session).get_by_id(hypothesis_id)
         admitted_evidence = EvidenceRepository(session).list_for_hypothesis(hypothesis_id)
+        task = TaskRepository(session).get_by_id(task_id)
+        profile = (
+            DataProfileRepository(session).get_by_id(hypothesis.profile_id)
+            if hypothesis
+            else None
+        )
     finally:
         session.close()
-    if hypothesis is None:
+    if hypothesis is None or task is None or profile is None:
         return state
 
     if not evaluation.finalize:
@@ -949,13 +1074,44 @@ def evaluate_hypothesis(state: State, runtime: Runtime[Context]) -> State:
         )
         return state
 
+    computed_outcome = _evaluate_deterministically(
+        current_evidence,
+        prepared.specification.decision_rule,
+        validation_method=prepared.specification.validation_method,
+    )
+    if evaluation.outcome != computed_outcome:
+        state.execution_review = ExecutionReviewResult(
+            reviewed=True,
+            succeeded=False,
+            error_code="evaluation_mismatch",
+            error_message=(
+                f"Executor advisory outcome ({evaluation.outcome}) contradicts "
+                f"deterministic evaluation ({computed_outcome})."
+            ),
+        )
+        run_id = state.resolve_object_reference(prepared.execution_run_ref)
+        state.planner_operations = [
+            operation
+            for operation in state.planner_operations
+            if not (
+                operation.operation_type == PlannerOperationType.CREATE_EVIDENCE
+                and operation.payload.get("evidence_id") == str(evidence_id)
+            )
+            and not (
+                operation.operation_type == PlannerOperationType.UPDATE_EXECUTION_RUN
+                and operation.payload.get("execution_run_id") == run_id
+            )
+        ]
+        _append_execution_failure(state, runtime)
+        return state
+
     observation = result.evidence_observation
     discovery = _discovery_from_evaluation(
         hypothesis=hypothesis,
         evidence=current_evidence,
         analysis_frame_ref=analysis_frame_id,
         decision_rule=prepared.specification.decision_rule,
-        evaluation=evaluation.outcome,
+        evaluation=computed_outcome,
         evaluation_note=evaluation.note,
         code_reference=observation.code_reference,
         environment_reference=observation.environment_reference,
@@ -978,7 +1134,32 @@ def evaluate_hypothesis(state: State, runtime: Runtime[Context]) -> State:
         HypothesisEvidenceOutcome.INCONCLUSIVE: HypothesisStatus.INCONCLUSIVE,
         HypothesisEvidenceOutcome.INSUFFICIENT_EVIDENCE: HypothesisStatus.INSUFFICIENT_EVIDENCE,
     }
-    final_status = status_by_outcome[evaluation.outcome]
+    final_status = status_by_outcome[computed_outcome]
+    completed_task = task.model_copy(update={"lifecycle_state": TaskLifecycleState.COMPLETED})
+    frame = SessionFrame(
+        frame_topic="Execution Result",
+        objective_snapshot="Ad-hoc execution",
+        frame_outcome=discovery.claim.statement,
+        data_profile_summaries=[SessionFrameBuilder._profile_summary(profile)],
+        active_data_profile_refs=[profile.profile_id],
+        # A completed Task/Hypothesis is kept as an auditable reference but
+        # omitted from active planning summaries by its lifecycle policy.
+        active_task_refs=[completed_task.task_id],
+        relevant_discoveries=[SessionFrameBuilder._discovery_summary(discovery)],
+        relevant_discovery_refs=[discovery.discovery_id],
+        supporting_evidence=[SessionFrameBuilder._evidence_summary(current_evidence)],
+        supporting_evidence_refs=[current_evidence.evidence_id],
+        inclusion_reasons={
+            str(profile.profile_id): "accepted DataProfile for the completed execution",
+            str(completed_task.task_id): "completed analytical Task audit reference",
+            str(discovery.discovery_id): "new evidence-bound Discovery",
+            str(current_evidence.evidence_id): "admitted Evidence for the new Discovery",
+        },
+        key_warnings=[
+            "Assumptions are excluded from execution-result conclusion context.",
+            "Completed Task and Hypothesis summaries are not active planning context.",
+        ],
+    )
     state.planner_operations.extend(
         [
             _execution_operation(
@@ -1004,6 +1185,13 @@ def evaluate_hypothesis(state: State, runtime: Runtime[Context]) -> State:
                     "task_id": str(task_id),
                     "lifecycle_state": TaskLifecycleState.COMPLETED.value,
                 },
+                produced_by_node=PlannerNodeName.EVALUATE_HYPOTHESIS,
+                approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
+            ),
+            PlannerOperation(
+                session_id=session_id,
+                operation_type=PlannerOperationType.UPDATE_SESSION_FRAME,
+                payload=frame.model_dump(mode="json"),
                 produced_by_node=PlannerNodeName.EVALUATE_HYPOTHESIS,
                 approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
             ),
@@ -1126,25 +1314,137 @@ def manage_assumptions(state: State, runtime: Runtime[Context]) -> State:
 
 @registry.register()
 def request_user_input(state: State, runtime: Runtime[Context]) -> State:
-    """Prepare a request for clarification or other user input."""
+    """Durably persist the approval request before exposing it to a caller."""
     prepared = state.prepared_execution
     if (
         prepared is not None
         and state.execution_preparation is not None
         and state.execution_preparation.prepared
     ):
+        context = _runtime_context(runtime)
+        if context is None or context.database_url is None:
+            state.controlled_error = ControlledPlannerError(
+                code="execution_store_unavailable",
+                message="Execution approval requires a configured planner database.",
+            )
+            return state
+        try:
+            task_id = UUID(state.resolve_object_reference(prepared.task_ref))
+            profile_id = UUID(state.resolve_object_reference(prepared.data_profile_ref))
+            hypothesis_id = (
+                UUID(state.resolve_object_reference(prepared.hypothesis_ref))
+                if prepared.hypothesis_ref is not None
+                else None
+            )
+        except ValueError as exc:
+            state.controlled_error = ControlledPlannerError(
+                code="unknown_execution_reference", message=str(exc)
+            )
+            return state
+
+        session_id = _session_id(state, runtime) or "default"
+        session = get_session(context.database_url)
+        try:
+            approvals = ExecutionApprovalRepository(session)
+            approval = approvals.find_pending(
+                session_id=session_id,
+                task_id=task_id,
+                contract_fingerprint=prepared.contract_fingerprint,
+            )
+            if approval is None:
+                approval = approvals.create(
+                    ExecutionApproval(
+                        session_id=session_id,
+                        task_id=task_id,
+                        profile_id=profile_id,
+                        hypothesis_id=hypothesis_id,
+                        execution_ref=prepared.execution_ref,
+                        contract_fingerprint=prepared.contract_fingerprint,
+                        prepared_payload=_prepared_payload(prepared),
+                    )
+                )
+        finally:
+            session.close()
+
         state.pending_interaction = PendingUserInteraction(
             kind="execution_approval",
             payload={
+                "execution_approval_id": str(approval.execution_approval_id),
                 "execution_ref": prepared.execution_ref,
                 "contract_fingerprint": prepared.contract_fingerprint,
-                "task_ref": prepared.task_ref,
-                "data_profile_ref": prepared.data_profile_ref,
+                "task_id": str(task_id),
+                "data_profile_id": str(profile_id),
             },
             allowed_actions=["approve", "cancel", "revise", "clarify"],
             snapshot_hash=prepared.contract_fingerprint,
-            proposal_id=prepared.execution_ref,
+            proposal_id=str(approval.execution_approval_id),
         )
+    return state
+
+
+@registry.register()
+def resume_execution(state: State, runtime: Runtime[Context]) -> State:
+    """Reconstruct one pending approval from the durable workflow record."""
+
+    approval_id = state.resume_approval_id
+    context = _runtime_context(runtime)
+    if approval_id is None or context is None or context.database_url is None:
+        state.controlled_error = ControlledPlannerError(
+            code="execution_resume_unavailable",
+            message="No durable execution approval is available to resume.",
+        )
+        return state
+    session = get_session(context.database_url)
+    try:
+        approval = ExecutionApprovalRepository(session).get_by_id(approval_id)
+    finally:
+        session.close()
+    if approval is None or approval.session_id != (_session_id(state, runtime) or "default"):
+        state.controlled_error = ControlledPlannerError(
+            code="invalid_execution_approval",
+            message="The requested execution approval does not belong to this session.",
+        )
+        return state
+    if approval.status not in {ExecutionApprovalStatus.PENDING, ExecutionApprovalStatus.APPROVED}:
+        state.controlled_error = ControlledPlannerError(
+            code="execution_approval_not_pending",
+            message="The requested execution approval is no longer resumable.",
+        )
+        return state
+
+    task_ref = state.bind_object_reference("task", str(approval.task_id))
+    profile_ref = state.bind_object_reference("data_profile", str(approval.profile_id))
+    hypothesis_ref = (
+        state.bind_object_reference("hypothesis", str(approval.hypothesis_id))
+        if approval.hypothesis_id is not None
+        else None
+    )
+    prepared_payload = dict(approval.prepared_payload)
+    prepared_payload.update(
+        {
+            "task_ref": task_ref,
+            "data_profile_ref": profile_ref,
+            "hypothesis_ref": hypothesis_ref,
+            "execution_ref": approval.execution_ref,
+            "contract_fingerprint": approval.contract_fingerprint,
+        }
+    )
+    state.prepared_execution = PreparedExecution.model_validate(prepared_payload)
+    state.execution_preparation = ExecutionPreparation(prepared=True)
+    state.task_selection = TaskSelection(task_ref=task_ref, selected=True)
+    state.pending_interaction = PendingUserInteraction(
+        kind="execution_approval",
+        payload={
+            "execution_approval_id": str(approval.execution_approval_id),
+            "execution_ref": approval.execution_ref,
+            "contract_fingerprint": approval.contract_fingerprint,
+            "task_id": str(approval.task_id),
+            "data_profile_id": str(approval.profile_id),
+        },
+        allowed_actions=["approve", "cancel", "revise", "clarify"],
+        snapshot_hash=approval.contract_fingerprint,
+        proposal_id=str(approval.execution_approval_id),
+    )
     return state
 
 
@@ -1164,6 +1464,57 @@ def process_decision(state: State, runtime: Runtime[Context]) -> State:
     if interaction is None or decision is None:
         state.interaction_error = "No user approval was supplied for the pending interaction."
         return state
+    context = _runtime_context(runtime)
+    if context is None or context.database_url is None:
+        state.interaction_error = "Execution approval requires a configured planner database."
+        return state
+    approval_id_text = interaction.payload.get("execution_approval_id")
+    try:
+        approval_id = UUID(str(approval_id_text))
+    except (TypeError, ValueError):
+        state.interaction_error = "The pending execution approval is malformed."
+        return state
+    session = get_session(context.database_url)
+    try:
+        approvals = ExecutionApprovalRepository(session)
+        approval = approvals.get_by_id(approval_id)
+        if approval is None or approval.session_id != (_session_id(state, runtime) or "default"):
+            state.execution_revalidation = ExecutionRevalidation(
+                valid=False,
+                error_code="invalid_execution_approval",
+                error_message="The approval does not belong to this planner session.",
+            )
+            return state
+        if decision.action != "approve":
+            approvals.set_status(approval_id, ExecutionApprovalStatus.CANCELLED)
+            return state
+        if approval.status == ExecutionApprovalStatus.CONSUMED:
+            state.execution_revalidation = ExecutionRevalidation(
+                valid=False,
+                error_code="execution_already_admitted",
+                error_message="This approval has already admitted an execution attempt.",
+            )
+            return state
+        if approval.status != ExecutionApprovalStatus.PENDING:
+            state.execution_revalidation = ExecutionRevalidation(
+                valid=False,
+                error_code="execution_approval_not_pending",
+                error_message="This execution approval is no longer pending.",
+            )
+            return state
+        # A legacy in-process caller may omit proposal_id, but cannot supply a
+        # different id or fingerprint to authorize another contract.
+        if decision.proposal_id is not None and decision.proposal_id != str(approval_id):
+            state.execution_revalidation = ExecutionRevalidation(
+                valid=False,
+                error_code="stale_execution_approval",
+                error_message="The approval does not identify the pending execution contract.",
+            )
+            return state
+        approvals.set_status(approval_id, ExecutionApprovalStatus.APPROVED)
+    finally:
+        session.close()
+
     if decision.action != "approve":
         return state
     if interaction.kind != "execution_approval" or state.prepared_execution is None:
@@ -1171,7 +1522,8 @@ def process_decision(state: State, runtime: Runtime[Context]) -> State:
         return state
     prepared = state.prepared_execution
     if (
-        interaction.snapshot_hash != prepared.contract_fingerprint
+        approval.contract_fingerprint != prepared.contract_fingerprint
+        or interaction.snapshot_hash != prepared.contract_fingerprint
         or interaction.payload.get("execution_ref") != prepared.execution_ref
         or (decision.execution_ref is not None and decision.execution_ref != prepared.execution_ref)
     ):
@@ -1285,9 +1637,25 @@ def _execution_contract_fingerprint(task: Any, profile: Any, specification: Any)
         "parameters": [
             parameter.model_dump(mode="json") for parameter in specification.method_parameters
         ],
-        "decision_rule": specification.decision_rule,
+        "decision_rule": (
+            specification.decision_rule.model_dump(mode="json")
+            if hasattr(specification.decision_rule, "model_dump")
+            else specification.decision_rule
+        ),
     }
     return sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def _prepared_payload(prepared: PreparedExecution) -> dict[str, Any]:
+    """Serialize only durable contract content; local handles are reconstructed on resume."""
+
+    return {
+        "task_title": prepared.task_title,
+        "dataset_path": prepared.dataset_path,
+        "hypothesis": prepared.hypothesis.model_dump(mode="json"),
+        "specification": prepared.specification.model_dump(mode="json"),
+        "deterministic_seed": prepared.deterministic_seed,
+    }
 
 
 def _materialize_analysis_frame(
@@ -1339,6 +1707,53 @@ def _execution_operation(
         payload=payload.model_dump(mode="json"),
         produced_by_node=produced_by_node,
         approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
+    )
+
+
+def _append_execution_failure(
+    state: State,
+    runtime: Runtime[Context] | None,
+    *,
+    run_status: str = "failed",
+) -> None:
+    """Queue one retryable failure transition for an admitted execution attempt."""
+
+    prepared = state.prepared_execution
+    if prepared is None or prepared.execution_run_ref is None or prepared.hypothesis_ref is None:
+        return
+    try:
+        run_id = state.resolve_object_reference(prepared.execution_run_ref)
+        hypothesis_id = state.resolve_object_reference(prepared.hypothesis_ref)
+    except ValueError:
+        return
+    if any(
+        operation.operation_type == PlannerOperationType.UPDATE_EXECUTION_RUN
+        and operation.payload.get("execution_run_id") == run_id
+        and operation.payload.get("status") in {"failed", "dispatch_failed"}
+        for operation in state.planner_operations
+    ):
+        return
+    session_id = _session_id(state, runtime)
+    state.planner_operations.extend(
+        [
+            PlannerOperation(
+                session_id=session_id,
+                operation_type=PlannerOperationType.UPDATE_EXECUTION_RUN,
+                payload={"execution_run_id": run_id, "status": run_status},
+                produced_by_node=PlannerNodeName.REVIEW_EXECUTION,
+                approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
+            ),
+            PlannerOperation(
+                session_id=session_id,
+                operation_type=PlannerOperationType.CHANGE_HYPOTHESIS_STATE,
+                payload={
+                    "hypothesis_id": hypothesis_id,
+                    "status": HypothesisStatus.APPROVED.value,
+                },
+                produced_by_node=PlannerNodeName.REVIEW_EXECUTION,
+                approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
+            ),
+        ]
     )
 
 
@@ -1409,6 +1824,40 @@ def _discovery_conclusion(
     )
 
 
+def _evaluate_deterministically(
+    evidence: Evidence,
+    rule: EvaluationThresholds,
+    *,
+    validation_method: str,
+) -> HypothesisEvidenceOutcome:
+    """Evaluate the only supported method from admitted metrics, never executor advice."""
+
+    if validation_method != "deterministic_test":
+        return HypothesisEvidenceOutcome.INSUFFICIENT_EVIDENCE
+    # The narrow method has one understood metric: a finite p-value evaluated
+    # against alpha. Other rule shapes require a method-owned evaluator first.
+    if rule.p_value is None or rule.effect_size is not None or rule.metric_thresholds:
+        return HypothesisEvidenceOutcome.INSUFFICIENT_EVIDENCE
+    metric_name = evidence.result_summary.metric_name
+    metric_value = evidence.result_summary.metric_value
+
+    if (
+        metric_name != "p_value"
+        or not isinstance(metric_value, (int, float))
+        or isinstance(metric_value, bool)
+    ):
+        return HypothesisEvidenceOutcome.INSUFFICIENT_EVIDENCE
+    from math import isfinite
+
+    if not isfinite(metric_value) or not 0.0 <= metric_value <= 1.0:
+        return HypothesisEvidenceOutcome.INSUFFICIENT_EVIDENCE
+    if not 0.0 < rule.p_value <= 1.0:
+        return HypothesisEvidenceOutcome.INSUFFICIENT_EVIDENCE
+    if metric_value < rule.p_value:
+        return HypothesisEvidenceOutcome.SUPPORTS
+    return HypothesisEvidenceOutcome.INCONCLUSIVE
+
+
 def _session_id(state: State, runtime: Runtime[Context] | None) -> str | None:
     context = _runtime_context(runtime)
     if context is not None and context.session_id is not None:
@@ -1423,4 +1872,4 @@ def _persist_planner_operations(
     repository = PlannerOperationRepository(session)
     for operation in operations:
         if repository.get_by_id(operation.operation_id) is None:
-            repository.create(operation)
+            repository.stage_create(operation)
