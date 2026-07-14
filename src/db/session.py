@@ -75,6 +75,13 @@ def _enable_sqlite_foreign_keys(engine: Engine) -> None:
         del connection_record
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        # CogniEDA supports SQLite for durable execution state.  Keep the
+        # runtime connection behavior aligned with the file-backed concurrent
+        # finalization tests: readers may proceed during a writer transaction
+        # and a competing writer waits for the short, bounded final commit.
+        cursor.execute("PRAGMA busy_timeout=5000")
+        if str(engine.url.database or "") not in {":memory:", ""}:
+            cursor.execute("PRAGMA journal_mode=WAL")
         cursor.close()
 
 
