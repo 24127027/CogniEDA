@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from db.init_db import init_db
+from db.models import ExecutionRunRecord
 from db.session import create_db_engine, get_session
 from repositories import (
     AnalysisFrameRepository,
@@ -16,7 +17,6 @@ from repositories import (
     DataProfileRepository,
     DiscoveryRepository,
     EvidenceRepository,
-    ExecutionRunRepository,
     HypothesisRepository,
     HypothesisUpdate,
     ObjectiveRepository,
@@ -31,6 +31,7 @@ from schemas.artifacts import (
     Assumption,
     DataProfile,
     Discovery,
+    EvaluationThresholds,
     Evidence,
     Hypothesis,
     Objective,
@@ -59,6 +60,7 @@ from schemas.enums import (
     DiscoveryLifecycleState,
     EvidenceLifecycleState,
     EvidenceType,
+    ExecutionRunStatus,
     FirstClassObjectType,
     HypothesisStatus,
     ObjectiveStatus,
@@ -68,7 +70,7 @@ from schemas.enums import (
     TaskLifecycleState,
     UserDecisionType,
 )
-from schemas.provenance import AnalysisFrame, ExecutionRun, ObjectiveRevision
+from schemas.provenance import AnalysisFrame, ObjectiveRevision
 
 
 def build_objective(**overrides: object) -> Objective:
@@ -207,7 +209,7 @@ def build_discovery(
             parameters=[MethodParameter(name="alpha", value=0.05)],
             code_reference="tests/evidence",
             environment_reference="pytest",
-            decision_rule="p_value < alpha",
+            decision_rule=EvaluationThresholds(p_value=0.05),
             strength="moderate",
             uncertainty="p_value=0.01",
             invalidators=["DataProfile superseded", "method implementation changes"],
@@ -928,17 +930,20 @@ def test_analysis_frame_and_execution_run_are_minimal_provenance_refs(db_session
             row_filter_description="Active residential customers only.",
         )
     )
-    execution_run = ExecutionRunRepository(db_session).create(
-        ExecutionRun(
-            task_id=task.task_id,
-            hypothesis_id=hypothesis.hypothesis_id,
-            analysis_frame_id=analysis_frame.analysis_frame_id,
-            executor_type="hypothesis_analyst",
-            method_id="logistic_regression",
-            parameter_hash="params:alpha-005",
-            status="succeeded",
-        )
+    execution_run = ExecutionRunRecord(
+        execution_run_id=uuid4(),
+        task_id=task.task_id,
+        hypothesis_id=hypothesis.hypothesis_id,
+        analysis_frame_id=analysis_frame.analysis_frame_id,
+        executor_type="hypothesis_analyst",
+        method_id="logistic_regression",
+        parameter_hash="params:alpha-005",
+        status=ExecutionRunStatus.COMPLETED,
+        dispatch_idempotency_key="key",
+        attempt_version=1,
     )
+    db_session.add(execution_run)
+    db_session.commit()
     evidence = EvidenceRepository(db_session).create(
         build_evidence(
             hypothesis.hypothesis_id,
@@ -958,9 +963,10 @@ def test_analysis_frame_and_execution_run_are_minimal_provenance_refs(db_session
     assert AnalysisFrameRepository(db_session).list(data_profile_id=profile.profile_id) == [
         analysis_frame
     ]
-    assert ExecutionRunRepository(db_session).list(hypothesis_id=hypothesis.hypothesis_id) == [
-        execution_run
-    ]
+    from sqlmodel import select
+    runs = db_session.exec(select(ExecutionRunRecord).where(ExecutionRunRecord.hypothesis_id == hypothesis.hypothesis_id)).all()
+    assert len(runs) == 1
+    assert runs[0].execution_run_id == execution_run.execution_run_id
     assert evidence.analysis_frame_ref == str(analysis_frame.analysis_frame_id)
     assert evidence.execution_run_ref == str(execution_run.execution_run_id)
 
@@ -977,14 +983,17 @@ def test_evidence_creation_succeeds_with_strict_provenance_validation(db_session
             frame_hash="frame-hash:customers:v1",
         )
     )
-    execution_run = ExecutionRunRepository(db_session).create(
-        ExecutionRun(
-            task_id=task.task_id,
-            hypothesis_id=hypothesis.hypothesis_id,
-            analysis_frame_id=analysis_frame.analysis_frame_id,
-            status="succeeded",
-        )
+    execution_run = ExecutionRunRecord(
+        execution_run_id=uuid4(),
+        task_id=task.task_id,
+        hypothesis_id=hypothesis.hypothesis_id,
+        analysis_frame_id=analysis_frame.analysis_frame_id,
+        status=ExecutionRunStatus.COMPLETED,
+        dispatch_idempotency_key="key",
+        attempt_version=1,
     )
+    db_session.add(execution_run)
+    db_session.commit()
 
     evidence = EvidenceRepository(
         db_session,
@@ -1015,13 +1024,16 @@ def test_evidence_creation_fails_for_missing_analysis_frame_in_strict_mode(
     hypothesis = HypothesisRepository(db_session).create(
         build_hypothesis(task.task_id, profile.profile_id)
     )
-    execution_run = ExecutionRunRepository(db_session).create(
-        ExecutionRun(
-            task_id=task.task_id,
-            hypothesis_id=hypothesis.hypothesis_id,
-            status="succeeded",
-        )
+    execution_run = ExecutionRunRecord(
+        execution_run_id=uuid4(),
+        task_id=task.task_id,
+        hypothesis_id=hypothesis.hypothesis_id,
+        status=ExecutionRunStatus.COMPLETED,
+        dispatch_idempotency_key="key",
+        attempt_version=1,
     )
+    db_session.add(execution_run)
+    db_session.commit()
     missing_analysis_frame_ref = str(uuid4())
 
     with pytest.raises(ValueError, match="existing AnalysisFrame"):
@@ -1091,13 +1103,16 @@ def test_evidence_creation_fails_for_analysis_frame_profile_mismatch(
             frame_hash="frame-hash:customers:v2",
         )
     )
-    execution_run = ExecutionRunRepository(db_session).create(
-        ExecutionRun(
-            task_id=task.task_id,
-            hypothesis_id=hypothesis.hypothesis_id,
-            status="succeeded",
-        )
+    execution_run = ExecutionRunRecord(
+        execution_run_id=uuid4(),
+        task_id=task.task_id,
+        hypothesis_id=hypothesis.hypothesis_id,
+        status=ExecutionRunStatus.COMPLETED,
+        dispatch_idempotency_key="key",
+        attempt_version=1,
     )
+    db_session.add(execution_run)
+    db_session.commit()
 
     with pytest.raises(ValueError, match="data_profile_id must match"):
         EvidenceRepository(db_session, strict_provenance_validation=True).create(
@@ -1132,14 +1147,17 @@ def test_evidence_creation_fails_for_execution_run_hypothesis_mismatch(
             frame_hash="frame-hash:customers:v1",
         )
     )
-    execution_run = ExecutionRunRepository(db_session).create(
-        ExecutionRun(
-            task_id=second_task.task_id,
-            hypothesis_id=second_hypothesis.hypothesis_id,
-            analysis_frame_id=analysis_frame.analysis_frame_id,
-            status="succeeded",
-        )
+    execution_run = ExecutionRunRecord(
+        execution_run_id=uuid4(),
+        task_id=second_task.task_id,
+        hypothesis_id=second_hypothesis.hypothesis_id,
+        analysis_frame_id=analysis_frame.analysis_frame_id,
+        status=ExecutionRunStatus.COMPLETED,
+        dispatch_idempotency_key="key",
+        attempt_version=1,
     )
+    db_session.add(execution_run)
+    db_session.commit()
 
     with pytest.raises(ValueError, match="hypothesis_id must match"):
         EvidenceRepository(db_session, strict_provenance_validation=True).create(

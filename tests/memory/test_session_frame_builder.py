@@ -7,6 +7,7 @@ from schemas.artifacts import (
     Assumption,
     DataProfile,
     Discovery,
+    EvaluationThresholds,
     Evidence,
     Hypothesis,
     Objective,
@@ -136,7 +137,7 @@ def build_discovery(
             evidence_ids=[evidence_id],
             method="chi_square",
             parameters=[MethodParameter(name="alpha", value=0.05)],
-            decision_rule="p_value < alpha",
+            decision_rule=EvaluationThresholds(p_value=0.05),
             uncertainty="p_value=0.03",
         ),
     }
