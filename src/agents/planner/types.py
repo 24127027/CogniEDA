@@ -11,7 +11,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
 
-from schemas.artifacts import Assumption, Task
+from schemas.artifacts import Assumption, EvaluationThresholds, Task
 from schemas.common import EvidenceResultSummary, MethodParameter
 from schemas.enums import (
     AssumptionStatus,
@@ -161,14 +161,19 @@ class ExecutionSpecification(BaseModel):
     variable_bindings: list[str] = Field(default_factory=list)
     scope: str
     evidence_expectation: str
-    decision_rule: str
+    decision_rule: EvaluationThresholds
     validation_method: str
     executor_id: str
     method_parameters: list[MethodParameter] = Field(default_factory=list)
 
 
 class PreparedExecution(BaseModel):
-    """Typed executor input linked by local references, not durable UUIDs."""
+    """Typed executor contract reconstructed from durable admission state.
+
+    Local references help only while the Planner prepares approval.  Once
+    admitted, the dispatcher supplies the durable attempt identity below, so
+    executors do not need Planner graph state to run the contract.
+    """
 
     execution_ref: str = Field(default_factory=lambda: new_local_reference("execution"))
     task_ref: str
@@ -181,6 +186,9 @@ class PreparedExecution(BaseModel):
     specification: ExecutionSpecification
     deterministic_seed: int | None = None
     contract_fingerprint: str
+    execution_run_id: UUID | None = None
+    dispatch_idempotency_key: str | None = None
+    lease_epoch: int | None = None
 
 
 class PendingUserInteraction(BaseModel):
@@ -569,6 +577,7 @@ class State(BaseModel):
     hypothesis_evaluation: HypothesisEvaluation | None = None
     execution_review: ExecutionReviewResult | None = None
     session_id: str | None = None
+    resume_approval_id: UUID | None = None
     active_session_frame_id: UUID | None = None
     requested_capability: PlannerCapability | None = None
     controlled_placeholder: ControlledPlaceholderResult | None = None
@@ -600,6 +609,7 @@ class State(BaseModel):
     interaction_error: str | None = None
     hard_stop_code: str | None = None
     hard_stop_message: str | None = None
+    controlled_error: ControlledPlannerError | None = None
     commit_result: PlannerCommitResult | None = None
 
     def bind_object_reference(self, object_type: str, persistent_id: str) -> str:
