@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from sqlmodel import Session, asc, select
+
 from db.models import PlannerOperationRecord
 from repositories.common import record_to_schema, schema_to_record_payload
 from schemas.enums import PlannerOperationApprovalState
 from schemas.planner_operations import PlannerOperation
-from sqlmodel import Session, asc, select
 
 PLANNER_OPERATION_JSON_FIELDS = {"payload"}
 
@@ -22,6 +23,14 @@ class PlannerOperationRepository:
     def create(self, operation: PlannerOperation) -> PlannerOperation:
         """Persist and return a new PlannerOperation."""
 
+        record = self.stage_create(operation)
+        self._session.commit()
+        self._session.refresh(record)
+        return record_to_schema(PlannerOperation, record)
+
+    def stage_create(self, operation: PlannerOperation) -> PlannerOperationRecord:
+        """Add an operation to the current transaction without committing it."""
+
         record = PlannerOperationRecord(
             **schema_to_record_payload(
                 operation,
@@ -29,9 +38,7 @@ class PlannerOperationRepository:
             )
         )
         self._session.add(record)
-        self._session.commit()
-        self._session.refresh(record)
-        return record_to_schema(PlannerOperation, record)
+        return record
 
     def get_by_id(self, operation_id: UUID) -> PlannerOperation | None:
         """Return a PlannerOperation by primary id if it exists."""
