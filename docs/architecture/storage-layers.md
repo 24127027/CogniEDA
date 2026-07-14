@@ -9,7 +9,7 @@ The target architecture defines five conceptual layers inside a workspace:
 | Filesystem workspace | Physical files, datasets, scripts, notebooks, outputs, reports, graph DB, provenance logs, cache, and DVC metadata. Not an FCO. |
 | Research graph/database | Target FCOs with durable scientific or workflow meaning. |
 | Workflow store | Task hierarchy, task state, pending approvals, active planning state, and `SessionFrame` state. |
-| Provenance store | `ObjectiveRevision`, `PlannerOperation`, `ExecutionRun`, `AnalysisFrame`, rejected paths, cleaning decisions, tool calls, code versions, user decisions, and raw interaction traces when needed for audit. |
+| Provenance store | `PlannerOperation`, `ExecutionRun`, `AnalysisFrame`, rejected paths, cleaning decisions, tool calls, code versions, user decisions, and raw interaction traces when needed for audit. |
 | Evidence cache | Reusable computation references keyed by `DataProfile`, `AnalysisFrame`, method, parameters, code version, environment, and seed. |
 
 ## Current Implementation
