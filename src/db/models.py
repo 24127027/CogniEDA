@@ -64,42 +64,6 @@ class ObjectiveRecord(TimestampedRecord, table=True):
     status: ObjectiveStatus = Field(default=ObjectiveStatus.ACTIVE, nullable=False, index=True)
 
 
-class ObjectiveRevisionRecord(SQLModel, table=True):
-    """Minimal provenance record for one Objective refinement."""
-
-    __tablename__ = "objective_revisions"
-
-    objective_revision_id: UUID = Field(default_factory=uuid4, primary_key=True)
-    objective_id: UUID = Field(
-        foreign_key="objectives.objective_id",
-        nullable=False,
-        index=True,
-    )
-    previous_title: str = Field(sa_column=Column(Text, nullable=False))
-    previous_description: str = Field(sa_column=Column(Text, nullable=False))
-    previous_lifecycle_state: ObjectiveStatus | None = Field(
-        default=None,
-        nullable=True,
-        index=True,
-    )
-    new_title: str = Field(sa_column=Column(Text, nullable=False))
-    new_description: str = Field(sa_column=Column(Text, nullable=False))
-    new_lifecycle_state: ObjectiveStatus | None = Field(
-        default=None,
-        nullable=True,
-        index=True,
-    )
-    changed_fields: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(JSON, nullable=False),
-    )
-    revision_reason: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
-    planner_operation_id: str | None = Field(default=None, index=True)
-    user_decision_id: str | None = Field(default=None, index=True)
-    created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
-    created_by: str | None = Field(default=None, index=True)
-
-
 class DataProfileRecord(SQLModel, table=True):
     """Persisted immutable DataProfile snapshot."""
 
