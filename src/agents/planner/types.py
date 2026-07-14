@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from enum import StrEnum
 from secrets import token_urlsafe
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -309,14 +309,6 @@ class ExecutorResult(BaseModel):
             if not self.error_message:
                 raise ValueError("Failed executor results require failure information.")
         return self
-
-
-@runtime_checkable
-class AnalyticalExecutor(Protocol):
-    """Injected boundary for Stage 2 analytical execution."""
-
-    def execute(self, request: PreparedExecution) -> ExecutorResult:
-        """Execute one prepared analytical request without planner context."""
 
 
 class ExecutionPreparation(BaseModel):
@@ -640,7 +632,6 @@ class Context(BaseModel):
     session_id: str | None = None
     session_frame_id: UUID | None = None
     request_understanding_model: RequestUnderstandingModel | None = None
-    analytical_executor: AnalyticalExecutor | None = None
     governance_mode: GovernanceMode = GovernanceMode.RISK_BASED
 
 

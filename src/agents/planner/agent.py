@@ -8,7 +8,7 @@ from tools.builtin_tools import AvailableBuiltinTools
 
 from ..types import RuntimePayload
 from .graph import build_graph
-from .types import AnalyticalExecutor, Context, PlannerDecision, PlannerOutput, State
+from .types import Context, PlannerDecision, PlannerOutput, State
 
 
 class Planner:
@@ -22,15 +22,11 @@ class Planner:
         self,
         *,
         database_url: str | None = None,
-        analytical_executor: AnalyticalExecutor | None = None,
         checkpointer=None,
     ) -> None:
         self.checkpointer = checkpointer or MemorySaver()
         self.graph = build_graph(checkpointer=self.checkpointer)
         self._database_url = database_url
-        self._analytical_executor = analytical_executor
-        self._database_url = database_url
-        self._analytical_executor = analytical_executor
 
     async def run(
         self,
@@ -42,12 +38,12 @@ class Planner:
 
         context = self.prepare_context(session_frame)
         if context.database_url:
+            from application.orchestrator.reconciler import reconcile_execution_attempts
             from db.session import get_session
 
-            from .reconciler import ExecutionReconciler
             session = get_session(context.database_url)
             try:
-                ExecutionReconciler(session).reconcile_all()
+                reconcile_execution_attempts(session)
             finally:
                 session.close()
 
@@ -101,8 +97,5 @@ class Planner:
         return base_context.model_copy(
             update={
                 "database_url": self._database_url or base_context.database_url,
-                "analytical_executor": (
-                    self._analytical_executor or base_context.analytical_executor
-                ),
             }
         )
