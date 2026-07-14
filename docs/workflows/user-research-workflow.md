@@ -16,17 +16,16 @@ Target design:
 - Workspace is a runtime/filesystem boundary, not an FCO.
 - Each workspace owns one independent graph database.
 - User creates the first `Objective` FCO.
-- Objective refinements preserve prior versions as provenance.
+- Objective lifecycle changes preserve stable Objective identity and remain attributable to committed operations.
 
 Current implementation:
 
 - `Objective` schema/table/repository exist.
 - Default persistence is workspace-local SQLite.
 - No workspace initializer or registry exists.
-- Minimal non-FCO `ObjectiveRevision` provenance exists for repository-level
-  Objective updates and approved `UPDATE_OBJECTIVE` commit operations. Direct
-  provenance-aware repository updates require a shared SQLModel session; this is
-  not objective merge policy or production transaction machinery.
+- `Objective.status` is the authoritative lifecycle field. Approved
+  `UPDATE_OBJECTIVE` PlannerOperations provide requested/approved/committed
+  mutation attribution without a dedicated Objective revision store.
 
 Status: Partially implemented.
 
