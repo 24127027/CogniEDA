@@ -348,7 +348,6 @@ class PlannerOperationType(StrEnum):
     UPDATE_TASK = "update_task"
     DELETE_TASK = "delete_task"
     CHANGE_TASK_STATE = "change_task_state"
-    CREATE_OBJECTIVE_REVISION = "create_objective_revision"
     UPDATE_OBJECTIVE = "update_objective"
     CREATE_ASSUMPTION = "create_assumption"
     UPDATE_ASSUMPTION_STATE = "update_assumption_state"

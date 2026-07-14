@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 from pydantic import Field, model_validator
 
 from schemas.common import CogniEDABaseModel, NonEmptyStr, utc_now
-from schemas.enums import ExecutionApprovalStatus, ExecutionRunStatus, ObjectiveStatus
+from schemas.enums import ExecutionApprovalStatus, ExecutionRunStatus
 
 
 class AnalysisFrame(CogniEDABaseModel):
@@ -49,13 +49,13 @@ class ExecutionRun(CogniEDABaseModel):
     lease_epoch: int = 0
     lease_acquired_at: datetime | None = None
     lease_expires_at: datetime | None = None
-    
+
     attempt_version: int = 1
     finalizer_owner_id: NonEmptyStr | None = None
     finalization_fencing_epoch: int | None = None
     finalization_claimed_at: datetime | None = None
     finalization_expires_at: datetime | None = None
-    
+
     previous_attempt_id: UUID | None = None
     retry_reason: NonEmptyStr | None = None
     retry_authorization_metadata: dict[str, Any] | None = None
@@ -112,22 +112,3 @@ class ExecutionApproval(CogniEDABaseModel):
     execution_run_id: UUID | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
-
-
-class ObjectiveRevision(CogniEDABaseModel):
-    """Minimal provenance record for one Objective refinement."""
-
-    objective_revision_id: UUID = Field(default_factory=uuid4)
-    objective_id: UUID
-    previous_title: NonEmptyStr
-    previous_description: NonEmptyStr
-    previous_lifecycle_state: ObjectiveStatus | None = None
-    new_title: NonEmptyStr
-    new_description: NonEmptyStr
-    new_lifecycle_state: ObjectiveStatus | None = None
-    changed_fields: list[NonEmptyStr] = Field(default_factory=list)
-    revision_reason: str | None = None
-    planner_operation_id: str | None = None
-    user_decision_id: str | None = None
-    created_at: datetime = Field(default_factory=utc_now)
-    created_by: str | None = None
