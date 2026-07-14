@@ -14,6 +14,7 @@ from pydantic import (
     NonNegativeInt,
     field_validator,
 )
+
 from schemas.enums import (
     ConfidenceLevel,
     DataProfileLifecycleState,
@@ -239,6 +240,15 @@ class DiscoveryClaim(CogniEDABaseModel):
         return reject_unqualified_absence_claim(value)
 
 
+class EvaluationThresholds(CogniEDABaseModel):
+    """Typed thresholds for deterministic decision-rule evaluation."""
+
+    p_value: float | None = None
+    effect_size: float | None = None
+    metric_thresholds: dict[str, float] = Field(default_factory=dict)
+    rule_description: str | None = None
+
+
 class ValidityBasis(CogniEDABaseModel):
     """Dependency and invalidation contract for a Discovery claim."""
 
@@ -250,7 +260,7 @@ class ValidityBasis(CogniEDABaseModel):
     parameters: list[MethodParameter] = Field(default_factory=list)
     code_reference: str | None = None
     environment_reference: str | None = None
-    decision_rule: NonEmptyStr
+    decision_rule: EvaluationThresholds
     strength: str | None = None
     uncertainty: str | None = None
     assumptions_excluded_from_inference: bool = True

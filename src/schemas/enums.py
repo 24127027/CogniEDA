@@ -196,6 +196,7 @@ class HypothesisStatus(StrEnum):
     CONTRADICTED = "contradicted"
     INCONCLUSIVE = "inconclusive"
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    FAILED = "failed"
     CANCELLED = "cancelled"
     ARCHIVED = "archived"
 
@@ -207,6 +208,35 @@ class HypothesisEvidenceOutcome(StrEnum):
     CONTRADICTS = "contradicts"
     INCONCLUSIVE = "inconclusive"
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+
+
+class ExecutionRunStatus(StrEnum):
+    """Lifecycle states for an ExecutionRun."""
+
+    PENDING_APPROVAL = "pending_approval"
+    ADMITTED = "admitted"
+    DISPATCH_CLAIMED = "dispatch_claimed"
+    RUNNING = "running"
+    RESULT_RECEIVED = "result_received"
+    FINALIZING = "finalizing"
+    COMPLETED = "completed"
+    DISPATCH_FAILED = "dispatch_failed"
+    EXECUTION_FAILED = "execution_failed"
+    EXPIRED = "expired"
+    ABANDONED = "abandoned"
+    CANCELLED = "cancelled"
+    RESULT_CONFLICT = "result_conflict"
+
+
+class ExecutionApprovalStatus(StrEnum):
+    """Durable lifecycle for one user-approved execution contract."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    CANCELLED = "cancelled"
+    STALE = "stale"
+    CONSUMED = "consumed"
+    FAILED = "failed"
 
 
 class AnalysisIntent(StrEnum):
@@ -327,6 +357,8 @@ class PlannerOperationType(StrEnum):
     CREATE_ANALYSIS_FRAME = "create_analysis_frame"
     CREATE_EXECUTION_RUN = "create_execution_run"
     UPDATE_EXECUTION_RUN = "update_execution_run"
+    CREATE_EXECUTION_OUTBOX = "create_execution_outbox"
+    CREATE_EXECUTION_INBOX = "create_execution_inbox"
     CREATE_EVIDENCE = "create_evidence"
     CREATE_DISCOVERY = "create_discovery"
     UPDATE_SESSION_FRAME = "update_session_frame"

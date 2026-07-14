@@ -16,6 +16,7 @@ from schemas.common import (
     DeadEndSummary,
     DiscoveryClaim,
     DiscoveryContextSummary,
+    EvaluationThresholds,
     EvidenceContextSummary,
     EvidenceProvenance,
     EvidenceResultSummary,
@@ -169,7 +170,7 @@ class AnalyticalSpecification(CogniEDABaseModel):
     variable_bindings: list[NonEmptyStr] = Field(min_length=1)
     scope: NonEmptyStr
     evidence_expectation: NonEmptyStr
-    decision_rule: NonEmptyStr
+    decision_rule: EvaluationThresholds
     validation_method: NonEmptyStr
     executor_id: Literal["deterministic"]
     method_parameters: list[MethodParameter] = Field(default_factory=list)
