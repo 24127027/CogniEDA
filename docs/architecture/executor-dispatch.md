@@ -86,6 +86,14 @@ GraphMiner (find relevant subgraph)
 
 This is architecturally supported but not implemented in the initial version.
 
+### External Executor Delivery Semantics
+
+The execution subsystem provides **at-least-once** delivery semantics at the boundary between the internal graph store and external executors. 
+
+When the dispatcher routes a task to an external executor (such as a separate process or remote service), network failures, worker crashes, or node evictions may cause the operation to be retried. The `ExecutionAttemptTransitionService` ensures that the transition of the `ExecutionRun` state is transactional within the core database, but the side effects produced by the external executor itself (e.g., calling an external API, writing intermediate scratch files) may occur more than once. 
+
+This is an acceptable and intended system boundary. Executors must either be inherently idempotent or accept that their side effects may be repeated in the event of a crash and subsequent claim renewal. The `ExecutionRunRecord` provides a `dispatch_idempotency_key` specifically so that well-behaved executors can deduplicate work if they choose to track it.
+
 ### Registration Pattern
 
 Executors self-register using a decorator that mirrors the existing `NodeRegistry` pattern:

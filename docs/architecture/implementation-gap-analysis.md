@@ -28,12 +28,12 @@ This report compares the audited current implementation against the target archi
 
 | Affected concept | Current implementation | Status | Remaining risk |
 | --- | --- | --- | --- |
-| Atomic PlannerOperation batch commit | `PlannerOperationBatch` records the exact durable envelope set. One shared commit path now applies normal and execution operations atomically, validates session/batch ownership, stops at the first failure, rolls back target changes, and records durable `failed` status plus failure information. | Partially implemented | There is no migration path for existing SQLite databases, distributed transaction support, durable retry policy/UI, or approval audit beyond the current operation/batch records. |
+| Atomic PlannerOperation execution commit | The execution bundle stages its PlannerOperation envelopes and target records in one SQLModel transaction, then commits them together or rolls them back together. | Partially implemented | There is no `PlannerOperationBatch` record in current source. Normal non-execution commits remain skeleton-level, older SQLite files have no migration path, and interrupted execution recovery is not implemented. |
 | Planner capability dispatch | `PlannerCapabilityContract` is status-free. `resolve_capability` dispatches a request-only classification to an implemented handler or a controlled placeholder; handlers own their required object-state checks. | Partially implemented | Most capability handlers, durable LangGraph checkpoints, and production interfaces remain absent. |
 | Public Planner result | `Planner.run()` provides typed response, explicit SessionFrame reference when supplied through runtime context, requested capability, pending interaction, controlled error, operations, and commit result. It has no project id, phase, or status field. | Partially implemented | No production service boundary and no durable cross-process LangGraph checkpoint store exist. |
 | SessionFrame integration | Planner receives an optional explicit SessionFrame reference from runtime context; no project record owns it. No Planner node creates, refreshes, pins, removes, reorders, or atomically synchronizes it. | Not implemented as workflow integration | The existing SessionFrame projection policy remains local memory-component behavior, not capability orchestration. |
-| Planner execution admission — 2026-07-12 | A narrow injected-executor path now requires a contract-fingerprint approval before it persists one approved Hypothesis and a pending ExecutionRun, then dispatches. A retry may reuse the same nonterminal Hypothesis and add Evidence through a new ExecutionRun. | Partially implemented | Approval is in-memory state, not durable approval provenance tied to an optimistic state version; crash/restart and concurrent approval handling are not recoverable. |
-| Evidence admission and hypothesis evaluation — 2026-07-12 | Raw executor output becomes Evidence only after method, parameter, parameter-hash, and variable-binding checks. A successful run finalizes a Hypothesis only when the executor explicitly marks its evaluation final; final Discovery synthesis includes the admitted Evidence set. | Partially implemented | No durable expected AnalysisFrame hash, row/artifact/diagnostic validation, independently governed evaluation policy, or migration support exists. |
+| Planner execution admission — 2026-07-13 | A narrow injected-executor path now persists a non-FCO `ExecutionApproval` record before user approval is exposed. A new Planner instance can resume by proposal id and session id; admission rereads Task/Profile state, atomically creates or reuses the Hypothesis and creates one ExecutionRun. | Partially implemented | There is no durable attempt lease, heartbeat, result inbox, or reconciliation after interruption. Concurrent admission is not an explicit optimistic-version protocol, and older SQLite files have no migration for `execution_approvals`. |
+| Evidence admission and hypothesis evaluation — 2026-07-13 | Raw executor output is admitted only after method, parameter, parameter-hash, and variable-binding checks. The only supported `deterministic_test` evaluator derives outcome from a finite p-value and typed alpha rule; advisory disagreement prevents Evidence/Discovery finalization. Final success bundles Evidence, Discovery, lifecycle state, and a governed SessionFrame snapshot. | Partially implemented | Effect-size rules, diagnostics, sample-size checks, directionality, expected frame identity, and method-specific evaluators are not implemented. Interruption after dispatch remains unreconciled. |
 
 1. There is no migration path for older SQLite files that contain scaffold-era tables.
 2. `AnalysisFrame` and `ExecutionRun` exist only as minimal provenance skeletons; optional Evidence dereference validation is narrow, and cache records are still absent.
@@ -43,6 +43,43 @@ This report compares the audited current implementation against the target archi
 6. Executor capability registration, singleton resolution, and basic dispatch now exist, but planner integration, runnable default executor graphs, `DataExplorerExecutor`, typed execution-result drafts, caller-scoped authorization, and executor-to-executor delegation controls are not implemented.
 
 ## Owner Review Needed
+
+### Execution-attempt recovery audit (2026-07-14)
+
+`ExecutionRun` now has dispatch-key and lease fields, and the new side tables
+can be added to a prior `execution_runs` table by an idempotent targeted
+upgrade. This is **not** a complete recovery implementation: dispatch bypasses
+the outbox, result receipt is not durable before finalization, scientific
+finalization is not fenced, cancellation/retry APIs are absent, and the
+reconciler cannot redispatch or finalize a received result. The recovery
+protocol document is a target design. See
+`docs/audits/PLANNER_EXECUTION_RECOVERY_REVIEW.md`.
+
+### Execution-topology review (2026-07-14)
+
+The Planner no longer invokes an executor in its compiled route: approval
+admission creates a durable outbox, an independent dispatcher receives attempt
+identity/fencing fields, and a database-only finalizer can create the atomic
+scientific bundle from a durable inbox result. This is **not** a complete
+attempt-recovery protocol. Cancellation, retry, reconciliation, and complete
+fencing ownership still bypass a single guarded transition service. See
+`docs/audits/PLANNER_EXECUTION_TOPOLOGY_REVIEW.md`.
+
+### Execution-transition corrective review (2026-07-14)
+
+The live attempt path now routes admission, dispatch, result receipt,
+finalization claim/reclaim, cancellation, lease release, and scientific
+completion through `ExecutionAttemptTransitionService`. The scientific commit
+uses the current finalization owner, epoch, and attempt version as a fence, so
+a reclaimed finalizer cannot commit stale work. This remains **partially
+implemented**: admission record construction is now also owned by the service,
+and the SQLite migration test covers the committed pre-protocol
+`execution_runs` shape, including idempotent indexes and a new post-upgrade
+attempt. The release gate is still blocked because no test forces two complete
+scientific finalizations to overlap, nor forces cancellation/finalization or a
+reclaimed finalizer to compete at the scientific commit boundary. External
+executor side effects also remain at-least-once. See
+`docs/audits/PLANNER_EXECUTION_RELEASE_GATE_REVIEW.md`.
 
 - Decide whether existing local databases should be migrated or discarded during this scaffold convergence.
 - Decide the fuller persisted shape for `ExecutionRun`, `AnalysisFrame`, cleaning decisions, and rejected task proposals.
