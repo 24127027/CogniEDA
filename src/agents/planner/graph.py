@@ -7,6 +7,40 @@ from langgraph.graph.state import CompiledStateGraph, StateGraph
 from .nodes import R, registry, route_entry, route_intent, route_process_decision
 from .types import Context, State
 
+ENTRY_ROUTES = {
+    "understand_request": R.understand_request,
+    "resume_execution": R.resume_execution,
+}
+
+INTENT_ROUTES = {
+    "check_answerability": R.check_answerability,
+    "suggest": R.propose_questions,
+    "manage_task": R.manage_tasks,
+    "execute": R.select_task,
+    "objective": R.manage_objective,
+    "assumption": R.manage_assumptions,
+    "invalid_request": R.invalid_request,
+    # Preserve the current temporary behavior for recognized but unsupported commands.
+    "register_dataset": R.invalid_request,
+    "close_project": R.invalid_request,
+    "profile": R.invalid_request,
+    "review_profile": R.invalid_request,
+    "clean": R.invalid_request,
+    "accept_profile": R.invalid_request,
+    "review_result": R.invalid_request,
+    "review_conflict": R.invalid_request,
+}
+
+DECISION_ROUTES = {
+    "clarify": R.understand_request,
+    "approved_questions": R.expand_plan,
+    "approved_task": R.commit,
+    "approved_plan": R.commit,
+    "approved_conflict": R.commit,
+    "approved_execution": R.commit_execution_contract,
+    "cancel": R.commit,
+}
+
 
 def build_graph(
     *, checkpointer: BaseCheckpointSaver[Any] | None = None
@@ -27,10 +61,7 @@ def build_graph(
     builder.add_conditional_edges(
         START,
         route_entry,
-        {
-            "understand_request": R.understand_request,
-            "resume_execution": R.resume_execution,
-        },
+        ENTRY_ROUTES,
     )
 
     # --------------------------------------------------
@@ -38,27 +69,13 @@ def build_graph(
     # --------------------------------------------------
 
     builder.add_conditional_edges(
-        R.understand_request,
+        R.contextual_grounding,
         route_intent,
-        {
-            "check_answerability": R.check_answerability,
-            "suggest": R.propose_questions,
-            "manage_task": R.manage_tasks,
-            "execute": R.select_task,
-            "objective": R.manage_objective,
-            "assumption": R.manage_assumptions,
-            "invalid_request": R.invalid_request,
-            # Map unsupported commands to invalid_request to avoid KeyError
-            "register_dataset": R.invalid_request,
-            "close_project": R.invalid_request,
-            "profile": R.invalid_request,
-            "review_profile": R.invalid_request,
-            "clean": R.invalid_request,
-            "accept_profile": R.invalid_request,
-            "review_result": R.invalid_request,
-            "review_conflict": R.invalid_request,
-        },
+        INTENT_ROUTES,
     )
+    # Contextual grounding is where later SessionFrame-aware flows can resolve
+    # references before intent-specific work begins.
+    builder.add_edge(R.understand_request, R.contextual_grounding)
 
     # --------------------------------------------------
     # Question answering
@@ -87,10 +104,12 @@ def build_graph(
     # Execution is deliberately approval-gated.  A prepared contract is not a
     # dispatch authorization until the decision node revalidates its snapshot.
     builder.add_edge(R.prepare_execution, R.request_user_input)
-    builder.add_edge(R.commit_execution_contract, END)
-
-    # The following nodes are bypassed in the durable execution topology:
-    # dispatch_executor, review_execution, validate_evidence, evaluate_hypothesis, review_conflicts
+    builder.add_edge(R.commit_execution_contract, R.dispatch_executor)
+    builder.add_edge(R.dispatch_executor, R.review_execution)
+    builder.add_edge(R.review_execution, R.validate_evidence)
+    builder.add_edge(R.validate_evidence, R.evaluate_hypothesis)
+    builder.add_edge(R.evaluate_hypothesis, R.review_conflicts)
+    builder.add_edge(R.review_conflicts, R.request_user_input)
 
     # --------------------------------------------------
     # Knowledge management
@@ -110,15 +129,7 @@ def build_graph(
     builder.add_conditional_edges(
         R.process_decision,
         route_process_decision,
-        {
-            "clarify": R.understand_request,
-            "approved_questions": R.expand_plan,
-            "approved_task": R.commit,
-            "approved_plan": R.commit,
-            "approved_conflict": R.commit,
-            "approved_execution": R.commit_execution_contract,
-            "cancel": R.commit,
-        },
+        DECISION_ROUTES,
     )
 
     # --------------------------------------------------

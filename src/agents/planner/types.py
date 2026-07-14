@@ -659,6 +659,9 @@ class ControlledPlaceholderResult(BaseModel):
         "capability_precondition_failed",
     ]
     capability: PlannerCapability
+    node_name: str
+    intent: PlannerIntent | None = None
+    request_text: str | None = None
     message: str
     future_extension_boundary: str
     unmet_requirements: tuple[str, ...] = ()

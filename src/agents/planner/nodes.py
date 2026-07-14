@@ -49,7 +49,6 @@ from .types import (
     COMMAND_TO_INTENT,
     AnalysisFrameObservation,
     Context,
-    ContextualGrounding,
     ControlledPlannerError,
     EvidenceAdmission,
     ExecutionAdmission,
@@ -205,19 +204,18 @@ def route_entry(state: State, runtime: Runtime[Context]) -> str:
 
 @registry.register()
 def contextual_grounding(state: State, runtime: Runtime[Context]) -> State:
-    """Resolve relative references using SessionFrame."""
-    if state.request_understanding is None:
-        return state
-    state.contextual_grounding = ContextualGrounding(
-        resolved_query=state.request_understanding.request_text,
-    )
-    return state
+    """Resolve relative references using SessionFrame context."""
+
+    # TODO: Resolve request references against the active SessionFrame.
+    pass
 
 
 @registry.register()
 def check_answerability(state: State, runtime: Runtime[Context]) -> State:
     """Gate: determine if we have adequate valid basis to answer a question."""
-    return state
+
+    # TODO: Assess evidence-backed answerability without using assumptions as premises.
+    pass
 
 
 @registry.register()
@@ -234,11 +232,9 @@ def invalid_request(state: State, runtime: Runtime[Context]) -> State:
 
 @registry.register()
 def answer_question(state: State, runtime: Runtime[Context]) -> None:
-    """LLM answers the user's question
+    """Answer the user's question using the relevant research context."""
 
-    The LLM is provided with context from the session, so it can answer the question more
-    accurately.
-    """
+    # TODO: Implement question answering using SessionFrame context.
     pass
 
 
@@ -249,22 +245,17 @@ def answer_question(state: State, runtime: Runtime[Context]) -> None:
 
 @registry.register()
 def propose_questions(state: State, runtime: Runtime[Context]) -> None:
-    """
-    LLM proposes possible research directions, open questions, or
-    investigation ideas based on the current research context.
-    """
+    """Propose research directions using the relevant planning context."""
+
+    # TODO: Implement research-direction proposal from planning context.
     pass
 
 
 @registry.register()
 def expand_plan(state: State, runtime: Runtime[Context]) -> None:
-    """
-    LLM expands an approved research direction into executable Tasks.
+    """Expand an approved research direction into executable Task drafts."""
 
-    This may include refining scope, decomposing large Tasks into
-    subtasks, identifying dependencies, and determining a concrete
-    execution plan.
-    """
+    # TODO: Implement Task-draft expansion for an approved research direction.
     pass
 
 
@@ -738,13 +729,7 @@ def commit_execution_contract(state: State, runtime: Runtime[Context]) -> State:
 
 @registry.register()
 def dispatch_executor(state: State, runtime: Runtime[Context]) -> State:
-    """Retired Planner-side dispatch node.
-
-    Production terminates after durable admission.  Keeping this node
-    side-effect free prevents a direct graph invocation from reintroducing a
-    graph-local executor call; only the independent dispatcher consumes an
-    admitted outbox record.
-    """
+    """Dispatch an admitted execution contract to the configured executor."""
 
     if state.execution_admission is not None and state.execution_admission.admitted:
         state.response_text = "Execution admitted and awaiting durable dispatch."
@@ -1452,7 +1437,8 @@ def resume_execution(state: State, runtime: Runtime[Context]) -> State:
 def pause(state: State, runtime: Runtime[Context]) -> State:
     """Pause the current process and wait for user input or confirmation."""
 
-    return state
+    # TODO: Implement durable pause handling beyond the graph interrupt boundary.
+    pass
 
 
 @registry.register()
