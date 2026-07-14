@@ -14,7 +14,6 @@ from db.models import (
     ExecutionRunRecord,
     HypothesisRecord,
     ObjectiveRecord,
-    ObjectiveRevisionRecord,
     PlannerOperationRecord,
     SessionFrameRecord,
     TaskRecord,
@@ -25,8 +24,7 @@ from repositories.common import apply_update, record_to_schema, schema_to_record
 from repositories.discovery_repository import DiscoveryRepository
 from repositories.evidence_repository import EvidenceRepository
 from repositories.hypothesis_repository import HypothesisRepository, HypothesisUpdate
-from repositories.objective_repository import ObjectiveUpdate, build_objective_revision
-from repositories.objective_revision_repository import OBJECTIVE_REVISION_JSON_FIELDS
+from repositories.objective_repository import ObjectiveUpdate
 from repositories.session_frame_repository import SESSION_FRAME_JSON_FIELDS
 from repositories.task_repository import TASK_JSON_FIELDS, TaskUpdate
 from schemas.artifacts import (
@@ -34,7 +32,6 @@ from schemas.artifacts import (
     Discovery,
     Evidence,
     Hypothesis,
-    Objective,
     SessionFrame,
     Task,
 )
@@ -406,32 +403,12 @@ def _apply_update_objective(session: Session, operation: PlannerOperation) -> No
     objective_record = _require_record(session, ObjectiveRecord, objective_id, "Objective")
     payload = dict(operation.payload)
     payload.pop("objective_id", None)
-    revision_reason = payload.pop("revision_reason", None)
-    user_decision_id = payload.pop("user_decision_id", None)
-    created_by = payload.pop("created_by", None)
+    payload.pop("revision_reason", None)
+    payload.pop("user_decision_id", None)
+    payload.pop("created_by", None)
     update = ObjectiveUpdate(**payload)
     _require_update_payload(update.model_fields_set, operation.operation_type.value)
-    previous_objective = record_to_schema(Objective, objective_record)
     apply_update(objective_record, update)
-    updated_objective = record_to_schema(Objective, objective_record)
-    revision = build_objective_revision(
-        previous_objective,
-        updated_objective,
-        revision_reason=revision_reason,
-        planner_operation_id=operation.operation_id,
-        user_decision_id=user_decision_id,
-        created_by=created_by,
-    )
-    # TODO: Wire richer approval/user-decision provenance when approval UX exists.
-    if revision is not None:
-        session.add(
-            ObjectiveRevisionRecord(
-                **schema_to_record_payload(
-                    revision,
-                    json_fields=OBJECTIVE_REVISION_JSON_FIELDS,
-                )
-            )
-        )
     session.add(objective_record)
 
 
