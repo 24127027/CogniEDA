@@ -4,8 +4,8 @@ import pytest
 from langgraph.runtime import Runtime
 from pydantic_ai.messages import ModelRequest, UserPromptPart
 
-from agents.planner.graph import build_graph
-from agents.planner.nodes import route_intent, understand_request
+from agents.planner.graph import INTENT_ROUTES, build_graph
+from agents.planner.nodes import registry, route_intent, understand_request
 from agents.planner.types import (
     COMMAND_TO_INTENT,
     Context,
@@ -111,7 +111,7 @@ def test_unknown_command_requires_correction_without_model_fallback() -> None:
 
 
 @pytest.mark.parametrize(
-    ("intent", "expected_route"),
+    ("intent", "expected_route_key"),
     [
         ("answer", "check_answerability"),
         ("suggest", "suggest"),
@@ -123,7 +123,7 @@ def test_unknown_command_requires_correction_without_model_fallback() -> None:
 )
 def test_route_intent_is_deterministic(
     intent: str,
-    expected_route: str,
+    expected_route_key: str,
 ) -> None:
     model = FakeRequestUnderstandingModel(
         RequestUnderstanding(intent="answer", request_text="unexpected", source="llm")
@@ -137,7 +137,7 @@ def test_route_intent_is_deterministic(
         ),
     )
 
-    assert route_intent(state, runtime_with(model)) == expected_route
+    assert route_intent(state, runtime_with(model)) == expected_route_key
     assert model.prompts == []
 
 
@@ -198,3 +198,63 @@ def test_graph_terminates_unknown_commands_on_the_invalid_request_route() -> Non
     final_state = State.model_validate(result)
     assert final_state.request_understanding is not None
     assert final_state.request_understanding.source == "invalid_command"
+    assert final_state.controlled_error is None
+
+
+@pytest.mark.parametrize(
+    ("command", "intent", "node_name"),
+    [
+        ("register_dataset", "register_dataset", "register_dataset"),
+        ("profile", "profile", "profile"),
+        ("review_result", "review_result", "review_result"),
+        ("review_conflict", "review_conflict", "review_conflict"),
+    ],
+)
+def test_known_unsupported_commands_use_the_existing_invalid_request_path(
+    command: str,
+    intent: str,
+    node_name: str,
+) -> None:
+    state = State(query=f"/{command} requested work")
+
+    result = build_graph().invoke(state, context=Context())
+    final_state = State.model_validate(result)
+
+    assert route_intent(final_state, runtime_with()) == node_name
+    assert final_state.request_understanding is not None
+    assert final_state.request_understanding.intent == intent
+    assert INTENT_ROUTES[node_name] == "invalid_request"
+    assert final_state.controlled_error is None
+
+
+def test_compiled_graph_contains_intended_planner_nodes() -> None:
+    intended_nodes = {
+        "check_answerability",
+        "answer_question",
+        "propose_questions",
+        "expand_plan",
+        "contextual_grounding",
+        "manage_tasks",
+        "select_task",
+        "prepare_execution",
+        "request_user_input",
+        "pause",
+        "process_decision",
+        "review_execution",
+        "validate_evidence",
+        "evaluate_hypothesis",
+        "review_conflicts",
+        "manage_objective",
+        "manage_assumptions",
+        "commit",
+        "commit_execution_contract",
+        "understand_request",
+        "resume_execution",
+        "invalid_request",
+        "dispatch_executor",
+    }
+
+    compiled_nodes = set(build_graph().get_graph().nodes)
+
+    assert intended_nodes <= set(registry.nodes)
+    assert intended_nodes <= compiled_nodes

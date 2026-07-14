@@ -12,7 +12,6 @@ from application.orchestrator.planner_commit import commit_planner_operations
 from repositories import (
     AssumptionRepository,
     ObjectiveRepository,
-    ObjectiveRevisionRepository,
     PlannerOperationRepository,
     SessionFrameRepository,
     TaskRepository,
@@ -307,22 +306,9 @@ def test_commit_updates_objective_and_assumption_through_operations(db_session) 
 
     updated_objective = ObjectiveRepository(db_session).get_by_id(objective.objective_id)
     updated_assumption = AssumptionRepository(db_session).get_by_id(assumption.assumption_id)
-    objective_revisions = ObjectiveRevisionRepository(db_session).list_for_objective(
-        objective.objective_id
-    )
     assert result.failed_operation_ids == []
     assert updated_objective is not None
     assert updated_objective.statement == "Understand churn drivers."
-    assert len(objective_revisions) == 1
-    assert objective_revisions[0].previous_title == "Churn Investigation"
-    assert objective_revisions[0].previous_description == "Understand churn."
-    assert objective_revisions[0].new_description == "Understand churn drivers."
-    assert objective_revisions[0].changed_fields == ["statement"]
-    assert objective_revisions[0].revision_reason == (
-        "Refine objective from planner operation."
-    )
-    assert objective_revisions[0].planner_operation_id == str(
-        objective_operation.operation_id
-    )
+    assert objective_operation.operation_id in result.committed_operation_ids
     assert updated_assumption is not None
     assert updated_assumption.status == AssumptionStatus.FLAGGED

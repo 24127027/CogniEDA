@@ -20,7 +20,6 @@ from repositories import (
     HypothesisRepository,
     HypothesisUpdate,
     ObjectiveRepository,
-    ObjectiveRevisionRepository,
     ObjectiveUpdate,
     SessionFrameRepository,
     TaskRepository,
@@ -70,7 +69,7 @@ from schemas.enums import (
     TaskLifecycleState,
     UserDecisionType,
 )
-from schemas.provenance import AnalysisFrame, ObjectiveRevision
+from schemas.provenance import AnalysisFrame
 
 
 def build_objective(**overrides: object) -> Objective:
@@ -329,182 +328,41 @@ def test_objective_task_profile_repositories_round_trip_without_project_ids(db_s
     assert "workspace_id" not in DataProfile.model_fields
 
 
-def test_objective_revision_is_non_fco_provenance() -> None:
-    fcos = {item.value for item in FirstClassObjectType}
+def test_objective_lifecycle_is_explicit_and_active_lookup_excludes_history(db_session) -> None:
+    repository = ObjectiveRepository(db_session)
+    active = repository.create(build_objective())
+    archived = repository.create(build_objective(title="Archived investigation"))
 
-    assert "objective_revision" not in fcos
-
-    import schemas.artifacts as artifacts
-    import schemas.provenance as provenance
-
-    assert not hasattr(artifacts, "ObjectiveRevision")
-    assert hasattr(provenance, "ObjectiveRevision")
-
-
-def test_objective_revision_repository_create_get_list_for_objective(db_session) -> None:
-    objective_repository = ObjectiveRepository(db_session)
-    revision_repository = ObjectiveRevisionRepository(db_session)
-    objective = objective_repository.create(build_objective())
-    other_objective = objective_repository.create(build_objective(title="Retention Investigation"))
-
-    revision = revision_repository.create(
-        ObjectiveRevision(
-            objective_id=objective.objective_id,
-            previous_title="Churn Investigation",
-            previous_description="Understand customer churn drivers.",
-            previous_lifecycle_state=ObjectiveStatus.ACTIVE,
-            new_title="Churn Investigation",
-            new_description="Understand churn drivers by segment.",
-            new_lifecycle_state=ObjectiveStatus.ACTIVE,
-            changed_fields=["statement"],
-            revision_reason="Scope was narrowed.",
-            planner_operation_id="planner-operation-1",
-            user_decision_id="decision-1",
-            created_by="test",
-        )
-    )
-    other_revision = revision_repository.create(
-        ObjectiveRevision(
-            objective_id=other_objective.objective_id,
-            previous_title="Retention Investigation",
-            previous_description="Understand customer churn drivers.",
-            previous_lifecycle_state=ObjectiveStatus.ACTIVE,
-            new_title="Retention Investigation",
-            new_description="Understand retention drivers.",
-            new_lifecycle_state=ObjectiveStatus.ACTIVE,
-            changed_fields=["statement"],
-        )
-    )
-
-    loaded = revision_repository.get(revision.objective_revision_id)
-
-    assert loaded == revision
-    assert revision_repository.list_for_objective(objective.objective_id) == [revision]
-    assert revision_repository.list_for_objective(other_objective.objective_id) == [other_revision]
-
-
-def test_objective_update_with_revision_repository_creates_revision(
-    db_session,
-) -> None:
-    objective_repository = ObjectiveRepository(db_session)
-    revision_repository = ObjectiveRevisionRepository(db_session)
-    objective = objective_repository.create(build_objective())
-
-    updated = objective_repository.update(
-        objective.objective_id,
-        ObjectiveUpdate(
-            title="Segmented Churn Investigation",
-            statement="Understand churn drivers by segment.",
-        ),
-        revision_repository=revision_repository,
-        revision_reason="Narrowed objective scope.",
-        planner_operation_id="planner-operation-1",
-        user_decision_id="decision-1",
-        created_by="test",
-    )
-
-    revisions = revision_repository.list_for_objective(objective.objective_id)
-
-    assert updated is not None
-    assert updated.objective_id == objective.objective_id
-    assert updated.title == "Segmented Churn Investigation"
-    assert updated.statement == "Understand churn drivers by segment."
-    assert len(objective_repository.list()) == 1
-    assert len(revisions) == 1
-    revision = revisions[0]
-    assert revision.objective_id == objective.objective_id
-    assert revision.previous_title == "Churn Investigation"
-    assert revision.previous_description == "Understand customer churn drivers."
-    assert revision.previous_lifecycle_state == ObjectiveStatus.ACTIVE
-    assert revision.new_title == "Segmented Churn Investigation"
-    assert revision.new_description == "Understand churn drivers by segment."
-    assert revision.new_lifecycle_state == ObjectiveStatus.ACTIVE
-    assert revision.changed_fields == ["title", "statement"]
-    assert revision.revision_reason == "Narrowed objective scope."
-    assert revision.planner_operation_id == "planner-operation-1"
-    assert revision.user_decision_id == "decision-1"
-    assert revision.created_by == "test"
-
-
-def test_objective_update_rejects_revision_repository_from_different_session(
-    tmp_path: Path,
-) -> None:
-    database_url = f"sqlite:///{(tmp_path / 'objective_sessions.sqlite3').as_posix()}"
-    create_db_engine.cache_clear()
-    init_db(database_url)
-    objective_session = get_session(database_url)
-    revision_session = get_session(database_url)
-    try:
-        objective_repository = ObjectiveRepository(objective_session)
-        revision_repository = ObjectiveRevisionRepository(revision_session)
-        objective = objective_repository.create(build_objective())
-
-        with pytest.raises(
-            ValueError,
-            match=(
-                "Objective update and ObjectiveRevision creation must share "
-                "the same SQLModel session"
-            ),
-        ):
-            objective_repository.update(
-                objective.objective_id,
-                ObjectiveUpdate(statement="This update must be rejected."),
-                revision_repository=revision_repository,
-            )
-
-        reloaded = objective_repository.get_by_id(objective.objective_id)
-
-        assert reloaded is not None
-        assert reloaded.title == objective.title
-        assert reloaded.statement == objective.statement
-        assert reloaded.status == objective.status
-        assert (
-            ObjectiveRevisionRepository(objective_session).list_for_objective(
-                objective.objective_id
-            )
-            == []
-        )
-        assert revision_repository.list_for_objective(objective.objective_id) == []
-    finally:
-        objective_session.close()
-        revision_session.close()
-        create_db_engine.cache_clear()
-
-
-def test_objective_update_without_revision_repository_preserves_behavior(
-    db_session,
-) -> None:
-    objective_repository = ObjectiveRepository(db_session)
-    objective = objective_repository.create(build_objective())
-
-    updated = objective_repository.update(
-        objective.objective_id,
-        ObjectiveUpdate(statement="Refined churn objective."),
+    updated = repository.update(
+        archived.objective_id,
+        ObjectiveUpdate(status=ObjectiveStatus.ARCHIVED),
     )
 
     assert updated is not None
-    assert updated.objective_id == objective.objective_id
-    assert updated.statement == "Refined churn objective."
-    assert ObjectiveRevisionRepository(db_session).list_for_objective(objective.objective_id) == []
+    assert updated.objective_id == archived.objective_id
+    assert updated.status == ObjectiveStatus.ARCHIVED
+    assert repository.get_by_id(archived.objective_id) == updated
+    assert repository.get_active() == active
+    assert repository.list(status=ObjectiveStatus.ARCHIVED) == [updated]
 
 
-def test_objective_noop_update_with_revision_repository_does_not_create_revision(
-    db_session,
-) -> None:
-    objective_repository = ObjectiveRepository(db_session)
-    revision_repository = ObjectiveRevisionRepository(db_session)
-    objective = objective_repository.create(build_objective())
+def test_objective_lifecycle_transition_preserves_identity(db_session) -> None:
+    repository = ObjectiveRepository(db_session)
+    objective = repository.create(build_objective())
 
-    updated = objective_repository.update(
+    completed = repository.update(
         objective.objective_id,
-        ObjectiveUpdate(statement=objective.statement),
-        revision_repository=revision_repository,
-        revision_reason="No semantic change.",
+        ObjectiveUpdate(status=ObjectiveStatus.COMPLETED),
+    )
+    archived = repository.update(
+        objective.objective_id,
+        ObjectiveUpdate(status=ObjectiveStatus.ARCHIVED),
     )
 
-    assert updated is not None
-    assert updated.objective_id == objective.objective_id
-    assert revision_repository.list_for_objective(objective.objective_id) == []
+    assert completed is not None
+    assert archived is not None
+    assert completed.objective_id == objective.objective_id == archived.objective_id
+    assert archived.status == ObjectiveStatus.ARCHIVED
 
 
 def test_data_profile_supersede_marks_old_profile_and_records_replacement(
