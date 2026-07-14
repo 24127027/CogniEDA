@@ -28,6 +28,7 @@ from agents.planner.types import (
     RequestUnderstandingModel,
     State,
 )
+from application.orchestrator import reconciler as reconciliation_module
 from application.orchestrator.dispatcher import dispatch_pending_attempts
 from application.orchestrator.finalizer import finalize_attempt
 from application.orchestrator.planner_commit import commit_planner_operations
@@ -166,12 +167,10 @@ class FailIfCalledRequestModel(RequestUnderstandingModel):
 
 def _context(
     db_session,
-    executor: FakeExecutor | None = None,
     request_model: RequestUnderstandingModel | None = None,
 ) -> Context:
     return Context(
         database_url=str(db_session.get_bind().url),
-        analytical_executor=executor,
         request_understanding_model=request_model,
     )
 
@@ -325,7 +324,7 @@ def test_execute_graph_selection_failure_is_controlled_and_non_mutating(
     final_state = State.model_validate(
         build_graph().invoke(
             State(query=query),
-            context=_context(db_session, executor, request_model),
+            context=_context(db_session, request_model),
         )
     )
 
@@ -520,7 +519,7 @@ def test_execute_graph_persists_one_authorized_chain_without_second_approval(
                 query=f"/execute {task.task_id}",
                 planner_decision={"action": "approve"},
             ),
-            context=_context(db_session, executor, request_model),
+            context=_context(db_session, request_model),
         )
     )
 
@@ -562,7 +561,7 @@ def test_execute_graph_persists_one_authorized_chain_without_second_approval(
     repeated_state = State.model_validate(
         graph.invoke(
             State(query=f"/execute {task.task_id}"),
-            context=_context(db_session, executor, request_model),
+            context=_context(db_session, request_model),
         )
     )
     assert repeated_state.execution_preparation is not None
@@ -586,7 +585,7 @@ def test_execute_graph_failure_keeps_task_active_and_creates_no_evidence_or_disc
                 query=f"/execute {task.task_id}",
                 planner_decision={"action": "approve"},
             ),
-            context=_context(db_session, executor, request_model),
+            context=_context(db_session, request_model),
         )
     )
 
@@ -614,7 +613,7 @@ def test_execution_does_not_dispatch_without_an_explicit_approval(db_session) ->
     final_state = State.model_validate(
         build_graph().invoke(
             State(query=f"/execute {task.task_id}"),
-            context=_context(db_session, executor, FailIfCalledRequestModel()),
+            context=_context(db_session, FailIfCalledRequestModel()),
         )
     )
 
@@ -626,14 +625,26 @@ def test_execution_does_not_dispatch_without_an_explicit_approval(db_session) ->
     assert ExecutionRunRepository(db_session).list(task_id=task.task_id) == []
 
 
-def test_public_planner_resumes_durable_approval_in_a_new_instance(db_session) -> None:
+def test_public_planner_resumes_durable_approval_in_a_new_instance(db_session, monkeypatch) -> None:
     task = _persist_ready_task(db_session)
     database_url = str(db_session.get_bind().url)
     executor = FakeExecutor()
     context = Context(session_id="restart-safe-session")
+    reconcile_calls = []
+    original_reconcile = reconciliation_module.reconcile_execution_attempts
+
+    def track_reconciliation(session) -> None:
+        reconcile_calls.append(session)
+        original_reconcile(session)
+
+    monkeypatch.setattr(
+        reconciliation_module,
+        "reconcile_execution_attempts",
+        track_reconciliation,
+    )
 
     first = asyncio.run(
-        Planner(database_url=database_url, analytical_executor=executor).run(
+        Planner(database_url=database_url).run(
             f"/execute {task.task_id}",
             context,
         )
@@ -651,7 +662,7 @@ def test_public_planner_resumes_durable_approval_in_a_new_instance(db_session) -
     assert approval.contract_fingerprint == first.pending_interaction.snapshot_hash
 
     second = asyncio.run(
-        Planner(database_url=database_url, analytical_executor=executor).run(
+        Planner(database_url=database_url).run(
             "/approve",
             context,
             decision=PlannerDecision(
@@ -673,6 +684,12 @@ def test_public_planner_resumes_durable_approval_in_a_new_instance(db_session) -
         hypothesis[0].hypothesis_id
     )
     assert len(discoveries) == 1
+    assert len(reconcile_calls) == 2
+
+
+def test_planner_context_has_no_retired_executor_dependency() -> None:
+    assert "analytical_executor" not in Context.model_fields
+    assert "analytical_executor" not in Planner.__init__.__annotations__
 
 
 def test_durable_topology_survives_planner_and_dispatcher_replacement(db_session) -> None:
@@ -683,7 +700,7 @@ def test_durable_topology_survives_planner_and_dispatcher_replacement(db_session
     planner_executor = FakeExecutor()
     context = Context(session_id="durable-topology")
     first = asyncio.run(
-        Planner(database_url=database_url, analytical_executor=planner_executor).run(
+        Planner(database_url=database_url).run(
             f"/execute {task.task_id}", context
         )
     ).payload
@@ -691,7 +708,7 @@ def test_durable_topology_survives_planner_and_dispatcher_replacement(db_session
     assert planner_executor.requests == []
 
     admitted = asyncio.run(
-        Planner(database_url=database_url, analytical_executor=planner_executor).run(
+        Planner(database_url=database_url).run(
             "/approve",
             context,
             decision=PlannerDecision(
@@ -740,7 +757,7 @@ def test_public_planner_rejects_stale_durable_approval(db_session) -> None:
     executor = FakeExecutor()
     context = Context(session_id="stale-approval-session")
     first = asyncio.run(
-        Planner(database_url=database_url, analytical_executor=executor).run(
+        Planner(database_url=database_url).run(
             f"/execute {task.task_id}", context
         )
     ).payload
@@ -755,7 +772,7 @@ def test_public_planner_rejects_stale_durable_approval(db_session) -> None:
     db_session.commit()
 
     second = asyncio.run(
-        Planner(database_url=database_url, analytical_executor=executor).run(
+        Planner(database_url=database_url).run(
             "/approve",
             context,
             decision=PlannerDecision(
@@ -798,7 +815,8 @@ def test_changed_contract_cannot_reuse_execution_approval(db_session) -> None:
 
 def test_hypothesis_accumulates_evidence_until_explicit_finalization(db_session) -> None:
     task = _persist_ready_task(db_session)
-    context = _context(db_session, FakeExecutor(finalize=False), FailIfCalledRequestModel())
+    executor = FakeExecutor(finalize=False)
+    context = _context(db_session, FailIfCalledRequestModel())
     first_state = State.model_validate(
         build_graph().invoke(
             State(
@@ -810,7 +828,7 @@ def test_hypothesis_accumulates_evidence_until_explicit_finalization(db_session)
     )
     hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)[0]
     assert first_state.execution_admission is not None and first_state.execution_admission.admitted
-    _dispatch_and_finalize(db_session, context.analytical_executor, task)
+    _dispatch_and_finalize(db_session, executor, task)
     hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)[0]
     assert len(EvidenceRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)) == 1
     assert DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id) == []
@@ -822,7 +840,7 @@ def test_hypothesis_accumulates_evidence_until_explicit_finalization(db_session)
                 query=f"/execute {task.task_id}",
                 planner_decision={"action": "approve"},
             ),
-            context=_context(db_session, FakeExecutor(finalize=True), FailIfCalledRequestModel()),
+            context=_context(db_session, FailIfCalledRequestModel()),
         )
     )
     discoveries = DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)
@@ -862,7 +880,7 @@ def test_review_rejects_executor_identity_drift(
                 query=f"/execute {task.task_id}",
                 planner_decision={"action": "approve"},
             ),
-            context=_context(db_session, executor, FailIfCalledRequestModel()),
+            context=_context(db_session, FailIfCalledRequestModel()),
         )
     )
 
@@ -910,7 +928,7 @@ def test_inconclusive_execution_does_not_overclaim_no_relationship(db_session) -
             query=f"/execute {task.task_id}",
             planner_decision={"action": "approve"},
         ),
-        context=_context(db_session, executor, FailIfCalledRequestModel()),
+        context=_context(db_session, FailIfCalledRequestModel()),
     ))
     assert final_state.execution_admission is not None and final_state.execution_admission.admitted
     _dispatch_and_finalize(db_session, executor, task)
@@ -932,7 +950,7 @@ def test_executor_advisory_outcome_cannot_override_deterministic_evaluation(db_s
                 query=f"/execute {task.task_id}",
                 planner_decision={"action": "approve"},
             ),
-            context=_context(db_session, executor, FailIfCalledRequestModel()),
+            context=_context(db_session, FailIfCalledRequestModel()),
         )
     )
 
