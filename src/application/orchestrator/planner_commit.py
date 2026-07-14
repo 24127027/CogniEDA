@@ -7,6 +7,7 @@ from uuid import UUID
 
 from sqlmodel import Session, asc, select
 
+from application.orchestrator.transition_service import ExecutionAttemptTransitionService
 from db.models import (
     AnalysisFrameRecord,
     AssumptionRecord,
@@ -23,7 +24,6 @@ from repositories.assumption_repository import ASSUMPTION_JSON_FIELDS, Assumptio
 from repositories.common import apply_update, record_to_schema, schema_to_record_payload
 from repositories.discovery_repository import DiscoveryRepository
 from repositories.evidence_repository import EvidenceRepository
-from repositories.execution_run_repository import ExecutionRunRepository
 from repositories.hypothesis_repository import HypothesisRepository, HypothesisUpdate
 from repositories.objective_repository import ObjectiveUpdate, build_objective_revision
 from repositories.objective_revision_repository import OBJECTIVE_REVISION_JSON_FIELDS
@@ -45,7 +45,7 @@ from schemas.enums import (
     TaskLifecycleState,
 )
 from schemas.planner_operations import PlannerCommitResult, PlannerOperation
-from schemas.provenance import AnalysisFrame, ExecutionRun
+from schemas.provenance import AnalysisFrame, ExecutionOutbox, ExecutionRun
 
 _COMMITTABLE_STATES = {
     PlannerOperationApprovalState.APPROVED,
@@ -56,8 +56,12 @@ _EXECUTION_OPERATION_TYPES = {
     PlannerOperationType.CHANGE_HYPOTHESIS_STATE,
     PlannerOperationType.CREATE_ANALYSIS_FRAME,
     PlannerOperationType.CREATE_EXECUTION_RUN,
+    PlannerOperationType.UPDATE_EXECUTION_RUN,
+    PlannerOperationType.CREATE_EXECUTION_OUTBOX,
+    PlannerOperationType.CREATE_EXECUTION_INBOX,
     PlannerOperationType.CREATE_EVIDENCE,
     PlannerOperationType.CREATE_DISCOVERY,
+    PlannerOperationType.UPDATE_SESSION_FRAME,
 }
 
 
@@ -67,6 +71,7 @@ def commit_planner_operations(
     *,
     session_id: str | None = None,
     operation_ids: list[UUID] | None = None,
+    commit: bool = True,
 ) -> PlannerCommitResult:
     """Dispatch approved PlannerOperations through the commit boundary.
 
@@ -85,7 +90,7 @@ def commit_planner_operations(
         )
 
     if _is_execution_bundle(candidate_operations):
-        return _commit_execution_bundle(session, candidate_operations)
+        return _commit_execution_bundle(session, candidate_operations, commit=commit)
 
     result = PlannerCommitResult()
     committed_at = datetime.now(UTC)
@@ -112,7 +117,8 @@ def commit_planner_operations(
 
     # This single flush is only the skeleton boundary. Production commit should
     # make transaction, rollback, and approval semantics explicit in this layer.
-    session.commit()
+    if commit:
+        session.commit()
     result.message = _result_message(result)
     return result
 
@@ -147,6 +153,8 @@ def _is_execution_bundle(operations: list[PlannerOperation]) -> bool:
 def _commit_execution_bundle(
     session: Session,
     operations: list[PlannerOperation],
+    *,
+    commit: bool,
 ) -> PlannerCommitResult:
     """Apply an analytical bundle in one session commit or roll back all target changes."""
 
@@ -163,6 +171,12 @@ def _commit_execution_bundle(
     current_operation: PlannerOperation | None = None
     try:
         for current_operation in committable:
+            if current_operation.operation_type == PlannerOperationType.CREATE_EXECUTION_OUTBOX:
+                continue
+            if current_operation.operation_type == PlannerOperationType.CREATE_EXECUTION_RUN:
+                _stage_execution_admission(session, committable)
+                session.flush()
+                continue
             _apply_operation(session, current_operation)
             # Surface FK/uniqueness errors before marking any operation successful.
             session.flush()
@@ -174,7 +188,8 @@ def _commit_execution_bundle(
                 operation.operation_id,
                 committed_at=committed_at,
             )
-        session.commit()
+        if commit:
+            session.commit()
     except Exception as exc:
         session.rollback()
         if current_operation is not None:
@@ -186,6 +201,49 @@ def _commit_execution_bundle(
     result.committed_operation_ids.extend(operation.operation_id for operation in committable)
     result.message = _result_message(result)
     return result
+
+
+def _stage_execution_admission(session: Session, operations: list[PlannerOperation]) -> None:
+    """Route the immutable run/outbox admission pair through its sole owner."""
+    run_operations = [
+        operation
+        for operation in operations
+        if operation.operation_type == PlannerOperationType.CREATE_EXECUTION_RUN
+    ]
+    outbox_operations = [
+        operation
+        for operation in operations
+        if operation.operation_type == PlannerOperationType.CREATE_EXECUTION_OUTBOX
+    ]
+    if not run_operations and not outbox_operations:
+        return
+    if len(run_operations) != 1 or len(outbox_operations) != 1:
+        raise ValueError("Execution admission requires exactly one ExecutionRun and one outbox.")
+    run = ExecutionRun(**run_operations[0].payload)
+    outbox = ExecutionOutbox(**outbox_operations[0].payload)
+    if session.get(ExecutionRunRecord, run.execution_run_id) is not None:
+        raise ValueError(f"ExecutionRun already exists: {run.execution_run_id}")
+    executor_type = run.executor_type
+    method_id = run.method_id
+    parameter_hash = run.parameter_hash
+    dispatch_idempotency_key = run.dispatch_idempotency_key
+    if None in (executor_type, method_id, parameter_hash, dispatch_idempotency_key):
+        raise ValueError("Execution admission requires complete immutable attempt identity.")
+    ExecutionAttemptTransitionService(session).stage_admit_attempt(
+        execution_run_id=run.execution_run_id,
+        task_id=run.task_id,
+        hypothesis_id=run.hypothesis_id,
+        analysis_frame_id=run.analysis_frame_id,
+        executor_type=executor_type,
+        method_id=method_id,
+        parameter_hash=parameter_hash,
+        dispatch_idempotency_key=dispatch_idempotency_key,
+        prepared_payload=outbox.prepared_payload,
+        previous_attempt_id=run.previous_attempt_id,
+        retry_reason=run.retry_reason,
+        retry_authorization_metadata=run.retry_authorization_metadata,
+        created_at=run.created_at,
+    )
 
 
 def _apply_operation(session: Session, operation: PlannerOperation) -> None:
@@ -210,6 +268,10 @@ def _apply_operation(session: Session, operation: PlannerOperation) -> None:
             _apply_create_execution_run(session, operation)
         case PlannerOperationType.UPDATE_EXECUTION_RUN:
             _apply_update_execution_run(session, operation)
+        case PlannerOperationType.CREATE_EXECUTION_OUTBOX:
+            _apply_create_execution_outbox(session, operation)
+        case PlannerOperationType.CREATE_EXECUTION_INBOX:
+            _apply_create_execution_inbox(session, operation)
         case PlannerOperationType.CREATE_EVIDENCE:
             _apply_create_evidence(session, operation)
         case PlannerOperationType.CREATE_DISCOVERY:
@@ -291,18 +353,31 @@ def _apply_create_analysis_frame(session: Session, operation: PlannerOperation) 
 
 
 def _apply_create_execution_run(session: Session, operation: PlannerOperation) -> None:
-    execution_run = ExecutionRun(**operation.payload)
-    if session.get(ExecutionRunRecord, execution_run.execution_run_id) is not None:
-        raise ValueError(f"ExecutionRun already exists: {execution_run.execution_run_id}")
-    ExecutionRunRepository(session).stage_create(execution_run)
+    raise ValueError(
+        "ExecutionRun creation is owned by ExecutionAttemptTransitionService; "
+        "PlannerOperation CREATE_EXECUTION_RUN must be staged via _stage_execution_admission."
+    )
 
 
 def _apply_update_execution_run(session: Session, operation: PlannerOperation) -> None:
-    execution_run_id = _require_payload_uuid(operation, "execution_run_id")
-    record = _require_record(session, ExecutionRunRecord, execution_run_id, "ExecutionRun")
-    if "status" in operation.payload:
-        record.status = operation.payload["status"]
-    session.add(record)
+    raise ValueError(
+        "ExecutionRun transitions are owned by ExecutionAttemptTransitionService; "
+        "PlannerOperation UPDATE_EXECUTION_RUN is not a production mutation path."
+    )
+
+
+def _apply_create_execution_outbox(session: Session, operation: PlannerOperation) -> None:
+    raise ValueError(
+        "ExecutionOutbox creation is owned by ExecutionAttemptTransitionService; "
+        "PlannerOperation CREATE_EXECUTION_OUTBOX must be staged via _stage_execution_admission."
+    )
+
+
+def _apply_create_execution_inbox(session: Session, operation: PlannerOperation) -> None:
+    raise ValueError(
+        "ExecutionInbox creation is owned by ExecutionAttemptTransitionService; "
+        "PlannerOperation CREATE_EXECUTION_INBOX is not a production mutation path."
+    )
 
 
 def _apply_create_evidence(session: Session, operation: PlannerOperation) -> None:
