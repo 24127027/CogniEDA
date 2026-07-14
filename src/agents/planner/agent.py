@@ -1,10 +1,14 @@
 """Planner agent wrapper."""
 
+from uuid import UUID
+
+from langgraph.checkpoint.memory import MemorySaver
+
 from tools.builtin_tools import AvailableBuiltinTools
 
 from ..types import RuntimePayload
 from .graph import build_graph
-from .types import AnalyticalExecutor, Context, PlannerOutput, State
+from .types import AnalyticalExecutor, Context, PlannerDecision, PlannerOutput, State
 
 
 class Planner:
@@ -19,8 +23,12 @@ class Planner:
         *,
         database_url: str | None = None,
         analytical_executor: AnalyticalExecutor | None = None,
+        checkpointer=None,
     ) -> None:
-        self.graph = build_graph()
+        self.checkpointer = checkpointer or MemorySaver()
+        self.graph = build_graph(checkpointer=self.checkpointer)
+        self._database_url = database_url
+        self._analytical_executor = analytical_executor
         self._database_url = database_url
         self._analytical_executor = analytical_executor
 
@@ -28,12 +36,35 @@ class Planner:
         self,
         query: str,
         session_frame: Context | None = None,
+        decision: PlannerDecision | None = None,
     ) -> RuntimePayload:
         """Run the Planner agent with the given query and session frame."""
 
-        input = State(query=query)
         context = self.prepare_context(session_frame)
-        final_state_dict = await self.graph.ainvoke(input, context=context)
+        if context.database_url:
+            from db.session import get_session
+
+            from .reconciler import ExecutionReconciler
+            session = get_session(context.database_url)
+            try:
+                ExecutionReconciler(session).reconcile_all()
+            finally:
+                session.close()
+
+        resume_approval_id: UUID | None = None
+        if decision is not None and decision.proposal_id is not None:
+            try:
+                resume_approval_id = UUID(decision.proposal_id)
+            except ValueError:
+                resume_approval_id = None
+        input = State(
+            query=query,
+            planner_decision=decision,
+            resume_approval_id=resume_approval_id,
+            session_id=context.session_id or "default",
+        )
+        config = {"configurable": {"thread_id": context.session_id or "default"}}
+        final_state_dict = await self.graph.ainvoke(input, config=config, context=context)
         final_state = State(**final_state_dict)
 
         payload = self.prepare_payload(final_state)
@@ -45,7 +76,20 @@ class Planner:
         """
         return RuntimePayload(
             payload=PlannerOutput(
+                response_text=state.response_text,
+                session_frame_id=state.active_session_frame_id,
+                requested_capability=state.requested_capability,
+                pending_interaction=state.pending_interaction,
+                controlled_error=state.controlled_error,
+                controlled_placeholder=state.controlled_placeholder,
+                committed_operation_ids=state.operation_ids_to_commit or [],
                 planner_operations=state.planner_operations,
+                executor_dispatch_ref=(
+                    state.resolve_object_reference(state.execution_admission.execution_run_ref)
+                    if state.execution_admission is not None
+                    and state.execution_admission.execution_run_ref is not None
+                    else None
+                ),
                 commit_result=state.commit_result,
             )
         )
