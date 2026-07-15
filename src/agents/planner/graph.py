@@ -27,8 +27,8 @@ INTENT_ROUTES = {
     "review_profile": R.invalid_request,
     "clean": R.invalid_request,
     "accept_profile": R.invalid_request,
-    "review_result": R.invalid_request,
-    "review_conflict": R.invalid_request,
+    "review_result": R.review_result,
+    "review_conflict": R.review_conflict,
 }
 
 DECISION_ROUTES = {
@@ -69,13 +69,19 @@ def build_graph(
     # --------------------------------------------------
 
     builder.add_conditional_edges(
+        R.understand_request,
+        route_intent,
+        {
+            "invalid_request": R.invalid_request,
+            **{k: R.contextual_grounding for k in INTENT_ROUTES if k != "invalid_request"},
+        },
+    )
+
+    builder.add_conditional_edges(
         R.contextual_grounding,
         route_intent,
         INTENT_ROUTES,
     )
-    # Contextual grounding is where later SessionFrame-aware flows can resolve
-    # references before intent-specific work begins.
-    builder.add_edge(R.understand_request, R.contextual_grounding)
 
     # --------------------------------------------------
     # Question answering
@@ -104,12 +110,7 @@ def build_graph(
     # Execution is deliberately approval-gated.  A prepared contract is not a
     # dispatch authorization until the decision node revalidates its snapshot.
     builder.add_edge(R.prepare_execution, R.request_user_input)
-    builder.add_edge(R.commit_execution_contract, R.dispatch_executor)
-    builder.add_edge(R.dispatch_executor, R.review_execution)
-    builder.add_edge(R.review_execution, R.validate_evidence)
-    builder.add_edge(R.validate_evidence, R.evaluate_hypothesis)
-    builder.add_edge(R.evaluate_hypothesis, R.review_conflicts)
-    builder.add_edge(R.review_conflicts, R.request_user_input)
+    builder.add_edge(R.commit_execution_contract, END)
 
     # --------------------------------------------------
     # Knowledge management
