@@ -9,7 +9,6 @@ from langgraph.runtime import Runtime
 from agents.planner.agent import Planner
 from agents.planner.graph import build_graph
 from agents.planner.nodes import (
-    _method_parameter_hash,
     prepare_execution,
     process_decision,
     request_user_input,
@@ -32,6 +31,7 @@ from application.orchestrator import reconciler as reconciliation_module
 from application.orchestrator.dispatcher import dispatch_pending_attempts
 from application.orchestrator.finalizer import finalize_attempt
 from application.orchestrator.planner_commit import commit_planner_operations
+from application.orchestrator.scientific_processing import _method_parameter_hash
 from db.session import get_session
 from repositories import (
     AnalysisFrameRepository,
@@ -137,11 +137,10 @@ class FakeExecutor:
                     key_findings=["deterministic fake result"],
                     metric_name="p_value",
                     metric_value=(
-                        0.01 if self.outcome == HypothesisEvidenceOutcome.SUPPORTS
+                        0.01
+                        if self.outcome == HypothesisEvidenceOutcome.SUPPORTS
                         else (
-                            0.1
-                            if self.outcome == HypothesisEvidenceOutcome.INCONCLUSIVE
-                            else None
+                            0.1 if self.outcome == HypothesisEvidenceOutcome.INCONCLUSIVE else None
                         )
                     ),
                 ),
@@ -236,8 +235,7 @@ def _dispatch_and_finalize(db_session, executor: FakeExecutor, task: Task) -> UU
     dispatch_session = get_session(database_url)
     try:
         assert (
-            asyncio.run(dispatch_pending_attempts(dispatch_session, executor, "test-worker"))
-            == 1
+            asyncio.run(dispatch_pending_attempts(dispatch_session, executor, "test-worker")) == 1
         )
     finally:
         dispatch_session.close()
@@ -680,9 +678,7 @@ def test_public_planner_resumes_durable_approval_in_a_new_instance(db_session, m
     assert len(executor.requests) == 1
     hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)
     assert len(hypothesis) == 1
-    discoveries = DiscoveryRepository(db_session).list_for_hypothesis(
-        hypothesis[0].hypothesis_id
-    )
+    discoveries = DiscoveryRepository(db_session).list_for_hypothesis(hypothesis[0].hypothesis_id)
     assert len(discoveries) == 1
     assert len(reconcile_calls) == 2
 
@@ -700,9 +696,7 @@ def test_durable_topology_survives_planner_and_dispatcher_replacement(db_session
     planner_executor = FakeExecutor()
     context = Context(session_id="durable-topology")
     first = asyncio.run(
-        Planner(database_url=database_url).run(
-            f"/execute {task.task_id}", context
-        )
+        Planner(database_url=database_url).run(f"/execute {task.task_id}", context)
     ).payload
     assert first.pending_interaction is not None
     assert planner_executor.requests == []
@@ -722,16 +716,22 @@ def test_durable_topology_survives_planner_and_dispatcher_replacement(db_session
     assert planner_executor.requests == []
     run_id = UUID(admitted.executor_dispatch_ref)
     assert len(ExecutionOutboxRepository(db_session).list(execution_run_id=run_id)) == 1
-    assert EvidenceRepository(db_session).list_for_hypothesis(
-        HypothesisRepository(db_session).list(task_id=task.task_id)[0].hypothesis_id
-    ) == []
+    assert (
+        EvidenceRepository(db_session).list_for_hypothesis(
+            HypothesisRepository(db_session).list(task_id=task.task_id)[0].hypothesis_id
+        )
+        == []
+    )
 
     dispatcher_executor = FakeExecutor()
     dispatch_session = get_session(database_url)
     try:
-        assert asyncio.run(
-            dispatch_pending_attempts(dispatch_session, dispatcher_executor, "worker-b")
-        ) == 1
+        assert (
+            asyncio.run(
+                dispatch_pending_attempts(dispatch_session, dispatcher_executor, "worker-b")
+            )
+            == 1
+        )
     finally:
         dispatch_session.close()
     assert len(dispatcher_executor.requests) == 1
@@ -757,9 +757,7 @@ def test_public_planner_rejects_stale_durable_approval(db_session) -> None:
     executor = FakeExecutor()
     context = Context(session_id="stale-approval-session")
     first = asyncio.run(
-        Planner(database_url=database_url).run(
-            f"/execute {task.task_id}", context
-        )
+        Planner(database_url=database_url).run(f"/execute {task.task_id}", context)
     ).payload
     assert first.pending_interaction is not None
 
@@ -846,8 +844,7 @@ def test_hypothesis_accumulates_evidence_until_explicit_finalization(db_session)
     discoveries = DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)
     evidence = EvidenceRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)
     assert (
-        second_state.execution_admission is not None
-        and second_state.execution_admission.admitted
+        second_state.execution_admission is not None and second_state.execution_admission.admitted
     )
     _dispatch_and_finalize(db_session, FakeExecutor(finalize=True), task)
     discoveries = DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)
@@ -923,13 +920,15 @@ def test_inconclusive_execution_does_not_overclaim_no_relationship(db_session) -
     task = _persist_ready_task(db_session)
     executor = FakeExecutor(outcome=HypothesisEvidenceOutcome.INSUFFICIENT_EVIDENCE)
 
-    final_state = State.model_validate(build_graph().invoke(
-        State(
-            query=f"/execute {task.task_id}",
-            planner_decision={"action": "approve"},
-        ),
-        context=_context(db_session, FailIfCalledRequestModel()),
-    ))
+    final_state = State.model_validate(
+        build_graph().invoke(
+            State(
+                query=f"/execute {task.task_id}",
+                planner_decision={"action": "approve"},
+            ),
+            context=_context(db_session, FailIfCalledRequestModel()),
+        )
+    )
     assert final_state.execution_admission is not None and final_state.execution_admission.admitted
     _dispatch_and_finalize(db_session, executor, task)
 

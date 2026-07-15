@@ -8,6 +8,14 @@ from agents.planner.graph import (
 )
 from agents.planner.nodes import registry
 
+FORBIDDEN_SCIENTIFIC_NODES = {
+    "dispatch_executor",
+    "review_execution",
+    "validate_evidence",
+    "evaluate_hypothesis",
+    "review_conflicts",
+}
+
 
 def _edges_by_source() -> dict[str, set[str]]:
     graph = build_graph().get_graph()
@@ -33,6 +41,13 @@ def test_compiled_graph_contains_every_registered_planner_node() -> None:
     assert set(registry.nodes) <= set(build_graph().get_graph().nodes)
 
 
+def test_scientific_processing_nodes_are_not_registered_or_compiled() -> None:
+    compiled_nodes = set(build_graph().get_graph().nodes)
+
+    assert FORBIDDEN_SCIENTIFIC_NODES.isdisjoint(registry.nodes)
+    assert FORBIDDEN_SCIENTIFIC_NODES.isdisjoint(compiled_nodes)
+
+
 def test_all_declared_router_destinations_are_compiled_nodes() -> None:
     compiled_nodes = set(build_graph().get_graph().nodes)
 
@@ -53,7 +68,7 @@ def test_every_registered_planner_node_has_incoming_and_outgoing_edges() -> None
     assert set(registry.nodes) <= set(edges)
 
 
-def test_connected_workflow_order_includes_execution_processing_chain() -> None:
+def test_connected_workflow_order_terminates_at_execution_commit() -> None:
     edges = _edges_by_source()
 
     assert "contextual_grounding" in edges["understand_request"]
@@ -62,11 +77,5 @@ def test_connected_workflow_order_includes_execution_processing_chain() -> None:
     assert "pause" in edges["request_user_input"]
     assert "process_decision" in edges["pause"]
     assert "commit_execution_contract" in edges["process_decision"]
-    assert "dispatch_executor" in edges["commit_execution_contract"]
-    assert "review_execution" in edges["dispatch_executor"]
-    assert "validate_evidence" in edges["review_execution"]
-    assert "evaluate_hypothesis" in edges["validate_evidence"]
-    assert "review_conflicts" in edges["evaluate_hypothesis"]
-    assert "request_user_input" in edges["review_conflicts"]
-    assert "__end__" not in edges["commit_execution_contract"]
-    assert "commit" not in edges["review_conflicts"]
+    assert "__end__" in edges["commit_execution_contract"]
+    assert "dispatch_executor" not in edges["commit_execution_contract"]

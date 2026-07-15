@@ -5,7 +5,7 @@ from langgraph.runtime import Runtime
 from pydantic_ai.messages import ModelRequest, UserPromptPart
 
 from agents.planner.graph import INTENT_ROUTES, build_graph
-from agents.planner.nodes import registry, route_intent, understand_request
+from agents.planner.nodes import contextual_grounding, registry, route_intent, understand_request
 from agents.planner.types import (
     COMMAND_TO_INTENT,
     Context,
@@ -201,13 +201,106 @@ def test_graph_terminates_unknown_commands_on_the_invalid_request_route() -> Non
     assert final_state.controlled_error is None
 
 
+def test_graph_classifies_once_then_grounds_before_routing_a_recognized_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = FakeRequestUnderstandingModel(
+        RequestUnderstanding(
+            intent="manage_task",
+            request_text="create a task",
+            source="llm",
+        )
+    )
+    observed_intents: list[str | None] = []
+
+    def observe_grounding(state: State, runtime: Runtime[Context]) -> State | None:
+        assert state.request_understanding is not None
+        observed_intents.append(state.request_understanding.intent)
+        return contextual_grounding(state, runtime)
+
+    monkeypatch.setitem(registry._registry, "contextual_grounding", observe_grounding)
+    updates = list(
+        build_graph().stream(
+            State(query="Please create a task."),
+            context=Context(request_understanding_model=model),
+            stream_mode="updates",
+        )
+    )
+    node_names = [next(iter(update)) for update in updates]
+
+    assert model.prompts and len(model.prompts) == 1
+    assert node_names.index("understand_request") < node_names.index("contextual_grounding")
+    assert node_names.index("contextual_grounding") < node_names.index("manage_tasks")
+    assert observed_intents == ["manage_task"]
+
+
+def test_invalid_request_bypasses_contextual_grounding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = FakeRequestUnderstandingModel(
+        RequestUnderstanding(intent="answer", request_text="unexpected", source="llm")
+    )
+    grounding_calls = 0
+
+    def observe_grounding(state: State, runtime: Runtime[Context]) -> State | None:
+        nonlocal grounding_calls
+        grounding_calls += 1
+        return contextual_grounding(state, runtime)
+
+    monkeypatch.setitem(registry._registry, "contextual_grounding", observe_grounding)
+    updates = list(
+        build_graph().stream(
+            State(query="/unknown"),
+            context=Context(request_understanding_model=model),
+            stream_mode="updates",
+        )
+    )
+    node_names = [next(iter(update)) for update in updates]
+
+    assert "invalid_request" in node_names
+    assert "contextual_grounding" not in node_names
+    assert grounding_calls == 0
+    assert model.prompts == []
+
+
+def test_unclassifiable_request_bypasses_contextual_grounding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = FakeRequestUnderstandingModel(
+        RequestUnderstanding(intent=None, request_text="unclear", source="llm")
+    )
+    grounding_calls = 0
+
+    def observe_grounding(state: State, runtime: Runtime[Context]) -> State | None:
+        nonlocal grounding_calls
+        grounding_calls += 1
+        return contextual_grounding(state, runtime)
+
+    monkeypatch.setitem(registry._registry, "contextual_grounding", observe_grounding)
+    updates = list(
+        build_graph().stream(
+            State(query="Please do something unclear."),
+            context=Context(request_understanding_model=model),
+            stream_mode="updates",
+        )
+    )
+    node_names = [next(iter(update)) for update in updates]
+
+    assert "invalid_request" in node_names
+    assert "contextual_grounding" not in node_names
+    assert grounding_calls == 0
+    assert len(model.prompts) == 1
+
+
 @pytest.mark.parametrize(
     ("command", "intent", "node_name"),
     [
         ("register_dataset", "register_dataset", "register_dataset"),
         ("profile", "profile", "profile"),
-        ("review_result", "review_result", "review_result"),
-        ("review_conflict", "review_conflict", "review_conflict"),
+        ("close_project", "close_project", "close_project"),
+        ("review_profile", "review_profile", "review_profile"),
+        ("clean", "clean", "clean"),
+        ("accept_profile", "accept_profile", "accept_profile"),
     ],
 )
 def test_known_unsupported_commands_use_the_existing_invalid_request_path(
@@ -227,6 +320,36 @@ def test_known_unsupported_commands_use_the_existing_invalid_request_path(
     assert final_state.controlled_error is None
 
 
+@pytest.mark.parametrize(
+    ("command", "intent", "node_name"),
+    [
+        ("review_result", "review_result", "review_result"),
+        ("review_conflict", "review_conflict", "review_conflict"),
+    ],
+)
+def test_future_commands_use_dedicated_planner_nodes(
+    command: str,
+    intent: str,
+    node_name: str,
+) -> None:
+    state = State(query=f"/{command} requested work")
+
+    graph = build_graph()
+    updates = list(graph.stream(state, context=Context(), stream_mode="updates"))
+    node_names = [next(iter(update)) for update in updates]
+    result = graph.invoke(state, context=Context())
+    final_state = State.model_validate(result)
+
+    assert "contextual_grounding" in node_names
+    assert node_name in node_names
+    assert node_names.index("contextual_grounding") < node_names.index(node_name)
+    assert route_intent(final_state, runtime_with()) == node_name
+    assert final_state.request_understanding is not None
+    assert final_state.request_understanding.intent == intent
+    assert INTENT_ROUTES[node_name] == node_name
+    assert final_state.controlled_error is None
+
+
 def test_compiled_graph_contains_intended_planner_nodes() -> None:
     intended_nodes = {
         "check_answerability",
@@ -239,11 +362,6 @@ def test_compiled_graph_contains_intended_planner_nodes() -> None:
         "prepare_execution",
         "request_user_input",
         "pause",
-        "process_decision",
-        "review_execution",
-        "validate_evidence",
-        "evaluate_hypothesis",
-        "review_conflicts",
         "manage_objective",
         "manage_assumptions",
         "commit",
@@ -251,6 +369,15 @@ def test_compiled_graph_contains_intended_planner_nodes() -> None:
         "understand_request",
         "resume_execution",
         "invalid_request",
+        "review_result",
+        "review_conflict",
+    }
+
+    forbidden_nodes = {
+        "review_execution",
+        "validate_evidence",
+        "evaluate_hypothesis",
+        "review_conflicts",
         "dispatch_executor",
     }
 
@@ -258,3 +385,4 @@ def test_compiled_graph_contains_intended_planner_nodes() -> None:
 
     assert intended_nodes <= set(registry.nodes)
     assert intended_nodes <= compiled_nodes
+    assert forbidden_nodes.isdisjoint(compiled_nodes)
