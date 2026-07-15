@@ -43,6 +43,7 @@ class TaskUpdateOperationPayload(BaseModel):
     profile_id: UUID | None = None
     variables: list[str] | None = None
     evidence_expectation: str | None = None
+    motivated_by_discovery_ids: list[UUID] | None = None
 
 
 class TaskStateChangeOperationPayload(BaseModel):

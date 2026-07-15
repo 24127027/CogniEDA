@@ -232,6 +232,7 @@ class TaskUpdateDraft(BaseModel):
     data_profile_ref: str | None = None
     variables: list[str] | None = None
     evidence_expectation: str | None = None
+    motivated_by_discovery_ids: list[UUID] | None = None
 
     def operation_payload(
         self,

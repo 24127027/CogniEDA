@@ -85,3 +85,49 @@ def upgrade_pre_repair_database(engine: Engine) -> None:
     ExecutionApprovalRecord.__table__.create(engine, checkfirst=True)
     ExecutionOutboxRecord.__table__.create(engine, checkfirst=True)
     ExecutionInboxRecord.__table__.create(engine, checkfirst=True)
+
+
+def upgrade_task_motivation_schema(engine: Engine) -> None:
+    """Upgrade Tasks schema to include motivated_by_discovery_ids.
+
+    Adds a JSON column initialized to an empty list '[]' for all existing tasks.
+    """
+
+    if engine.dialect.name != "sqlite":
+        raise ValueError(
+            "Task motivation schema migration supports SQLite only; "
+            f"received {engine.dialect.name!r}."
+        )
+
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "tasks" in tables:
+        existing_columns = {column["name"] for column in inspector.get_columns("tasks")}
+        if "motivated_by_discovery_ids" not in existing_columns:
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "ALTER TABLE tasks ADD COLUMN motivated_by_discovery_ids "
+                        "JSON NOT NULL DEFAULT '[]'"
+                    )
+                )
+
+
+def downgrade_task_motivation_schema(engine: Engine) -> None:
+    """Downgrade Tasks schema by removing motivated_by_discovery_ids."""
+
+    if engine.dialect.name != "sqlite":
+        raise ValueError(
+            "Task motivation schema migration supports SQLite only; "
+            f"received {engine.dialect.name!r}."
+        )
+
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "tasks" in tables:
+        existing_columns = {column["name"] for column in inspector.get_columns("tasks")}
+        if "motivated_by_discovery_ids" in existing_columns:
+            with engine.begin() as connection:
+                connection.execute(
+                    text("ALTER TABLE tasks DROP COLUMN motivated_by_discovery_ids")
+                )

@@ -11,6 +11,7 @@ from application.orchestrator.transition_service import ExecutionAttemptTransiti
 from db.models import (
     AnalysisFrameRecord,
     AssumptionRecord,
+    DiscoveryRecord,
     ExecutionRunRecord,
     HypothesisRecord,
     ObjectiveRecord,
@@ -72,10 +73,10 @@ def commit_planner_operations(
 ) -> PlannerCommitResult:
     """Dispatch approved PlannerOperations through the commit boundary.
 
-    The current implementation is intentionally skeleton-first. It shows that
-    planner nodes produce operations and that commit is the only place where
-    approved operations are applied. Future work should add explicit
-    transaction scope, rollback provenance, and the user-approval workflow here.
+    Planner nodes produce operations and commit is the only place where
+    approved operations are applied. Each requested batch is all-or-nothing:
+    a validation or persistence failure rolls back every target mutation and
+    leaves persisted operations uncommitted.
     """
 
     candidate_operations = operations
@@ -90,32 +91,41 @@ def commit_planner_operations(
         return _commit_execution_bundle(session, candidate_operations, commit=commit)
 
     result = PlannerCommitResult()
+    committable = [
+        operation
+        for operation in candidate_operations
+        if operation.approval_state in _COMMITTABLE_STATES
+    ]
+    result.skipped_operation_ids.extend(
+        operation.operation_id
+        for operation in candidate_operations
+        if operation.approval_state not in _COMMITTABLE_STATES
+    )
     committed_at = datetime.now(UTC)
-    for operation in candidate_operations:
-        if operation.approval_state not in _COMMITTABLE_STATES:
-            result.skipped_operation_ids.append(operation.operation_id)
-            continue
+    current_operation: PlannerOperation | None = None
+    try:
+        for current_operation in committable:
+            _apply_operation(session, current_operation)
+            session.flush()
+        for operation in committable:
+            operation.approval_state = PlannerOperationApprovalState.COMMITTED
+            operation.committed_at = committed_at
+            _mark_persisted_operation_committed(
+                session,
+                operation.operation_id,
+                committed_at=committed_at,
+            )
+        if commit:
+            session.commit()
+    except Exception as exc:
+        session.rollback()
+        if current_operation is not None:
+            result.failed_operation_ids.append(current_operation.operation_id)
+            result.errors[current_operation.operation_id] = str(exc)
+        result.message = _result_message(result)
+        return result
 
-        try:
-            _apply_operation(session, operation)
-        except Exception as exc:
-            result.failed_operation_ids.append(operation.operation_id)
-            result.errors[operation.operation_id] = str(exc)
-            continue
-
-        operation.approval_state = PlannerOperationApprovalState.COMMITTED
-        operation.committed_at = committed_at
-        _mark_persisted_operation_committed(
-            session,
-            operation.operation_id,
-            committed_at=committed_at,
-        )
-        result.committed_operation_ids.append(operation.operation_id)
-
-    # This single flush is only the skeleton boundary. Production commit should
-    # make transaction, rollback, and approval semantics explicit in this layer.
-    if commit:
-        session.commit()
+    result.committed_operation_ids.extend(operation.operation_id for operation in committable)
     result.message = _result_message(result)
     return result
 
@@ -290,6 +300,7 @@ def _apply_create_task(session: Session, operation: PlannerOperation) -> None:
     task = Task(**operation.payload)
     if session.get(TaskRecord, task.task_id) is not None:
         raise ValueError(f"Task already exists: {task.task_id}")
+    _require_motivating_discoveries(session, task.motivated_by_discovery_ids)
     session.add(TaskRecord(**schema_to_record_payload(task, json_fields=TASK_JSON_FIELDS)))
 
 
@@ -300,8 +311,19 @@ def _apply_update_task(session: Session, operation: PlannerOperation) -> None:
     payload.pop("task_id", None)
     update = TaskUpdate(**payload)
     _require_update_payload(update.model_fields_set, operation.operation_type.value)
+    if update.motivated_by_discovery_ids is not None:
+        _require_motivating_discoveries(session, update.motivated_by_discovery_ids)
+
     apply_update(task_record, update, json_fields=TASK_JSON_FIELDS)
     session.add(task_record)
+
+
+def _require_motivating_discoveries(session: Session, discovery_ids: list[UUID]) -> None:
+    """Require motivation references from the current workspace-local graph."""
+
+    for discovery_id in discovery_ids:
+        if session.get(DiscoveryRecord, discovery_id) is None:
+            raise ValueError(f"Referenced Discovery does not exist: {discovery_id}")
 
 
 def _apply_change_task_state(session: Session, operation: PlannerOperation) -> None:

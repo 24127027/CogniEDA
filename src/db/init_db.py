@@ -13,9 +13,10 @@ def init_db(database_url: str | None = None) -> str:
 
     resolved_url = database_url or get_database_url()
     engine = create_db_engine(resolved_url)
-    from db.migrations import upgrade_pre_repair_database
+    from db.migrations import upgrade_pre_repair_database, upgrade_task_motivation_schema
 
     upgrade_pre_repair_database(engine)
+    upgrade_task_motivation_schema(engine)
     SQLModel.metadata.create_all(engine)
 
     return resolved_url

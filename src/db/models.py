@@ -171,6 +171,11 @@ class TaskRecord(TimestampedRecord, table=True):
         default=None,
         sa_column=Column(JSON, nullable=True),
     )
+    motivated_by_discovery_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+
 
 
 class HypothesisRecord(TimestampedRecord, table=True):

@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from sqlmodel import Session, desc, select
 
-from db.models import TaskRecord
+from db.models import DiscoveryRecord, TaskRecord
 from repositories.common import apply_update, record_to_schema, schema_to_record_payload
 from schemas.artifacts import Task
 from schemas.enums import TaskKind, TaskLifecycleState
 
-TASK_JSON_FIELDS = {"variables", "analytical_specification"}
+TASK_JSON_FIELDS = {"variables", "analytical_specification", "motivated_by_discovery_ids"}
 
 
 class TaskUpdate(BaseModel):
@@ -30,7 +31,24 @@ class TaskUpdate(BaseModel):
     variables: list[str] | None = None
     evidence_expectation: str | None = None
     analytical_specification: dict[str, object] | None = None
+    motivated_by_discovery_ids: list[UUID] | None = None
     updated_at: datetime | None = None
+
+    @field_validator("motivated_by_discovery_ids")
+    @classmethod
+    def _validate_unique_discovery_ids(cls, value: list[UUID] | None) -> list[UUID] | None:
+        if value is not None and len(value) != len(set(value)):
+            raise ValueError("motivated_by_discovery_ids must not contain duplicates")
+        return value
+
+    @model_validator(mode="after")
+    def _reject_explicit_null_motivation(self) -> TaskUpdate:
+        if (
+            "motivated_by_discovery_ids" in self.model_fields_set
+            and self.motivated_by_discovery_ids is None
+        ):
+            raise ValueError("motivated_by_discovery_ids must be a list when provided")
+        return self
 
 
 class TaskRepository:
@@ -42,6 +60,7 @@ class TaskRepository:
     def create(self, task: Task) -> Task:
         """Persist and return a new Task."""
 
+        self._validate_motivating_discoveries(task.motivated_by_discovery_ids)
         record = TaskRecord(**schema_to_record_payload(task, json_fields=TASK_JSON_FIELDS))
         self._session.add(record)
         self._session.commit()
@@ -81,8 +100,17 @@ class TaskRepository:
         record = self._session.get(TaskRecord, task_id)
         if record is None:
             return None
+        if "motivated_by_discovery_ids" in update.model_fields_set:
+            self._validate_motivating_discoveries(update.motivated_by_discovery_ids or [])
         apply_update(record, update, json_fields=TASK_JSON_FIELDS)
         self._session.add(record)
         self._session.commit()
         self._session.refresh(record)
         return record_to_schema(Task, record)
+
+    def _validate_motivating_discoveries(self, discovery_ids: Sequence[UUID]) -> None:
+        """Require motivation references from this workspace-local graph."""
+
+        for discovery_id in discovery_ids:
+            if self._session.get(DiscoveryRecord, discovery_id) is None:
+                raise ValueError(f"Referenced Discovery does not exist: {discovery_id}")

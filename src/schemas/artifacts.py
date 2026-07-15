@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
-from pydantic import Field, NonNegativeInt, model_validator
+from pydantic import Field, NonNegativeInt, field_validator, model_validator
 
 from schemas.common import (
     AssumptionContextSummary,
@@ -138,8 +138,16 @@ class Task(CogniEDABaseModel):
     variables: list[NonEmptyStr] = Field(default_factory=list)
     evidence_expectation: str | None = None
     analytical_specification: AnalyticalSpecification | None = None
+    motivated_by_discovery_ids: list[UUID] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+    @field_validator("motivated_by_discovery_ids")
+    @classmethod
+    def _validate_unique_discovery_ids(cls, v: list[UUID]) -> list[UUID]:
+        if len(v) != len(set(v)):
+            raise ValueError("motivated_by_discovery_ids must not contain duplicates")
+        return v
 
     def can_generate_hypothesis(
         self,
