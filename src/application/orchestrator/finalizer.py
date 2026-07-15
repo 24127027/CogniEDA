@@ -7,11 +7,9 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from langgraph.runtime import Runtime
 from sqlmodel import Session, select
 
-from agents.planner.nodes import evaluate_hypothesis, review_execution, validate_evidence
-from agents.planner.types import Context, ExecutorResult, PreparedExecution, State
+from application.orchestrator.execution_contracts import ExecutorResult, PreparedExecution
 from application.orchestrator.planner_commit import commit_planner_operations
 from application.orchestrator.transition_service import (
     AlreadyCompletedError,
@@ -65,6 +63,9 @@ def finalize_attempt(
         raise ClaimLostError("claim_lost")
 
     run = session.get(ExecutionRunRecord, execution_run_id)
+    if run is None:
+        session.rollback()
+        return False
 
     inbox = session.exec(
         select(ExecutionInboxRecord).where(
@@ -90,6 +91,8 @@ def finalize_attempt(
     if inbox.executor_status == "failed":
         return _finalize_execution_failure(session, run, inbox, transition_service)
     try:
+        from application.orchestrator.scientific_processing import process_scientific_result
+
         result = ExecutorResult.model_validate(inbox.serialized_observations)
         prepared = PreparedExecution.model_validate(outbox.prepared_payload).model_copy(
             update={
@@ -100,29 +103,21 @@ def finalize_attempt(
                 "lease_epoch": run.lease_epoch,
             }
         )
-        state = State(
-            query="",
+
+        profile_id = _profile_id_for_run(session, run)
+
+        success, operations = process_scientific_result(
+            session=session,
             session_id="durable-finalizer",
-            prepared_execution=prepared,
-            executor_result=result,
-            object_reference_index={
-                prepared.task_ref: str(run.task_id),
-                prepared.data_profile_ref: str(_profile_id_for_run(session, run)),
-                prepared.hypothesis_ref: str(run.hypothesis_id),
-                prepared.execution_run_ref: str(run.execution_run_id),
-            },
+            prepared=prepared,
+            result=result,
+            run=run,
+            profile_id=profile_id,
+            hypothesis_id=run.hypothesis_id,
+            task_id=run.task_id,
         )
-        database_url = str(session.get_bind().url)
-        runtime = Runtime(context=Context(database_url=database_url))
-        review_execution(state, runtime)
-        state.planner_operations = [
-            operation
-            for operation in state.planner_operations
-            if operation.operation_type != PlannerOperationType.CREATE_EXECUTION_INBOX
-        ]
-        validate_evidence(state, runtime)
-        evaluate_hypothesis(state, runtime)
-        if state.execution_review is not None and not state.execution_review.succeeded:
+
+        if not success:
             return _finalize_execution_failure(session, run, inbox, transition_service)
 
         if run.finalization_fencing_epoch is None:
@@ -139,12 +134,14 @@ def finalize_attempt(
         ) or not transition_service.stage_consume_inbox(inbox.inbox_id):
             session.rollback()
             return False
-        state.planner_operations = [
+
+        # Exclude UPDATE_EXECUTION_RUN since stage_complete_finalization handles the run status
+        operations = [
             operation
-            for operation in state.planner_operations
+            for operation in operations
             if operation.operation_type != PlannerOperationType.UPDATE_EXECUTION_RUN
         ]
-        result_commit = commit_planner_operations(session, state.planner_operations, commit=False)
+        result_commit = commit_planner_operations(session, operations, commit=False)
         if result_commit.failed_operation_ids:
             session.rollback()
             return False
@@ -176,7 +173,7 @@ def _finalize_execution_failure(
 ) -> bool:
     """Durably classify a failed execution without manufacturing Evidence."""
 
-    if run.finalization_fencing_epoch is None:
+    if run.finalization_fencing_epoch is None or run.hypothesis_id is None:
         return False
     if not transition_service.stage_fail_finalization(
         execution_run_id=run.execution_run_id,
