@@ -9,7 +9,7 @@ from uuid import UUID
 
 from sqlmodel import Session
 
-from agents.planner.types import ExecutorResult
+from application.orchestrator.execution_contracts import ExecutorResult
 from db.models import ExecutionInboxRecord
 
 

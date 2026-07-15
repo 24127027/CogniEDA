@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlmodel import Session
 
-from agents.planner.types import PreparedExecution
+from application.orchestrator.execution_contracts import PreparedExecution
 from application.orchestrator.receiver import submit_execution_result
 from application.orchestrator.transition_service import ExecutionAttemptTransitionService
 from db.models import ExecutionOutboxRecord
