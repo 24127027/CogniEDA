@@ -4,7 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from langgraph.runtime import Runtime
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlmodel import Session
 
 from application.orchestrator.execution_admission import build_execution_admission_operations
@@ -13,7 +13,7 @@ from application.orchestrator.scientific_processing import (
     _execution_operation,
     _method_parameter_hash,
 )
-from db.models import ExecutionApprovalRecord
+from db.models import ExecutionApprovalRecord, PlannerOperationRecord
 from db.session import get_session
 from repositories import (
     DataProfileRepository,
@@ -52,7 +52,10 @@ from .types import (
     RequestUnderstanding,
     RequestUnderstandingModel,
     State,
+    TaskCreateDraft,
     TaskSelection,
+    TaskStateChangeDraft,
+    TaskUpdateDraft,
     parse_explicit_command,
 )
 
@@ -70,7 +73,12 @@ class _ConfiguredRequestUnderstandingModel(RequestUnderstandingModel):
     def __init__(self) -> None:
         from agents.llm import ModelConfig, create_agent
 
-        self._agent = create_agent("planner", ModelConfig())
+        self._agent = create_agent(
+            worker="planner",
+            config=ModelConfig(),
+            deps_type=type(None),
+            builtin_tools=[],
+        )
 
     def understand(self, prompt: str) -> RequestUnderstanding:
         result = self._agent.run_sync(prompt, output_type=RequestUnderstanding)
@@ -165,7 +173,7 @@ def understand_request(state: State, runtime: Runtime[Context]) -> State:
         state.request_understanding = RequestUnderstanding.model_validate(
             model.understand(_request_understanding_prompt(state.query))
         )
-    except (TypeError, ValueError, ValidationError):
+    except Exception:
         state.request_understanding = _invalid_llm_understanding(state.query)
     return state
 
@@ -187,6 +195,8 @@ def route_intent(state: State, runtime: Runtime[Context]) -> str:
 def route_entry(state: State, runtime: Runtime[Context]) -> str:
     """Resume only through a durable approval identifier when one is supplied."""
 
+    if state.resume_operation_ids or state.resume_operation_proposal_id is not None:
+        return "resume_planner_operations"
     return "resume_execution" if state.resume_approval_id is not None else "understand_request"
 
 
@@ -252,6 +262,61 @@ def expand_plan(state: State, runtime: Runtime[Context]) -> None:
 # --------------------
 
 
+class TaskManagementDraft(BaseModel):
+    """Structured output for translating a user request into task operations."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    task_create_payloads: list[TaskCreateDraft] = Field(default_factory=list)
+    task_update_payloads: list[TaskUpdateDraft] = Field(default_factory=list)
+    task_state_change_payloads: list[TaskStateChangeDraft] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _reject_model_authored_discovery_motivation(self) -> "TaskManagementDraft":
+        """Discovery motivation is planner provenance, not general proposal output."""
+
+        if any(
+            "motivated_by_discovery_ids" in update.model_fields_set
+            for update in self.task_update_payloads
+        ):
+            raise ValueError(
+                "Task-management proposals cannot author Discovery motivation references."
+            )
+        return self
+
+
+class _ConfiguredTaskManagementModel:
+    """Adapter over the repository LLM factory for task drafting."""
+
+    def __init__(self) -> None:
+        from agents.llm import ModelConfig, create_agent
+
+        self._agent = create_agent(
+            worker="planner",
+            config=ModelConfig(),
+            deps_type=type(None),
+            builtin_tools=[],
+        )
+
+    def draft(self, prompt: str) -> TaskManagementDraft:
+        result = self._agent.run_sync(prompt, output_type=TaskManagementDraft)
+        return TaskManagementDraft.model_validate(result.output)
+
+
+def _task_management_prompt(query: str, state: State) -> str:
+    """Build the prompt for drafting task operations."""
+
+    references = ", ".join(sorted(state.object_reference_index)) or "(none)"
+    return (
+        "Translate the user's task management request into task operations.\n"
+        "Do not invent UUIDs or use identifiers not listed below. New tasks receive their "
+        "durable ids only at commit. Use listed local references for updates, parent tasks, "
+        "profiles, and supersession. Do not propose Discovery motivation.\n"
+        f"Allowed existing local references: {references}\n"
+        f"Latest raw user request:\n{query}"
+    )
+
+
 @registry.register()
 def manage_tasks(state: State, runtime: Runtime[Context]) -> State:
     """
@@ -260,56 +325,102 @@ def manage_tasks(state: State, runtime: Runtime[Context]) -> State:
     Later workflow code can decide which operations require user approval before
     commit applies them.
     """
+    has_existing_drafts = any(
+        (
+            state.task_create_payloads,
+            state.task_update_payloads,
+            state.task_state_change_payloads,
+        )
+    )
+    if not has_existing_drafts:
+        context = _runtime_context(runtime)
+        model = context.task_management_model if context else None
+        if model is None:
+            model = _ConfiguredTaskManagementModel()
+        try:
+            draft_result = model.draft(_task_management_prompt(state.query, state))
+            state.task_create_payloads.extend(draft_result.task_create_payloads)
+            state.task_update_payloads.extend(draft_result.task_update_payloads)
+            state.task_state_change_payloads.extend(draft_result.task_state_change_payloads)
+        except Exception:
+            state.controlled_error = ControlledPlannerError(
+                code="task_proposal_unavailable",
+                message="Unable to produce a valid task proposal from the request.",
+            )
+            return state
+
     session_id = _session_id(state, runtime)
-    for task in state.task_create_payloads:
-        state.planner_operations.append(
-            PlannerOperation(
-                session_id=session_id,
-                operation_type=PlannerOperationType.CREATE_TASK,
-                payload=task.model_dump(mode="json"),
-                produced_by_node=PlannerNodeName.MANAGE_TASKS,
+    operations: list[PlannerOperation] = []
+    try:
+        for task in state.task_create_payloads:
+            parent_task_id = (
+                UUID(state.resolve_object_reference(task.parent_task_ref))
+                if task.parent_task_ref is not None
+                else None
             )
-        )
-    for task_update in state.task_update_payloads:
-        parent_task_id = (
-            UUID(state.resolve_object_reference(task_update.parent_task_ref))
-            if task_update.parent_task_ref is not None
-            else None
-        )
-        profile_id = (
-            UUID(state.resolve_object_reference(task_update.data_profile_ref))
-            if task_update.data_profile_ref is not None
-            else None
-        )
-        state.planner_operations.append(
-            PlannerOperation(
-                session_id=session_id,
-                operation_type=PlannerOperationType.UPDATE_TASK,
-                payload=task_update.operation_payload(
-                    task_id=UUID(state.resolve_object_reference(task_update.task_ref)),
-                    parent_task_id=parent_task_id,
-                    profile_id=profile_id,
-                ).model_dump(
-                    mode="json",
-                    exclude_unset=True,
-                ),
-                produced_by_node=PlannerNodeName.MANAGE_TASKS,
+            profile_id = (
+                UUID(state.resolve_object_reference(task.data_profile_ref))
+                if task.data_profile_ref is not None
+                else None
             )
-        )
-    for task_state_change in state.task_state_change_payloads:
-        state.planner_operations.append(
-            PlannerOperation(
-                session_id=session_id,
-                operation_type=PlannerOperationType.CHANGE_TASK_STATE,
-                payload=task_state_change.operation_payload(
-                    task_id=UUID(state.resolve_object_reference(task_state_change.task_ref)),
-                ).model_dump(
-                    mode="json",
-                    exclude_unset=True,
-                ),
-                produced_by_node=PlannerNodeName.MANAGE_TASKS,
+            operations.append(
+                PlannerOperation(
+                    session_id=session_id,
+                    operation_type=PlannerOperationType.CREATE_TASK,
+                    payload=task.operation_payload(
+                        parent_task_id=parent_task_id,
+                        profile_id=profile_id,
+                    ).model_dump(mode="json"),
+                    produced_by_node=PlannerNodeName.MANAGE_TASKS,
+                )
             )
+        for task_update in state.task_update_payloads:
+            parent_task_id = (
+                UUID(state.resolve_object_reference(task_update.parent_task_ref))
+                if task_update.parent_task_ref is not None
+                else None
+            )
+            profile_id = (
+                UUID(state.resolve_object_reference(task_update.data_profile_ref))
+                if task_update.data_profile_ref is not None
+                else None
+            )
+            superseded_by_task_id = (
+                UUID(state.resolve_object_reference(task_update.superseded_by_task_ref))
+                if task_update.superseded_by_task_ref is not None
+                else None
+            )
+            operations.append(
+                PlannerOperation(
+                    session_id=session_id,
+                    operation_type=PlannerOperationType.UPDATE_TASK,
+                    payload=task_update.operation_payload(
+                        task_id=UUID(state.resolve_object_reference(task_update.task_ref)),
+                        parent_task_id=parent_task_id,
+                        profile_id=profile_id,
+                        superseded_by_task_id=superseded_by_task_id,
+                    ).model_dump(mode="json", exclude_unset=True),
+                    produced_by_node=PlannerNodeName.MANAGE_TASKS,
+                )
+            )
+        for task_state_change in state.task_state_change_payloads:
+            operations.append(
+                PlannerOperation(
+                    session_id=session_id,
+                    operation_type=PlannerOperationType.CHANGE_TASK_STATE,
+                    payload=task_state_change.operation_payload(
+                        task_id=UUID(state.resolve_object_reference(task_state_change.task_ref)),
+                    ).model_dump(mode="json", exclude_unset=True),
+                    produced_by_node=PlannerNodeName.MANAGE_TASKS,
+                )
+            )
+    except ValueError:
+        state.controlled_error = ControlledPlannerError(
+            code="invalid_task_proposal_reference",
+            message="The task proposal contains an unknown or invalid object reference.",
         )
+        return state
+    state.planner_operations.extend(operations)
     return state
 
 
@@ -783,13 +894,14 @@ def review_conflict(state: State, runtime: Runtime[Context]) -> State:
 @registry.register()
 def request_user_input(state: State, runtime: Runtime[Context]) -> State:
     """Durably persist the approval request before exposing it to a caller."""
+
+    context = _runtime_context(runtime)
     prepared = state.prepared_execution
     if (
         prepared is not None
         and state.execution_preparation is not None
         and state.execution_preparation.prepared
     ):
-        context = _runtime_context(runtime)
         if context is None or context.database_url is None:
             state.controlled_error = ControlledPlannerError(
                 code="execution_store_unavailable",
@@ -846,6 +958,26 @@ def request_user_input(state: State, runtime: Runtime[Context]) -> State:
             allowed_actions=["approve", "cancel", "revise", "clarify"],
             snapshot_hash=prepared.contract_fingerprint,
             proposal_id=str(approval.execution_approval_id),
+        )
+        return state
+
+    if state.planner_operations:
+        operation_ids = [str(operation.operation_id) for operation in state.planner_operations]
+        snapshot_hash = _planner_operations_fingerprint(state.planner_operations)
+        if context is not None and context.database_url is not None:
+            session = get_session(context.database_url)
+            try:
+                _persist_planner_operations(session, state.planner_operations)
+                session.commit()
+            finally:
+                session.close()
+        state.pending_interaction = PendingUserInteraction(
+            kind="planner_operation_approval",
+            payload={"operation_count": len(state.planner_operations)},
+            allowed_actions=["approve", "cancel", "revise", "clarify"],
+            operation_ids=operation_ids,
+            snapshot_hash=snapshot_hash,
+            proposal_id=snapshot_hash,
         )
     return state
 
@@ -917,6 +1049,69 @@ def resume_execution(state: State, runtime: Runtime[Context]) -> State:
 
 
 @registry.register()
+def resume_planner_operations(state: State, runtime: Runtime[Context]) -> State:
+    """Reload one pending, session-bound PlannerOperation proposal for a user decision."""
+
+    context = _runtime_context(runtime)
+    session_id = _session_id(state, runtime)
+    requested_ids = state.resume_operation_ids
+    if context is None or context.database_url is None or session_id is None or not requested_ids:
+        state.controlled_error = ControlledPlannerError(
+            code="planner_operation_resume_unavailable",
+            message="A task proposal decision must include its durable operation identifiers.",
+        )
+        return state
+    if len(requested_ids) != len(set(requested_ids)):
+        state.controlled_error = ControlledPlannerError(
+            code="invalid_planner_operation_proposal",
+            message="The task proposal contains duplicate operation identifiers.",
+        )
+        return state
+
+    session = get_session(context.database_url)
+    try:
+        repository = PlannerOperationRepository(session)
+        operations = [repository.get_by_id(operation_id) for operation_id in requested_ids]
+    finally:
+        session.close()
+    if (
+        any(operation is None for operation in operations)
+        or any(
+            operation.session_id != session_id
+            for operation in operations
+            if operation is not None
+        )
+        or any(
+            operation.approval_state != PlannerOperationApprovalState.PENDING
+            for operation in operations
+            if operation is not None
+        )
+    ):
+        state.controlled_error = ControlledPlannerError(
+            code="invalid_planner_operation_proposal",
+            message=(
+                "The task proposal is unknown, belongs to another session, "
+                "or is no longer pending."
+            ),
+        )
+        return state
+
+    restored_operations = [operation for operation in operations if operation is not None]
+    snapshot_hash = _planner_operations_fingerprint(restored_operations)
+    state.planner_operations = restored_operations
+    state.operation_ids_to_commit = [str(operation_id) for operation_id in requested_ids]
+    state.pending_interaction = PendingUserInteraction(
+        kind="planner_operation_approval",
+        payload={"operation_count": len(restored_operations)},
+        allowed_actions=["approve", "cancel", "revise", "clarify"],
+        operation_ids=state.operation_ids_to_commit,
+        snapshot_hash=snapshot_hash,
+        proposal_id=snapshot_hash,
+    )
+    return state
+
+
+@registry.register()
 def pause(state: State, runtime: Runtime[Context]) -> State:
     """Pause the current process and wait for user input or confirmation."""
 
@@ -933,6 +1128,8 @@ def process_decision(state: State, runtime: Runtime[Context]) -> State:
     if interaction is None or decision is None:
         state.interaction_error = "No user approval was supplied for the pending interaction."
         return state
+    if interaction.kind == "planner_operation_approval":
+        return _process_planner_operation_decision(state, runtime)
     context = _runtime_context(runtime)
     if context is None or context.database_url is None:
         state.interaction_error = "Execution approval requires a configured planner database."
@@ -986,6 +1183,7 @@ def process_decision(state: State, runtime: Runtime[Context]) -> State:
 
     if decision.action != "approve":
         return state
+
     if interaction.kind != "execution_approval" or state.prepared_execution is None:
         state.interaction_error = "The pending interaction is not an execution approval."
         return state
@@ -1006,11 +1204,58 @@ def process_decision(state: State, runtime: Runtime[Context]) -> State:
     return state
 
 
+def _process_planner_operation_decision(
+    state: State,
+    runtime: Runtime[Context],
+) -> State:
+    """Bind a decision to exactly the persisted task-operation proposal it reviews."""
+
+    interaction = state.pending_interaction
+    decision = state.planner_decision
+    assert interaction is not None
+    assert decision is not None
+    expected_ids = interaction.operation_ids
+    if (
+        not interaction.proposal_id
+        or decision.proposal_id != interaction.proposal_id
+        or decision.selected_ids != expected_ids
+    ):
+        state.interaction_error = "The decision does not match the pending task proposal."
+        return state
+    approval_state = (
+        PlannerOperationApprovalState.APPROVED
+        if decision.action == "approve"
+        else PlannerOperationApprovalState.REJECTED
+    )
+    for operation in state.planner_operations:
+        operation.approval_state = approval_state
+
+    context = _runtime_context(runtime)
+    if context is not None and context.database_url is not None:
+        session = get_session(context.database_url)
+        try:
+            for operation in state.planner_operations:
+                record = session.get(PlannerOperationRecord, operation.operation_id)
+                if record is not None:
+                    record.approval_state = approval_state
+                    session.add(record)
+            session.commit()
+        finally:
+            session.close()
+    return state
+
+
 def route_process_decision(state: State, runtime: Runtime[Context]) -> str:
     """Route only after the decision node has recorded its validation result."""
 
     if state.execution_revalidation is not None and state.execution_revalidation.valid:
         return "approved_execution"
+    if (
+        state.pending_interaction is not None
+        and state.pending_interaction.kind == "planner_operation_approval"
+    ):
+        if state.planner_decision is not None and state.planner_decision.action == "approve":
+            return "approved_task"
     if state.planner_decision is not None and state.planner_decision.action == "clarify":
         return "clarify"
     return "cancel"
@@ -1132,3 +1377,18 @@ def _persist_planner_operations(
     for operation in operations:
         if repository.get_by_id(operation.operation_id) is None:
             repository.stage_create(operation)
+
+
+def _planner_operations_fingerprint(operations: list[PlannerOperation]) -> str:
+    """Fingerprint the exact ordered proposal the user is being asked to approve."""
+
+    content = [
+        {
+            "operation_id": str(operation.operation_id),
+            "operation_type": operation.operation_type,
+            "payload": operation.payload,
+            "session_id": operation.session_id,
+        }
+        for operation in operations
+    ]
+    return sha256(json.dumps(content, sort_keys=True, separators=(",", ":")).encode()).hexdigest()

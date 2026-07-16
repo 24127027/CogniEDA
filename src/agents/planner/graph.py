@@ -10,6 +10,7 @@ from .types import Context, State
 ENTRY_ROUTES = {
     "understand_request": R.understand_request,
     "resume_execution": R.resume_execution,
+    "resume_planner_operations": R.resume_planner_operations,
 }
 
 INTENT_ROUTES = {
@@ -126,6 +127,7 @@ def build_graph(
     builder.add_edge(R.request_user_input, R.pause)
     builder.add_edge(R.pause, R.process_decision)
     builder.add_edge(R.resume_execution, R.process_decision)
+    builder.add_edge(R.resume_planner_operations, R.process_decision)
 
     builder.add_conditional_edges(
         R.process_decision,
