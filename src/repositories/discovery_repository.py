@@ -67,9 +67,7 @@ class DiscoveryRepository:
             raise ValueError("Discovery creation requires an existing Hypothesis.")
 
         duplicate = self._session.exec(
-            select(DiscoveryRecord).where(
-                DiscoveryRecord.hypothesis_id == discovery.hypothesis_id
-            )
+            select(DiscoveryRecord).where(DiscoveryRecord.hypothesis_id == discovery.hypothesis_id)
         ).first()
         if duplicate is not None:
             raise ValueError("A Hypothesis can produce exactly one Discovery.")
@@ -99,6 +97,7 @@ class DiscoveryRepository:
         hypothesis_id: UUID | None = None,
         epistemic_status: DiscoveryEpistemicStatus | None = None,
         lifecycle_state: DiscoveryLifecycleState | None = None,
+        limit: int | None = None,
     ) -> list[Discovery]:
         """List Discoveries by source Hypothesis, epistemic status, or lifecycle state."""
 
@@ -109,6 +108,8 @@ class DiscoveryRepository:
             statement = statement.where(DiscoveryRecord.epistemic_status == epistemic_status)
         if lifecycle_state is not None:
             statement = statement.where(DiscoveryRecord.lifecycle_state == lifecycle_state)
+        if limit is not None:
+            statement = statement.limit(limit)
         records = self._session.exec(statement).all()
         return [record_to_schema(Discovery, record) for record in records]
 
@@ -237,9 +238,7 @@ class DiscoveryRepository:
             f"historically_scoped_data_profile_id={old_data_profile_id}",
         ]
         if replacement_data_profile_id is not None:
-            reason_parts.append(
-                f"replacement_data_profile_id={replacement_data_profile_id}"
-            )
+            reason_parts.append(f"replacement_data_profile_id={replacement_data_profile_id}")
         if reason is not None and reason.strip():
             reason_parts.append(f"reason={reason.strip()}")
         return "; ".join(reason_parts)

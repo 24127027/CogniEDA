@@ -69,6 +69,7 @@ class TaskCreateOperationPayload(BaseModel):
     readiness_status: str | None = None
     readiness_reason: str | None = None
     parent_task_updated_at: datetime | None = None
+    selected_motivating_discovery_ids: list[UUID] | None = None
 
 
 class TaskStateChangeOperationPayload(BaseModel):
