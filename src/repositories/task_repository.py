@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
@@ -14,7 +15,12 @@ from repositories.common import apply_update, record_to_schema, schema_to_record
 from schemas.artifacts import Task
 from schemas.enums import TaskDependencyType, TaskKind, TaskLifecycleState
 
-TASK_JSON_FIELDS = {"variables", "analytical_specification", "motivated_by_discovery_ids"}
+TASK_JSON_FIELDS = {
+    "variables",
+    "analytical_specification",
+    "motivated_by_discovery_ids",
+    "review_reasons",
+}
 
 
 class TaskUpdate(BaseModel):
@@ -35,6 +41,7 @@ class TaskUpdate(BaseModel):
     evidence_expectation: str | None = None
     analytical_specification: dict[str, object] | None = None
     motivated_by_discovery_ids: list[UUID] | None = None
+    review_reasons: list[str] | None = None
     updated_at: datetime | None = None
 
     @field_validator("motivated_by_discovery_ids")
@@ -64,6 +71,7 @@ class TaskRepository:
         """Persist and return a new Task."""
 
         self._validate_motivating_discoveries(task.motivated_by_discovery_ids)
+        self._validate_parent(task.task_id, task.parent_task_id)
         record = TaskRecord(**schema_to_record_payload(task, json_fields=TASK_JSON_FIELDS))
         self._session.add(record)
         self._session.commit()
@@ -105,6 +113,8 @@ class TaskRepository:
             return None
         if "motivated_by_discovery_ids" in update.model_fields_set:
             self._validate_motivating_discoveries(update.motivated_by_discovery_ids or [])
+        if "parent_task_id" in update.model_fields_set:
+            self._validate_parent(task_id, update.parent_task_id)
         apply_update(record, update, json_fields=TASK_JSON_FIELDS)
         self._session.add(record)
         self._session.commit()
@@ -117,3 +127,33 @@ class TaskRepository:
         for discovery_id in discovery_ids:
             if self._session.get(DiscoveryRecord, discovery_id) is None:
                 raise ValueError(f"Referenced Discovery does not exist: {discovery_id}")
+
+    def list_motivated_by_discovery(self, discovery_id: UUID) -> builtins.list[Task]:
+        """Return Tasks that are directly motivated by the exact discovery."""
+        all_tasks = self.list()
+        discovery_str = str(discovery_id)
+        # Using exact Python-side filtering because motivated_by_discovery_ids is JSON
+        return [
+            task for task in all_tasks
+            if discovery_str in [str(d) for d in task.motivated_by_discovery_ids]
+        ]
+
+    def _validate_parent(self, task_id: UUID, parent_task_id: UUID | None) -> None:
+        if parent_task_id is None:
+            return
+        if parent_task_id == task_id:
+            raise ValueError("A Task cannot be its own parent.")
+        parent = self._session.get(TaskRecord, parent_task_id)
+        if parent is None:
+            raise ValueError(f"Parent Task does not exist: {parent_task_id}")
+        seen: set[UUID] = {task_id}
+        current: TaskRecord | None = parent
+        while current is not None:
+            if current.task_id in seen:
+                raise ValueError("Task parent relationship would create a cycle.")
+            seen.add(current.task_id)
+            current = (
+                self._session.get(TaskRecord, current.parent_task_id)
+                if current.parent_task_id is not None
+                else None
+            )

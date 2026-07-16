@@ -139,6 +139,7 @@ class Task(CogniEDABaseModel):
     evidence_expectation: str | None = None
     analytical_specification: AnalyticalSpecification | None = None
     motivated_by_discovery_ids: list[UUID] = Field(default_factory=list)
+    review_reasons: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

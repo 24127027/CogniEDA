@@ -52,6 +52,7 @@ class TaskCreateOperationPayload(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    task_id: UUID | None = None
     title: str
     description: str
     task_kind: TaskKind = TaskKind.ANALYTICAL
@@ -61,6 +62,13 @@ class TaskCreateOperationPayload(BaseModel):
     profile_id: UUID | None = None
     variables: list[str] = Field(default_factory=list)
     evidence_expectation: str | None = None
+    motivated_by_discovery_ids: list[UUID] = Field(default_factory=list)
+    # Reviewed proposal provenance; commit strips these before materializing Task.
+    decomposition_scope: str | None = None
+    decomposition_rationale: str | None = None
+    readiness_status: str | None = None
+    readiness_reason: str | None = None
+    parent_task_updated_at: datetime | None = None
 
 
 class TaskStateChangeOperationPayload(BaseModel):
