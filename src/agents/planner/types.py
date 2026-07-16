@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from enum import StrEnum
 from secrets import token_urlsafe
 from typing import Any, Literal, Protocol, runtime_checkable
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_ai.messages import ModelMessage
 
 from application.orchestrator import execution_contracts
@@ -48,6 +49,7 @@ PlannerIntent = Literal[
     "answer",
     "suggest",
     "manage_task",
+    "decompose",
     "execute",
     "objective",
     "register_dataset",
@@ -80,6 +82,7 @@ COMMAND_TO_INTENT: dict[str, PlannerIntent] = {
     "answer": "answer",
     "suggest": "suggest",
     "manage_task": "manage_task",
+    "decompose": "decompose",
     "execute": "execute",
     "objective": "objective",
     "register_dataset": "register_dataset",
@@ -322,6 +325,81 @@ class TaskStateChangeDraft(BaseModel):
         )
 
 
+class ChildTaskProposalDraft(BaseModel):
+    """Proposal for a decomposed child Task."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    description: str
+    scope: str
+    parent_task_ref: str
+    motivated_by_discovery_refs: list[str]
+    decomposition_rationale: str
+    readiness_status: Literal[
+        "ready_analytical", "requires_decomposition", "operational", "blocked"
+    ]
+    readiness_reason: str | None = None
+
+    @field_validator("motivated_by_discovery_refs")
+    @classmethod
+    def _reject_duplicate_motivation_refs(cls, refs: list[str]) -> list[str]:
+        if len(refs) != len(set(refs)):
+            raise ValueError("motivated_by_discovery_refs must not contain duplicates")
+        return refs
+
+    @model_validator(mode="after")
+    def _require_readiness_reason_when_not_ready(self) -> ChildTaskProposalDraft:
+        if self.readiness_status != "ready_analytical" and not self.readiness_reason:
+            raise ValueError("non-ready child proposals require readiness_reason")
+        return self
+
+    def operation_payload(
+        self,
+        *,
+        task_id: UUID,
+        parent_task_id: UUID,
+        motivated_by_discovery_ids: list[UUID],
+        parent_task_updated_at: datetime,
+    ) -> TaskCreateOperationPayload:
+        """Return the typed operation payload for this child task."""
+        return TaskCreateOperationPayload(
+            task_id=task_id,
+            title=self.title,
+            description=self.description,
+            task_kind=(
+                TaskKind.ANALYTICAL
+                if self.readiness_status == "ready_analytical"
+                else TaskKind.ORGANIZING
+            ),
+            parent_task_id=parent_task_id,
+            motivated_by_discovery_ids=motivated_by_discovery_ids,
+            decomposition_scope=self.scope,
+            decomposition_rationale=self.decomposition_rationale,
+            readiness_status=self.readiness_status,
+            readiness_reason=self.readiness_reason,
+            parent_task_updated_at=parent_task_updated_at,
+        )
+
+
+class TaskDecompositionDraft(BaseModel):
+    """Planner draft containing multiple child tasks for decomposition."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    parent_task_ref: str
+    child_task_proposals: list[ChildTaskProposalDraft]
+
+    @model_validator(mode="after")
+    def _require_children_to_name_the_same_parent(self) -> TaskDecompositionDraft:
+        if any(
+            child.parent_task_ref != self.parent_task_ref
+            for child in self.child_task_proposals
+        ):
+            raise ValueError("every child proposal must name the decomposition parent")
+        return self
+
+
 class ObjectiveUpdateDraft(BaseModel):
     """Planner Objective-update draft addressed by a graph-local Objective reference."""
 
@@ -513,6 +591,7 @@ class State(BaseModel):
     task_create_payloads: list[TaskCreateDraft] = Field(default_factory=list)
     task_update_payloads: list[TaskUpdateDraft] = Field(default_factory=list)
     task_state_change_payloads: list[TaskStateChangeDraft] = Field(default_factory=list)
+    task_decomposition_payloads: list[TaskDecompositionDraft] = Field(default_factory=list)
     objective_update_payloads: list[ObjectiveUpdateDraft] = Field(default_factory=list)
     assumption_create_payloads: list[Assumption] = Field(default_factory=list)
     assumption_state_update_payloads: list[AssumptionStateUpdateDraft] = Field(default_factory=list)
@@ -565,6 +644,13 @@ class TaskManagementModel(Protocol):
     def draft(self, prompt: str) -> Any: ...
 
 
+@runtime_checkable
+class TaskDecompositionModel(Protocol):
+    """Abstract dependency for bounded child-Task proposals."""
+
+    def draft(self, prompt: str) -> Any: ...
+
+
 class Context(BaseModel):
     """Execution context injected into the graph at runtime."""
 
@@ -575,6 +661,7 @@ class Context(BaseModel):
     database_url: str | None = None
     request_understanding_model: RequestUnderstandingModel | None = None
     task_management_model: TaskManagementModel | None = None
+    task_decomposition_model: TaskDecompositionModel | None = None
     governance_mode: GovernanceMode = GovernanceMode.RISK_BASED
 
 

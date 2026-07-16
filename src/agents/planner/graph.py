@@ -17,6 +17,7 @@ INTENT_ROUTES = {
     "check_answerability": R.check_answerability,
     "suggest": R.propose_questions,
     "manage_task": R.manage_tasks,
+    "decompose": R.expand_plan,
     "execute": R.select_task,
     "objective": R.manage_objective,
     "assumption": R.manage_assumptions,

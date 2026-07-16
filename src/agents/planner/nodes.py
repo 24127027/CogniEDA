@@ -1,7 +1,7 @@
 import json
 from hashlib import sha256
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from langgraph.runtime import Runtime
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -13,19 +13,24 @@ from application.orchestrator.scientific_processing import (
     _execution_operation,
     _method_parameter_hash,
 )
-from db.models import ExecutionApprovalRecord, PlannerOperationRecord
+from db.models import DiscoveryRecord, ExecutionApprovalRecord, PlannerOperationRecord
 from db.session import get_session
+from memory.session_frame import SessionContextBuilder
 from repositories import (
     DataProfileRepository,
     DiscoveryRepository,
     ExecutionApprovalRepository,
     HypothesisRepository,
     PlannerOperationRepository,
+    SessionFrameRepository,
     TaskRepository,
 )
 from schemas.artifacts import Hypothesis
+from schemas.common import TaskContextSummary
 from schemas.enums import (
+    ContextMode,
     DataProfileLifecycleState,
+    DiscoveryLifecycleState,
     ExecutionApprovalStatus,
     HypothesisStatus,
     PlannerNodeName,
@@ -41,6 +46,7 @@ from ..utilities.nodes_registry import NodeRegistry
 from .types import (
     COMMAND_TO_INTENT,
     Context,
+    ContextualGrounding,
     ControlledPlannerError,
     ExecutionAdmission,
     ExecutionPreparation,
@@ -53,6 +59,7 @@ from .types import (
     RequestUnderstandingModel,
     State,
     TaskCreateDraft,
+    TaskDecompositionDraft,
     TaskSelection,
     TaskStateChangeDraft,
     TaskUpdateDraft,
@@ -204,8 +211,39 @@ def route_entry(state: State, runtime: Runtime[Context]) -> str:
 def contextual_grounding(state: State, runtime: Runtime[Context]) -> State:
     """Resolve relative references using SessionFrame context."""
 
-    # TODO: Resolve request references against the active SessionFrame.
-    pass
+    understanding = state.request_understanding
+    if understanding is None or understanding.intent != "decompose":
+        return state
+    try:
+        task_id = UUID(understanding.request_text)
+    except ValueError:
+        state.controlled_error = ControlledPlannerError(
+            code="malformed_decomposition_parent",
+            message="/decompose requires one exact parent Task UUID.",
+        )
+        return state
+    session = _read_session(runtime)
+    if session is None:
+        state.controlled_error = ControlledPlannerError(
+            code="decomposition_store_unavailable",
+            message="Task decomposition requires a configured planner database.",
+        )
+        return state
+    try:
+        parent = TaskRepository(session).get_by_id(task_id)
+    finally:
+        session.close()
+    if parent is None:
+        state.controlled_error = ControlledPlannerError(
+            code="unknown_decomposition_parent",
+            message="The requested parent Task does not exist.",
+        )
+        return state
+    state.contextual_grounding = ContextualGrounding(
+        resolved_query=understanding.request_text,
+        target_task_refs=[state.bind_object_reference("task", str(parent.task_id))],
+    )
+    return state
 
 
 @registry.register()
@@ -249,12 +287,215 @@ def propose_questions(state: State, runtime: Runtime[Context]) -> None:
     pass
 
 
-@registry.register()
-def expand_plan(state: State, runtime: Runtime[Context]) -> None:
-    """Expand an approved research direction into executable Task drafts."""
+class _ConfiguredTaskDecompositionModel:
+    """Adapter for the bounded decomposition structured-output request."""
 
-    # TODO: Implement Task-draft expansion for an approved research direction.
-    pass
+    def __init__(self) -> None:
+        from agents.llm import ModelConfig, create_agent
+
+        self._agent = create_agent(
+            worker="planner", config=ModelConfig(), deps_type=type(None), builtin_tools=[]
+        )
+
+    def draft(self, prompt: str) -> TaskDecompositionDraft:
+        result = self._agent.run_sync(prompt, output_type=TaskDecompositionDraft)
+        return TaskDecompositionDraft.model_validate(result.output)
+
+
+@registry.register()
+def expand_plan(state: State, runtime: Runtime[Context]) -> State:
+    """Draft bounded, child-specific Task operations for one approved parent."""
+
+    context = _runtime_context(runtime)
+    grounding = state.contextual_grounding
+    if (
+        state.request_understanding is None
+        or state.request_understanding.intent != "decompose"
+        or grounding is None
+        or len(grounding.target_task_refs) != 1
+    ):
+        state.controlled_error = ControlledPlannerError(
+            code="invalid_decomposition_request",
+            message="Decomposition requires one resolved parent Task.",
+        )
+        return state
+    if context is None or context.database_url is None or context.session_frame_id is None:
+        state.controlled_error = ControlledPlannerError(
+            code="decomposition_context_unavailable",
+            message="Decomposition requires a configured database and active SessionFrame.",
+        )
+        return state
+
+    parent_ref = grounding.target_task_refs[0]
+    try:
+        parent_task_id = UUID(state.resolve_object_reference(parent_ref))
+    except ValueError:
+        state.controlled_error = ControlledPlannerError(
+            code="invalid_decomposition_parent",
+            message="The resolved parent Task is no longer available.",
+        )
+        return state
+
+    session = get_session(context.database_url)
+    try:
+        parent = TaskRepository(session).get_by_id(parent_task_id)
+        frame = SessionFrameRepository(session).get_by_id(context.session_frame_id)
+        if parent is None or frame is None:
+            state.controlled_error = ControlledPlannerError(
+                code="decomposition_context_missing",
+                message="The parent Task or active SessionFrame is no longer available.",
+            )
+            return state
+        planning = SessionContextBuilder().build(frame, mode=ContextMode.PLANNING)
+        candidate_ids = list(
+            dict.fromkeys([*parent.motivated_by_discovery_ids, *planning.discovery_refs])
+        )
+        candidates: dict[str, UUID] = {}
+        parent_motivation_refs: list[str] = []
+        other_candidate_refs: list[str] = []
+        for discovery_id in candidate_ids:
+            discovery = session.get(DiscoveryRecord, discovery_id)
+            if discovery is None or discovery.lifecycle_state != DiscoveryLifecycleState.ACTIVE:
+                continue
+            reference = state.bind_object_reference("discovery", str(discovery_id))
+            candidates[reference] = discovery_id
+            if discovery_id in parent.motivated_by_discovery_ids:
+                parent_motivation_refs.append(reference)
+            else:
+                other_candidate_refs.append(reference)
+        prompt = _task_decomposition_prompt(
+            parent_ref=parent_ref,
+            parent=parent,
+            planning=planning,
+            parent_motivation_refs=parent_motivation_refs,
+            other_candidate_refs=other_candidate_refs,
+        )
+    finally:
+        session.close()
+
+    model = context.task_decomposition_model or _ConfiguredTaskDecompositionModel()
+    try:
+        draft = TaskDecompositionDraft.model_validate(model.draft(prompt))
+        if draft.parent_task_ref != parent_ref:
+            raise ValueError("The proposal parent is not the resolved parent Task.")
+        operations, frame_operation = _decomposition_operations(
+            state=state,
+            parent=parent,
+            frame=frame,
+            draft=draft,
+            candidate_refs=candidates,
+        )
+    except Exception:
+        state.controlled_error = ControlledPlannerError(
+            code="invalid_decomposition_proposal",
+            message="Unable to produce a valid bounded child-Task proposal.",
+        )
+        return state
+
+    state.task_decomposition_payloads.append(draft)
+    state.planner_operations.extend([*operations, frame_operation])
+    state.requested_interaction_kind = "planner_operation_approval"
+    return state
+
+
+def _task_decomposition_prompt(
+    *,
+    parent_ref: str,
+    parent: Any,
+    planning: Any,
+    parent_motivation_refs: list[str],
+    other_candidate_refs: list[str],
+) -> str:
+    """Build a bounded planning-only prompt; no global Discovery retrieval occurs."""
+
+    return (
+        "Decompose one parent Task into child Task proposals. Return only the typed "
+        "TaskDecompositionDraft. Every child must explicitly provide "
+        "motivated_by_discovery_refs; [] is valid and means no motivation. Do not use "
+        "UUIDs: use only the local references supplied below. A child may select any "
+        "subset of the bounded candidates; never inherit parent motivation implicitly. "
+        "Rationale and readiness are proposal provenance, not Evidence or Discovery. "
+        "Readiness does not authorize execution.\n\n"
+        f"Parent local reference: {parent_ref}\n"
+        f"Parent title: {parent.title}\nParent description: {parent.description}\n"
+        f"Objective constraints: {planning.objective_snapshot}\n"
+        "Planning Assumptions: "
+        f"{json.dumps([item.model_dump(mode='json') for item in planning.assumptions])}\n"
+        f"Parent direct-motivation candidates: {parent_motivation_refs}\n"
+        f"Other bounded Discovery candidates: {other_candidate_refs}\n"
+        "No other Task or Discovery reference is valid."
+    )
+
+
+def _decomposition_operations(
+    *,
+    state: State,
+    parent: Any,
+    frame: Any,
+    draft: TaskDecompositionDraft,
+    candidate_refs: dict[str, UUID],
+) -> tuple[list[PlannerOperation], PlannerOperation]:
+    """Translate one validated draft to atomic child and frame operations."""
+
+    operations: list[PlannerOperation] = []
+    child_ids: list[UUID] = []
+    child_summaries: list[TaskContextSummary] = []
+    for child in draft.child_task_proposals:
+        if child.parent_task_ref != draft.parent_task_ref:
+            raise ValueError("Child proposal names another parent.")
+        if any(
+            reference not in candidate_refs for reference in child.motivated_by_discovery_refs
+        ):
+            raise ValueError(
+                "Child proposal references a Discovery outside the bounded candidates."
+            )
+        child_id = uuid4()
+        child_ids.append(child_id)
+        payload = child.operation_payload(
+            task_id=child_id,
+            parent_task_id=parent.task_id,
+            motivated_by_discovery_ids=[
+                candidate_refs[ref] for ref in child.motivated_by_discovery_refs
+            ],
+            parent_task_updated_at=parent.updated_at,
+        )
+        operations.append(
+            PlannerOperation(
+                session_id=state.session_id or "default",
+                operation_type=PlannerOperationType.CREATE_TASK,
+                payload=payload.model_dump(mode="json"),
+                produced_by_node=PlannerNodeName.EXPAND_PLAN,
+            )
+        )
+        child_summaries.append(
+            TaskContextSummary(
+                task_id=child_id,
+                title=child.title,
+                lifecycle_state=TaskLifecycleState.ACTIVE.value,
+                parent_task_id=parent.task_id,
+            )
+        )
+    updated_frame = frame.model_copy(
+        update={
+            "session_frame_id": uuid4(),
+            "parent_session_frame_id": frame.session_frame_id,
+            "active_task_refs": [*frame.active_task_refs, *child_ids],
+            "active_tasks": [*frame.active_tasks, *child_summaries],
+            "inclusion_reasons": {
+                **frame.inclusion_reasons,
+                **{
+                    str(task_id): "approved decomposition child of the selected parent Task"
+                    for task_id in child_ids
+                },
+            },
+        }
+    )
+    return operations, PlannerOperation(
+        session_id=state.session_id or "default",
+        operation_type=PlannerOperationType.UPDATE_SESSION_FRAME,
+        payload=updated_frame.model_dump(mode="json"),
+        produced_by_node=PlannerNodeName.EXPAND_PLAN,
+    )
 
 
 # --------------------
@@ -370,7 +611,7 @@ def manage_tasks(state: State, runtime: Runtime[Context]) -> State:
                     payload=task.operation_payload(
                         parent_task_id=parent_task_id,
                         profile_id=profile_id,
-                    ).model_dump(mode="json"),
+                    ).model_dump(mode="json", exclude_none=True),
                     produced_by_node=PlannerNodeName.MANAGE_TASKS,
                 )
             )
