@@ -14,10 +14,10 @@
 | `SessionFrame` | FCO for active user-governed context. | Partially implemented as append-only compact snapshots. |
 | `Workspace` | Filesystem/runtime boundary containing files and one independent graph database. | No Workspace FCO exists. |
 | `Question` | User interface input that becomes or modifies a Task. | No Question FCO exists. |
-| `AnalysisFrame` | Provenance/data-view record for exact dataframe view used in Evidence. | Referenced by Evidence; full record missing. |
+| `AnalysisFrame` | Provenance/data-view record for exact dataframe view used in Evidence. | Minimal durable record exists and is materialized by the scientific finalizer; full reproducibility detail remains incomplete. |
 | `GeneratedView` | Runtime/provenance output such as answer or synthesis. Not Discovery. | Not a durable FCO. |
-| `PlannerOperation` | Pending mutation produced by planner nodes before commit. | Planner contract exists; persistence missing. |
-| `ExecutionRun` | Provenance record for one execution attempt. | Referenced by Evidence; full record missing. |
+| `PlannerOperation` | Pending mutation produced by planner nodes before commit. | Durable envelope/table/repository and local atomic commit/rollback boundary exist; handler/reachability gaps remain. |
+| `ExecutionRun` | Provenance/workflow record for one execution attempt. | Durable attempt record exists with outbox/inbox/approval, lease, fencing and recovery metadata; full reproducibility detail remains incomplete. |
 | `EvidenceCacheEntry` | Cache record keyed by data/method/parameter/code/environment identity. | Not implemented. |
 | `validity_basis` | Discovery metadata describing evidence, data, method, uncertainty, excluded assumptions, and invalidators. | Implemented locally. |
 | Planning Context | Context mode where assumptions may guide planning. | Implemented for SessionFrame projection; no graph retriever exists. |
@@ -29,6 +29,6 @@
 | Name | Role | Target-design note |
 | --- | --- | --- |
 | `ToolResultCacheSummary` | Cached tool-result summary embedded in `SessionFrame`. | Not target cache persistence. |
-| `EvidenceProvenance` | Embedded provenance fields on Evidence. | References AnalysisFrame and ExecutionRun; full provenance records remain missing. |
+| `EvidenceProvenance` | Embedded provenance fields on Evidence. | References minimal durable AnalysisFrame and ExecutionRun records; full provenance detail remains incomplete. |
 | `SessionFrameBuilder` | Deterministic builder for compact SessionFrame snapshots. | Useful scaffold; not full user-governed retrieval. |
 | `SessionContextBuilder` | Non-persistent projector from `SessionFrame` snapshots into planning, answer, conclusion, or discovery-synthesis context bundles. | Partial context-type-safety guard; not a graph retriever and not an FCO. |
