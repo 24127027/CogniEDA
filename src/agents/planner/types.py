@@ -5,19 +5,20 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from enum import StrEnum
 from secrets import token_urlsafe
-from typing import Any, Literal
+from typing import Any, Literal, Protocol, runtime_checkable
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai.messages import ModelMessage
 
 from application.orchestrator import execution_contracts
-from schemas.artifacts import Assumption, Task
+from schemas.artifacts import Assumption
 from schemas.enums import (
     AssumptionStatus,
     HypothesisStatus,
     ObjectiveStatus,
     PlannerCapability,
+    TaskDependencyType,
     TaskKind,
     TaskLifecycleState,
 )
@@ -27,6 +28,7 @@ from schemas.planner_operations import (
     ObjectiveUpdateOperationPayload,
     PlannerCommitResult,
     PlannerOperation,
+    TaskCreateOperationPayload,
     TaskStateChangeOperationPayload,
     TaskUpdateOperationPayload,
 )
@@ -218,6 +220,40 @@ class ExecutionReviewResult(BaseModel):
     failure_kind: str | None = None
 
 
+class TaskCreateDraft(BaseModel):
+    """Planner Task-create draft."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    description: str
+    task_kind: TaskKind = TaskKind.ANALYTICAL
+    parent_task_ref: str | None = None
+    dependency_type: TaskDependencyType | None = None
+    blocked_reason: str | None = None
+    data_profile_ref: str | None = None
+    variables: list[str] = Field(default_factory=list)
+    evidence_expectation: str | None = None
+
+    def operation_payload(
+        self,
+        *,
+        parent_task_id: UUID | None = None,
+        profile_id: UUID | None = None,
+    ) -> TaskCreateOperationPayload:
+        """Return the typed persisted payload without allowing model-authored ids."""
+
+        payload = self.model_dump(
+            mode="python",
+            exclude={"parent_task_ref", "data_profile_ref"},
+        )
+        if "parent_task_ref" in self.model_fields_set:
+            payload["parent_task_id"] = parent_task_id
+        if "data_profile_ref" in self.model_fields_set:
+            payload["profile_id"] = profile_id
+        return TaskCreateOperationPayload(**payload)
+
+
 class TaskUpdateDraft(BaseModel):
     """Planner Task-update draft addressed by a graph-local Task reference."""
 
@@ -229,9 +265,13 @@ class TaskUpdateDraft(BaseModel):
     lifecycle_state: TaskLifecycleState | None = None
     task_kind: TaskKind | None = None
     parent_task_ref: str | None = None
+    dependency_type: TaskDependencyType | None = None
+    blocked_reason: str | None = None
+    superseded_by_task_ref: str | None = None
     data_profile_ref: str | None = None
     variables: list[str] | None = None
     evidence_expectation: str | None = None
+    analytical_specification: dict[str, Any] | None = None
     motivated_by_discovery_ids: list[UUID] | None = None
 
     def operation_payload(
@@ -240,18 +280,21 @@ class TaskUpdateDraft(BaseModel):
         task_id: UUID,
         parent_task_id: UUID | None = None,
         profile_id: UUID | None = None,
+        superseded_by_task_id: UUID | None = None,
     ) -> TaskUpdateOperationPayload:
         """Return the typed operation payload for this Task update."""
 
         payload = self.model_dump(
             mode="python",
-            exclude={"task_ref", "parent_task_ref", "data_profile_ref"},
+            exclude={"task_ref", "parent_task_ref", "data_profile_ref", "superseded_by_task_ref"},
             exclude_unset=True,
         )
         if "parent_task_ref" in self.model_fields_set:
             payload["parent_task_id"] = parent_task_id
         if "data_profile_ref" in self.model_fields_set:
             payload["profile_id"] = profile_id
+        if "superseded_by_task_ref" in self.model_fields_set:
+            payload["superseded_by_task_id"] = superseded_by_task_id
         return TaskUpdateOperationPayload(
             task_id=task_id,
             **payload,
@@ -460,12 +503,14 @@ class State(BaseModel):
     execution_review: ExecutionReviewResult | None = None
     session_id: str | None = None
     resume_approval_id: UUID | None = None
+    resume_operation_ids: list[UUID] = Field(default_factory=list)
+    resume_operation_proposal_id: str | None = None
     active_session_frame_id: UUID | None = None
     requested_capability: PlannerCapability | None = None
     controlled_placeholder: ControlledPlaceholderResult | None = None
     object_reference_index: dict[str, str] = Field(default_factory=dict)
     history: list[ModelMessage] = Field(default_factory=list)
-    task_create_payloads: list[Task] = Field(default_factory=list)
+    task_create_payloads: list[TaskCreateDraft] = Field(default_factory=list)
     task_update_payloads: list[TaskUpdateDraft] = Field(default_factory=list)
     task_state_change_payloads: list[TaskStateChangeDraft] = Field(default_factory=list)
     objective_update_payloads: list[ObjectiveUpdateDraft] = Field(default_factory=list)
@@ -513,15 +558,23 @@ class State(BaseModel):
             raise ValueError(f"Unknown local object reference: {reference}") from exc
 
 
+@runtime_checkable
+class TaskManagementModel(Protocol):
+    """Abstract dependency for task drafting."""
+
+    def draft(self, prompt: str) -> Any: ...
+
+
 class Context(BaseModel):
-    """Context for the Planner agent."""
+    """Execution context injected into the graph at runtime."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    database_url: str | None = None
     session_id: str | None = None
     session_frame_id: UUID | None = None
+    database_url: str | None = None
     request_understanding_model: RequestUnderstandingModel | None = None
+    task_management_model: TaskManagementModel | None = None
     governance_mode: GovernanceMode = GovernanceMode.RISK_BASED
 
 

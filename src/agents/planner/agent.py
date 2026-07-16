@@ -48,15 +48,26 @@ class Planner:
                 session.close()
 
         resume_approval_id: UUID | None = None
-        if decision is not None and decision.proposal_id is not None:
+        resume_operation_ids: list[UUID] = []
+        resume_operation_proposal_id: str | None = None
+        if decision is not None and decision.selected_ids:
+            try:
+                resume_operation_ids = [
+                    UUID(operation_id) for operation_id in decision.selected_ids
+                ]
+            except ValueError:
+                resume_operation_ids = []
+        elif decision is not None and decision.proposal_id is not None:
             try:
                 resume_approval_id = UUID(decision.proposal_id)
             except ValueError:
-                resume_approval_id = None
+                resume_operation_proposal_id = decision.proposal_id
         input = State(
             query=query,
             planner_decision=decision,
             resume_approval_id=resume_approval_id,
+            resume_operation_ids=resume_operation_ids,
+            resume_operation_proposal_id=resume_operation_proposal_id,
             session_id=context.session_id or "default",
         )
         config = {"configurable": {"thread_id": context.session_id or "default"}}
@@ -78,7 +89,11 @@ class Planner:
                 pending_interaction=state.pending_interaction,
                 controlled_error=state.controlled_error,
                 controlled_placeholder=state.controlled_placeholder,
-                committed_operation_ids=state.operation_ids_to_commit or [],
+                committed_operation_ids=(
+                    state.commit_result.committed_operation_ids
+                    if state.commit_result is not None
+                    else []
+                ),
                 planner_operations=state.planner_operations,
                 executor_dispatch_ref=(
                     state.resolve_object_reference(state.execution_admission.execution_run_ref)
