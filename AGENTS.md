@@ -14,7 +14,7 @@ Your highest priority is epistemic correctness: every conclusion must remain tra
 
 ## Current Implementation Warning
 
-The local schema and persistence layer now use the target FCO names, but several runtime pieces remain scaffold-level: planner nodes are mostly stubs, executable DVC integration is not implemented, and full `PlannerOperation`, `AnalysisFrame`, `ExecutionRun`, and cache persistence records are still missing.
+The local schema and persistence layer use the target FCO names. Minimal durable `PlannerOperation`, `AnalysisFrame`, `ExecutionRun`, execution approval/outbox/inbox, and scientific-finalization paths now exist. Several product/runtime pieces remain scaffold-level: answer/suggest/plan planner branches are incomplete, the default natural-language adapter is broken, concrete executor graphs and executable DVC integration are not implemented, cache persistence is absent, and no production CLI/service/worker bootstrap exists.
 
 ## Target FCO Set
 
