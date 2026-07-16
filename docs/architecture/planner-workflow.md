@@ -1,83 +1,94 @@
 # Planner Workflow
 
-## Target Design
+> **Current implementation snapshot:** 2026-07-16. Source graph topology is defined by `src/agents/planner/graph.py`; worker execution after admission lives under `src/application/orchestrator/`.
 
-The target planner is a state-operation pipeline. Nodes should produce `PlannerOperation` records, then `commit` should atomically persist approved operations.
-
-Target pipeline:
+## Compiled graph currently in source
 
 ```text
+START
+  -> understand_request                 (new request)
+  -> resume_execution -> process_decision (resumed approval)
+
 understand_request
-route_intent
-answer_question
-propose_questions
-expand_plan
-manage_tasks
-select_task
-prepare_execution
-dispatch_executor
-review_execution
-review_conflicts
-manage_objective
-manage_assumptions
-request_user_input
-pause
+  -> contextual_grounding
+  -> invalid_request                    (unsupported/invalid command)
+
+contextual_grounding
+  -> check_answerability -> answer_question -> commit -> END
+  -> propose_questions -> request_user_input -> pause -> process_decision
+  -> expand_plan       -> request_user_input -> pause -> process_decision
+  -> manage_tasks      -> request_user_input -> pause -> process_decision
+  -> select_task -> prepare_execution -> request_user_input -> pause
+  -> manage_objective  -> request_user_input -> pause -> process_decision
+  -> manage_assumptions-> request_user_input -> pause -> process_decision
+  -> review_result / review_conflict -> END
+
 process_decision
-commit
+  -> commit_execution_contract          (only reachable approved path)
+  -> understand_request                 (clarify)
+  -> END                                (cancel)
 ```
 
-## Current Implementation
+The graph does **not** contain application worker dispatch, result receipt, scientific evaluation or finalization nodes.
 
-Current files inspected:
+## Node status
 
-- `src/agents/planner/nodes.py`
-- `src/agents/planner/graph.py`
-- `src/agents/planner/types.py`
-- `src/agents/planner/agent.py`
+| Node/area | Current implementation | Status |
+| --- | --- | --- |
+| `understand_request` | Explicit command precedence plus injectable classification model | Partial; default model adapter is broken |
+| `contextual_grounding` | No body | Not implemented |
+| `check_answerability` | No body | Not implemented |
+| `answer_question` | No body | Not implemented |
+| `propose_questions` | No body | Not implemented |
+| `expand_plan` | No body | Not implemented |
+| `manage_tasks` | Converts already-present typed drafts into PlannerOperations | Partial; no public draft producer |
+| `select_task` | Selects eligible task from supplied state/context | Implemented local stage |
+| `prepare_execution` | Builds/reuses Hypothesis and prepared execution/admission drafts | Implemented narrow stage |
+| `manage_objective` / `manage_assumptions` | Convert supplied drafts into operations | Partial; no public draft producer |
+| `review_result` / `review_conflict` | Placeholder hooks | Not implemented as detection/review |
+| `request_user_input` | Persists durable `ExecutionApproval` for prepared execution | Implemented for execution only |
+| `pause` | No body; LangGraph MemorySaver holds in-process graph state | Not a durable general pause boundary |
+| `resume_execution` / `process_decision` | Reload and validate execution approval/decision | Implemented for execution only |
+| `commit_execution_contract` | Revalidates and atomically admits Hypothesis/Run/Outbox via operations | Implemented narrow stage |
+| `commit` | Persists/dispatches approved operations through local SQLModel boundary | Partial general commit |
 
-`nodes.py` registers all target node names. The request parser and route selection are implemented for explicit commands. A narrow injected-executor execution spine is also implemented: it selects an active terminal analytical Task with an accepted DataProfile, prepares a contract, requires a matching approval snapshot, persists the Hypothesis and pending ExecutionRun before dispatch, validates raw executor output before admitting Evidence, and creates a Discovery only when the executor explicitly requests finalization.
+## Approval reachability deviation
 
-`src/agents/planner/types.py` defines structured planner state and draft payload models for Task, Objective, Assumption, and conflict-flag operations. `manage_tasks`, `manage_objective`, `manage_assumptions`, and `review_conflicts` translate those structured payloads into `PlannerOperation` objects without mutating persistent FCO state.
+`DECISION_ROUTES` declares `approved_task`, `approved_plan`, and `approved_conflict`, but `route_process_decision()` can return only `approved_execution`, `clarify`, or `cancel`. The graph therefore does not implement general task/plan/conflict approval despite the route names.
 
-`src/application/orchestrator/planner_commit.py` is intentionally skeleton-first. It filters approved/not-required operations, dispatches supported operation handlers, marks successfully dispatched persisted operations committed, and returns `PlannerCommitResult`. An `UPDATE_OBJECTIVE` operation is itself the immutable attribution record for the requested, approved, and committed mutation; it does not create a dedicated Objective revision snapshot. This remains skeleton commit behavior, not production transaction machinery; rollback, approval UX, objective merge policy, and richer provenance belong at this boundary later.
+## Operation boundary
 
-## Node Status
+Planner nodes should produce typed operations rather than mutating durable state. Current commit code provides:
 
-| Node | Target responsibility | Current behavior | Status |
-| --- | --- | --- | --- |
-| `understand_request` | Interpret latest user message without SessionFrame context. | Parses explicit commands deterministically; ordinary-language classification is delegated to an injected structured model. | Partially implemented |
-| `route_intent` | Route a validated request to its owning workflow stage. | Deterministically maps every declared intent to a graph destination. Invalid/unclassifiable requests use `invalid_request`; recognized unavailable capabilities use their named node. | Partially implemented |
-| `answer_question` | Answer using SessionFrame context. | Registered controlled stub. The current answerability gate reports `capability_not_implemented` and terminates before answer synthesis. | Not implemented |
-| `propose_questions` | Propose directions/open questions. | Registered controlled stub that records `capability_not_implemented`, creates no operations, and terminates. | Not implemented |
-| `expand_plan` | Expand directions into executable tasks and subtasks. | Registered controlled stub that records `capability_not_implemented`, creates no operations, and terminates. | Not implemented |
-| `manage_tasks` | Produce task hierarchy operations. | Converts structured Task create/update/state-change payloads into `PlannerOperation` drafts without direct mutation. | Partially implemented |
-| `select_task` | Resolve selected task. | Registered stub with `pass`. | Partially implemented |
-| `prepare_execution` | Check readiness, compile hypothesis when appropriate, choose executor. | Validates active terminal analytical Task, accepted DataProfile, variables, specification bindings, and one-Hypothesis lifecycle. Produces an approval-bound contract. | Partially implemented |
-| `dispatch_executor` | Delegate to specialist agent. | Invokes only an injected analytical executor after durable contract admission. | Partially implemented |
-| `review_execution` | Review results and prepare Evidence/Discovery/Task/SessionFrame operations. | Keeps executor output as an observation, materializes AnalysisFrame provenance, and records run failure/success state. Separate evidence-admission and hypothesis-evaluation nodes decide later mutation operations. | Partially implemented |
-| `review_conflicts` | Detect conflicts with assumptions or existing knowledge. | Converts structured conflict-flag payloads into `FLAG_OBJECT` operations; automatic detection is not implemented. | Partially implemented |
-| `manage_objective` | Draft Objective wording or lifecycle operations. | Converts structured Objective update payloads into `UPDATE_OBJECTIVE` operations while preserving Objective identity. | Partially implemented |
-| `manage_assumptions` | Create assumption operations. | Converts structured Assumption create/status payloads into operations without using Assumptions as inference premises. | Partially implemented |
-| `request_user_input` | Prepare user approval/clarification request. | Creates an execution-approval interaction containing the contract fingerprint. | Partially implemented |
-| `pause` | Pause for user input. | State placeholder; no durable cross-process interrupt/resume store exists. | Not implemented as a durable workflow boundary |
-| `process_decision` | Route after user decision. | Revalidates an approval against the exact prepared contract, then stores state; a separate routing helper selects the next graph node. | Partially implemented |
-| `commit` | Persist approved state changes through the operation boundary. | Persists in-memory operations when a database URL exists, then calls `commit_planner_operations`. Current commit is a skeleton dispatch boundary, not full rollback/transaction machinery. | Partially implemented |
+- durable `PlannerOperation` envelopes and repository;
+- approved/not-required filtering;
+- rollback on apply/flush errors;
+- a special atomic execution/scientific bundle;
+- handlers for Task, Assumption, Hypothesis, AnalysisFrame, Evidence, Discovery, Objective, SessionFrame and conflict flags.
 
-## Graph Wiring
+Known gaps:
 
-`src/agents/planner/graph.py` wires the nodes using LangGraph:
+- `DELETE_TASK` has no handler;
+- outbox-only execution operation can be marked committed without a row;
+- Task update payload fields are not fully accepted by `TaskUpdate`;
+- direct attempt/inbox writes are rejected because the transition service is the owner;
+- public planner output may report requested ids instead of actually committed ids.
 
-- `START -> understand_request -> route_intent`
-- conditional routing from `route_intent`
-- user approval loop through `request_user_input -> pause -> process_decision`
-- approved execution routes to `commit_execution_contract -> END`; durable application dispatch owns subsequent executor submission
-- `commit -> END`
+## Worker continuation after graph admission
 
-Recognized unfinished data, profiling, result-review, conflict-review, answer, suggestion, and planning capabilities take `named capability node -> capability_unavailable -> END`. The terminal state contains a typed `capability_not_implemented` result and creates no operation, approval request, execution contract, or persistence mutation.
+```text
+commit_execution_contract -> ExecutionRun + outbox -> END
 
-## Known Deviations
+external worker:
+  dispatch_pending_attempts
+    -> receive_executor_result
+    -> finalize_pending_result
+    -> process_scientific_result
+```
 
-- `ExecutionApproval` is a durable approval record for the execution path; broader planner checkpoint/resume state is not yet durable.
-- Evidence admission validates method, parameters, parameter hash, and frame variable bindings, but it does not yet validate row filters, frame hashes against a durable expected frame, artifact contents, or method-specific diagnostics.
-- `commit` remains local SQLModel transaction machinery. It has no migration path, distributed recovery protocol, or concurrency reconciliation for critical lifecycle transitions.
-- Conflict comparison and answerability are graph hooks only; the required scope-aware classification and evidence-backed answer surface are not implemented.
+This split is current implementation, not merely target topology.
+
+## Target design
+
+The broader target pipeline still includes governed answer/planning/conflict workflows, runnable specialist executors, retrieval, user-controlled SessionFrame updates and production checkpointing. Those targets must not be described as live until the graph nodes, external surfaces and tests exist.
+

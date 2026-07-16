@@ -1,87 +1,72 @@
 # Implementation Gap Analysis
 
-This report compares the audited current implementation against the target architecture. Code is the source of truth for current behavior; the final FCO design is the source of truth for target behavior.
+> **Current implementation snapshot:** 2026-07-16 at `7779d518e511afe1844f0d6a6e9b18235ed8a4d4`.
+> Code is the source of truth for current behavior. This page separates implemented local contracts from target product behavior.
 
-| Affected concept | Target design says | Current implementation appears to do | Status | Remaining risk |
+## Current implementation versus target
+
+| Concept | Target design | Current implementation | Status | Remaining gap/risk |
 | --- | --- | --- | --- | --- |
-| FCO set | Only `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, and `SessionFrame` are FCOs. | Schemas, SQLModel tables, repositories, and tests now use that FCO set. | Implemented for local schema/persistence | Migration from older local DB files is not implemented. |
-| Workspace boundary | Workspace is a filesystem/runtime boundary; each workspace owns one graph DB. | The default DB is workspace-local at `.local/cognieda_graph.sqlite3`, and tests cover isolation across separate SQLite URLs. | Partially implemented | No app-level workspace registry or initializer exists. |
-| DataProfile data-version identity | Raw dataset and separate dataset-version objects are not FCOs; `DataProfile` stores dataset path, DVC identity, source metadata, profile stats, preprocessing history, and acceptance state. | `DataProfile` has `dataset_path`, optional `dvc_hash`, optional `dvc_version_label`, source fields, immutable profile summaries, lifecycle state, `superseded_by_data_profile_id`, preprocessing history, artifacts, and `accepted_as_ground_truth`. | Implemented locally | DVC identity is caller-supplied until executable DVC integration exists. |
-| DataProfile supersession and historical scope | When a DataProfile is replaced, old Evidence and Discovery remain traceable but must not be silently treated as valid for the replacement DataProfile. | `DataProfileRepository.supersede()` first requires every supplied `EvidenceRepository` and `DiscoveryRepository` to be bound to its exact SQLModel `Session` object, then marks the old profile `superseded` and records the replacement id. `EvidenceRepository.mark_historically_scoped_by_data_profile()` marks scoped Evidence `historically_scoped` without editing result payloads. `DiscoveryRepository.mark_historically_scoped_by_data_profile()` flags scoped Discoveries for review without changing claim, evidence ids, validity basis, epistemic status, strength, or uncertainty. | Partially implemented | This is repository-level exact-session safety, not a full propagation engine, production transaction or rollback guarantee, or automatic SessionFrame refresh. Retrieval policy, cleaning pipeline integration, DVC integration, approval UX, and runtime orchestration remain future work. |
-| Objective lifecycle and attribution | Objective remains the FCO for research intent; wording and lifecycle changes preserve its identity. | `Objective.status` is the sole persisted lifecycle field (`active`, `paused`, `completed`, or `archived`). `ObjectiveRepository.get_active()` excludes archived history by default, while `get_by_id()` and `list(status=...)` remain historical access paths. Approved `UPDATE_OBJECTIVE` PlannerOperations remain the immutable request/approval/commit attribution record. | Partially implemented | There is no dedicated before/after Objective snapshot, history UI, merge policy, rollback semantics, or migration that removes old local `objective_revisions` tables. Existing tables are left untouched for data safety and are no longer read or written. |
-| User decisions | Decisions are provenance, not durable scientific knowledge. | `UserDecision` and `UserDecisionRepository` replace the old generic decision artifact name. | Partially implemented | Cleaning/user-decision provenance is typed but not yet integrated into planner commit. |
-| Task lifecycle | Durable Tasks use proposed, active, paused, completed, failed, rejected, and cancelled states; only active terminal analytical Tasks can execute. | `Task`, `TaskRepository`, and `TaskLifecycleState` support the target states. The execute spine requires one matching accepted active `DataProfile`, an active analytical leaf Task, and either no Hypothesis or one nonterminal Hypothesis awaiting further Evidence. | Partially implemented | General Task planning, decomposition, approval UX, and broader lifecycle policy remain out of scope. |
-| Terminal task to hypothesis | Only active terminal analytical Tasks generate Hypotheses; one terminal Task generates exactly one Hypothesis. | `HypothesisRepository.create()` verifies the source Task exists, is active/analytical/childless, uses an active accepted DataProfile, matches the Hypothesis profile, and has no existing Hypothesis. Fresh DBs add a uniqueness constraint on `hypotheses.task_id`. | Implemented locally | Older local SQLite files are not migrated to the new uniqueness constraint. |
-| Evidence provenance | Evidence must reference `DataProfile`, `AnalysisFrame` provenance, method, parameters, execution run, result payload, and artifacts. | `Evidence` requires `profile_id`, `analysis_frame_ref`, `execution_run_ref`, method, parameters, provenance, result summary, and artifacts. Minimal `AnalysisFrame` and `ExecutionRun` provenance records exist. `EvidenceRepository` rejects missing Hypotheses, missing DataProfiles, and cross-profile Evidence before persistence; optional strict dereference validation additionally checks the two provenance records. | Partially implemented | Strict validation is intentionally narrow and is not full reproducibility validation for row filters, code versions, environments, parameters, seeds, or artifacts. |
-| Evidence lifecycle | Wrong, stale, or superseded analytical output should not be edited; create new Evidence and mark old Evidence superseded or invalidated. Dependent Discovery claims should be flagged for review, not silently rewritten. | `EvidenceRepository.supersede()` and `EvidenceRepository.invalidate()` update lifecycle metadata without editing result payload fields. When a `DiscoveryRepository` is supplied, it must use the exact same SQLModel session before either repository is read or mutated; shared-session calls flag Discoveries that reference the changed Evidence. | Partially implemented | This is repository-level same-session safety and a narrow review signal only, not production transaction or rollback machinery, an automatic propagation engine, review UX, planner/executor propagation, or full impact analysis. |
-| Discovery validity | Discovery is an evidence-bound claim with structured claim, epistemic status, scope, and validity metadata; one Hypothesis produces exactly one Discovery. | `Discovery` requires non-empty `evidence_ids`, `claim`, `epistemic_status`, `scope`, and `validity_basis`. `DiscoveryRepository.create()` verifies the Hypothesis exists, Evidence exists, Evidence is active, Evidence belongs to the same Hypothesis, and no Discovery already exists. Fresh DBs add a uniqueness constraint on `discoveries.hypothesis_id`. Discovery review metadata can flag Evidence supersession/invalidation without changing claim, Evidence links, validity basis, or epistemic status. | Implemented locally | Older local SQLite files are not migrated to the new uniqueness constraint; review UI and runtime propagation are missing. |
-| Assumption admission and review | Assumptions are planning constraints with source, testability, scope, scoped DataProfiles, contradiction refs, and replacement refs. Testable claims should become Task/Hypothesis candidates. Contradictions should flag review, not rewrite truth. | `Assumption` now carries source/testability/scope/scoped DataProfiles/contradiction/replacement fields. Testable claims are rejected as Assumptions at schema admission. `AssumptionRepository.flag_for_contradiction()` records Discovery contradiction refs and marks `flagged` without rewriting the statement. | Partially implemented | Planner warning and automatic post-Discovery contradiction review are not implemented. |
-| Assumption quarantine | Assumptions may guide planning but must be excluded from Discovery Synthesis Context. Existing Discoveries should not seed new Discovery synthesis. | `SessionContextBuilder` includes Assumptions and Discoveries in planning context, excludes Assumptions and existing Discoveries from `CONCLUSION`/`DISCOVERY_SYNTHESIS`, and exposes a separate `ANSWER` context that may include Discoveries for user Q&A. | Partially implemented | Graph retrieval policy is not implemented, so future retrieval must enforce the same rule. |
-| Planner ownership | Planner produces operations and dispatches executors; it does not author Evidence or Discovery from prose. | A narrow injected-executor spine prepares an approval-bound contract, persists its Hypothesis and ExecutionRun before dispatch, retains executor output as an observation, and creates Evidence/Discovery operations only after deterministic admission and explicit finalization checks. | Partially implemented | The planner does not yet use capability dispatch, durable approval/recovery records, production checkpoints, or a complete state-transition policy. |
-| Executor ownership | Executors operate on execution state and produce Evidence/Discovery drafts. | `Executor.run()` invokes the executor graph and validates graph output into `ExecutionResult`, but `ExecutorOutput`/`ExecutionResult` currently have no concrete draft or provenance fields; the intended fields are commented out. | Partially implemented | Executor graph bodies are still stubs and draft payloads are not yet typed to concrete Evidence/Discovery draft schemas. |
-| Executor capability dispatch | The minimal target dispatch architecture invokes executors by capability id through `ExecutorDispatcher`; `ExecutorRegistry` owns capability specs, factories, and lazy singleton instances. Delegation policy, tracing, retries, cycle/depth protection, and workspace-scoped instances are deferred. | `capabilities.py` defines canonical specs and derived capability ids. `ExecutionRequest` contains `capability`, `input`, and `context`, and validates capability ids at the Pydantic boundary. `ExecutorRegistry` supports decorator registration, duplicate guards, spec lookup, lazy singleton construction, explicit capability rendering, and Pydantic capability-selection model/instruction helpers for selecting one capability from an allowed subset. `ExecutorDispatcher` invokes `Executor.run(input, context)` by request capability. Importing `agents.executor` registers the existing `GraphMiner` and `HypothesisAnalyst` wrappers. `data_exploration` is catalogued but has no registered executor. | Partially implemented | Planner integration is still absent, registered executor graph builders still raise `NotImplementedError`, `DataExplorerExecutor` is not implemented, and unrestricted dispatcher access has no caller authorization, delegation trace, retry policy, or cycle/depth protection. Singleton safety still depends on executors remaining stateless. |
-| Evidence cache | Cache is an optimization keyed by validity inputs and cannot create Discovery. | No evidence-cache service exists. | Not implemented | Future cache work must not author Discovery. |
+| FCO ontology | Exactly `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, `SessionFrame` | Schema, SQLModel records and repositories use exactly this FCO set | Implemented locally | No graph-store ontology runtime |
+| Workspace boundary | Workspace is filesystem/runtime scope with isolated durable state | SQLite URL defaults to `.local/cognieda_graph.sqlite3`; tests cover URL isolation | Partial | No workspace registry, initializer command or service boundary |
+| Immutable knowledge | `DataProfile` and `Evidence` are immutable; Discovery remains evidence-bound | Frozen schemas, append/supersede/invalidate repositories and Discovery admission guards exist | Implemented locally | Supersession/review propagation uses multiple commits and is not atomic end-to-end |
+| Task/Hypothesis cardinality | Only active leaf analytical Tasks execute; one Task produces one Hypothesis | Repository admission guards and fresh-schema unique constraint on `hypotheses.task_id` | Implemented locally | Retry code conflicts with this invariant and currently fails |
+| Hypothesis/Discovery cardinality | One Hypothesis produces one evidence-bound Discovery | Repository guards and fresh-schema unique constraint on `discoveries.hypothesis_id` | Implemented locally | No migration framework for arbitrary older schemas; no review UI |
+| Provenance | Evidence traces DataProfile, AnalysisFrame, ExecutionRun, method, parameters and artifacts | Minimal durable `AnalysisFrame`/`ExecutionRun`; strict Evidence dereference is optional | Partial | Full reproducibility envelope, environment/code identity and artifact integrity are incomplete |
+| Planner operations | Nodes produce pending operations; approved operations commit atomically | Durable `PlannerOperation`, normal commit and special atomic execution bundle exist | Partial | `DELETE_TASK` unsupported; orphan outbox false-success; non-execution approval flow not reachable |
+| Planner request understanding | Natural language and explicit commands route deterministically | Explicit command parser works; fake-model classification tests pass | Broken for default NL path | Adapter calls `create_agent` with two missing arguments |
+| Planner execution admission | User approves a revalidated execution contract before dispatch | Durable `ExecutionApproval`; approved path commits Hypothesis/Run/Outbox | Implemented narrow path | Only execution approval is end-to-end; other decision routes are declared but unreachable |
+| Durable attempt protocol | Worker claims, renews, receives, finalizes, cancels and recovers with fencing | Transition service, outbox/inbox, lease/epoch/version, finalization fencing and reconciler exist | Implemented locally | `authorize_retry()` fails; no process bootstrap; external side effects remain at-least-once |
+| Scientific finalization | Executor observations become Evidence/Discovery only through deterministic admission | One deterministic-test processor validates contract and creates AnalysisFrame/Evidence/Discovery/lifecycle/SessionFrame operations | Implemented narrow method | No generic method registry, effect-size/sample-size policy, multiple testing or full diagnostics |
+| Executor capability dispatch | Registry selects runnable executors by capability | Capability catalog, registry and dispatcher exist | Partial | Default GraphMiner/HypothesisAnalyst graph builders raise `NotImplementedError`; `data_exploration` is unregistered |
+| Context type safety | Planning may use Assumptions; synthesis must exclude them and existing Discoveries | Pure `RetrievalPolicy` and local planning/synthesis/answer projections exist | Partial | No graph/vector retrieval engine or production prompt assembly |
+| SessionFrame | Durable scoped active-context/checkpoint artifact | Append-only repository, builder and scientific finalizer snapshot exist | Partial | Planner does not automatically refresh/pin/prune/synchronize frames |
+| Data versioning | Physical versions plus immutable DataProfiles and explicit transformation lineage | CSV/Parquet loading and baseline profiler exist; DVC boundary is explicit | Partial | DVC methods are not implemented; no cleaning/derived-version workflow |
+| Evidence cache | Validity-keyed optimization that cannot author Discovery | No cache record/service | Not implemented | Key design, invalidation and runtime integration remain target-only |
+| Product surface | User-facing CLI/service and independent worker loop | No production entrypoint | Not implemented | Current modules require external bootstrap/injected executor |
+| Quality gates | Tests, lint and strict type checks pass in CI | 210 pytest tests pass; Ruff has 12 errors; mypy has 132 errors; no tracked CI workflow | Partial / failing gates | Local behavioral coverage is stronger than static/integration readiness |
 
-## Highest-Risk Remaining Gaps
+## Confirmed blockers
 
-## Planner lifecycle and commit delta — 2026-07-11
+### Critical: retry contradicts the Task/Hypothesis invariant
 
-| Affected concept | Current implementation | Status | Remaining risk |
-| --- | --- | --- | --- |
-| Atomic PlannerOperation execution commit | The execution bundle stages its PlannerOperation envelopes and target records in one SQLModel transaction, then commits them together or rolls them back together. | Partially implemented | There is no `PlannerOperationBatch` record in current source. Normal non-execution commits remain skeleton-level, older SQLite files have no migration path, and interrupted execution recovery is not implemented. |
-| Planner capability dispatch | `PlannerCapabilityContract` is status-free. `resolve_capability` dispatches a request-only classification to an implemented handler or a controlled placeholder; handlers own their required object-state checks. | Partially implemented | Most capability handlers, durable LangGraph checkpoints, and production interfaces remain absent. |
-| Public Planner result | `Planner.run()` provides typed response, explicit SessionFrame reference when supplied through runtime context, requested capability, pending interaction, controlled error, operations, and commit result. It has no project id, phase, or status field. | Partially implemented | No production service boundary and no durable cross-process LangGraph checkpoint store exist. |
-| SessionFrame integration | Planner receives an optional explicit SessionFrame reference from runtime context; no project record owns it. No Planner node creates, refreshes, pins, removes, reorders, or atomically synchronizes it. | Not implemented as workflow integration | The existing SessionFrame projection policy remains local memory-component behavior, not capability orchestration. |
-| Planner execution admission — 2026-07-13 | A narrow injected-executor path now persists a non-FCO `ExecutionApproval` record before user approval is exposed. A new Planner instance can resume by proposal id and session id; admission rereads Task/Profile state, atomically creates or reuses the Hypothesis and creates one ExecutionRun. | Partially implemented | There is no durable attempt lease, heartbeat, result inbox, or reconciliation after interruption. Concurrent admission is not an explicit optimistic-version protocol, and older SQLite files have no migration for `execution_approvals`. |
-| Evidence admission and hypothesis evaluation — 2026-07-13 | Raw executor output is admitted only after method, parameter, parameter-hash, and variable-binding checks. The only supported `deterministic_test` evaluator derives outcome from a finite p-value and typed alpha rule; advisory disagreement prevents Evidence/Discovery finalization. Final success bundles Evidence, Discovery, lifecycle state, and a governed SessionFrame snapshot. | Partially implemented | Effect-size rules, diagnostics, sample-size checks, directionality, expected frame identity, and method-specific evaluators are not implemented. Interruption after dispatch remains unreconciled. |
+`ExecutionAttemptTransitionService.authorize_new_attempt()` clones a Hypothesis for the old Task and stages a new run. A SQLite in-memory reproduction fails first on the new run's Hypothesis foreign key because the Hypothesis has not been flushed; flushing it would then violate `uq_hypotheses_task_id`. The target retry semantics require owner review rather than a local tactical patch.
 
-1. There is no migration path for older SQLite files that contain scaffold-era tables.
-2. `AnalysisFrame` and `ExecutionRun` exist only as minimal provenance skeletons; optional Evidence dereference validation is narrow, and cache records are still absent.
-3. Context type safety now has a pure policy skeleton, but graph retrieval and production prompt assembly still do not exist and therefore do not enforce it.
-4. Stage 2/3 proves one narrow injected-executor path with configurable confirmation and durable pre-dispatch admission only; task decomposition, real executors, retrieval, cache, parent-task synthesis, durable recovery actions, and SessionFrame synchronization remain scaffold-level or absent.
-5. DVC integration is an explicit interface, not executable integration.
-6. Executor capability registration, singleton resolution, and basic dispatch now exist, but planner integration, runnable default executor graphs, `DataExplorerExecutor`, typed execution-result drafts, caller-scoped authorization, and executor-to-executor delegation controls are not implemented.
+Evidence: `src/application/orchestrator/transition_service.py:L570-L616`; `src/db/models.py:L181-L188`.
 
-## Owner Review Needed
+### High: default natural-language planner adapter is not callable
 
-### Execution-attempt recovery audit (2026-07-14)
+`_ConfiguredRequestUnderstandingModel` passes only worker/config to a factory that also requires dependency type and built-in tool declarations. Explicit slash commands and fake-model tests do not exercise this path.
 
-`ExecutionRun` now has dispatch-key and lease fields, and the new side tables
-can be added to a prior `execution_runs` table by an idempotent targeted
-upgrade. This is **not** a complete recovery implementation: dispatch bypasses
-the outbox, result receipt is not durable before finalization, scientific
-finalization is not fenced, cancellation/retry APIs are absent, and the
-reconciler cannot redispatch or finalize a received result. The recovery
-protocol document is a target design. See
-`docs/audits/PLANNER_EXECUTION_RECOVERY_REVIEW.md`.
+Evidence: `src/agents/planner/nodes.py:L67-L77`; `src/agents/llm.py:L21-L35`.
 
-### Execution-topology review (2026-07-14)
+### High: execution bundle validation is incomplete
 
-The Planner no longer invokes an executor in its compiled route: approval
-admission creates a durable outbox, an independent dispatcher receives attempt
-identity/fencing fields, and a database-only finalizer can create the atomic
-scientific bundle from a durable inbox result. This is **not** a complete
-attempt-recovery protocol. Cancellation, retry, reconciliation, and complete
-fencing ownership still bypass a single guarded transition service. See
-`docs/audits/PLANNER_EXECUTION_TOPOLOGY_REVIEW.md`.
+An outbox-only approved operation enters the execution bundle, is skipped in the apply loop, and is marked committed without inserting an outbox row. Admission must require exactly one run/outbox pair before any operation is marked committed.
 
-### Execution-transition corrective review (2026-07-14)
+Evidence: `src/application/orchestrator/planner_commit.py:L160-L228`.
 
-The live attempt path now routes admission, dispatch, result receipt,
-finalization claim/reclaim, cancellation, lease release, and scientific
-completion through `ExecutionAttemptTransitionService`. The scientific commit
-uses the current finalization owner, epoch, and attempt version as a fence, so
-a reclaimed finalizer cannot commit stale work. This remains **partially
-implemented**: admission record construction is now also owned by the service,
-and the SQLite migration test covers the committed pre-protocol
-`execution_runs` shape, including idempotent indexes and a new post-upgrade
-attempt. The release gate is still blocked because no test forces two complete
-scientific finalizations to overlap, nor forces cancellation/finalization or a
-reclaimed finalizer to compete at the scientific commit boundary. External
-executor side effects also remain at-least-once. See
-`docs/audits/PLANNER_EXECUTION_RELEASE_GATE_REVIEW.md`.
+### High: declared non-execution approval routes are unreachable
 
-- Decide whether existing local databases should be migrated or discarded during this scaffold convergence.
-- Decide the fuller persisted shape for `ExecutionRun`, `AnalysisFrame`, cleaning decisions, and rejected task proposals.
-- Decide when the skeleton `PlannerOperation` commit boundary should grow transaction, rollback, and approval provenance semantics.
-- Decide whether SQLModel remains the runtime store during convergence or whether/when a graph store is introduced.
+The graph route table advertises task/plan/conflict approvals, while `route_process_decision()` can return only approved execution, clarify or cancel.
+
+Evidence: `src/agents/planner/graph.py:L34-L41`; `src/agents/planner/nodes.py:L1009-L1016`.
+
+## Verified commands
+
+| Command class | Result |
+| --- | --- |
+| Full pytest with absolute project/rootdir | `210 passed` |
+| Ruff on `src` and `tests` | Failed with 12 findings |
+| Strict mypy on `src` | Failed with 132 errors in 14 files |
+
+These results are not interchangeable: passing tests validate covered behavior, while failing lint/type gates remain real implementation debt.
+
+## Owner decisions required
+
+1. Define retry identity: reuse the existing Hypothesis, create a new Task, or revise the one-Task/one-Hypothesis invariant explicitly.
+2. Decide whether non-execution approval routes are in the next implementation slice or should remain target-only vocabulary.
+3. Decide the supported migration policy for local databases created before current unique constraints and attempt columns.
+4. Decide whether SQLModel/SQLite remains the durable runtime store or is a convergence layer before a graph store.
+5. Define the minimum runnable executor and product bootstrap required before describing CogniEDA as end-to-end.
+6. Define when Ruff/mypy/CI become release gates.

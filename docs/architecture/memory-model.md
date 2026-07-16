@@ -40,7 +40,7 @@ The current repository implements parts of this model:
 | --- | --- | --- |
 | `SessionFrame` snapshots | Partially implemented | Persisted and tested, but not yet the target user-governed active context item model. |
 | Semantic Research Memory | Partially implemented | Target FCOs are modeled locally, but the store is SQLModel rather than graph retrieval. |
-| Workflow State Memory | Partially implemented | `Task` exists; minimal `PlannerOperation` state and commit dispatch boundary exist, but planner runtime behavior remains scaffold-level. |
+| Workflow State Memory | Partially implemented | `Task`, durable `PlannerOperation`, execution approval/outbox/inbox and local commit/rollback boundaries exist; broad planner behavior and product integration remain incomplete. |
 | Provenance Memory | Partially implemented | Evidence references, UserDecision records, and minimal `AnalysisFrame`/`ExecutionRun` records exist; full provenance trace and dereference validation are missing. |
 | Evidence Cache | Not implemented | Only session-frame-level `ToolResultCacheSummary` exists. |
 | Context Type Safety | Partially implemented | Basic frame projection enforces planning/answer/discovery-synthesis exclusions, records projection-local Discovery exclusion notes, and a pure retrieval policy skeleton now defines lifecycle/type gates. No graph retrieval implementation exists. |

@@ -20,8 +20,8 @@ The current implementation uses:
 - a local SQLModel store, defaulting to `.local/cognieda_graph.sqlite3`
 - Git-tracked DataProfile mirror templates under `artifacts/data_profiles/`
 - no graph database implementation
-- no migration tooling
-- partial typed provenance via `UserDecision` and Evidence references
+- two targeted SQLite migrations for the execution-attempt protocol and Task motivation; no general migration framework
+- typed provenance/workflow records for `UserDecision`, `AnalysisFrame`, `ExecutionRun`, execution outbox/inbox/approval, and `PlannerOperation`
 - no target evidence cache
 
 The SQLModel store currently persists tables for:
@@ -35,6 +35,12 @@ The SQLModel store currently persists tables for:
 - `discoveries`
 - `user_decisions`
 - `session_frames`
+- `analysis_frames`
+- `execution_runs`
+- `execution_outbox`
+- `execution_inbox`
+- `execution_approvals`
+- `planner_operations`
 
 ## Implementation Status
 
@@ -43,8 +49,8 @@ The SQLModel store currently persists tables for:
 | Filesystem workspace | Partially implemented | Repo has data/artifact folders and workspace-local DB default, but no workspace initializer or registry. |
 | SQLModel runtime store | Implemented | `src/db/session.py` and `src/db/init_db.py` provide local DB setup. |
 | Research graph/database | Partially implemented | The current store is relational SQLModel rather than a graph database, but it stores the target FCO set. |
-| Workflow store | Partially implemented | Tasks, SessionFrames, minimal PlannerOperations, and a skeleton commit boundary exist; full planner runtime and approval UX are missing. |
-| Provenance store | Partially implemented | `UserDecision`, minimal `AnalysisFrame`, minimal `ExecutionRun`, and Evidence provenance refs exist; full reproducibility records are missing. |
+| Workflow store | Partially implemented | Tasks, SessionFrames, durable PlannerOperations, execution approvals, and a local atomic execution commit boundary exist; general planner approval/product UX are missing. |
+| Provenance store | Partially implemented | `UserDecision`, `AnalysisFrame`, durable attempt/outbox/inbox records, and Evidence provenance refs exist; full reproducibility records are missing. |
 | Evidence cache | Not implemented | No cache lookup service exists. |
 | DVC integration | Partially implemented | `DvcAdapter` defines the boundary and raises explicit not-implemented behavior. Executable DVC support is not declared as a runtime dependency. |
 

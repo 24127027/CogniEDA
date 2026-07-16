@@ -1,153 +1,61 @@
-# Executor Dispatch Architecture
+# Executor Dispatch
 
-## Target Design
+> **Current implementation snapshot:** 2026-07-16. This page distinguishes the agent capability adapter from the durable application worker.
 
-The executor dispatch layer decouples *what* needs to happen from *who* does it. Callers (the planner or other executors) declare a **capability** they need fulfilled — such as "hypothesis_testing", "graph_mining", or "data_exploration" — and the **ExecutorDispatcher** resolves which registered executor can fulfill that capability.
+## Current implementation: capability adapter
 
-This design follows three principles:
+`src/agents/executor/` implements:
 
-1. **Capability-based routing** — the caller names the analytical need, not the executor. The dispatcher owns the mapping.
-2. **Uniform interface** — every executor call uses the same `ExecutionRequest → ExecutionResult` contract, regardless of whether the caller is the planner or another executor.
-3. **Self-registration** — executors declare their capabilities via a `@registry.register(capability)` decorator at class definition time. No central config file enumerates executors.
+| Component | Role |
+| --- | --- |
+| `CapabilitySpec` and canonical capability ids | Catalog and descriptions for `data_exploration`, `graph_mining`, and `hypothesis_testing`. |
+| `ExecutionRequest` | Typed capability/input/context request; validates against the catalog. |
+| `ExecutorRegistry` | Registers specs/factories, guards duplicates and lazily creates singleton executor wrappers. |
+| `ExecutorDispatcher` | Resolves one registered capability and calls `executor.run(...)`. |
+| Capability selection helpers | Build a constrained Pydantic selection model and instructions for an allowed subset. |
 
-### Architecture Diagram
+Registration status:
 
-```mermaid
-flowchart TD
-    P[Planner Node: prepare_execution] -->|maps TaskKind → Capability| ER[ExecutionRequest]
-    ER --> D[ExecutorDispatcher]
-    D -->|capability lookup| REG[ExecutorRegistry]
-    REG -->|resolves to| EX[Executor Instance]
-    EX -->|async run| ERES[ExecutionResult]
-    ERES --> P2[Planner Node: dispatch_executor]
-    P2 --> P3[Planner Node: review_execution]
+| Capability | Registered | Runnable default graph |
+| --- | --- | --- |
+| `data_exploration` | No | No |
+| `graph_mining` | `GraphMinerExecutor` | No; graph builder raises `NotImplementedError` |
+| `hypothesis_testing` | `HypothesisAnalystExecutor` | No; graph builder raises `NotImplementedError` |
 
-    E1[GraphMiner] -.->|@register GRAPH_MINING| REG
-    E2[HypothesisAnalyst] -.->|@register HYPOTHESIS_TESTING| REG
-    E3[Future: DataExplorer] -.->|@register DATA_EXPLORATION| REG
+The catalog boundary and registry boundary are different: an `ExecutionRequest` can accept a catalogued id for which registry resolution later raises `KeyError`.
+
+## Current implementation: durable application worker
+
+`src/application/orchestrator/dispatcher.py` is not the same dispatcher. It consumes persisted execution attempts:
+
+```text
+ExecutionOutbox(pending)
+  -> claim_dispatch(worker/lease/epoch/version)
+  -> injected executor.execute(prepared_payload)
+  -> receive_executor_result
+  -> ExecutionInbox
 ```
 
-### Component Responsibilities
+The injected object only needs the application worker's `execute(prepared)` contract. Current source has no adapter that resolves `executor_type` through `agents.executor.ExecutorRegistry`.
 
-| Component | Responsibility | Location |
-|---|---|---|
-| `Capability` (StrEnum) | Shared vocabulary of analytical needs | `src/agents/executor/types.py` |
-| `ExecutionRequest` | Input contract: capability + task + context | `src/agents/executor/types.py` |
-| `ExecutionResult` | Output contract: evidence drafts, discovery drafts, execution run ref | `src/agents/executor/types.py` |
-| `ExecutorRegistry` | Decorator-based registry mapping capability → executor instance | `src/agents/executor/registry.py` |
-| `ExecutorDispatcher` | Resolves capability to executor, invokes `executor.run()`, returns result | `src/agents/executor/dispatcher.py` |
-| `Executor` (ABC) | Base class all executors inherit; provides `run(input, context) → ExecutionResult` | `src/agents/executor/executor.py` |
+## Planner boundary
 
-### Capability Set (Initial)
+The compiled planner graph prepares and approves an execution contract, then commits `Hypothesis`, `ExecutionRun`, and outbox state. It ends after admission. Dispatch, result receipt and scientific finalization are independent worker operations outside the graph.
 
-| Capability | Description | Registered Executor |
-|---|---|---|
-| `graph_mining` | Search and traverse the knowledge graph | `GraphMiner` |
-| `hypothesis_testing` | Execute statistical tests, produce Evidence and Discovery drafts | `HypothesisAnalyst` |
-| `data_exploration` | Profile, visualize, and summarize datasets | *(future executor)* |
+This avoids treating executor output as durable knowledge. The finalizer validates the persisted result and produces operations for `AnalysisFrame`, `Evidence`, `Discovery`, lifecycle changes and `SessionFrame` before the fenced transaction commits.
 
-Capabilities use a `StrEnum` for type safety while remaining extensible without schema migration — the same pattern used by `FirstClassObjectType` and `TaskKind` in `src/schemas/enums.py`.
+## Not yet implemented
 
-### Dispatch Flow
+- runnable default GraphMiner/HypothesisAnalyst graphs;
+- a registered data-exploration executor;
+- planner capability selection integrated with prepared execution;
+- durable-worker-to-capability-registry adapter;
+- concrete Evidence/Discovery draft fields on `ExecutionResult`;
+- caller authorization, delegation tracing, retry and cycle/depth protection in the capability layer;
+- production worker bootstrap.
 
-1. **Caller** (planner node or executor node) constructs an `ExecutionRequest` with:
-   - `capability`: which analytical need to fulfill
-   - `input`: the task and any additional parameters
-   - `context`: session frame context for the executor
+## Target design constraint
 
-2. **ExecutorDispatcher.dispatch(request)**:
-   - Looks up `request.capability` in the `ExecutorRegistry`
-   - If not found → raises `CapabilityNotFoundError`
-   - If found → calls `executor.run(request.input, request.context)`
-   - Returns the `ExecutionResult`
+Future integration must keep write ownership in the durable attempt/finalization boundary. An executor or capability dispatcher must not directly persist Evidence or Discovery, mutate attempt state, or bypass user approval.
 
-3. **Caller** receives `ExecutionResult` containing:
-   - `evidence_drafts`: list of evidence produced
-   - `discovery_drafts`: list of discovery claims produced
-   - `execution_run_ref`: provenance reference for the execution
-
-### Planner Integration
-
-Two planner nodes bridge the planner pipeline to the dispatch layer:
-
-- **`prepare_execution`**: Inspects the selected `Task`'s `TaskKind`, maps it to a `Capability`, and constructs an `ExecutionRequest`. The mapping is a simple dictionary.
-
-- **`dispatch_executor`**: Takes the `ExecutionRequest` from planner state, calls `dispatcher.dispatch(request)`, and stores the `ExecutionResult` in planner state for `review_execution` to consume.
-
-### Executor-to-Executor Chaining (Future)
-
-Because the dispatcher exposes a uniform `ExecutionRequest → ExecutionResult` interface, any executor node can call `dispatcher.dispatch()` to invoke another executor. This enables chains like:
-
-```
-GraphMiner (find relevant subgraph)
-  → dispatcher.dispatch(capability="hypothesis_testing", ...)
-    → HypothesisAnalyst (test hypothesis on subgraph)
-```
-
-This is architecturally supported but not implemented in the initial version.
-
-### External Executor Delivery Semantics
-
-The execution subsystem provides **at-least-once** delivery semantics at the boundary between the internal graph store and external executors. 
-
-When the dispatcher routes a task to an external executor (such as a separate process or remote service), network failures, worker crashes, or node evictions may cause the operation to be retried. The `ExecutionAttemptTransitionService` ensures that the transition of the `ExecutionRun` state is transactional within the core database, but the side effects produced by the external executor itself (e.g., calling an external API, writing intermediate scratch files) may occur more than once. 
-
-This is an acceptable and intended system boundary. Executors must either be inherently idempotent or accept that their side effects may be repeated in the event of a crash and subsequent claim renewal. The `ExecutionRunRecord` provides a `dispatch_idempotency_key` specifically so that well-behaved executors can deduplicate work if they choose to track it.
-
-### Registration Pattern
-
-Executors self-register using a decorator that mirrors the existing `NodeRegistry` pattern:
-
-```python
-# In graph_miner/agent.py
-from ..registry import executor_registry
-from ..types import Capability
-
-@executor_registry.register(Capability.GRAPH_MINING)
-class GraphMiner(Executor):
-    ...
-```
-
-The `ExecutorRegistry` validates:
-- No duplicate capability registrations (one capability → one executor)
-- Registered classes are `Executor` subclasses
-
-### Runtime Wiring
-
-The dispatcher is passed to planner nodes via LangGraph's `Runtime[Context]` mechanism. The planner's `Context` model gains a `dispatcher: ExecutorDispatcher` field. This avoids global mutable state and keeps the dispatcher testable — tests inject a dispatcher with mock executors.
-
-## Current Implementation
-
-The executor dispatch layer does not yet exist. Current state:
-
-- `ExecutionRequest` exists but uses `executor_name: str` (names an executor directly) instead of `capability: str` (declares a need).
-- `ExecutionResult` is an empty stub (`...`).
-- `prepare_execution` and `dispatch_executor` planner nodes are `pass` stubs.
-- `GraphMiner` and `HypothesisAnalyst` exist as `Executor` subclasses but are not registered anywhere.
-- No `ExecutorRegistry` or `ExecutorDispatcher` exists.
-- The planner has no mechanism to discover or invoke executors.
-
-## Implementation Status
-
-| Component | Status | Note |
-|---|---|---|
-| `Capability` enum | Not implemented | Will be added to `src/agents/executor/types.py` |
-| `ExecutionRequest` (capability-based) | Not implemented | Currently uses `executor_name` |
-| `ExecutionResult` (structured) | Not implemented | Currently empty stub |
-| `ExecutorRegistry` | Not implemented | New file needed |
-| `ExecutorDispatcher` | Not implemented | New file needed |
-| `prepare_execution` node | Stub | `pass` in `src/agents/planner/nodes.py` |
-| `dispatch_executor` node | Stub | `pass` in `src/agents/planner/nodes.py` |
-| Executor registration | Not implemented | Executors exist but are undiscoverable |
-
-## Known Deviations
-
-- The current `ExecutionRequest.executor_name` field reflects the older "name the executor" model. This will be replaced by `capability`.
-- A minimal `PlannerOperation` schema/table exists, but `prepare_execution` still does not produce execution operations. It should stay skeleton-only until the planner/executor approval contract is designed.
-- `review_execution` cannot persist `Evidence` or `Discovery` because those persistence paths are not yet implemented. The `ExecutionResult` will carry drafts that `review_execution` can inspect but not yet commit.
-
-## Related Documents
-
-- [Planner Workflow](planner-workflow.md) — the planner pipeline that calls the dispatcher
-- [First-Class Objects](first-class-objects.md) — the `Evidence` and `Discovery` FCOs that executors produce
-- [Implementation Gap Analysis](implementation-gap-analysis.md) — tracks the "execution dispatch has no implemented executor integration" gap
+See [Implementation Gap Analysis](implementation-gap-analysis.md).

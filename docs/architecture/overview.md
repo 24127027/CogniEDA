@@ -8,7 +8,7 @@ The canonical FCO set is `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypo
 
 ## Current Implementation
 
-The current implementation is a Python scaffold managed with `uv`. It contains:
+The current implementation is a Python backend prototype managed with `uv`. It contains:
 
 - target FCO schemas in `src/schemas/artifacts.py`
 - value objects and validity/provenance summaries in `src/schemas/common.py`
@@ -16,8 +16,10 @@ The current implementation is a Python scaffold managed with `uv`. It contains:
 - thin repositories in `src/repositories/`
 - baseline profiling utilities and a DVC adapter boundary in `src/data/`
 - `SessionFrameBuilder` and `SessionContextBuilder` in `src/memory/session_frame.py`
-- planner/executor contract scaffolding in `src/agents/`
-- tests for repositories, profiling semantics, DB foreign keys, and session-frame context projection
+- a narrow approval-gated planner admission path in `src/agents/planner/`
+- a durable attempt worker/finalization protocol in `src/application/orchestrator/`
+- executor capability registration/dispatch plumbing, while concrete executor graphs remain stubs
+- tests for planner admission, repositories, profiling, DB constraints, context projection, attempt races/recovery, and scientific finalization
 
 ## Implementation Status
 
@@ -27,15 +29,15 @@ The current implementation is a Python scaffold managed with `uv`. It contains:
 | SQLModel persistence | Implemented locally | Tables exist under `src/db/models.py`; `init_db()` creates tables for the target local schema. |
 | Repository layer | Implemented locally | Thin repositories exist for FCOs and `UserDecision` provenance, with local Task-to-Hypothesis and Hypothesis-to-Discovery admission guards. |
 | Data profiling | Partially implemented | Baseline dataframe profiling exists and produces immutable DataProfiles with optional DVC identity. Executable DVC integration is missing. |
-| Planner workflow | Partially implemented | Planner contracts and node names exist, but most nodes are stubs and operation persistence is missing. |
-| Executor workflow | Partially implemented | Executor contracts can return Evidence/Discovery drafts, but executor graph bodies are stubs. |
-| Context type safety | Partially implemented | `SessionContextBuilder` enforces Planning, Answer, and Discovery Synthesis filtering for `SessionFrame` snapshots; graph retrieval policy does not exist. |
+| Planner workflow | Partially implemented | Explicit commands and execution approval/admission work; answer/suggest/plan and general non-execution approval remain incomplete. Durable PlannerOperation persistence exists. |
+| Executor workflow | Partially implemented | Capability catalog/registry/dispatcher exist, but concrete executor graphs and structured result drafts are stubs. Durable worker execution is a separate application-layer path. |
+| Context type safety | Partially implemented | A pure retrieval policy plus `SessionContextBuilder` projections enforce local type/lifecycle filtering; no graph/vector retrieval engine exists. |
 | Validity basis | Implemented locally | `Discovery.validity_basis` records dependency and invalidation metadata. Full provenance records remain incomplete. |
 | AnalysisFrame provenance | Partially implemented | Evidence requires `analysis_frame_ref`; a minimal `AnalysisFrame` table exists, but no full analytical-view provenance exists. |
 | Evidence cache | Not implemented | No evidence-cache service exists. |
 
 ## Known Deviation
 
-The local SQLModel schema has converged to the target FCO set, but the repository still lacks migrations for older local database files and lacks full planner/executor/provenance runtime behavior.
+The local SQLModel schema has converged to the target FCO set and now includes targeted migrations plus minimal provenance/workflow records. It still lacks a general migration framework, runnable default executors, a working default natural-language planner path, production retrieval/cache, and a CLI/service/worker bootstrap.
 
 See [Implementation Gap Analysis](implementation-gap-analysis.md).
