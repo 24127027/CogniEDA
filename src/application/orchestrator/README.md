@@ -21,8 +21,8 @@ There are no `application_orchestrator.py`, `request_pipeline.py` or `response_p
 
 ## Known deviations
 
-- `authorize_new_attempt()` currently cannot complete a retry and conflicts with the one-Task/one-Hypothesis invariant.
-- An outbox-only execution bundle can be marked committed without inserting an outbox row.
+- Technical retry reuses the existing Hypothesis and creates one successor `ExecutionRun`; a database constraint prevents direct-successor fan-out. A retry of a failed successor must target that successor, not the original attempt.
+- Execution admission validates one matching `ExecutionRun`/outbox pair before staging either row. This is a narrow attempt-contract boundary, not a general executor-contract redesign.
 - No process/worker bootstrap invokes dispatcher/reconciler loops.
 - External executor side effects remain at-least-once.
 - Scientific processing supports one narrow deterministic-test contract, not a generic analytical engine.

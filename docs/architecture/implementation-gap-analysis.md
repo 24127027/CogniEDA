@@ -1,6 +1,6 @@
 # Implementation Gap Analysis
 
-> **Current implementation snapshot:** 2026-07-16 at `7779d518e511afe1844f0d6a6e9b18235ed8a4d4`.
+> **Current implementation snapshot:** 2026-07-16 working tree at `2f0ae3d5ecbe075c76b7518c37885b3ccf878589`, including the reviewed uncommitted control-plane changes.
 > Code is the source of truth for current behavior. This page separates implemented local contracts from target product behavior.
 
 ## Current implementation versus target
@@ -10,13 +10,13 @@
 | FCO ontology | Exactly `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, `SessionFrame` | Schema, SQLModel records and repositories use exactly this FCO set | Implemented locally | No graph-store ontology runtime |
 | Workspace boundary | Workspace is filesystem/runtime scope with isolated durable state | SQLite URL defaults to `.local/cognieda_graph.sqlite3`; tests cover URL isolation | Partial | No workspace registry, initializer command or service boundary |
 | Immutable knowledge | `DataProfile` and `Evidence` are immutable; Discovery remains evidence-bound | Frozen schemas, append/supersede/invalidate repositories and Discovery admission guards exist | Implemented locally | Supersession/review propagation uses multiple commits and is not atomic end-to-end |
-| Task/Hypothesis cardinality | Only active leaf analytical Tasks execute; one Task produces one Hypothesis | Repository admission guards and fresh-schema unique constraint on `hypotheses.task_id` | Implemented locally | Retry code conflicts with this invariant and currently fails |
+| Task/Hypothesis cardinality | Only active leaf analytical Tasks execute; one Task produces one Hypothesis | Repository admission guards, fresh-schema unique constraint on `hypotheses.task_id`, and technical retry reuse the same Hypothesis | Implemented locally | No governed changed-analysis rerun path |
 | Hypothesis/Discovery cardinality | One Hypothesis produces one evidence-bound Discovery | Repository guards and fresh-schema unique constraint on `discoveries.hypothesis_id` | Implemented locally | No migration framework for arbitrary older schemas; no review UI |
 | Provenance | Evidence traces DataProfile, AnalysisFrame, ExecutionRun, method, parameters and artifacts | Minimal durable `AnalysisFrame`/`ExecutionRun`; strict Evidence dereference is optional | Partial | Full reproducibility envelope, environment/code identity and artifact integrity are incomplete |
-| Planner operations | Nodes produce pending operations; approved operations commit atomically | Durable `PlannerOperation`, normal commit and special atomic execution bundle exist | Partial | `DELETE_TASK` unsupported; orphan outbox false-success; non-execution approval flow not reachable |
-| Planner request understanding | Natural language and explicit commands route deterministically | Explicit command parser works; fake-model classification tests pass | Broken for default NL path | Adapter calls `create_agent` with two missing arguments |
-| Planner execution admission | User approves a revalidated execution contract before dispatch | Durable `ExecutionApproval`; approved path commits Hypothesis/Run/Outbox | Implemented narrow path | Only execution approval is end-to-end; other decision routes are declared but unreachable |
-| Durable attempt protocol | Worker claims, renews, receives, finalizes, cancels and recovers with fencing | Transition service, outbox/inbox, lease/epoch/version, finalization fencing and reconciler exist | Implemented locally | `authorize_retry()` fails; no process bootstrap; external side effects remain at-least-once |
+| Planner operations | Nodes produce pending operations; approved operations commit atomically | Durable `PlannerOperation`, normal commit and special atomic execution bundle exist. `/manage_task` persists the exact pending task-operation batch before approval, and only the restored, session-bound batch can commit. | Partial | `DELETE_TASK` unsupported; only Task-operation approval is currently public |
+| Planner request understanding | Natural language and explicit commands route deterministically | Explicit commands bypass classification; configured request-only adapter uses the LLM factory contract and returns controlled invalid results on invalid output or model failure | Partially implemented | Contextual grounding and most downstream capability nodes remain scaffold-level; live model credentials/service are required outside tests |
+| Planner execution admission | User approves a revalidated execution contract before dispatch | Durable `ExecutionApproval`; approved path commits Hypothesis/Run/Outbox | Implemented narrow path | Task-operation approval is also end-to-end, but plan/objective/assumption/conflict approval remains incomplete |
+| Durable attempt protocol | Worker claims, renews, receives, finalizes, cancels and recovers with fencing | Transition service, outbox/inbox, lease/epoch/version, finalization fencing and reconciler exist; retry creates a successor attempt under the existing Hypothesis | Implemented locally | No process bootstrap; external side effects remain at-least-once |
 | Scientific finalization | Executor observations become Evidence/Discovery only through deterministic admission | One deterministic-test processor validates contract and creates AnalysisFrame/Evidence/Discovery/lifecycle/SessionFrame operations | Implemented narrow method | No generic method registry, effect-size/sample-size policy, multiple testing or full diagnostics |
 | Executor capability dispatch | Registry selects runnable executors by capability | Capability catalog, registry and dispatcher exist | Partial | Default GraphMiner/HypothesisAnalyst graph builders raise `NotImplementedError`; `data_exploration` is unregistered |
 | Context type safety | Planning may use Assumptions; synthesis must exclude them and existing Discoveries | Pure `RetrievalPolicy` and local planning/synthesis/answer projections exist | Partial | No graph/vector retrieval engine or production prompt assembly |
@@ -28,29 +28,21 @@
 
 ## Confirmed blockers
 
-### Critical: retry contradicts the Task/Hypothesis invariant
+### Step 3.5B: execution-attempt correctness (implemented narrow scope)
 
-`ExecutionAttemptTransitionService.authorize_new_attempt()` clones a Hypothesis for the old Task and stages a new run. A SQLite in-memory reproduction fails first on the new run's Hypothesis foreign key because the Hypothesis has not been flushed; flushing it would then violate `uq_hypotheses_task_id`. The target retry semantics require owner review rather than a local tactical patch.
+Technical retry preserves Task/DataProfile/Hypothesis identity, creates a new `ExecutionRun` plus outbox from the persisted predecessor contract, and records predecessor lineage. A unique direct-successor constraint makes a retry chain deterministic under concurrent authorization. A retry of a failed successor must target that successor rather than fork the original attempt.
 
-Evidence: `src/application/orchestrator/transition_service.py:L570-L616`; `src/db/models.py:L181-L188`.
+Execution admission validates duplicate operation IDs, one matching run/outbox pair, common session, immutable identifiers, admitted status, and persisted Task/Hypothesis compatibility before staging the pair. Staged `commit=False` operations are not reported as committed before their enclosing transaction commits.
 
-### High: default natural-language planner adapter is not callable
+### Remaining planner approval limitation
 
-`_ConfiguredRequestUnderstandingModel` passes only worker/config to a factory that also requires dependency type and built-in tool declarations. Explicit slash commands and fake-model tests do not exercise this path.
+Task-operation proposals now persist as pending `PlannerOperation` records and are resumed only when the caller supplies the matching proposal fingerprint and exact operation-id list for the same session. The remaining plan/objective/assumption/conflict approval routes are still not public workflows.
 
-Evidence: `src/agents/planner/nodes.py:L67-L77`; `src/agents/llm.py:L21-L35`.
+Evidence: `src/agents/planner/nodes.py`; `src/agents/planner/agent.py`; `src/agents/planner/graph.py`.
 
-### High: execution bundle validation is incomplete
+## Step status
 
-An outbox-only approved operation enters the execution bundle, is skipped in the apply loop, and is marked committed without inserting an outbox row. Admission must require exactly one run/outbox pair before any operation is marked committed.
-
-Evidence: `src/application/orchestrator/planner_commit.py:L160-L228`.
-
-### High: declared non-execution approval routes are unreachable
-
-The graph route table advertises task/plan/conflict approvals, while `route_process_decision()` can return only approved execution, clarify or cancel.
-
-Evidence: `src/agents/planner/graph.py:L34-L41`; `src/agents/planner/nodes.py:L1009-L1016`.
+Steps 1-3, Step 3.5A, and the narrow Step 3.5B execution-attempt correction are complete for the currently implemented scope: configured request classification, typed Task proposals, approval-gated atomic non-execution commit, complete execution admission pairs, retry lineage, and committed-result reporting. Step 4 is not implemented. This statement does not make executor dispatch, retrieval, or broader planner capabilities part of the Planner graph.
 
 ## Verified commands
 
@@ -64,8 +56,8 @@ These results are not interchangeable: passing tests validate covered behavior, 
 
 ## Owner decisions required
 
-1. Define retry identity: reuse the existing Hypothesis, create a new Task, or revise the one-Task/one-Hypothesis invariant explicitly.
-2. Decide whether non-execution approval routes are in the next implementation slice or should remain target-only vocabulary.
+1. Define a scientifically governed rerun path for changed analytical contracts; technical retry intentionally reuses the existing contract and Hypothesis.
+2. Define the public approval behavior for plan/objective/assumption/conflict workflows beyond the implemented Task-operation batch.
 3. Decide the supported migration policy for local databases created before current unique constraints and attempt columns.
 4. Decide whether SQLModel/SQLite remains the durable runtime store or is a convergence layer before a graph store.
 5. Define the minimum runnable executor and product bootstrap required before describing CogniEDA as end-to-end.

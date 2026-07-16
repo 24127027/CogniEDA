@@ -47,8 +47,8 @@ No test is marked skipped or xfailed in the audited snapshot. Concurrency tests 
 Passing tests do not cover:
 
 - default `_ConfiguredRequestUnderstandingModel` construction (it currently raises `TypeError`);
-- successful public `authorize_retry()` (current code fails and conflicts with Hypothesis cardinality);
-- rejection of an outbox-only execution bundle (current code reports false success);
+- technical retry reuses its existing Hypothesis and creates a distinct successor attempt;
+- rejection of an outbox-only execution bundle without marking an operation committed;
 - runnable GraphMiner/HypothesisAnalyst graphs;
 - DVC execution or cleaning/version creation;
 - natural-language end-to-end planning, retrieval or prompt construction;
@@ -60,6 +60,6 @@ Passing tests do not cover:
 
 ## Test credibility boundary
 
-Use “210 tests pass” to claim that covered local contracts pass. Do not use it to claim that CogniEDA is product-ready, that the default natural-language path works, or that static quality gates are green.
+Use a passing test count only to claim that covered local contracts pass. Do not use it to claim that CogniEDA is product-ready, that a live configured model service is reachable, or that static quality gates are green.
 
 When adding behavior, protect invariants first: immutable knowledge, context-role exclusion, admission/cardinality, transition ownership/fencing, operation atomicity, and evidence-bound Discovery creation.

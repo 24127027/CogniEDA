@@ -23,7 +23,7 @@ Current enums in `src/schemas/enums.py`:
 
 No code was found for:
 
-- general planner approval before durable non-execution Task/plan/conflict changes
+- plan/objective/assumption/conflict approval beyond the implemented durable Task-operation batch
 - full Discovery user-review workflow
 - atomic DataProfile supersession propagation (repository-level historical scoping exists but commits in multiple steps)
 - full runtime Evidence supersession propagation beyond the optional repository-level Discovery review flag

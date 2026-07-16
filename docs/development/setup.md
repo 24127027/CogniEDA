@@ -65,4 +65,4 @@ No docs build or docs link-check command was found in the current repo.
 
 ## Current verification note
 
-At the 2026-07-16 source snapshot, full pytest passes (210 tests), while Ruff reports 12 findings and strict mypy reports 132 errors. The default natural-language planner adapter also calls `create_agent()` with an invalid signature.
+At the 2026-07-16 source snapshot, full pytest passed (210 tests), while Ruff reported 12 findings and strict mypy reported 132 errors. Those historical results should be refreshed after changes; configured planner model access also requires valid external model credentials and service availability.

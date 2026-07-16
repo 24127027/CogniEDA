@@ -17,6 +17,8 @@ These reports are pinned to the audited Git commit stated in each file. For newe
 - [Memory Model](architecture/memory-model.md)
 - [Storage Layers](architecture/storage-layers.md)
 - [Planner Workflow](architecture/planner-workflow.md)
+- [Step 3.5A Control-Plane Stabilization](architecture/step-3.5a-control-plane-stabilization.md)
+- [Step 3.5B Execution-Attempt Correctness Review](architecture/step-3.5b-execution-attempt-correctness-review.md)
 - [SessionFrame](architecture/session-frame.md)
 - [Provenance And Cache](architecture/provenance-and-cache.md)
 - [Implementation Gap Analysis](architecture/implementation-gap-analysis.md)

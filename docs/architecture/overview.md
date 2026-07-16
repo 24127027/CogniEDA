@@ -38,6 +38,6 @@ The current implementation is a Python backend prototype managed with `uv`. It c
 
 ## Known Deviation
 
-The local SQLModel schema has converged to the target FCO set and now includes targeted migrations plus minimal provenance/workflow records. It still lacks a general migration framework, runnable default executors, a working default natural-language planner path, production retrieval/cache, and a CLI/service/worker bootstrap.
+The local SQLModel schema has converged to the target FCO set and now includes targeted migrations plus minimal provenance/workflow records. It still lacks a general migration framework, runnable default executors, planner capabilities beyond configured request understanding and Task-operation approval, production retrieval/cache, and a CLI/service/worker bootstrap.
 
 See [Implementation Gap Analysis](implementation-gap-analysis.md).

@@ -47,7 +47,7 @@ Current provenance exists in typed but incomplete forms:
 - `EvidenceRepository` has minimal helpers to mark Evidence superseded or invalidated without editing the observed result payload. Any `DiscoveryRepository` supplied for dependent flagging must use the exact same SQLModel session before either repository is read or mutated.
 - `DiscoveryRepository` can flag dependent Discoveries for review during same-session Evidence supersession or invalidation helpers.
 
-The implementation now provides real local transaction/rollback behavior at the PlannerOperation boundary. It remains incomplete as a product workflow: non-execution approval routes are unreachable, some enum/payload contracts lack handlers, distributed recovery is absent, and approval UX is limited to execution.
+The implementation now provides real local transaction/rollback behavior at the PlannerOperation boundary. A Task-operation proposal is persisted as a pending batch and can be approved only by its matching, session-bound proposal fingerprint and operation IDs. It remains incomplete as a product workflow: plan/objective/assumption/conflict approval routes, some enum/payload handlers, distributed recovery, and broader approval UX remain unimplemented.
 
 `AnalysisFrame` and `ExecutionRun` are not FCOs. They are small provenance records that Evidence may reference by string identifier. Objective remains the stable-identity FCO for research intent; its `status` is its authoritative lifecycle field. Strict Evidence validation currently verifies only that referenced records exist and that cleanly available `DataProfile`/`Hypothesis` refs match; it is not full reproducibility validation.
 

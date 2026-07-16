@@ -68,4 +68,4 @@ This enforcement is exercised by one narrow approved deterministic-test path fro
 
 ## Architectural Risk
 
-The main remaining lifecycle risk is not local repository admission; it is orchestration consistency. Retry currently attempts to clone a Hypothesis for the same Task and fails, non-execution approval routes are unreachable, an orphan outbox operation can be marked committed without a row, and supersession propagation is not atomic across dependent records.
+The main remaining lifecycle risk is not local repository admission; it is orchestration consistency. Retry currently attempts to clone a Hypothesis for the same Task and fails, approval is currently implemented only for Task-operation batches and execution contracts, an orphan outbox operation can be marked committed without a row, and supersession propagation is not atomic across dependent records.

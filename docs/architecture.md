@@ -16,4 +16,4 @@ The current implementation is a backend prototype with target FCO persistence, p
 
 The architecture defines exactly these FCOs: `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, and `SessionFrame`.
 
-The largest remaining gaps are a working default natural-language path, general planner approvals, runnable executors, full reproducibility provenance, executable DVC/cleaning, graph retrieval, cache, static-quality compliance, and production service/worker bootstrap.
+The largest remaining gaps are planner capabilities beyond configured request understanding and Task-operation approval, runnable executors, full reproducibility provenance, executable DVC/cleaning, graph retrieval, cache, static-quality compliance, and production service/worker bootstrap.
