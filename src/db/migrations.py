@@ -147,3 +147,22 @@ def downgrade_task_motivation_schema(engine: Engine) -> None:
                 connection.execute(
                     text("ALTER TABLE tasks DROP COLUMN motivated_by_discovery_ids")
                 )
+
+
+def upgrade_task_review_schema(engine: Engine) -> None:
+    """Upgrade Tasks schema with idempotent planning-review reasons."""
+
+    if engine.dialect.name != "sqlite":
+        raise ValueError(
+            "Task review schema migration supports SQLite only; "
+            f"received {engine.dialect.name!r}."
+        )
+    inspector = inspect(engine)
+    if "tasks" not in set(inspector.get_table_names()):
+        return
+    columns = {column["name"] for column in inspector.get_columns("tasks")}
+    if "review_reasons" not in columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE tasks ADD COLUMN review_reasons JSON NOT NULL DEFAULT '[]'")
+            )

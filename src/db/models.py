@@ -175,6 +175,10 @@ class TaskRecord(TimestampedRecord, table=True):
         default_factory=list,
         sa_column=Column(JSON, nullable=False),
     )
+    review_reasons: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
 
 
 
