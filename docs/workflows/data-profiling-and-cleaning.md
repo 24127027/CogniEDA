@@ -33,7 +33,7 @@ Not implemented:
 - Cleaning execution service.
 - User-reviewed cleaning decision loop.
 - Automated derived dataset creation.
-- Runtime propagation, retrieval policy, and user-review workflow after `DataProfile` supersession.
+- Atomic runtime propagation, graph retrieval integration, and user-review workflow after `DataProfile` supersession. Repository-level historical scoping/review flagging exists but commits in multiple steps.
 
 ## Implementation Status
 

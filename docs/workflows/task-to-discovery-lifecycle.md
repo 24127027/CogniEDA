@@ -41,8 +41,8 @@ Current implementation:
 - The database schema adds a unique constraint for one Hypothesis to one Discovery in fresh databases.
 - `GeneratedView` does not exist.
 - `Evidence` exists as an immutable schema/table/repository and requires `analysis_frame_ref` and `execution_run_ref`.
-- `analysis_frame_ref` and `execution_run_ref` are string provenance references; full `AnalysisFrame` and `ExecutionRun` provenance records are not persisted yet.
-- Planner nodes for task selection, execution preparation, dispatch, review, conflict review, and commit are stubs.
+- Minimal durable `AnalysisFrame` and execution-attempt `ExecutionRun` records are persisted; they do not yet provide a full reproducibility envelope.
+- Planner task selection, execution preparation, durable approval and execution admission are implemented. Dispatch, result receipt and scientific finalization run independently under `application/orchestrator`, not as planner graph nodes.
 
 ## Implementation Status
 
@@ -64,8 +64,8 @@ Current `Task`, `Hypothesis`, `Evidence`, and `Discovery` repositories support:
 - repository-level Discovery review flagging after referenced Evidence changes
 - one Hypothesis to one Discovery guard at repository and fresh-database schema level
 
-This is useful local enforcement, but planner execution and commit still do not drive this lifecycle end to end.
+This enforcement is exercised by one narrow approved deterministic-test path from execution admission through scientific finalization. It is not a general end-to-end analytical product because default executors, natural-language planning, general approvals and service/worker bootstrap remain incomplete.
 
 ## Architectural Risk
 
-The main remaining lifecycle risk is not local repository admission; it is orchestration. Planner nodes still do not produce typed pending operations, `commit` does not atomically persist approved operations, and full `AnalysisFrame`/`ExecutionRun` provenance records are still missing.
+The main remaining lifecycle risk is not local repository admission; it is orchestration consistency. Retry currently attempts to clone a Hypothesis for the same Task and fails, non-execution approval routes are unreachable, an orphan outbox operation can be marked committed without a row, and supersession propagation is not atomic across dependent records.

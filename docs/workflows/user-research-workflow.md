@@ -2,9 +2,9 @@
 
 ## Implementation Status
 
-Partially implemented scaffold.
+Partially implemented backend prototype.
 
-The repo has target FCO schemas, repositories, profiling utilities, session-frame construction, and planner/executor contract stubs. It does not implement an end-to-end user workflow.
+The repo has FCO/provenance persistence, profiling, session-frame projection, an approval-gated execution admission path, a durable worker protocol, and one deterministic scientific-finalization path. It still does not implement an end-to-end user product workflow because natural-language planning, default executors, cleaning, retrieval, UI/API and worker bootstrap are incomplete.
 
 ## Target Workflow
 
@@ -77,7 +77,7 @@ Current implementation:
 - `Assumption` stores source, testability, scope, scoped DataProfile ids, contradiction Discovery refs, and replacement refs.
 - Schema admission rejects claims marked as testable so they can be converted into Task/Hypothesis candidates instead of Assumptions.
 - `SessionContextBuilder` excludes assumptions from conclusion/discovery-synthesis context.
-- No planner warning flow or graph retrieval policy exists.
+- No planner warning flow or graph retrieval engine exists. A pure type/lifecycle retrieval policy does exist under `src/memory/retrieval_policy.py`.
 
 Status: Partially implemented.
 
@@ -94,7 +94,7 @@ Current implementation:
 - `Task` schema/table/repository exist with proposed/active/paused/completed/failed/rejected/cancelled lifecycle.
 - Proposed Tasks can appear in planning SessionFrame context but cannot generate Hypotheses.
 - `HypothesisRepository.create()` rejects Hypothesis creation from non-active, non-analytical, parent, unaccepted-DataProfile, or duplicate Task sources.
-- Planner task-management nodes are stubs.
+- `manage_tasks` can turn already-supplied typed drafts into PlannerOperations, but the public planner path does not yet produce those drafts or complete general Task approval.
 
 Status: Partially implemented.
 
@@ -132,8 +132,8 @@ Current implementation:
 - Evidence requires `DataProfile`, `AnalysisFrame`, and `ExecutionRun` references.
 - Discovery requires Evidence and `validity_basis`.
 - Repository guards enforce one Task to one Hypothesis and one Hypothesis to one Discovery for fresh local stores.
-- Executor contracts can return Evidence/Discovery drafts.
-- Executor nodes are stubs.
+- Approved execution admission persists Hypothesis/ExecutionRun/outbox state. An independent worker persists an inbox result and a fenced finalizer can create AnalysisFrame/Evidence/Discovery/lifecycle/SessionFrame operations for one deterministic method.
+- Capability registry/dispatcher plumbing exists, but default executor graph builders and concrete `ExecutionResult` draft fields remain stubs.
 
 Status: Partially implemented.
 
