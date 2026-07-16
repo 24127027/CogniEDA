@@ -14,7 +14,7 @@ Your highest priority is epistemic correctness: every conclusion must remain tra
 
 ## Current Implementation Warning
 
-The local schema and persistence layer use the target FCO names. Minimal durable `PlannerOperation`, `AnalysisFrame`, `ExecutionRun`, execution approval/outbox/inbox, and scientific-finalization paths now exist. Several product/runtime pieces remain scaffold-level: answer/suggest/plan planner branches are incomplete, the default natural-language adapter is broken, concrete executor graphs and executable DVC integration are not implemented, cache persistence is absent, and no production CLI/service/worker bootstrap exists.
+The local schema and persistence layer use the target FCO names. Minimal durable `PlannerOperation`, `AnalysisFrame`, `ExecutionRun`, execution approval/outbox/inbox, and scientific-finalization paths now exist. Configured request understanding and `/manage_task` Task-proposal approval work, but several product/runtime pieces remain scaffold-level: answer/suggest/plan planner branches are incomplete, concrete executor graphs and executable DVC integration are not implemented, cache persistence is absent, and no production CLI/service/worker bootstrap exists.
 
 ## Target FCO Set
 
