@@ -1,5 +1,7 @@
 # Data Versioning Workflow
 
+> **Status:** current profiling/storage boundary plus target workflow. Executable DVC and cleaning/version-creation orchestration are not implemented. 
+
 ## Current Implementation
 
 The repository uses a split responsibility model:

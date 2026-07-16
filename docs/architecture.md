@@ -12,8 +12,8 @@ Use these pages for implementation-oriented architecture:
 
 ## Current Status
 
-The current implementation is a scaffold with target FCO schemas, SQLModel persistence, repositories, profiling utilities, `SessionFrame` snapshots, and planner/executor graph stubs.
+The current implementation is a backend prototype with target FCO persistence, provenance/workflow records, profiling utilities, `SessionFrame` projections, approval-gated execution admission, and a durable local worker/finalization protocol. Answer/planning branches and concrete executor graphs remain scaffold-level.
 
 The architecture defines exactly these FCOs: `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, and `SessionFrame`.
 
-The largest remaining gaps are runtime behavior: operation-before-commit planner persistence, full execution/provenance records, executable DVC integration, graph retrieval policy, and evidence-cache services.
+The largest remaining gaps are a working default natural-language path, general planner approvals, runnable executors, full reproducibility provenance, executable DVC/cleaning, graph retrieval, cache, static-quality compliance, and production service/worker bootstrap.

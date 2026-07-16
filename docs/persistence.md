@@ -1,6 +1,6 @@
 # Persistence Notes
 
-This file is retained as a legacy entry point for current persistence behavior. See [architecture/storage-layers.md](architecture/storage-layers.md) for the current code/target comparison.
+This file is retained as a legacy entry point. See [architecture/storage-layers.md](architecture/storage-layers.md) and [implementation/SRC_IMPLEMENTATION_STATUS.md](implementation/SRC_IMPLEMENTATION_STATUS.md) for the audited current comparison.
 
 ## Current Implementation
 
@@ -13,6 +13,8 @@ Implemented persistence surfaces:
 - table creation in `src/db/init_db.py`
 - repositories in `src/repositories/`
 - SQLite foreign-key enforcement
+- targeted execution/task-motivation migrations
+- durable `PlannerOperation`, `AnalysisFrame`, `ExecutionRun`, execution approval/outbox/inbox, and `UserDecision` records
 
 ## Current Invariants
 
@@ -24,4 +26,4 @@ Implemented persistence surfaces:
 
 ## Target Gaps
 
-The target architecture calls for full graph retrieval policy, workflow store, provenance store, and evidence cache. The current implementation does not yet provide persisted `PlannerOperation`, full `AnalysisFrame`, full `ExecutionRun`, or cache records.
+The target architecture calls for graph retrieval, a complete workflow/provenance store and evidence cache. The current implementation persists minimal `PlannerOperation`, `AnalysisFrame`, `ExecutionRun`, approval/outbox/inbox and user-decision records, but it does not provide full reproducibility detail, a general migration framework, cache records, or production retrieval.

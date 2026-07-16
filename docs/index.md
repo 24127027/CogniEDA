@@ -2,6 +2,14 @@
 
 This documentation separates implemented behavior from target architecture. Use code as the source of truth for current behavior, and use the internal design documents as the source of truth for intended behavior.
 
+## Implementation Status
+
+- [Source Implementation Status](implementation/SRC_IMPLEMENTATION_STATUS.md)
+- [Documentation/Source Drift Audit](implementation/DOC_SRC_DRIFT_AUDIT.md)
+- [Vietnamese Source Codebase Audit](implementation/SRC_CODEBASE_REPORT_VI.md)
+
+These reports are pinned to the audited Git commit stated in each file. For newer commits, re-verify source and tests before treating their status as current.
+
 ## Architecture
 
 - [Overview](architecture/overview.md)
@@ -37,4 +45,4 @@ This documentation separates implemented behavior from target architecture. Use 
 
 ## Legacy Notes
 
-The older flat docs under `docs/artifacts.md`, `docs/architecture.md`, `docs/persistence.md`, and `docs/data_versioning.md` may describe the current scaffold or earlier terminology. Prefer this indexed docs tree for the current code/target comparison.
+The older flat docs under `docs/artifacts.md`, `docs/architecture.md`, `docs/persistence.md`, and `docs/data_versioning.md` are compatibility entry points, not complete runtime truth. `docs/idea.md` is historical ideation and is not normative ontology. Prefer the implementation reports and indexed architecture tree for current code/target comparison.

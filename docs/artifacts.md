@@ -1,6 +1,6 @@
 # Artifact Notes
 
-This file is retained as a legacy entry point. The current FCO contract is documented in [architecture/first-class-objects.md](architecture/first-class-objects.md).
+This file is retained as a legacy entry point, not as complete runtime status. The current FCO contract is documented in [architecture/first-class-objects.md](architecture/first-class-objects.md).
 
 ## Current Implementation
 

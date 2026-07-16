@@ -1,3 +1,7 @@
+# Historical CogniEDA Ideation
+
+> **Legacy/non-normative:** this document preserves early product and memory ideas. It uses terms such as `Conclusion`, `ValidationResult`, `ContextFrame`, and cache/graph nodes that are not necessarily current First-Class Objects or implemented runtime components. The canonical FCO set and audited implementation status live in [architecture/first-class-objects.md](architecture/first-class-objects.md)
+
 You are working on a project called CogniEDA.
 
 CogniEDA is not just an exploratory data analysis tool. It is an agentic data investigation system designed for long-running, evidence-based analytical work.
