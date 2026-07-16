@@ -47,6 +47,8 @@ uv run cognieda
 
 Current result: the script runs `main.py`, which prints a placeholder message.
 
+This verifies packaging only. It does not start the planner, database, worker, API, or UI.
+
 Verification commands:
 
 ```powershell
@@ -59,4 +61,8 @@ No docs build or docs link-check command was found in the current repo.
 
 ## Tool And MCP Config
 
-`config/agents.toml` and `config/mcp.toml` exist but are empty in the audited repo. `src/tools/manager.py` can load worker MCP config when populated. Built-in tool lists are placeholders.
+`config/agents.toml` and `config/skills.toml` contain worker/skill configuration. `config/mcp.toml` is primarily commented examples. `src/tools/manager.py` loads all three surfaces. The exported graph/dataset built-ins remain placeholders.
+
+## Current verification note
+
+At the 2026-07-16 source snapshot, full pytest passes (210 tests), while Ruff reports 12 findings and strict mypy reports 132 errors. The default natural-language planner adapter also calls `create_agent()` with an invalid signature.
