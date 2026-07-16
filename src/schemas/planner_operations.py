@@ -43,7 +43,24 @@ class TaskUpdateOperationPayload(BaseModel):
     profile_id: UUID | None = None
     variables: list[str] | None = None
     evidence_expectation: str | None = None
+    analytical_specification: dict[str, Any] | None = None
     motivated_by_discovery_ids: list[UUID] | None = None
+
+
+class TaskCreateOperationPayload(BaseModel):
+    """Persisted Task-create payload; new durable ids are assigned at commit."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    description: str
+    task_kind: TaskKind = TaskKind.ANALYTICAL
+    parent_task_id: UUID | None = None
+    dependency_type: TaskDependencyType | None = None
+    blocked_reason: str | None = None
+    profile_id: UUID | None = None
+    variables: list[str] = Field(default_factory=list)
+    evidence_expectation: str | None = None
 
 
 class TaskStateChangeOperationPayload(BaseModel):

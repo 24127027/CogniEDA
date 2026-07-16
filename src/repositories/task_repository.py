@@ -12,7 +12,7 @@ from sqlmodel import Session, desc, select
 from db.models import DiscoveryRecord, TaskRecord
 from repositories.common import apply_update, record_to_schema, schema_to_record_payload
 from schemas.artifacts import Task
-from schemas.enums import TaskKind, TaskLifecycleState
+from schemas.enums import TaskDependencyType, TaskKind, TaskLifecycleState
 
 TASK_JSON_FIELDS = {"variables", "analytical_specification", "motivated_by_discovery_ids"}
 
@@ -27,6 +27,9 @@ class TaskUpdate(BaseModel):
     lifecycle_state: TaskLifecycleState | None = None
     task_kind: TaskKind | None = None
     parent_task_id: UUID | None = None
+    dependency_type: TaskDependencyType | None = None
+    blocked_reason: str | None = None
+    superseded_by_task_id: UUID | None = None
     profile_id: UUID | None = None
     variables: list[str] | None = None
     evidence_expectation: str | None = None
