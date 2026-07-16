@@ -16,6 +16,7 @@ from schemas.artifacts import Hypothesis, Task
 from schemas.enums import (
     DataProfileMethod,
     DiscoveryEpistemicStatus,
+    DiscoveryLifecycleState,
     PlannerNodeName,
     PlannerOperationApprovalState,
     PlannerOperationType,
@@ -152,6 +153,34 @@ def test_unknown_discovery_rejects_create_without_partial_task_mutation(
     assert not result.succeeded
     assert result.failed_operation_ids == [operation.operation_id]
     assert "Referenced Discovery does not exist" in result.errors[operation.operation_id]
+    assert TaskRepository(db_session).get_by_id(task_id) is None
+
+
+def test_retrieval_selected_motivation_is_revalidated_at_commit(
+    db_session: Session,
+) -> None:
+    discovery_id = persist_discovery(db_session)
+    discovery = db_session.get(DiscoveryRecord, discovery_id)
+    assert discovery is not None
+    discovery.lifecycle_state = DiscoveryLifecycleState.FLAGGED
+    db_session.add(discovery)
+    db_session.commit()
+
+    task_id = uuid4()
+    payload = build_task_payload(
+        task_id,
+        motivated_by_discovery_ids=[discovery_id],
+    )
+    payload["selected_motivating_discovery_ids"] = [str(discovery_id)]
+    operation = build_operation(
+        PlannerOperationType.CREATE_TASK,
+        payload,
+    )
+
+    result = commit_planner_operations(db_session, [operation])
+
+    assert not result.succeeded
+    assert "Selected Discovery is no longer active" in result.errors[operation.operation_id]
     assert TaskRepository(db_session).get_by_id(task_id) is None
 
 

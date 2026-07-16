@@ -6,10 +6,17 @@ from langgraph.checkpoint.memory import MemorySaver
 from agents.planner.graph import build_graph
 from agents.planner.types import Context, TaskDecompositionDraft
 from application.orchestrator.planner_commit import commit_planner_operations
-from db.models import DataProfileRecord, DiscoveryRecord, HypothesisRecord, TaskRecord
+from db.models import (
+    DataProfileRecord,
+    DiscoveryRecord,
+    HypothesisRecord,
+    ObjectiveRecord,
+    TaskRecord,
+)
 from repositories import SessionFrameRepository, TaskRepository
 from schemas.artifacts import SessionFrame, Task
 from schemas.enums import (
+    DataProfileLifecycleState,
     DataProfileMethod,
     DiscoveryEpistemicStatus,
     DiscoveryLifecycleState,
@@ -61,8 +68,10 @@ def test_public_decomposition_drafts_child_specific_operations_and_waits_for_app
         method=DataProfileMethod.BASELINE_SUMMARY,
         row_count=1,
         column_count=1,
+        lifecycle_state=DataProfileLifecycleState.ACTIVE,
     )
     db_session.add(profile)
+    db_session.add(ObjectiveRecord(title="Objective", statement="Bounded decomposition"))
     db_session.flush()
     source_task = TaskRecord(title="Source", description="Source", profile_id=profile.profile_id)
     db_session.add(source_task)
@@ -77,6 +86,7 @@ def test_public_decomposition_drafts_child_specific_operations_and_waits_for_app
     )
     db_session.add(hypothesis)
     db_session.flush()
+    ev_id = str(uuid4())
     db_session.add(
         DiscoveryRecord(
             discovery_id=discovery_id,
@@ -84,13 +94,13 @@ def test_public_decomposition_drafts_child_specific_operations_and_waits_for_app
             epistemic_status=DiscoveryEpistemicStatus.SUPPORTED,
             scope="test scope",
             hypothesis_id=hypothesis.hypothesis_id,
-            evidence_ids=[],
+            evidence_ids=[ev_id],
             lifecycle_state=DiscoveryLifecycleState.ACTIVE,
             validity_basis={
                 "data_profile_id": str(profile.profile_id),
                 "analysis_frame_refs": ["test-frame"],
                 "hypothesis_id": str(hypothesis.hypothesis_id),
-                "evidence_ids": [],
+                "evidence_ids": [ev_id],
                 "method": "test method",
                 "decision_rule": {},
                 "assumptions_excluded_from_inference": True,
@@ -102,6 +112,7 @@ def test_public_decomposition_drafts_child_specific_operations_and_waits_for_app
         Task(
             title="Parent analytical task",
             description="Decompose this parent.",
+            profile_id=profile.profile_id,
             motivated_by_discovery_ids=[discovery_id],
         )
     )
@@ -142,8 +153,18 @@ def test_public_decomposition_drafts_child_specific_operations_and_waits_for_app
 
 
 def test_decomposition_commit_is_atomic_for_children_and_session_frame(db_session) -> None:
+    db_session.add(ObjectiveRecord(title="Objective", statement="Bounded decomposition"))
+    profile = DataProfileRecord(
+        dataset_path="data/atomic-decomposition.csv",
+        method=DataProfileMethod.BASELINE_SUMMARY,
+        row_count=1,
+        column_count=1,
+        lifecycle_state=DataProfileLifecycleState.ACTIVE,
+    )
+    db_session.add(profile)
+    db_session.commit()
     parent = TaskRepository(db_session).create(
-        Task(title="Parent", description="Parent task")
+        Task(title="Parent", description="Parent task", profile_id=profile.profile_id)
     )
     frame = SessionFrameRepository(db_session).create(
         SessionFrame(frame_topic="test", objective_snapshot="Bounded objective")
@@ -177,3 +198,24 @@ def test_decomposition_commit_is_atomic_for_children_and_session_frame(db_sessio
     assert not outcome.succeeded
     assert TaskRepository(db_session).list(parent_task_id=parent.task_id) == []
     assert SessionFrameRepository(db_session).list_recent(limit=2) == [frame]
+
+
+def test_decomposition_rejects_missing_active_data_profile(db_session) -> None:
+    db_session.add(ObjectiveRecord(title="Objective", statement="Bounded decomposition"))
+    db_session.commit()
+    parent = TaskRepository(db_session).create(Task(title="Parent", description="Parent task"))
+    frame = SessionFrameRepository(db_session).create(
+        SessionFrame(frame_topic="test", objective_snapshot="Bounded objective")
+    )
+
+    result = build_graph(checkpointer=MemorySaver()).invoke(
+        {"query": f"/decompose {parent.task_id}"},
+        config={"configurable": {"thread_id": "missing-profile-decomposition"}},
+        context=Context(
+            database_url=_database_url(db_session),
+            session_id="missing-profile-decomposition",
+            session_frame_id=frame.session_frame_id,
+        ),
+    )
+
+    assert result["controlled_error"].code == "decomposition_data_profile_missing"
