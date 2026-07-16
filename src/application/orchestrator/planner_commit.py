@@ -60,7 +60,6 @@ _EXECUTION_OPERATION_TYPES = {
     PlannerOperationType.CREATE_EXECUTION_INBOX,
     PlannerOperationType.CREATE_EVIDENCE,
     PlannerOperationType.CREATE_DISCOVERY,
-    PlannerOperationType.UPDATE_SESSION_FRAME,
 }
 
 
@@ -377,9 +376,26 @@ def _apply_operation(session: Session, operation: PlannerOperation) -> None:
 
 
 def _apply_create_task(session: Session, operation: PlannerOperation) -> None:
-    task = Task(**operation.payload)
+    payload = dict(operation.payload)
+    parent_task_updated_at = payload.pop("parent_task_updated_at", None)
+    for proposal_metadata in (
+        "decomposition_scope",
+        "decomposition_rationale",
+        "readiness_status",
+        "readiness_reason",
+    ):
+        payload.pop(proposal_metadata, None)
+    if payload.get("task_id") is None:
+        payload.pop("task_id", None)
+    task = Task(**payload)
     if session.get(TaskRecord, task.task_id) is not None:
         raise ValueError(f"Task already exists: {task.task_id}")
+    _require_valid_task_parent(
+        session,
+        task.task_id,
+        task.parent_task_id,
+        expected_updated_at=parent_task_updated_at,
+    )
     _require_motivating_discoveries(session, task.motivated_by_discovery_ids)
     session.add(TaskRecord(**schema_to_record_payload(task, json_fields=TASK_JSON_FIELDS)))
 
@@ -391,6 +407,8 @@ def _apply_update_task(session: Session, operation: PlannerOperation) -> None:
     payload.pop("task_id", None)
     update = TaskUpdate(**payload)
     _require_update_payload(update.model_fields_set, operation.operation_type.value)
+    if "parent_task_id" in update.model_fields_set:
+        _require_valid_task_parent(session, task_id, update.parent_task_id)
     if update.motivated_by_discovery_ids is not None:
         _require_motivating_discoveries(session, update.motivated_by_discovery_ids)
 
@@ -404,6 +422,39 @@ def _require_motivating_discoveries(session: Session, discovery_ids: list[UUID])
     for discovery_id in discovery_ids:
         if session.get(DiscoveryRecord, discovery_id) is None:
             raise ValueError(f"Referenced Discovery does not exist: {discovery_id}")
+
+
+def _require_valid_task_parent(
+    session: Session,
+    task_id: UUID,
+    parent_task_id: UUID | None,
+    *,
+    expected_updated_at: datetime | str | None = None,
+) -> None:
+    """Require an existing, non-cyclic parent and optionally its reviewed revision."""
+
+    if parent_task_id is None:
+        return
+    if parent_task_id == task_id:
+        raise ValueError("A Task cannot be its own parent.")
+    parent = session.get(TaskRecord, parent_task_id)
+    if parent is None:
+        raise ValueError(f"Parent Task does not exist: {parent_task_id}")
+    if expected_updated_at is not None:
+        expected = datetime.fromisoformat(str(expected_updated_at).replace("Z", "+00:00"))
+        if parent.updated_at != expected:
+            raise ValueError("Parent Task changed after the decomposition proposal was approved.")
+    seen: set[UUID] = {task_id}
+    current: TaskRecord | None = parent
+    while current is not None:
+        if current.task_id in seen:
+            raise ValueError("Task parent relationship would create a cycle.")
+        seen.add(current.task_id)
+        current = (
+            session.get(TaskRecord, current.parent_task_id)
+            if current.parent_task_id is not None
+            else None
+        )
 
 
 def _apply_change_task_state(session: Session, operation: PlannerOperation) -> None:
