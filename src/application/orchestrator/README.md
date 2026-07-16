@@ -1,65 +1,28 @@
-# Orchestrator
+# Durable Execution Orchestrator
 
-The `orchestrator` package coordinates the lifecycle of an application request.
+## Current implementation
 
-It transforms incoming requests into agent state, invokes the appropriate runtime components, coordinates persistence and event publication, and produces the final response.
+This package does not contain a generic request orchestrator. It implements the durable execution-attempt and scientific-finalization path:
 
-The orchestrator manages execution sequencing but never performs research planning or domain reasoning. Those responsibilities belong to the Planner and specialist agents.
+| Module | Current responsibility |
+| --- | --- |
+| `execution_contracts.py` | Validate/revalidate prepared planner execution contracts. |
+| `execution_admission.py` | Build the typed PlannerOperation admission bundle. |
+| `planner_commit.py` | Apply approved operations; special-case atomic execution/scientific bundles. |
+| `transition_service.py` | Sole owner of attempt admission, CAS, lease, fencing, cancellation and recovery writes. |
+| `dispatcher.py` | Claim pending outbox attempts and call an injected executor. |
+| `receiver.py` | Canonicalize/digest results and persist them through the transition owner. |
+| `finalizer.py` | Claim fenced finalization and commit scientific artifacts plus attempt/inbox transitions. |
+| `scientific_processing.py` | Validate one deterministic-test result and draft AnalysisFrame/Evidence/Discovery/lifecycle/SessionFrame operations. |
+| `reconciler.py` | Retry pending inbox finalization and handle expired leases. |
+| `cancellation.py` | Thin cancellation, release and retry APIs over the transition service. |
 
-## Responsibilities
+There are no `application_orchestrator.py`, `request_pipeline.py` or `response_pipeline.py` files.
 
-The orchestrator is responsible for:
+## Known deviations
 
-- Validating incoming requests
-- Loading runtime context
-- Constructing agent state
-- Invoking the Planner
-- Dispatching specialist executors
-- Coordinating persistence
-- Publishing runtime events
-- Producing application responses
-
-In short, it answers the question:
-
-> **How should this request be coordinated?**
-
-## Typical Request Flow
-
-```
-Request
-    │
-    ▼
-Orchestrator
-    │
-    ├── Validate request
-    ├── Load runtime context
-    ├── Construct agent state
-    ├── Invoke Planner
-    ├── Dispatch executors
-    ├── Persist changes
-    ├── Publish events
-    └── Produce response
-```
-
-The orchestrator owns the request lifecycle but never determines research direction.
-
-## Design Principles
-
-- Thin coordination layer
-- Deterministic execution
-- No domain knowledge
-- No scientific reasoning
-- Infrastructure-oriented
-
-## Package Structure
-
-```
-orchestrator/
-    application_orchestrator.py
-    request_pipeline.py
-    response_pipeline.py
-```
-
-- `application_orchestrator.py` coordinates the overall request lifecycle.
-- `request_pipeline.py` validates requests, loads runtime context, and constructs the initial agent state.
-- `response_pipeline.py` performs post-processing and produces the final application response.
+- `authorize_new_attempt()` currently cannot complete a retry and conflicts with the one-Task/one-Hypothesis invariant.
+- An outbox-only execution bundle can be marked committed without inserting an outbox row.
+- No process/worker bootstrap invokes dispatcher/reconciler loops.
+- External executor side effects remain at-least-once.
+- Scientific processing supports one narrow deterministic-test contract, not a generic analytical engine.

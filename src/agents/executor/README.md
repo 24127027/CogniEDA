@@ -43,11 +43,14 @@ The registered wrappers exist, but their graph builders still raise
 `NotImplementedError`. Basic registry and dispatcher plumbing exists; the
 default executor graphs are scaffold-level.
 
-Planner integration is also scaffold-level. `src/agents/planner/graph.py` has
-execution-shaped edges, but `prepare_execution`, `dispatch_executor`, and
-`review_execution` in `src/agents/planner/nodes.py` are stubs, and
-`src/agents/planner/types.py` does not define a dispatcher field on planner
-runtime `Context`.
+Planner-to-worker integration uses a different boundary from this capability
+dispatcher. `prepare_execution` and `commit_execution_contract` create a
+durable approval/admission contract, then the compiled planner graph ends.
+`src/application/orchestrator/dispatcher.py` is an independent outbox worker
+consumer that calls an injected executor with the persisted prepared payload.
+The current planner does not construct or invoke this package's
+`ExecutionRequest`/`ExecutorDispatcher`, and there is no `dispatch_executor` or
+`review_execution` node in the compiled graph.
 
 ## How dispatch actually works
 
@@ -158,12 +161,10 @@ unregistered capabilities such as `data_exploration`.
 
 The following behavior is not live in the current code:
 
-- Planner runtime ownership of a dispatcher instance.
-- Implemented `prepare_execution`, `dispatch_executor`, or `review_execution`
-  planner node bodies.
+- Planner runtime ownership of this capability dispatcher.
 - Planner construction of `ExecutionRequest` from selected `Task` objects.
-- Planner persistence of dispatch requests or results through atomic
-  `PlannerOperation` records.
+- A compiled planner `dispatch_executor` or `review_execution` node.
+- An adapter from durable outbox payloads to this capability registry.
 - Caller-scoped dispatcher authorization.
 - Executor-to-executor delegation routing.
 - Delegation tracing.
@@ -176,10 +177,11 @@ The following behavior is not live in the current code:
 
 ## Target behavior / future work
 
-The target planner/executor design is for the planner to prepare an execution
-request for an approved analytical task, dispatch it by capability id, review
-the execution result, and commit any durable changes through the appropriate
-operation/provenance path.
+The target planner/executor design may connect approved analytical Tasks to
+capability selection and a runnable executor. Current durable admission and
+scientific finalization already live in `application/orchestrator`; future work
+must preserve that transition/write ownership rather than adding a competing
+planner-side writer.
 
 Future executor-to-executor delegation may use the same
 `ExecutionRequest -> ExecutionResult` shape, but no delegation routing,
@@ -189,6 +191,6 @@ runtime behavior.
 
 ## Related documents
 
-- [Planner Workflow](planner-workflow.md)
-- [First-Class Objects](first-class-objects.md)
-- [Implementation Gap Analysis](implementation-gap-analysis.md)
+- [Planner Workflow](../../../docs/architecture/planner-workflow.md)
+- [First-Class Objects](../../../docs/architecture/first-class-objects.md)
+- [Implementation Gap Analysis](../../../docs/architecture/implementation-gap-analysis.md)
