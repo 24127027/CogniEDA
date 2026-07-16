@@ -14,8 +14,8 @@ Current enums in `src/schemas/enums.py`:
 | `DataProfile` | `draft`, `active`, `superseded`, `archived` | Implemented locally; records are immutable. |
 | `Assumption` | `proposed`, `active`, `flagged`, `retained`, `replaced`, `archived` | Partially implemented; source, testability, scope, scoped DataProfiles, contradiction refs, and replacement refs exist. |
 | `Task` | `proposed`, `active`, `paused`, `completed`, `failed`, `rejected`, `cancelled` | Implemented locally. Proposed Tasks can appear in planning SessionFrame context but cannot generate Hypotheses. |
-| `Hypothesis` | `proposed`, `testing`, `completed`, `invalidated`, `archived` | Implemented locally. |
-| `Evidence` | `active`, `superseded`, `invalidated` | Implemented locally; records are immutable. |
+| `Hypothesis` | `proposed`, `approved`, `testing`, `awaiting_additional_evidence`, `ready_for_evaluation`, `confirmed`, `contradicted`, `inconclusive`, `insufficient_evidence`, `failed`, `cancelled`, `archived` | Implemented locally; execution/scientific paths use a subset of these transitions. |
+| `Evidence` | `active`, `historically_scoped`, `superseded`, `invalidated` | Implemented locally; records are immutable. |
 | `Discovery` | Lifecycle: `active`, `flagged`, `invalidated`, `deprecated`; epistemic status: `supported`, `contradicted`, `inconclusive`, `insufficient_evidence` | Partially implemented; repository-level flagging records review metadata without rewriting the claim, Evidence links, validity basis, or epistemic status. |
 | `SessionFrame` | `active`, `checkpoint`, `handoff`, `superseded`, `archived` | Partially implemented. |
 
@@ -23,9 +23,9 @@ Current enums in `src/schemas/enums.py`:
 
 No code was found for:
 
-- planner operation approval before durable Task creation
+- general planner approval before durable non-execution Task/plan/conflict changes
 - full Discovery user-review workflow
-- DataProfile supersession propagation
+- atomic DataProfile supersession propagation (repository-level historical scoping exists but commits in multiple steps)
 - full runtime Evidence supersession propagation beyond the optional repository-level Discovery review flag
 - automatic Assumption contradiction review after Discovery creation
 - migration of older local databases to the current uniqueness constraints
@@ -36,6 +36,7 @@ Current local guards found:
 - `DiscoveryRepository.create()` enforces active same-Hypothesis Evidence and one Hypothesis to one Discovery.
 - `DiscoveryRepository.flag_by_evidence_change()` flags Discoveries for review after referenced Evidence is superseded or invalidated, while preserving the original claim and validity metadata.
 - `AssumptionRepository.flag_for_contradiction()` flags an Assumption for review and records the contradicting Discovery id without rewriting the assumption statement.
+- `DataProfileRepository.supersede()` can mark related Evidence historically scoped and flag related Discoveries when same-session repositories are supplied, but the full sequence is not atomic.
 
 ## Development Guidance
 

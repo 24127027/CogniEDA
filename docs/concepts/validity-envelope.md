@@ -37,7 +37,7 @@ Required metadata:
 
 ## Implementation Status
 
-Implemented locally for schema and repository persistence. Full `AnalysisFrame` and `ExecutionRun` provenance records remain missing.
+Implemented locally for schema and repository persistence. Minimal durable `AnalysisFrame` and execution-attempt `ExecutionRun` records exist and may be strictly dereferenced by `EvidenceRepository`; full row/filter/code/environment/artifact reproducibility remains incomplete.
 
 ## Development Guidance
 

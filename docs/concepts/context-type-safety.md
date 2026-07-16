@@ -57,6 +57,7 @@ Current code provides:
 - `conclusion` is treated as a legacy alias for protected Discovery Synthesis Context.
 - Discovery Synthesis Context excludes assumptions, tasks, existing Discoveries, user decisions, pending tasks, open questions, stale context, dead ends, and cached tool-result summaries.
 - Discovery Synthesis Context filters by safe memory status and active profile/evidence lifecycle.
+- `src/memory/retrieval_policy.py` defines a pure type/lifecycle admission policy for planning, answer, conclusion, and discovery-synthesis roles.
 - no retrieval engine
 - no graph retrieval context mode selector
 - no graph-level Discovery Synthesis Context constructor
@@ -65,7 +66,7 @@ Current code provides:
 
 Partially implemented.
 
-The current code enforces a local Planning/Answer/Discovery Synthesis split for `SessionFrame` snapshots. Full target Context Type Safety remains incomplete because there is no typed graph retrieval engine or retrieval policy.
+The current code enforces a local Planning/Answer/Discovery Synthesis split for `SessionFrame` snapshots and provides a pure retrieval policy. Full target Context Type Safety remains incomplete because there is no graph/vector retrieval engine, ranking, production candidate assembly, or prompt-construction boundary.
 
 ## Architectural Risk
 
