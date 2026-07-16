@@ -38,6 +38,7 @@ from schemas.artifacts import (
 )
 from schemas.enums import (
     AssumptionStatus,
+    DiscoveryLifecycleState,
     ExecutionRunStatus,
     PlannerOperationApprovalState,
     PlannerOperationType,
@@ -378,6 +379,7 @@ def _apply_operation(session: Session, operation: PlannerOperation) -> None:
 def _apply_create_task(session: Session, operation: PlannerOperation) -> None:
     payload = dict(operation.payload)
     parent_task_updated_at = payload.pop("parent_task_updated_at", None)
+    selected_motivating_discovery_ids = payload.pop("selected_motivating_discovery_ids", None)
     for proposal_metadata in (
         "decomposition_scope",
         "decomposition_rationale",
@@ -397,6 +399,13 @@ def _apply_create_task(session: Session, operation: PlannerOperation) -> None:
         expected_updated_at=parent_task_updated_at,
     )
     _require_motivating_discoveries(session, task.motivated_by_discovery_ids)
+    if selected_motivating_discovery_ids is not None:
+        selected_ids = [
+            UUID(str(discovery_id)) for discovery_id in selected_motivating_discovery_ids
+        ]
+        if selected_ids != task.motivated_by_discovery_ids:
+            raise ValueError("Selected Discovery motivation does not match the Task payload.")
+        _require_current_retrieval_motivations(session, selected_ids)
     session.add(TaskRecord(**schema_to_record_payload(task, json_fields=TASK_JSON_FIELDS)))
 
 
@@ -422,6 +431,20 @@ def _require_motivating_discoveries(session: Session, discovery_ids: list[UUID])
     for discovery_id in discovery_ids:
         if session.get(DiscoveryRecord, discovery_id) is None:
             raise ValueError(f"Referenced Discovery does not exist: {discovery_id}")
+
+
+def _require_current_retrieval_motivations(session: Session, discovery_ids: list[UUID]) -> None:
+    """Reject Step 5 selections that became ineligible after retrieval."""
+
+    for discovery_id in discovery_ids:
+        discovery = session.get(DiscoveryRecord, discovery_id)
+        if discovery is None:
+            raise ValueError(f"Referenced Discovery does not exist: {discovery_id}")
+        if discovery.lifecycle_state != DiscoveryLifecycleState.ACTIVE:
+            raise ValueError(
+                "Selected Discovery is no longer active: "
+                f"{discovery_id} ({discovery.lifecycle_state.value})."
+            )
 
 
 def _require_valid_task_parent(
