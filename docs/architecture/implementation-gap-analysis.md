@@ -19,12 +19,12 @@
 | Durable attempt protocol | Worker claims, renews, receives, finalizes, cancels and recovers with fencing | Transition service, outbox/inbox, lease/epoch/version, finalization fencing and reconciler exist; retry creates a successor attempt under the existing Hypothesis | Implemented locally | No process bootstrap; external side effects remain at-least-once |
 | Scientific finalization | Executor observations become Evidence/Discovery only through deterministic admission | One deterministic-test processor validates contract and creates AnalysisFrame/Evidence/Discovery/lifecycle/SessionFrame operations | Implemented narrow method | No generic method registry, effect-size/sample-size policy, multiple testing or full diagnostics |
 | Executor capability dispatch | Registry selects runnable executors by capability | Capability catalog, registry and dispatcher exist | Partial | Default GraphMiner/HypothesisAnalyst graph builders raise `NotImplementedError`; `data_exploration` is unregistered |
-| Context type safety | Planning may use Assumptions; synthesis must exclude them and existing Discoveries | Pure `RetrievalPolicy` and local planning/synthesis/answer projections exist | Partial | No graph/vector retrieval engine or production prompt assembly |
+| Context type safety | Planning may use Assumptions; synthesis must exclude them and existing Discoveries | Pure `RetrievalPolicy`, local planning/synthesis/answer projections, and a bounded structural-plus-lexical Discovery retrieval path for `/decompose` exist | Partial | No vector/embedding retrieval, historical-review mode, complete indexed search, cache, or production prompt assembly |
 | SessionFrame | Durable scoped active-context/checkpoint artifact | Append-only repository, builder and scientific finalizer snapshot exist; approved decomposition appends a child-task projection snapshot | Partial | Planner does not automatically refresh/pin/prune/synchronize frames outside that narrow approved decomposition path |
 | Data versioning | Physical versions plus immutable DataProfiles and explicit transformation lineage | CSV/Parquet loading and baseline profiler exist; DVC boundary is explicit | Partial | DVC methods are not implemented; no cleaning/derived-version workflow |
 | Evidence cache | Validity-keyed optimization that cannot author Discovery | No cache record/service | Not implemented | Key design, invalidation and runtime integration remain target-only |
 | Product surface | User-facing CLI/service and independent worker loop | No production entrypoint | Not implemented | Current modules require external bootstrap/injected executor |
-| Quality gates | Tests, lint and strict type checks pass in CI | 210 pytest tests pass; Ruff has 12 errors; mypy has 132 errors; no tracked CI workflow | Partial / failing gates | Local behavioral coverage is stronger than static/integration readiness |
+| Quality gates | Tests, lint and strict type checks pass in CI | `uv run --no-sync pytest` passes 230 tests; Ruff passes on Step 5-touched files; focused mypy remains blocked by existing SQLModel/SQLAlchemy and untyped planner/orchestrator debt; no tracked CI workflow | Partial / failing gates | Global Ruff/mypy and production integration readiness remain unresolved |
 
 ## Confirmed blockers
 
@@ -42,15 +42,15 @@ Evidence: `src/agents/planner/nodes.py`; `src/agents/planner/agent.py`; `src/age
 
 ## Step status
 
-Steps 1-3, Step 3.5A, and the narrow Step 3.5B execution-attempt correction are complete for the currently implemented scope. Step 4 is now partially implemented as a bounded, approval-gated `/decompose <parent-task-uuid>` path: it resolves one existing parent, uses only an active SessionFrame's planning projection plus direct parent motivations, requires typed child-specific motivation selections, and atomically commits children with a successor SessionFrame snapshot. This does not implement retrieval, autonomous general planning, executor dispatch, or a broader product workflow.
+Steps 1-3, Step 3.5A, and the narrow Step 3.5B execution-attempt correction are complete for the currently implemented scope. Step 4 is partially implemented as an approval-gated `/decompose <parent-task-uuid>` path. Step 5 is partially implemented within that path: an active Objective and DataProfile are required, a typed retrieval engine collects structural candidates plus a bounded lexical fallback, filters lifecycle/profile ineligibility, ranks deterministically under a strict budget, exposes local-reference explanations, and revalidates selected active motivation at commit. This is not semantic/vector retrieval, Objective graph traversal, a historical-review retrieval mode, autonomous general planning, executor dispatch, or a broader product workflow. See [Step 5 Retrieval Review](step-5-discovery-retrieval-review.md).
 
 ## Verified commands
 
 | Command class | Result |
 | --- | --- |
-| Full pytest with absolute project/rootdir | `210 passed` |
-| Ruff on `src` and `tests` | Failed with 12 findings |
-| Strict mypy on `src` | Failed with 132 errors in 14 files |
+| Full pytest | `230 passed` |
+| Ruff on Step 5-touched source and tests | Passed |
+| Focused mypy | Retrieval engine is clear; existing SQLModel/SQLAlchemy, transition-service, and untyped planner-node failures remain |
 
 These results are not interchangeable: passing tests validate covered behavior, while failing lint/type gates remain real implementation debt.
 
