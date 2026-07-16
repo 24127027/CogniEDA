@@ -79,12 +79,28 @@ def upgrade_pre_repair_database(engine: Engine) -> None:
                         f"CREATE INDEX IF NOT EXISTS {index_name} ON execution_runs ({column_name})"
                     )
                 )
+            connection.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_execution_runs_previous_attempt_id "
+                    "ON execution_runs (previous_attempt_id) "
+                    "WHERE previous_attempt_id IS NOT NULL"
+                )
+            )
 
     # These are new protocol-side tables.  Creating only the missing tables is
     # safe for an existing database and does not paper over changed old tables.
     ExecutionApprovalRecord.__table__.create(engine, checkfirst=True)
     ExecutionOutboxRecord.__table__.create(engine, checkfirst=True)
     ExecutionInboxRecord.__table__.create(engine, checkfirst=True)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS "
+                "uq_execution_outbox_execution_run_id "
+                "ON execution_outbox (execution_run_id)"
+            )
+        )
 
 
 def upgrade_task_motivation_schema(engine: Engine) -> None:

@@ -223,6 +223,11 @@ class ExecutionRunRecord(SQLModel, table=True):
     """Minimal provenance record for one executor attempt."""
 
     __tablename__ = "execution_runs"
+    __table_args__ = (
+        # A retry lineage is a chain, not a fan-out. SQLite permits multiple
+        # NULL roots, while each concrete predecessor has one successor.
+        UniqueConstraint("previous_attempt_id", name="uq_execution_runs_previous_attempt_id"),
+    )
 
     execution_run_id: UUID = Field(default_factory=uuid4, primary_key=True)
     task_id: UUID | None = Field(default=None, foreign_key="tasks.task_id", index=True)
@@ -270,6 +275,9 @@ class ExecutionOutboxRecord(SQLModel, table=True):
     """Durable dispatch intent to bridge Planner transaction and executor call."""
 
     __tablename__ = "execution_outbox"
+    __table_args__ = (
+        UniqueConstraint("execution_run_id", name="uq_execution_outbox_execution_run_id"),
+    )
 
     outbox_id: UUID = Field(default_factory=uuid4, primary_key=True)
     execution_run_id: UUID = Field(
