@@ -38,6 +38,7 @@ from schemas.artifacts import (
 )
 from schemas.enums import (
     AssumptionStatus,
+    ExecutionRunStatus,
     PlannerOperationApprovalState,
     PlannerOperationType,
     TaskLifecycleState,
@@ -80,12 +81,24 @@ def commit_planner_operations(
     """
 
     candidate_operations = operations
-    if candidate_operations is None:
-        candidate_operations = _load_candidate_operations(
-            session,
-            session_id=session_id,
-            operation_ids=operation_ids,
-        )
+    try:
+        if candidate_operations is None:
+            candidate_operations = _load_candidate_operations(
+                session,
+                session_id=session_id,
+                operation_ids=operation_ids,
+            )
+        _require_unique_operation_ids(candidate_operations)
+    except ValueError as exc:
+        failed_ids = list(dict.fromkeys(operation_ids or []))
+        if not failed_ids and candidate_operations is not None:
+            failed_ids = list(
+                dict.fromkeys(operation.operation_id for operation in candidate_operations)
+            )
+        result = PlannerCommitResult(failed_operation_ids=failed_ids)
+        result.errors = {operation_id: str(exc) for operation_id in failed_ids}
+        result.message = _result_message(result)
+        return result
 
     if _is_execution_bundle(candidate_operations):
         return _commit_execution_bundle(session, candidate_operations, commit=commit)
@@ -125,7 +138,8 @@ def commit_planner_operations(
         result.message = _result_message(result)
         return result
 
-    result.committed_operation_ids.extend(operation.operation_id for operation in committable)
+    if commit:
+        result.committed_operation_ids.extend(operation.operation_id for operation in committable)
     result.message = _result_message(result)
     return result
 
@@ -137,11 +151,16 @@ def _load_candidate_operations(
     operation_ids: list[UUID] | None,
 ) -> list[PlannerOperation]:
     if operation_ids is not None:
+        if len(operation_ids) != len(set(operation_ids)):
+            raise ValueError("Duplicate requested operation IDs.")
         operations: list[PlannerOperation] = []
         for operation_id in operation_ids:
             record = session.get(PlannerOperationRecord, operation_id)
-            if record is not None:
-                operations.append(record_to_schema(PlannerOperation, record))
+            if record is None:
+                raise ValueError(f"Unknown PlannerOperation: {operation_id}")
+            if session_id is not None and record.session_id != session_id:
+                raise ValueError(f"PlannerOperation belongs to another session: {operation_id}")
+            operations.append(record_to_schema(PlannerOperation, record))
         return operations
 
     statement = select(PlannerOperationRecord).order_by(asc(PlannerOperationRecord.created_at))
@@ -149,6 +168,12 @@ def _load_candidate_operations(
         statement = statement.where(PlannerOperationRecord.session_id == session_id)
     records = session.exec(statement).all()
     return [record_to_schema(PlannerOperation, record) for record in records]
+
+
+def _require_unique_operation_ids(operations: list[PlannerOperation]) -> None:
+    operation_ids = [operation.operation_id for operation in operations]
+    if len(operation_ids) != len(set(operation_ids)):
+        raise ValueError("Duplicate operation IDs found in batch.")
 
 
 def _is_execution_bundle(operations: list[PlannerOperation]) -> bool:
@@ -174,6 +199,16 @@ def _commit_execution_bundle(
         for operation in operations
         if operation.approval_state not in _COMMITTABLE_STATES
     )
+
+    try:
+        _validate_execution_bundle(committable)
+    except Exception as exc:
+        for operation in committable:
+            result.failed_operation_ids.append(operation.operation_id)
+            result.errors[operation.operation_id] = str(exc)
+        result.message = _result_message(result)
+        return result
+
     committed_at = datetime.now(UTC)
     current_operation: PlannerOperation | None = None
     try:
@@ -205,9 +240,46 @@ def _commit_execution_bundle(
         result.message = _result_message(result)
         return result
 
-    result.committed_operation_ids.extend(operation.operation_id for operation in committable)
+    if commit:
+        result.committed_operation_ids.extend(operation.operation_id for operation in committable)
     result.message = _result_message(result)
     return result
+
+
+def _validate_execution_bundle(operations: list[PlannerOperation]) -> None:
+    """Validate that execution bundle contains exactly one valid run and outbox pair."""
+    if len({operation.session_id for operation in operations}) > 1:
+        raise ValueError("Execution bundle operations must belong to one session.")
+    run_operations = [
+        operation
+        for operation in operations
+        if operation.operation_type == PlannerOperationType.CREATE_EXECUTION_RUN
+    ]
+    outbox_operations = [
+        operation
+        for operation in operations
+        if operation.operation_type == PlannerOperationType.CREATE_EXECUTION_OUTBOX
+    ]
+    if not run_operations and not outbox_operations:
+        return
+    if len(run_operations) != 1 or len(outbox_operations) != 1:
+        raise ValueError("Execution admission requires exactly one ExecutionRun and one outbox.")
+
+    run = ExecutionRun(**run_operations[0].payload)
+    outbox = ExecutionOutbox(**outbox_operations[0].payload)
+
+    if run.execution_run_id != outbox.execution_run_id:
+        raise ValueError("ExecutionRun and outbox must have matching execution_run_id.")
+    if run.dispatch_idempotency_key != outbox.dispatch_idempotency_key:
+        raise ValueError("ExecutionRun and outbox must have matching dispatch_idempotency_key.")
+    if run.executor_type != outbox.executor_type:
+        raise ValueError("ExecutionRun and outbox must have matching executor_type.")
+    if run.method_id != outbox.method_id:
+        raise ValueError("ExecutionRun and outbox must have matching method_id.")
+    if run.parameter_hash != outbox.parameter_hash:
+        raise ValueError("ExecutionRun and outbox must have matching parameter_hash.")
+    if run.status != ExecutionRunStatus.ADMITTED:
+        raise ValueError("Execution admission requires an admitted ExecutionRun.")
 
 
 def _stage_execution_admission(session: Session, operations: list[PlannerOperation]) -> None:
@@ -224,17 +296,25 @@ def _stage_execution_admission(session: Session, operations: list[PlannerOperati
     ]
     if not run_operations and not outbox_operations:
         return
-    if len(run_operations) != 1 or len(outbox_operations) != 1:
-        raise ValueError("Execution admission requires exactly one ExecutionRun and one outbox.")
     run = ExecutionRun(**run_operations[0].payload)
     outbox = ExecutionOutbox(**outbox_operations[0].payload)
     if session.get(ExecutionRunRecord, run.execution_run_id) is not None:
         raise ValueError(f"ExecutionRun already exists: {run.execution_run_id}")
+    if run.task_id is None or run.hypothesis_id is None:
+        raise ValueError("Execution admission requires Task and Hypothesis identities.")
+    hypothesis = session.get(HypothesisRecord, run.hypothesis_id)
+    if hypothesis is None or hypothesis.task_id != run.task_id:
+        raise ValueError("ExecutionRun Task and Hypothesis identities must match.")
     executor_type = run.executor_type
     method_id = run.method_id
     parameter_hash = run.parameter_hash
     dispatch_idempotency_key = run.dispatch_idempotency_key
-    if None in (executor_type, method_id, parameter_hash, dispatch_idempotency_key):
+    if (
+        executor_type is None
+        or method_id is None
+        or parameter_hash is None
+        or dispatch_idempotency_key is None
+    ):
         raise ValueError("Execution admission requires complete immutable attempt identity.")
     ExecutionAttemptTransitionService(session).stage_admit_attempt(
         execution_run_id=run.execution_run_id,

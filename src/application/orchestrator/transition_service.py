@@ -6,7 +6,8 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, or_, update
+from sqlalchemy import func, or_, text, update
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from db.models import (
@@ -575,46 +576,59 @@ class ExecutionAttemptTransitionService:
             ExecutionRunStatus.EXECUTION_FAILED,
             ExecutionRunStatus.DISPATCH_FAILED,
             ExecutionRunStatus.ABANDONED,
+            ExecutionRunStatus.CANCELLED,
         }:
             return None
+
+        # A predecessor may have only one direct successor. Further technical
+        # retries extend that successor, preserving a deterministic chain.
+        existing_successor = self._session.exec(
+            select(ExecutionRunRecord)
+            .where(ExecutionRunRecord.previous_attempt_id == old_execution_run_id)
+            .order_by(text("created_at"), text("execution_run_id"))
+        ).first()
+        if existing_successor is not None:
+            return existing_successor
+
         old_outbox = self._session.exec(
             select(ExecutionOutboxRecord).where(
                 ExecutionOutboxRecord.execution_run_id == old_execution_run_id
             )
         ).first()
         old_hypothesis = self._session.get(HypothesisRecord, old_run.hypothesis_id)
-        if old_outbox is None or old_hypothesis is None:
+        if (
+            old_outbox is None
+            or old_hypothesis is None
+            or old_run.task_id != old_hypothesis.task_id
+        ):
             return None
-        new_hypothesis = HypothesisRecord(
-            hypothesis_id=uuid4(),
-            task_id=old_hypothesis.task_id,
-            profile_id=old_hypothesis.profile_id,
-            statement=old_hypothesis.statement,
-            analysis_intent=old_hypothesis.analysis_intent,
-            variables=old_hypothesis.variables,
-            scope=old_hypothesis.scope,
-            validation_method=old_hypothesis.validation_method,
-            evidence_expectation=old_hypothesis.evidence_expectation,
-            status="approved",
-        )
-        self._session.add(new_hypothesis)
         new_run_id, dispatch_key = uuid4(), str(uuid4())
-        run = self.stage_admit_attempt(
-            execution_run_id=new_run_id,
-            task_id=old_run.task_id,
-            hypothesis_id=new_hypothesis.hypothesis_id,
-            analysis_frame_id=old_run.analysis_frame_id,
-            executor_type=old_outbox.executor_type,
-            method_id=old_outbox.method_id,
-            parameter_hash=old_outbox.parameter_hash,
-            dispatch_idempotency_key=dispatch_key,
-            prepared_payload=old_outbox.prepared_payload,
-            previous_attempt_id=old_execution_run_id,
-            retry_reason=retry_reason,
-            retry_authorization_metadata=authorization_metadata,
-        )
-        self._session.commit()
-        return run
+        try:
+            run = self.stage_admit_attempt(
+                execution_run_id=new_run_id,
+                task_id=old_run.task_id,
+                hypothesis_id=old_hypothesis.hypothesis_id,
+                analysis_frame_id=old_run.analysis_frame_id,
+                executor_type=old_outbox.executor_type,
+                method_id=old_outbox.method_id,
+                parameter_hash=old_outbox.parameter_hash,
+                dispatch_idempotency_key=dispatch_key,
+                prepared_payload=old_outbox.prepared_payload,
+                previous_attempt_id=old_execution_run_id,
+                retry_reason=retry_reason,
+                retry_authorization_metadata=authorization_metadata,
+            )
+            self._session.commit()
+            return run
+        except IntegrityError:
+            # The unique predecessor constraint is the concurrency authority.
+            # A competing transaction may have won after our read above.
+            self._session.rollback()
+            return self._session.exec(
+                select(ExecutionRunRecord)
+                .where(ExecutionRunRecord.previous_attempt_id == old_execution_run_id)
+                .order_by(text("created_at"), text("execution_run_id"))
+            ).first()
 
     def mark_recovery_error(
         self, execution_run_id: UUID, expected_attempt_version: int, error_msg: str
