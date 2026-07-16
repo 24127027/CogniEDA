@@ -379,6 +379,7 @@ class ChildTaskProposalDraft(BaseModel):
             readiness_status=self.readiness_status,
             readiness_reason=self.readiness_reason,
             parent_task_updated_at=parent_task_updated_at,
+            selected_motivating_discovery_ids=motivated_by_discovery_ids,
         )
 
 
@@ -393,8 +394,7 @@ class TaskDecompositionDraft(BaseModel):
     @model_validator(mode="after")
     def _require_children_to_name_the_same_parent(self) -> TaskDecompositionDraft:
         if any(
-            child.parent_task_ref != self.parent_task_ref
-            for child in self.child_task_proposals
+            child.parent_task_ref != self.parent_task_ref for child in self.child_task_proposals
         ):
             raise ValueError("every child proposal must name the decomposition parent")
         return self

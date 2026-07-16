@@ -2,7 +2,8 @@
 from typing import Any
 
 from pydantic import BaseModel
-    
+
+
 # TODO: Put whatever application runtime need here
 # Agent needs to extract the information from the graph state to return to the runtime
 class RuntimePayload(BaseModel):

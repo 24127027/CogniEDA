@@ -13,8 +13,9 @@ from application.orchestrator.scientific_processing import (
     _execution_operation,
     _method_parameter_hash,
 )
-from db.models import DiscoveryRecord, ExecutionApprovalRecord, PlannerOperationRecord
+from db.models import ExecutionApprovalRecord, PlannerOperationRecord
 from db.session import get_session
+from memory.retrieval_engine import DiscoveryRetrievalEngine
 from memory.session_frame import SessionContextBuilder
 from repositories import (
     DataProfileRepository,
@@ -25,12 +26,12 @@ from repositories import (
     SessionFrameRepository,
     TaskRepository,
 )
+from repositories.objective_repository import ObjectiveRepository
 from schemas.artifacts import Hypothesis
 from schemas.common import TaskContextSummary
 from schemas.enums import (
     ContextMode,
     DataProfileLifecycleState,
-    DiscoveryLifecycleState,
     ExecutionApprovalStatus,
     HypothesisStatus,
     PlannerNodeName,
@@ -41,6 +42,7 @@ from schemas.enums import (
 )
 from schemas.planner_operations import PlannerOperation
 from schemas.provenance import ExecutionApproval
+from schemas.retrieval import RetrievalRequest
 
 from ..utilities.nodes_registry import NodeRegistry
 from .types import (
@@ -346,29 +348,69 @@ def expand_plan(state: State, runtime: Runtime[Context]) -> State:
                 message="The parent Task or active SessionFrame is no longer available.",
             )
             return state
+        objective = ObjectiveRepository(session).get_active()
+        if objective is None:
+            state.controlled_error = ControlledPlannerError(
+                code="decomposition_objective_missing",
+                message="Decomposition retrieval requires an active Objective.",
+            )
+            return state
+
         planning = SessionContextBuilder().build(frame, mode=ContextMode.PLANNING)
-        candidate_ids = list(
-            dict.fromkeys([*parent.motivated_by_discovery_ids, *planning.discovery_refs])
+        active_profile_id = (
+            planning.data_profile_refs[0] if planning.data_profile_refs else parent.profile_id
         )
-        candidates: dict[str, UUID] = {}
+        if active_profile_id is None:
+            state.controlled_error = ControlledPlannerError(
+                code="decomposition_data_profile_missing",
+                message="Decomposition retrieval requires an active DataProfile.",
+            )
+            return state
+        active_profile = DataProfileRepository(session).get_by_id(active_profile_id)
+        if (
+            active_profile is None
+            or active_profile.lifecycle_state != DataProfileLifecycleState.ACTIVE
+        ):
+            state.controlled_error = ControlledPlannerError(
+                code="decomposition_data_profile_unavailable",
+                message="Decomposition retrieval requires a current active DataProfile.",
+            )
+            return state
+        retrieval_request = RetrievalRequest(
+            objective_id=objective.objective_id,
+            active_data_profile_id=active_profile_id,
+            session_frame_id=frame.session_frame_id,
+            parent_task_id=parent.task_id,
+            query_text=state.request_understanding.request_text,
+        )
+
+        engine = DiscoveryRetrievalEngine(session)
+        retrieval_result = engine.retrieve(retrieval_request, frame)
+
+        selectable_candidates: dict[str, UUID] = {}
+        candidate_explanations: dict[str, dict[str, object]] = {}
         parent_motivation_refs: list[str] = []
         other_candidate_refs: list[str] = []
-        for discovery_id in candidate_ids:
-            discovery = session.get(DiscoveryRecord, discovery_id)
-            if discovery is None or discovery.lifecycle_state != DiscoveryLifecycleState.ACTIVE:
-                continue
-            reference = state.bind_object_reference("discovery", str(discovery_id))
-            candidates[reference] = discovery_id
-            if discovery_id in parent.motivated_by_discovery_ids:
-                parent_motivation_refs.append(reference)
-            else:
-                other_candidate_refs.append(reference)
+
+        for item in retrieval_result.motivation_candidates:
+            reference = state.bind_object_reference("discovery", str(item.discovery_id))
+            selectable_candidates[reference] = item.discovery_id
+            parent_motivation_refs.append(reference)
+            candidate_explanations[reference] = _retrieval_candidate_explanation(item)
+
+        for item in retrieval_result.other_relevant_discoveries:
+            reference = state.bind_object_reference("discovery", str(item.discovery_id))
+            other_candidate_refs.append(reference)
+            candidate_explanations[reference] = _retrieval_candidate_explanation(item)
+
         prompt = _task_decomposition_prompt(
             parent_ref=parent_ref,
             parent=parent,
             planning=planning,
             parent_motivation_refs=parent_motivation_refs,
             other_candidate_refs=other_candidate_refs,
+            candidate_explanations=candidate_explanations,
+            retrieval_exclusion_notes=retrieval_result.exclusion_notes,
         )
     finally:
         session.close()
@@ -383,7 +425,7 @@ def expand_plan(state: State, runtime: Runtime[Context]) -> State:
             parent=parent,
             frame=frame,
             draft=draft,
-            candidate_refs=candidates,
+            candidate_refs=selectable_candidates,
         )
     except Exception:
         state.controlled_error = ControlledPlannerError(
@@ -405,6 +447,8 @@ def _task_decomposition_prompt(
     planning: Any,
     parent_motivation_refs: list[str],
     other_candidate_refs: list[str],
+    candidate_explanations: dict[str, dict[str, object]],
+    retrieval_exclusion_notes: list[str],
 ) -> str:
     """Build a bounded planning-only prompt; no global Discovery retrieval occurs."""
 
@@ -412,8 +456,9 @@ def _task_decomposition_prompt(
         "Decompose one parent Task into child Task proposals. Return only the typed "
         "TaskDecompositionDraft. Every child must explicitly provide "
         "motivated_by_discovery_refs; [] is valid and means no motivation. Do not use "
-        "UUIDs: use only the local references supplied below. A child may select any "
-        "subset of the bounded candidates; never inherit parent motivation implicitly. "
+        "UUIDs: use only the selectable local references supplied below. A child may "
+        "select any subset of the selectable candidates; never inherit parent "
+        "motivation implicitly. "
         "Rationale and readiness are proposal provenance, not Evidence or Discovery. "
         "Readiness does not authorize execution.\n\n"
         f"Parent local reference: {parent_ref}\n"
@@ -423,8 +468,26 @@ def _task_decomposition_prompt(
         f"{json.dumps([item.model_dump(mode='json') for item in planning.assumptions])}\n"
         f"Parent direct-motivation candidates: {parent_motivation_refs}\n"
         f"Other bounded Discovery candidates: {other_candidate_refs}\n"
-        "No other Task or Discovery reference is valid."
+        f"Candidate explanations: {json.dumps(candidate_explanations)}\n"
+        f"Retrieval warnings: {json.dumps(retrieval_exclusion_notes)}\n"
+        "Other bounded Discovery candidates are context-only and must not appear in "
+        "motivated_by_discovery_refs. No other Task or Discovery reference is valid."
     )
+
+
+def _retrieval_candidate_explanation(item: Any) -> dict[str, object]:
+    """Expose retrieval reasons to the planning model without durable identifiers."""
+
+    return {
+        "claim": item.claim_statement,
+        "lifecycle_state": item.lifecycle_state.value,
+        "relevance_score": item.relevance_score,
+        "structural_relations": item.structural_relations_used,
+        "inclusion_reasons": item.inclusion_reasons,
+        "warnings": item.flags,
+        "is_pinned": item.is_pinned,
+        "eligible_for_motivation": item.eligible_for_motivation,
+    }
 
 
 def _decomposition_operations(
@@ -443,9 +506,7 @@ def _decomposition_operations(
     for child in draft.child_task_proposals:
         if child.parent_task_ref != draft.parent_task_ref:
             raise ValueError("Child proposal names another parent.")
-        if any(
-            reference not in candidate_refs for reference in child.motivated_by_discovery_refs
-        ):
+        if any(reference not in candidate_refs for reference in child.motivated_by_discovery_refs):
             raise ValueError(
                 "Child proposal references a Discovery outside the bounded candidates."
             )
@@ -1045,6 +1106,7 @@ def commit_execution_contract(state: State, runtime: Runtime[Context]) -> State:
         session.close()
     return state
 
+
 @registry.register()
 def manage_objective(state: State, runtime: Runtime[Context]) -> State:
     """Draft Objective update operations without mutating the Objective directly."""
@@ -1318,9 +1380,7 @@ def resume_planner_operations(state: State, runtime: Runtime[Context]) -> State:
     if (
         any(operation is None for operation in operations)
         or any(
-            operation.session_id != session_id
-            for operation in operations
-            if operation is not None
+            operation.session_id != session_id for operation in operations if operation is not None
         )
         or any(
             operation.approval_state != PlannerOperationApprovalState.PENDING
@@ -1331,8 +1391,7 @@ def resume_planner_operations(state: State, runtime: Runtime[Context]) -> State:
         state.controlled_error = ControlledPlannerError(
             code="invalid_planner_operation_proposal",
             message=(
-                "The task proposal is unknown, belongs to another session, "
-                "or is no longer pending."
+                "The task proposal is unknown, belongs to another session, or is no longer pending."
             ),
         )
         return state
