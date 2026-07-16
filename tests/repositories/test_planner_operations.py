@@ -6,6 +6,7 @@ from agents.planner.nodes import manage_tasks
 from agents.planner.types import (
     ConflictFlagDraft,
     State,
+    TaskCreateDraft,
     TaskUpdateDraft,
 )
 from application.orchestrator.planner_commit import commit_planner_operations
@@ -139,6 +140,48 @@ def test_approved_create_task_operation_dispatches_through_commit(db_session) ->
     assert committed_operation.committed_at is not None
 
 
+def test_commit_does_not_report_staged_operations_as_durable(db_session) -> None:
+    task_id = uuid4()
+    operation = build_operation(
+        operation_type=PlannerOperationType.CREATE_TASK,
+        payload=build_task_payload(task_id),
+        approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
+    )
+
+    result = commit_planner_operations(db_session, [operation], commit=False)
+
+    assert result.committed_operation_ids == []
+    assert TaskRepository(db_session).get_by_id(task_id) is not None
+    db_session.rollback()
+    assert TaskRepository(db_session).get_by_id(task_id) is None
+
+
+def test_commit_rejects_unknown_or_cross_session_operation_ids(db_session) -> None:
+    unknown_id = uuid4()
+    unknown = commit_planner_operations(
+        db_session,
+        session_id="review-session",
+        operation_ids=[unknown_id],
+    )
+    assert unknown.failed_operation_ids == [unknown_id]
+    assert "Unknown PlannerOperation" in unknown.errors[unknown_id]
+
+    operation = build_operation(
+        operation_type=PlannerOperationType.CREATE_TASK,
+        payload=build_task_payload(),
+        approval_state=PlannerOperationApprovalState.APPROVED,
+    )
+    operation.session_id = "another-session"
+    persisted = PlannerOperationRepository(db_session).create(operation)
+    cross_session = commit_planner_operations(
+        db_session,
+        session_id="review-session",
+        operation_ids=[persisted.operation_id],
+    )
+    assert cross_session.failed_operation_ids == [persisted.operation_id]
+    assert "belongs to another session" in cross_session.errors[persisted.operation_id]
+
+
 def test_commit_reports_handler_failures_without_rollback_contract(db_session) -> None:
     operation = PlannerOperationRepository(db_session).create(
         build_operation(
@@ -177,18 +220,55 @@ def test_rejected_operation_is_not_committed(db_session) -> None:
 
 
 def test_manage_tasks_produces_planner_operation_not_direct_mutation(db_session) -> None:
-    task_payload = build_task_payload()
+    task_payload = TaskCreateDraft(
+        title="Investigate churn signal",
+        description="Evaluate whether spend is associated with churn.",
+    )
     state = State(query="create task", task_create_payloads=[task_payload])
 
     result_state = manage_tasks(state, None)
 
-    assert isinstance(result_state.task_create_payloads[0], Task)
+    assert isinstance(result_state.task_create_payloads[0], TaskCreateDraft)
     assert len(result_state.planner_operations) == 1
     operation = result_state.planner_operations[0]
     assert operation.operation_type == PlannerOperationType.CREATE_TASK
     assert operation.approval_state == PlannerOperationApprovalState.PENDING
-    assert "task_id" in operation.payload
+    assert "task_id" not in operation.payload
     assert TaskRepository(db_session).list() == []
+
+
+def test_manage_tasks_resolves_create_and_supersession_references() -> None:
+    parent_task_id = uuid4()
+    profile_id = uuid4()
+    target_task_id = uuid4()
+    replacement_task_id = uuid4()
+    state = State(query="manage tasks")
+    parent_ref = state.bind_object_reference("task", str(parent_task_id))
+    profile_ref = state.bind_object_reference("data_profile", str(profile_id))
+    target_ref = state.bind_object_reference("task", str(target_task_id))
+    replacement_ref = state.bind_object_reference("task", str(replacement_task_id))
+    state.task_create_payloads = [
+        TaskCreateDraft(
+            title="Child task",
+            description="Inspect one bounded signal.",
+            parent_task_ref=parent_ref,
+            data_profile_ref=profile_ref,
+        )
+    ]
+    state.task_update_payloads = [
+        TaskUpdateDraft(
+            task_ref=target_ref,
+            superseded_by_task_ref=replacement_ref,
+        )
+    ]
+
+    result = manage_tasks(state, None)
+
+    assert result.controlled_error is None
+    assert result.planner_operations[0].payload["parent_task_id"] == str(parent_task_id)
+    assert result.planner_operations[0].payload["profile_id"] == str(profile_id)
+    assert result.planner_operations[1].payload["task_id"] == str(target_task_id)
+    assert result.planner_operations[1].payload["superseded_by_task_id"] == str(replacement_task_id)
 
 
 def test_operation_payload_methods_return_named_payload_models() -> None:
@@ -312,3 +392,85 @@ def test_commit_updates_objective_and_assumption_through_operations(db_session) 
     assert objective_operation.operation_id in result.committed_operation_ids
     assert updated_assumption is not None
     assert updated_assumption.status == AssumptionStatus.FLAGGED
+
+
+def test_commit_execution_bundle_validation_fails_outbox_only(db_session) -> None:
+    repository = PlannerOperationRepository(db_session)
+    outbox_op = repository.create(
+        build_operation(
+            operation_type=PlannerOperationType.CREATE_EXECUTION_OUTBOX,
+            payload={
+                "execution_run_id": str(uuid4()),
+                "dispatch_idempotency_key": str(uuid4()),
+                "executor_type": "test",
+                "method_id": "method",
+                "parameter_hash": "hash",
+                "prepared_payload": {},
+            },
+            approval_state=PlannerOperationApprovalState.APPROVED,
+            produced_by_node=PlannerNodeName.PREPARE_EXECUTION,
+        )
+    )
+
+    result = commit_planner_operations(
+        db_session,
+        operation_ids=[outbox_op.operation_id],
+    )
+
+    assert result.failed_operation_ids == [outbox_op.operation_id]
+    assert (
+        "Execution admission requires exactly one ExecutionRun and one outbox."
+        in result.errors[outbox_op.operation_id]
+    )
+    outbox_op_db = repository.get_by_id(outbox_op.operation_id)
+    assert outbox_op_db.approval_state == PlannerOperationApprovalState.APPROVED  # unchanged
+
+
+def test_commit_execution_bundle_validation_fails_mismatched_ids(db_session) -> None:
+    repository = PlannerOperationRepository(db_session)
+    run_id1 = str(uuid4())
+    run_id2 = str(uuid4())
+    dispatch_key = str(uuid4())
+    run_op = repository.create(
+        build_operation(
+            operation_type=PlannerOperationType.CREATE_EXECUTION_RUN,
+            payload={
+                "execution_run_id": run_id1,
+                "task_id": str(uuid4()),
+                "hypothesis_id": str(uuid4()),
+                "executor_type": "test",
+                "method_id": "method",
+                "parameter_hash": "hash",
+                "status": "admitted",
+                "dispatch_idempotency_key": dispatch_key,
+            },
+            approval_state=PlannerOperationApprovalState.APPROVED,
+            produced_by_node=PlannerNodeName.PREPARE_EXECUTION,
+        )
+    )
+    outbox_op = repository.create(
+        build_operation(
+            operation_type=PlannerOperationType.CREATE_EXECUTION_OUTBOX,
+            payload={
+                "execution_run_id": run_id2,
+                "dispatch_idempotency_key": dispatch_key,
+                "executor_type": "test",
+                "method_id": "method",
+                "parameter_hash": "hash",
+                "prepared_payload": {},
+            },
+            approval_state=PlannerOperationApprovalState.APPROVED,
+            produced_by_node=PlannerNodeName.PREPARE_EXECUTION,
+        )
+    )
+
+    result = commit_planner_operations(
+        db_session,
+        operation_ids=[run_op.operation_id, outbox_op.operation_id],
+    )
+
+    assert len(result.failed_operation_ids) == 2
+    assert (
+        "ExecutionRun and outbox must have matching execution_run_id"
+        in result.errors[run_op.operation_id]
+    )

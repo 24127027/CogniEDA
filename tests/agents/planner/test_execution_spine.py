@@ -9,6 +9,7 @@ from langgraph.runtime import Runtime
 from agents.planner.agent import Planner
 from agents.planner.graph import build_graph
 from agents.planner.nodes import (
+    TaskManagementDraft,
     prepare_execution,
     process_decision,
     request_user_input,
@@ -26,6 +27,7 @@ from agents.planner.types import (
     RequestUnderstanding,
     RequestUnderstandingModel,
     State,
+    TaskCreateDraft,
 )
 from application.orchestrator import reconciler as reconciliation_module
 from application.orchestrator.dispatcher import dispatch_pending_attempts
@@ -162,6 +164,20 @@ class FailIfCalledRequestModel(RequestUnderstandingModel):
     def understand(self, prompt: str) -> RequestUnderstanding:
         self.calls += 1
         raise AssertionError(f"Request-understanding model must not be called: {prompt}")
+
+
+class FixedTaskManagementModel:
+    """Task proposal seam used to exercise the public planner resume path."""
+
+    def draft(self, prompt: str) -> TaskManagementDraft:
+        return TaskManagementDraft(
+            task_create_payloads=[
+                TaskCreateDraft(
+                    title="Review missing values",
+                    description="Inspect missing-value patterns before execution.",
+                )
+            ]
+        )
 
 
 def _context(
@@ -621,6 +637,108 @@ def test_execution_does_not_dispatch_without_an_explicit_approval(db_session) ->
     assert executor.requests == []
     assert HypothesisRepository(db_session).list(task_id=task.task_id) == []
     assert ExecutionRunRepository(db_session).list(task_id=task.task_id) == []
+
+
+def test_public_planner_commits_only_matching_task_proposal_after_resume(db_session) -> None:
+    database_url = str(db_session.get_bind().url)
+    context = Context(
+        session_id="task-proposal-session",
+        task_management_model=FixedTaskManagementModel(),
+    )
+
+    first = asyncio.run(
+        Planner(database_url=database_url).run(
+            "/manage_task create a missing-value review task",
+            context,
+        )
+    ).payload
+
+    assert first.pending_interaction is not None
+    assert first.pending_interaction.kind == "planner_operation_approval"
+    assert first.committed_operation_ids == []
+    assert first.pending_interaction.operation_ids
+    assert TaskRepository(db_session).list() == []
+
+    tampered = asyncio.run(
+        Planner(database_url=database_url).run(
+            "/approve",
+            Context(session_id=context.session_id),
+            decision=PlannerDecision(
+                action="approve",
+                proposal_id="tampered-proposal",
+                selected_ids=first.pending_interaction.operation_ids,
+            ),
+        )
+    ).payload
+
+    assert tampered.committed_operation_ids == []
+    assert tampered.commit_result is not None
+    assert tampered.commit_result.skipped_operation_ids
+    assert TaskRepository(db_session).list() == []
+
+    wrong_session = asyncio.run(
+        Planner(database_url=database_url).run(
+            "/approve",
+            Context(session_id="other-task-proposal-session"),
+            decision=PlannerDecision(
+                action="approve",
+                proposal_id=first.pending_interaction.proposal_id,
+                selected_ids=first.pending_interaction.operation_ids,
+            ),
+        )
+    ).payload
+
+    assert wrong_session.controlled_error is not None
+    assert wrong_session.controlled_error.code == "invalid_planner_operation_proposal"
+    assert TaskRepository(db_session).list() == []
+
+    malformed = asyncio.run(
+        Planner(database_url=database_url).run(
+            "/approve",
+            Context(session_id=context.session_id),
+            decision=PlannerDecision(
+                action="approve",
+                proposal_id=first.pending_interaction.proposal_id,
+            ),
+        )
+    ).payload
+
+    assert malformed.controlled_error is not None
+    assert malformed.controlled_error.code == "planner_operation_resume_unavailable"
+    assert TaskRepository(db_session).list() == []
+
+    second = asyncio.run(
+        Planner(database_url=database_url).run(
+            "/approve",
+            Context(session_id=context.session_id),
+            decision=PlannerDecision(
+                action="approve",
+                proposal_id=first.pending_interaction.proposal_id,
+                selected_ids=first.pending_interaction.operation_ids,
+            ),
+        )
+    ).payload
+
+    assert second.commit_result is not None
+    assert second.commit_result.succeeded
+    assert second.committed_operation_ids == second.commit_result.committed_operation_ids
+    assert len(TaskRepository(db_session).list()) == 1
+
+    replay = asyncio.run(
+        Planner(database_url=database_url).run(
+            "/approve",
+            Context(session_id=context.session_id),
+            decision=PlannerDecision(
+                action="approve",
+                proposal_id=first.pending_interaction.proposal_id,
+                selected_ids=first.pending_interaction.operation_ids,
+            ),
+        )
+    ).payload
+
+    assert replay.controlled_error is not None
+    assert replay.controlled_error.code == "invalid_planner_operation_proposal"
+    assert len(TaskRepository(db_session).list()) == 1
 
 
 def test_public_planner_resumes_durable_approval_in_a_new_instance(db_session, monkeypatch) -> None:

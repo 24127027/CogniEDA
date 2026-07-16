@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel, create_engine
 
 from application.orchestrator.transition_service import ExecutionAttemptTransitionService
@@ -220,3 +221,83 @@ def test_reclaimed_finalizer_fences_late_commit(memory_session: Session):
     )
     memory_session.commit()
     assert memory_session.get(ExecutionRunRecord, run_id).status == ExecutionRunStatus.COMPLETED
+
+
+def test_authorize_new_attempt_reuses_hypothesis_and_idempotent(memory_session: Session):
+    service = ExecutionAttemptTransitionService(memory_session)
+    run_id = uuid.uuid4()
+    hyp_id = uuid.uuid4()
+
+    # We need a hypothesis record
+    from db.models import HypothesisRecord
+    hyp = HypothesisRecord(
+        hypothesis_id=hyp_id,
+        task_id=uuid.uuid4(),
+        profile_id=uuid.uuid4(),
+        statement="statement",
+        analysis_intent="exploratory",
+        variables=[],
+        scope="scope",
+        validation_method="method",
+        evidence_expectation="expect",
+        status="approved"
+    )
+    memory_session.add(hyp)
+    memory_session.commit()
+
+    dispatch_key = str(uuid.uuid4())
+    run = service.admit_attempt(
+        execution_run_id=run_id,
+        task_id=hyp.task_id,
+        hypothesis_id=hyp_id,
+        analysis_frame_id=None,
+        executor_type="test",
+        method_id="test_method",
+        parameter_hash="hash",
+        dispatch_idempotency_key=dispatch_key,
+        prepared_payload={},
+    )
+
+    # Fail it so it's retryable
+    service.fail_execution(run_id, run.attempt_version, "failed")
+
+    # First retry
+    new_run = service.authorize_new_attempt(run_id, "retry", {})
+    assert new_run is not None
+    assert new_run.execution_run_id != run_id
+    assert new_run.hypothesis_id == hyp_id  # Reused hypothesis!
+    assert new_run.previous_attempt_id == run_id
+
+    # Check hypothesis count
+    from sqlmodel import select
+    hyp_count = len(memory_session.exec(select(HypothesisRecord)).all())
+    assert hyp_count == 1
+
+    # Concurrent / idempotent retry
+    new_run_2 = service.authorize_new_attempt(run_id, "retry", {})
+    assert new_run_2 is not None
+    assert new_run_2.execution_run_id == new_run.execution_run_id
+
+    # A failed successor is retried from itself, never by forking the original
+    # predecessor into a second direct successor.
+    assert service.fail_execution(
+        new_run.execution_run_id,
+        new_run.attempt_version,
+        "second failure",
+    )
+    assert service.authorize_new_attempt(run_id, "retry original", {}) is not None
+    assert (
+        service.authorize_new_attempt(run_id, "retry original", {}).execution_run_id
+        == new_run.execution_run_id
+    )
+
+
+def test_execution_run_predecessor_is_database_unique(memory_session: Session):
+    predecessor_id = uuid.uuid4()
+    memory_session.add(ExecutionRunRecord(previous_attempt_id=predecessor_id))
+    memory_session.commit()
+
+    memory_session.add(ExecutionRunRecord(previous_attempt_id=predecessor_id))
+    with pytest.raises(IntegrityError):
+        memory_session.commit()
+    memory_session.rollback()

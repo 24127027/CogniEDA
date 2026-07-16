@@ -1,11 +1,17 @@
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from langgraph.runtime import Runtime
 from pydantic_ai.messages import ModelRequest, UserPromptPart
 
 from agents.planner.graph import INTENT_ROUTES, build_graph
-from agents.planner.nodes import contextual_grounding, registry, route_intent, understand_request
+from agents.planner.nodes import (
+    _ConfiguredRequestUnderstandingModel,
+    contextual_grounding,
+    registry,
+    route_intent,
+    understand_request,
+)
 from agents.planner.types import (
     COMMAND_TO_INTENT,
     Context,
@@ -26,8 +32,22 @@ class FakeRequestUnderstandingModel(RequestUnderstandingModel):
         return cast(RequestUnderstanding, self.result)
 
 
+class FakeTaskManagementModel:
+    def __init__(self, result: Any = None) -> None:
+        self.result = result
+        self.prompts: list[str] = []
+
+    def draft(self, prompt: str) -> Any:
+        self.prompts.append(prompt)
+        from agents.planner.nodes import TaskManagementDraft
+        return self.result or TaskManagementDraft()
+
+
 def runtime_with(model: RequestUnderstandingModel | None = None) -> Runtime[Context]:
-    return Runtime(context=Context(request_understanding_model=model))
+    return Runtime(context=Context(
+        request_understanding_model=model,
+        task_management_model=FakeTaskManagementModel(),
+    ))
 
 
 @pytest.mark.parametrize(
@@ -180,8 +200,58 @@ def test_invalid_structured_model_result_uses_controlled_invalid_route() -> None
     assert len(model.prompts) == 1
 
 
+def test_model_exception_uses_controlled_invalid_route() -> None:
+    class RaisingRequestUnderstandingModel(RequestUnderstandingModel):
+        def understand(self, prompt: str) -> RequestUnderstanding:
+            raise RuntimeError("model unavailable")
+
+    result = understand_request(
+        State(query="What has been discovered?"),
+        runtime_with(RaisingRequestUnderstandingModel()),
+    )
+
+    assert result.request_understanding is not None
+    assert result.request_understanding.source == "invalid_llm"
+    assert route_intent(result, runtime_with()) == "invalid_request"
+
+
+def test_configured_request_adapter_uses_factory_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    factory_call: dict[str, object] = {}
+
+    class FakeAgent:
+        def run_sync(self, prompt: str, *, output_type):
+            assert output_type is RequestUnderstanding
+            return SimpleNamespace(
+                output=RequestUnderstanding(
+                    intent="manage_task",
+                    request_text="create a task",
+                    source="llm",
+                )
+            )
+
+    def fake_create_agent(**kwargs):
+        factory_call.update(kwargs)
+        return FakeAgent()
+
+    import agents.llm
+
+    monkeypatch.setattr(agents.llm, "create_agent", fake_create_agent)
+
+    result = _ConfiguredRequestUnderstandingModel().understand("latest request only")
+
+    assert result.intent == "manage_task"
+    assert factory_call["worker"] == "planner"
+    assert factory_call["deps_type"] is type(None)
+    assert factory_call["builtin_tools"] == []
+
+
 def test_graph_runs_explicit_answer_to_its_existing_downstream_route() -> None:
-    result = build_graph().invoke(State(query="/answer What was discovered?"), context=Context())
+    result = build_graph().invoke(
+        State(query="/answer What was discovered?"),
+        context=Context(task_management_model=FakeTaskManagementModel()),
+    )
 
     final_state = State.model_validate(result)
     assert final_state.request_understanding == RequestUnderstanding(
@@ -193,7 +263,10 @@ def test_graph_runs_explicit_answer_to_its_existing_downstream_route() -> None:
 
 
 def test_graph_terminates_unknown_commands_on_the_invalid_request_route() -> None:
-    result = build_graph().invoke(State(query="/unknown"), context=Context())
+    result = build_graph().invoke(
+        State(query="/unknown"),
+        context=Context(task_management_model=FakeTaskManagementModel()),
+    )
 
     final_state = State.model_validate(result)
     assert final_state.request_understanding is not None
@@ -222,7 +295,10 @@ def test_graph_classifies_once_then_grounds_before_routing_a_recognized_request(
     updates = list(
         build_graph().stream(
             State(query="Please create a task."),
-            context=Context(request_understanding_model=model),
+            context=Context(
+                request_understanding_model=model,
+                task_management_model=FakeTaskManagementModel(),
+            ),
             stream_mode="updates",
         )
     )
