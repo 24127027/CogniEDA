@@ -16,7 +16,7 @@ Implemented or partially implemented today:
 - A configured natural-language request-understanding adapter and a public `/manage_task` typed Task-proposal path. Proposed task operations remain uncommitted until the caller approves the exact persisted batch.
 - A narrow approval-gated planner execution admission path that atomically persists `Hypothesis`, `ExecutionRun`, and execution outbox state.
 - A durable local worker protocol with lease/fencing transitions, result inbox, reconciliation helpers, and transactional scientific finalization.
-- A capability registry/dispatcher under `src/agents/executor/`; the concrete GraphMiner and HypothesisAnalyst graphs remain stubs.
+- A durable-worker-to-domain adapter and capability registry/dispatcher under `src/agents/executor/`; the concrete GraphMiner and HypothesisAnalyst graphs remain stubs.
 
 Not implemented yet:
 

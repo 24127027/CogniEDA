@@ -133,7 +133,7 @@ Current implementation:
 - Discovery requires Evidence and `validity_basis`.
 - Repository guards enforce one Task to one Hypothesis and one Hypothesis to one Discovery for fresh local stores.
 - Approved execution admission persists Hypothesis/ExecutionRun/outbox state. An independent worker persists an inbox result and a fenced finalizer can create AnalysisFrame/Evidence/Discovery/lifecycle/SessionFrame operations for one deterministic method.
-- Capability registry/dispatcher plumbing exists, but default executor graph builders and concrete `ExecutionResult` draft fields remain stubs.
+- The durable worker now validates persisted attempt identity and reaches the capability registry through one `ExecutorInput` adapter. The canonical `ExecutorResult` observation schema exists, but default executor graph builders remain explicit stubs.
 
 Status: Partially implemented.
 
