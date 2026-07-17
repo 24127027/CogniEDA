@@ -22,6 +22,7 @@ PlannerIntent = Literal[
     "answer",
     "suggest",
     "manage_task",
+    "decompose",
     "execute",
     "objective",
     "assumption",
@@ -31,6 +32,7 @@ COMMAND_TO_INTENT: dict[str, PlannerIntent] = {
     "answer": "answer",
     "suggest": "suggest",
     "manage_task": "manage_task",
+    "decompose": "decompose",
     "execute": "execute",
     "objective": "objective",
     "assumption": "assumption",
@@ -87,6 +89,13 @@ class TaskManagementModel(Protocol):
     def draft(self, prompt: str) -> Any: ...
 
 
+@runtime_checkable
+class TaskDecompositionModel(Protocol):
+    """Dependency that proposes bounded, non-executable child Tasks."""
+
+    def draft(self, prompt: str) -> Any: ...
+
+
 class TaskCreateDraft(BaseModel):
     """Planner-owned draft for a Task-create operation."""
 
@@ -103,6 +112,35 @@ class TaskCreateDraft(BaseModel):
         """Serialize the reviewed draft at the PlannerOperation boundary."""
 
         return TaskCreateOperationPayload(**self.model_dump(mode="python"))
+
+
+class ChildTaskProposalDraft(BaseModel):
+    """One non-executable child Task proposed by ``/decompose``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: NonEmptyStr
+    description: NonEmptyStr
+    task_kind: Literal[TaskKind.ORGANIZING, TaskKind.REVIEW] = TaskKind.ORGANIZING
+
+    def operation_payload(self, *, parent_task_id: UUID) -> TaskCreateOperationPayload:
+        """Create a payload that cannot be admitted to analytical execution."""
+
+        return TaskCreateOperationPayload(
+            title=self.title,
+            description=self.description,
+            lifecycle_state=TaskLifecycleState.PROPOSED,
+            task_kind=self.task_kind,
+            parent_task_id=parent_task_id,
+        )
+
+
+class TaskDecompositionDraft(BaseModel):
+    """Typed child-Task proposal returned by the bounded decomposition model."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    child_task_proposals: list[ChildTaskProposalDraft] = Field(min_length=1, max_length=8)
 
 
 class _TargetedOperationDraft(BaseModel):
@@ -296,6 +334,7 @@ class State(BaseModel):
     session_id: str | None = None
     history: list[ModelMessage] = Field(default_factory=list)
     task_create_payloads: list[TaskCreateDraft] = Field(default_factory=list)
+    task_decomposition_payloads: list[TaskDecompositionDraft] = Field(default_factory=list)
     task_update_payloads: list[TaskUpdateDraft] = Field(default_factory=list)
     task_state_change_payloads: list[TaskStateChangeDraft] = Field(default_factory=list)
     objective_update_payloads: list[ObjectiveUpdateDraft] = Field(default_factory=list)
@@ -318,6 +357,7 @@ class Context(BaseModel):
     session_id: str | None = None
     request_understanding_model: RequestUnderstandingModel | None = None
     task_management_model: TaskManagementModel | None = None
+    task_decomposition_model: TaskDecompositionModel | None = None
 
 
 class PlannerOutput(BaseModel):

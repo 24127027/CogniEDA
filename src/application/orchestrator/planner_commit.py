@@ -164,6 +164,8 @@ def _apply_create_task(session: Session, operation: PlannerOperationRecord) -> N
     task = Task(**payload.model_dump(exclude_none=True))
     if session.get(TaskRecord, task.task_id) is not None:
         raise ValueError(f"Task already exists: {task.task_id}")
+    if task.parent_task_id is not None and session.get(TaskRecord, task.parent_task_id) is None:
+        raise ValueError(f"Parent Task not found: {task.parent_task_id}")
     record = TaskRecord(**schema_to_record_payload(task, json_fields=TASK_JSON_FIELDS))
     session.add(record)
     operation.target_object_id = task.task_id

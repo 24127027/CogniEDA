@@ -39,6 +39,7 @@ def build_graph() -> CompiledStateGraph[State, Context, State, State]:
             "answer": R.answer_question,
             "suggest": R.propose_questions,
             "manage_task": R.manage_tasks,
+            "decompose": R.expand_plan,
             "execute": R.select_task,
             "objective": R.manage_objective,
             "assumption": R.manage_assumptions,
