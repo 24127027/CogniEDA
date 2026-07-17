@@ -34,7 +34,7 @@ def finalize_attempt(
     run = session.get(ExecutionRunRecord, execution_run_id)
     if run is None:
         return False
-    if run.status == ExecutionRunStatus.COMPLETED:
+    if run.status in {ExecutionRunStatus.COMPLETED, ExecutionRunStatus.EXECUTION_FAILED}:
         return True
 
     if test_hook:

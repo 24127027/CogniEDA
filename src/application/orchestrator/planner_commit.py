@@ -11,6 +11,7 @@ from application.orchestrator.transition_service import ExecutionAttemptTransiti
 from db.models import (
     AnalysisFrameRecord,
     AssumptionRecord,
+    DataProfileRecord,
     DiscoveryRecord,
     ExecutionRunRecord,
     HypothesisRecord,
@@ -42,10 +43,12 @@ from schemas.artifacts import (
 )
 from schemas.enums import (
     AssumptionStatus,
+    DataProfileLifecycleState,
     DiscoveryLifecycleState,
     ExecutionRunStatus,
     PlannerOperationApprovalState,
     PlannerOperationType,
+    TaskKind,
     TaskLifecycleState,
 )
 from schemas.planner_operations import (
@@ -391,6 +394,7 @@ def _apply_create_task(session: Session, operation: PlannerOperation) -> None:
     payload = dict(operation.payload)
     parent_task_updated_at = payload.pop("parent_task_updated_at", None)
     selected_motivating_discovery_ids = payload.pop("selected_motivating_discovery_ids", None)
+    motivation_data_profile_id = payload.pop("motivation_data_profile_id", None)
     for proposal_metadata in (
         "decomposition_scope",
         "decomposition_rationale",
@@ -411,12 +415,24 @@ def _apply_create_task(session: Session, operation: PlannerOperation) -> None:
     )
     _require_motivating_discoveries(session, task.motivated_by_discovery_ids)
     if selected_motivating_discovery_ids is not None:
+        bounded_profile_id = (
+            UUID(str(motivation_data_profile_id))
+            if motivation_data_profile_id is not None
+            else None
+        )
+        _require_active_data_profile(session, bounded_profile_id)
         selected_ids = [
             UUID(str(discovery_id)) for discovery_id in selected_motivating_discovery_ids
         ]
         if selected_ids != task.motivated_by_discovery_ids:
             raise ValueError("Selected Discovery motivation does not match the Task payload.")
-        _require_current_retrieval_motivations(session, selected_ids)
+        _require_current_retrieval_motivations(
+            session,
+            selected_ids,
+            active_profile_id=bounded_profile_id,
+        )
+    _require_active_data_profile(session, task.profile_id)
+    _require_task_analytical_contract(session, task)
     session.add(TaskRecord(**schema_to_record_payload(task, json_fields=TASK_JSON_FIELDS)))
 
 
@@ -431,6 +447,8 @@ def _apply_update_task(session: Session, operation: PlannerOperation) -> None:
         _require_valid_task_parent(session, task_id, update.parent_task_id)
     if update.motivated_by_discovery_ids is not None:
         _require_motivating_discoveries(session, update.motivated_by_discovery_ids)
+    if "profile_id" in update.model_fields_set:
+        _require_active_data_profile(session, update.profile_id)
 
     apply_update(task_record, update, json_fields=TASK_JSON_FIELDS)
     session.add(task_record)
@@ -444,18 +462,82 @@ def _require_motivating_discoveries(session: Session, discovery_ids: list[UUID])
             raise ValueError(f"Referenced Discovery does not exist: {discovery_id}")
 
 
-def _require_current_retrieval_motivations(session: Session, discovery_ids: list[UUID]) -> None:
+def _require_active_data_profile(session: Session, profile_id: UUID | None) -> None:
+    """Require the task DataProfile to be present, active, and from the workspace."""
+
+    if profile_id is None:
+        return
+    profile = session.get(DataProfileRecord, profile_id)
+    if profile is None:
+        raise ValueError(f"Referenced DataProfile does not exist: {profile_id}")
+    if (
+        profile.lifecycle_state != DataProfileLifecycleState.ACTIVE.value
+        or not profile.accepted_as_ground_truth
+    ):
+        raise ValueError(f"Referenced DataProfile is not accepted and active: {profile_id}")
+
+
+def _require_current_retrieval_motivations(
+    session: Session,
+    discovery_ids: list[UUID],
+    *,
+    active_profile_id: UUID | None,
+) -> None:
     """Reject Step 5 selections that became ineligible after retrieval."""
 
     for discovery_id in discovery_ids:
-        discovery = session.get(DiscoveryRecord, discovery_id)
-        if discovery is None:
+        discovery_record = session.get(DiscoveryRecord, discovery_id)
+        if discovery_record is None:
             raise ValueError(f"Referenced Discovery does not exist: {discovery_id}")
-        if discovery.lifecycle_state != DiscoveryLifecycleState.ACTIVE:
+        if discovery_record.lifecycle_state != DiscoveryLifecycleState.ACTIVE:
+            lifecycle_value = getattr(
+                discovery_record.lifecycle_state,
+                "value",
+                discovery_record.lifecycle_state,
+            )
             raise ValueError(
                 "Selected Discovery is no longer active: "
-                f"{discovery_id} ({discovery.lifecycle_state.value})."
+                f"{discovery_id} ({lifecycle_value})."
             )
+        discovery = DiscoveryRepository(session).get_by_id(discovery_id)
+        if discovery is None:
+            raise ValueError(f"Referenced Discovery does not exist: {discovery_id}")
+        if not discovery.scope.strip():
+            raise ValueError(f"Selected Discovery has no valid scope: {discovery_id}")
+        if (
+            active_profile_id is None
+            or discovery.validity_basis.data_profile_id != active_profile_id
+        ):
+            raise ValueError(
+                f"Selected Discovery is incompatible with the bounded DataProfile: {discovery_id}"
+            )
+
+
+def _require_task_analytical_contract(session: Session, task: Task) -> None:
+    """Validate the canonical Task execution contract at the atomic commit boundary."""
+
+    specification = task.analytical_specification
+    if specification is None:
+        return
+    if task.task_kind != TaskKind.ANALYTICAL:
+        raise ValueError("Only analytical Tasks may carry an analytical specification.")
+    if task.profile_id is None or specification.data_profile_id != task.profile_id:
+        raise ValueError("Task and analytical specification DataProfile must match.")
+    if task.variables != specification.variable_bindings:
+        raise ValueError("Task variables must match analytical specification bindings.")
+    if task.evidence_expectation != specification.evidence_expectation:
+        raise ValueError("Task evidence expectation must match its analytical specification.")
+    profile = session.get(DataProfileRecord, task.profile_id)
+    if profile is None:
+        raise ValueError(f"Referenced DataProfile does not exist: {task.profile_id}")
+    schema_summary = profile.schema_summary or {}
+    column_order = schema_summary.get("column_order", [])
+    unknown_bindings = sorted(set(specification.variable_bindings) - set(column_order))
+    if unknown_bindings:
+        raise ValueError(
+            "Analytical variable bindings are absent from the DataProfile schema: "
+            f"{', '.join(unknown_bindings)}."
+        )
 
 
 def _require_valid_task_parent(
