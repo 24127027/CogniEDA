@@ -19,6 +19,7 @@ from schemas.enums import (
     ConfidenceLevel,
     DataProfileLifecycleState,
     DiscoveryEpistemicStatus,
+    DiscoveryLifecycleState,
     EvidenceLifecycleState,
     EvidenceType,
     HypothesisEvidenceOutcome,
@@ -384,6 +385,7 @@ class DiscoveryContextSummary(CogniEDABaseModel):
     epistemic_status: DiscoveryEpistemicStatus
     scope: NonEmptyStr
     evidence_ids: list[UUID]
+    lifecycle_state: DiscoveryLifecycleState = DiscoveryLifecycleState.ACTIVE
     memory_status: MemoryStatus = MemoryStatus.ACTIVE
     provenance: list[ContextProvenance] = Field(default_factory=list)
 
