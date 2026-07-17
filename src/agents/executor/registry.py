@@ -22,14 +22,22 @@ class ExecutorRegistry:
         capability: CapabilitySpec,
     ) -> Callable[[type[Executor[Any]]], type[Executor[Any]]]:
         def decorator(executor_type: type[Executor[Any]]) -> type[Executor[Any]]:
-            if capability.id in self._factories:
-                raise ValueError(f"Capability already registered: {capability.id}")
-
-            self._specs[capability.id] = capability
-            self._factories[capability.id] = cast(ExecutorFactory, executor_type)
+            self.register_factory(capability, cast(ExecutorFactory, executor_type))
             return executor_type
 
         return decorator
+
+    def register_factory(
+        self,
+        capability: CapabilitySpec,
+        factory: ExecutorFactory,
+    ) -> None:
+        """Register one lazily invoked executor factory for a capability."""
+        if capability.id in self._factories:
+            raise ValueError(f"Capability already registered: {capability.id}")
+
+        self._specs[capability.id] = capability
+        self._factories[capability.id] = factory
 
     def get(self, capability_id: str) -> Executor[Any]:
         if capability_id not in self._factories:

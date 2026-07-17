@@ -1,7 +1,8 @@
 """Internal state for HypothesisAnalyst executor.
 
 This state NEVER leaves the executor.
-It's converted from ExecutionRequest on entry and to ExecutionResult on exit.
+It is built from ExecutorInput on entry; the graph must return the canonical
+ExecutorResult envelope on exit.
 """
 
 from ..types import BaseState

@@ -1,10 +1,12 @@
 from langgraph.graph.state import CompiledStateGraph
 
-from ..types import ExecutionResult, ExecutorContext, ExecutorInput
+from application.orchestrator.execution_contracts import ExecutorResult
+
+from ..types import ExecutorContext, ExecutorInput
 from .state import State
 
 
-def build_graph() -> CompiledStateGraph[State, ExecutorContext, ExecutorInput, ExecutionResult]:
+def build_graph() -> CompiledStateGraph[State, ExecutorContext, ExecutorInput, ExecutorResult]:
     """
     Builds a graph representation of the planning problem.
     This function is a placeholder and should be implemented with the actual logic
