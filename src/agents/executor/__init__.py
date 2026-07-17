@@ -12,11 +12,8 @@ from .registry import (
     render_capabilities,
 )
 from .types import (
-    ExecutionRequest,
-    ExecutionResult,
     ExecutorContext,
     ExecutorInput,
-    ExecutorOutput,
     Task,
 )
 
@@ -24,12 +21,9 @@ __all__ = (
     "Capability",
     "CapabilitySpec",
     "CAPABILITY_IDS",
-    "ExecutionRequest",
-    "ExecutionResult",
     "ExecutorContext",
     "ExecutorDispatcher",
     "ExecutorInput",
-    "ExecutorOutput",
     "ExecutorRegistry",
     "GraphMiner",
     "GraphMinerExecutor",
