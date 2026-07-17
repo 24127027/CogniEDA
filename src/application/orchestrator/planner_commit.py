@@ -25,9 +25,15 @@ from schemas.enums import (
     AssumptionStatus,
     PlannerOperationApprovalState,
     PlannerOperationType,
-    TaskLifecycleState,
 )
-from schemas.planner_operations import PlannerCommitResult
+from schemas.planner_operations import (
+    AssumptionStateUpdateOperationPayload,
+    ConflictFlagOperationPayload,
+    ObjectiveUpdateOperationPayload,
+    PlannerCommitResult,
+    TaskStateChangeOperationPayload,
+    TaskUpdateOperationPayload,
+)
 
 _COMMITTABLE_STATES = {
     PlannerOperationApprovalState.APPROVED,
@@ -164,13 +170,14 @@ def _apply_create_task(session: Session, operation: PlannerOperationRecord) -> N
 
 
 def _apply_update_task(session: Session, operation: PlannerOperationRecord) -> None:
-    task_record = _require_record(
-        session,
-        TaskRecord,
-        _require_target_object_id(operation, "update_task"),
-        "Task",
+    payload = TaskUpdateOperationPayload.model_validate(
+        _payload_with_target_id(operation, id_field="task_id")
     )
-    update = TaskUpdate(**operation.payload)
+    _require_payload_target_matches(operation, payload.task_id, "update_task")
+    task_record = _require_record(session, TaskRecord, payload.task_id, "Task")
+    update = TaskUpdate(
+        **payload.model_dump(exclude={"task_id"}, exclude_none=True)
+    )
     _require_update_payload(update.model_fields_set, operation.operation_type.value)
     apply_update(task_record, update, json_fields=TASK_JSON_FIELDS)
     session.add(task_record)
@@ -178,17 +185,12 @@ def _apply_update_task(session: Session, operation: PlannerOperationRecord) -> N
 
 
 def _apply_change_task_state(session: Session, operation: PlannerOperationRecord) -> None:
-    task_record = _require_record(
-        session,
-        TaskRecord,
-        _require_target_object_id(operation, "change_task_state"),
-        "Task",
+    payload = TaskStateChangeOperationPayload.model_validate(
+        _payload_with_target_id(operation, id_field="task_id")
     )
-    if "lifecycle_state" not in operation.payload:
-        raise ValueError("change_task_state requires lifecycle_state in payload.")
-    update = TaskUpdate(
-        lifecycle_state=TaskLifecycleState(operation.payload["lifecycle_state"])
-    )
+    _require_payload_target_matches(operation, payload.task_id, "change_task_state")
+    task_record = _require_record(session, TaskRecord, payload.task_id, "Task")
+    update = TaskUpdate(lifecycle_state=payload.lifecycle_state)
     apply_update(task_record, update, json_fields=TASK_JSON_FIELDS)
     session.add(task_record)
     session.flush()
@@ -213,13 +215,23 @@ def _apply_update_assumption_state(
     session: Session,
     operation: PlannerOperationRecord,
 ) -> None:
+    payload = AssumptionStateUpdateOperationPayload.model_validate(
+        _payload_with_target_id(operation, id_field="assumption_id")
+    )
+    _require_payload_target_matches(
+        operation,
+        payload.assumption_id,
+        "update_assumption_state",
+    )
     assumption_record = _require_record(
         session,
         AssumptionRecord,
-        _require_target_object_id(operation, "update_assumption_state"),
+        payload.assumption_id,
         "Assumption",
     )
-    update = AssumptionUpdate(**operation.payload)
+    update = AssumptionUpdate(
+        **payload.model_dump(exclude={"assumption_id"}, exclude_none=True)
+    )
     _require_update_payload(update.model_fields_set, operation.operation_type.value)
     apply_update(assumption_record, update, json_fields=ASSUMPTION_JSON_FIELDS)
     session.add(assumption_record)
@@ -227,13 +239,19 @@ def _apply_update_assumption_state(
 
 
 def _apply_update_objective(session: Session, operation: PlannerOperationRecord) -> None:
+    payload = ObjectiveUpdateOperationPayload.model_validate(
+        _payload_with_target_id(operation, id_field="objective_id")
+    )
+    _require_payload_target_matches(operation, payload.objective_id, "update_objective")
     objective_record = _require_record(
         session,
         ObjectiveRecord,
-        _require_target_object_id(operation, "update_objective"),
+        payload.objective_id,
         "Objective",
     )
-    update = ObjectiveUpdate(**operation.payload)
+    update = ObjectiveUpdate(
+        **payload.model_dump(exclude={"objective_id"}, exclude_none=True)
+    )
     _require_update_payload(update.model_fields_set, operation.operation_type.value)
     apply_update(objective_record, update)
     session.add(objective_record)
@@ -256,19 +274,20 @@ def _apply_update_session_frame(session: Session, operation: PlannerOperationRec
 
 
 def _apply_flag_object(session: Session, operation: PlannerOperationRecord) -> None:
-    target_type = (operation.target_object_type or operation.payload.get("target_object_type"))
-    if target_type != "assumption":
+    payload = ConflictFlagOperationPayload.model_validate(
+        _payload_with_target_id(operation, id_field="assumption_id")
+    )
+    _require_payload_target_matches(operation, payload.assumption_id, "flag_object")
+    if payload.target_object_type != "assumption":
         raise ValueError("Phase 1 flag_object supports target_object_type='assumption' only.")
 
     assumption_record = _require_record(
         session,
         AssumptionRecord,
-        _require_target_object_id(operation, "flag_object"),
+        payload.assumption_id,
         "Assumption",
     )
-    contradiction_ref = operation.payload.get("discovery_id") or operation.payload.get(
-        "contradicted_by_discovery_id"
-    )
+    contradiction_ref = payload.discovery_id or payload.contradicted_by_discovery_id
     if contradiction_ref is not None:
         contradicted_by_discovery_ids = list(assumption_record.contradicted_by_discovery_ids)
         discovery_ref = str(UUID(str(contradiction_ref)))
@@ -299,6 +318,20 @@ def _require_target_object_id(
     if operation.target_object_id is None:
         raise ValueError(f"{operation_name} requires target_object_id.")
     return operation.target_object_id
+
+
+def _require_payload_target_matches(
+    operation: PlannerOperationRecord,
+    payload_target_id: UUID,
+    operation_name: str,
+) -> None:
+    if (
+        operation.target_object_id is not None
+        and operation.target_object_id != payload_target_id
+    ):
+        raise ValueError(
+            f"{operation_name} payload target does not match target_object_id."
+        )
 
 
 def _require_record[RecordT](

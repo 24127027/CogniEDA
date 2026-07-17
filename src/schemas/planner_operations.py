@@ -10,14 +10,77 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from schemas.common import CogniEDABaseModel, NonEmptyStr, utc_now
 from schemas.enums import (
+    AssumptionStatus,
+    ObjectiveStatus,
     PlannerNodeName,
     PlannerOperationApprovalState,
     PlannerOperationType,
+    TaskKind,
+    TaskLifecycleState,
 )
+
+
+class TaskUpdateOperationPayload(BaseModel):
+    """Typed persisted payload for updating one Task."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    task_id: UUID
+    title: str | None = None
+    description: str | None = None
+    lifecycle_state: TaskLifecycleState | None = None
+    task_kind: TaskKind | None = None
+    parent_task_id: UUID | None = None
+    profile_id: UUID | None = None
+    variables: list[str] | None = None
+    evidence_expectation: str | None = None
+
+
+class TaskStateChangeOperationPayload(BaseModel):
+    """Typed persisted payload for one Task lifecycle transition."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    task_id: UUID
+    lifecycle_state: TaskLifecycleState
+
+
+class ObjectiveUpdateOperationPayload(BaseModel):
+    """Typed persisted payload for updating one Objective."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    objective_id: UUID
+    title: str | None = None
+    statement: str | None = None
+    status: ObjectiveStatus | None = None
+
+
+class AssumptionStateUpdateOperationPayload(BaseModel):
+    """Typed persisted payload for updating one Assumption lifecycle state."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    assumption_id: UUID
+    status: AssumptionStatus | None = None
+    contradicted_by_discovery_ids: list[UUID] | None = None
+    replacement_assumption_id: UUID | None = None
+
+
+class ConflictFlagOperationPayload(BaseModel):
+    """Typed persisted payload for an Assumption review flag."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    assumption_id: UUID
+    target_object_type: str = "assumption"
+    discovery_id: UUID | None = None
+    contradicted_by_discovery_id: UUID | None = None
+    reason: str | None = None
 
 
 class PlannerOperation(CogniEDABaseModel):
