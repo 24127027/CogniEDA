@@ -31,6 +31,7 @@ from schemas.planner_operations import (
     ConflictFlagOperationPayload,
     ObjectiveUpdateOperationPayload,
     PlannerCommitResult,
+    TaskCreateOperationPayload,
     TaskStateChangeOperationPayload,
     TaskUpdateOperationPayload,
 )
@@ -157,8 +158,10 @@ def _apply_operation(session: Session, record: PlannerOperationRecord) -> None:
 
 
 def _apply_create_task(session: Session, operation: PlannerOperationRecord) -> None:
-    payload = _payload_with_target_id(operation, id_field="task_id")
-    task = Task(**payload)
+    payload = TaskCreateOperationPayload.model_validate(
+        _payload_with_target_id(operation, id_field="task_id")
+    )
+    task = Task(**payload.model_dump(exclude_none=True))
     if session.get(TaskRecord, task.task_id) is not None:
         raise ValueError(f"Task already exists: {task.task_id}")
     record = TaskRecord(**schema_to_record_payload(task, json_fields=TASK_JSON_FIELDS))

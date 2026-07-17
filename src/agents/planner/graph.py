@@ -1,8 +1,8 @@
-from langgraph.graph.state import StateGraph, CompiledStateGraph
-from langgraph.graph import START, END
+from langgraph.graph import END, START
+from langgraph.graph.state import CompiledStateGraph, StateGraph
 
-from .types import State, Context
-from .nodes import registry, R
+from .nodes import R, registry, route_entry, route_intent, route_process_decision
+from .types import Context, State
 
 
 def build_graph() -> CompiledStateGraph[State, Context, State, State]:
@@ -19,16 +19,22 @@ def build_graph() -> CompiledStateGraph[State, Context, State, State]:
     # Entry
     # --------------------------------------------------
 
-    builder.add_edge(START, R.understand_request)
-    builder.add_edge(R.understand_request, R.route_intent)
+    builder.add_conditional_edges(
+        START,
+        route_entry,
+        {
+            "understand_request": R.understand_request,
+            "resume_planner_operations": R.resume_planner_operations,
+        },
+    )
 
     # --------------------------------------------------
     # Intent routing
     # --------------------------------------------------
 
     builder.add_conditional_edges(
-        R.route_intent,
-        registry.nodes[R.route_intent],
+        R.understand_request,
+        route_intent,
         {
             "answer": R.answer_question,
             "suggest": R.propose_questions,
@@ -36,6 +42,7 @@ def build_graph() -> CompiledStateGraph[State, Context, State, State]:
             "execute": R.select_task,
             "objective": R.manage_objective,
             "assumption": R.manage_assumptions,
+            "invalid_request": R.invalid_request,
         },
     )
 
@@ -81,18 +88,19 @@ def build_graph() -> CompiledStateGraph[State, Context, State, State]:
 
     builder.add_edge(R.request_user_input, R.pause)
     builder.add_edge(R.pause, R.process_decision)
+    builder.add_edge(R.resume_planner_operations, R.process_decision)
 
     builder.add_conditional_edges(
         R.process_decision,
-        registry.nodes[R.process_decision],
+        route_process_decision,
         {
-            "clarify": R.understand_request,
             "approved_questions": R.expand_plan,
             "approved_task": R.commit,
             "approved_plan": R.commit,
             "approved_conflict": R.commit,
             "approved_execution": R.dispatch_executor,
             "cancel": R.commit,
+            "end": END,
         },
     )
 
@@ -100,6 +108,7 @@ def build_graph() -> CompiledStateGraph[State, Context, State, State]:
     # Finish
     # --------------------------------------------------
 
+    builder.add_edge(R.invalid_request, END)
     builder.add_edge(R.commit, END)
 
     return builder.compile()

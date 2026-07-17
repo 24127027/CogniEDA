@@ -3,8 +3,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+import pytest
+from pydantic import ValidationError
+
 from agents.planner.nodes import manage_tasks
-from agents.planner.types import State
+from agents.planner.types import State, TaskCreateDraft
 from application.orchestrator.planner_commit import commit_planner_operations
 from repositories import (
     AssumptionRepository,
@@ -13,7 +16,7 @@ from repositories import (
     SessionFrameRepository,
     TaskRepository,
 )
-from schemas.artifacts import Assumption, Objective, SessionFrame, Task
+from schemas.artifacts import Assumption, Objective, SessionFrame
 from schemas.common import TaskContextSummary
 from schemas.enums import (
     AssumptionSource,
@@ -27,7 +30,7 @@ from schemas.enums import (
     TaskKind,
     TaskLifecycleState,
 )
-from schemas.planner_operations import PlannerOperation
+from schemas.planner_operations import PlannerOperation, TaskCreateOperationPayload
 
 
 def build_task_payload(task_id: UUID | None = None, **overrides: object) -> dict[str, object]:
@@ -41,7 +44,7 @@ def build_task_payload(task_id: UUID | None = None, **overrides: object) -> dict
         "evidence_expectation": "A scoped statistical test result.",
     }
     payload.update(overrides)
-    return Task(**payload).model_dump(mode="json")
+    return TaskCreateOperationPayload(**payload).model_dump(mode="json", exclude_none=True)
 
 
 def build_assumption_payload(
@@ -234,17 +237,60 @@ def test_commit_result_reports_committed_and_failed_operations(db_session) -> No
 
 
 def test_manage_tasks_produces_planner_operation_not_direct_mutation(db_session) -> None:
-    task_payload = build_task_payload()
-    state = State(query="create task", task_create_payloads=[task_payload])
+    task_draft = TaskCreateDraft(
+        title="Investigate churn signal",
+        description="Evaluate whether spend is associated with churn.",
+        variables=["monthly_spend", "churned"],
+        evidence_expectation="A scoped statistical test result.",
+    )
+    state = State(query="create task", task_create_payloads=[task_draft])
 
     result_state = manage_tasks(state, None)
 
-    assert isinstance(result_state.task_create_payloads[0], Task)
+    assert isinstance(result_state.task_create_payloads[0], TaskCreateDraft)
     assert len(result_state.planner_operations) == 1
     operation = result_state.planner_operations[0]
     assert operation.operation_type == PlannerOperationType.CREATE_TASK
     assert operation.approval_state == PlannerOperationApprovalState.PENDING
+    assert operation.target_object_id is None
+    assert "task_id" not in operation.payload
     assert TaskRepository(db_session).list() == []
+
+
+def test_task_create_payload_rejects_unknown_fields() -> None:
+    with pytest.raises(ValidationError):
+        TaskCreateOperationPayload.model_validate(
+            {
+                "title": "Investigate churn signal",
+                "description": "Evaluate whether spend is associated with churn.",
+                "unexpected": "not a Task field",
+            }
+        )
+
+
+def test_approved_task_create_without_id_allocates_id_only_at_commit(db_session) -> None:
+    operation = PlannerOperationRepository(db_session).create(
+        build_operation(
+            operation_type=PlannerOperationType.CREATE_TASK,
+            payload=TaskCreateOperationPayload(
+                title="Investigate churn signal",
+                description="Evaluate whether spend is associated with churn.",
+            ).model_dump(mode="json", exclude_none=True),
+            approval_state=PlannerOperationApprovalState.APPROVED,
+        )
+    )
+
+    assert operation.target_object_id is None
+    assert "task_id" not in operation.payload
+    assert TaskRepository(db_session).list() == []
+
+    result = commit_planner_operations(db_session, operation_ids=[operation.operation_id])
+    committed = PlannerOperationRepository(db_session).get_by_id(operation.operation_id)
+
+    assert result.committed_operation_ids == [operation.operation_id]
+    assert committed is not None
+    assert committed.target_object_id is not None
+    assert TaskRepository(db_session).get_by_id(committed.target_object_id) is not None
 
 
 def test_commit_updates_session_frame_after_task_change(db_session) -> None:

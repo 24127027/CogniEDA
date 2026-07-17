@@ -35,6 +35,76 @@ class PlannerOperationRepository:
         self._session.refresh(record)
         return record_to_schema(PlannerOperation, record)
 
+    def create_batch(self, operations: list[PlannerOperation]) -> list[PlannerOperation]:
+        """Persist one proposed operation batch in a single transaction."""
+
+        records: list[PlannerOperationRecord] = []
+        try:
+            for operation in operations:
+                if (
+                    self._session.get(PlannerOperationRecord, operation.operation_id)
+                    is not None
+                ):
+                    raise ValueError(
+                        f"PlannerOperation already exists: {operation.operation_id}"
+                    )
+                record = PlannerOperationRecord(
+                    **schema_to_record_payload(
+                        operation,
+                        json_fields=PLANNER_OPERATION_JSON_FIELDS,
+                    )
+                )
+                self._session.add(record)
+                records.append(record)
+            self._session.commit()
+        except Exception:
+            self._session.rollback()
+            raise
+
+        for record in records:
+            self._session.refresh(record)
+        return [record_to_schema(PlannerOperation, record) for record in records]
+
+    def set_approval_state_batch(
+        self,
+        operation_ids: list[UUID],
+        *,
+        expected_state: PlannerOperationApprovalState,
+        approval_state: PlannerOperationApprovalState,
+    ) -> list[PlannerOperation]:
+        """Transition an exact reviewed operation batch atomically."""
+
+        records = [
+            self._session.get(PlannerOperationRecord, operation_id)
+            for operation_id in operation_ids
+        ]
+        if any(record is None for record in records) or any(
+            record.approval_state != expected_state
+            for record in records
+            if record is not None
+        ):
+            raise ValueError("PlannerOperation batch is unknown or no longer pending.")
+        approved_at = (
+            datetime.now(UTC)
+            if approval_state == PlannerOperationApprovalState.APPROVED
+            else None
+        )
+        for record in records:
+            assert record is not None
+            record.approval_state = approval_state
+            record.approved_at = approved_at
+            record.error_message = None
+            self._session.add(record)
+        self._session.commit()
+        for record in records:
+            assert record is not None
+            self._session.refresh(record)
+        return [
+            record_to_schema(PlannerOperation, record)
+            for record in records
+            if record is not None
+        ]
+
     def get_by_id(self, operation_id: UUID) -> PlannerOperation | None:
         """Return a PlannerOperation by primary id if it exists."""
 

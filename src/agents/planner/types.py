@@ -2,14 +2,107 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+from typing import Any, Literal, Protocol, runtime_checkable
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
 
-from schemas.artifacts import Assumption, Task
+from schemas.artifacts import Assumption
+from schemas.common import NonEmptyStr
 from schemas.enums import AssumptionStatus, ObjectiveStatus, TaskKind, TaskLifecycleState
-from schemas.planner_operations import PlannerCommitResult, PlannerOperation
+from schemas.planner_operations import (
+    PlannerCommitResult,
+    PlannerOperation,
+    TaskCreateOperationPayload,
+)
+
+PlannerIntent = Literal[
+    "answer",
+    "suggest",
+    "manage_task",
+    "execute",
+    "objective",
+    "assumption",
+]
+
+COMMAND_TO_INTENT: dict[str, PlannerIntent] = {
+    "answer": "answer",
+    "suggest": "suggest",
+    "manage_task": "manage_task",
+    "execute": "execute",
+    "objective": "objective",
+    "assumption": "assumption",
+}
+
+
+class ExplicitCommandParseResult(BaseModel):
+    """The command token and payload parsed from a raw planner request."""
+
+    command: str
+    original_command: str
+    request_text: str
+
+
+def parse_explicit_command(query: str) -> ExplicitCommandParseResult | None:
+    """Parse a leading slash command without interpreting ordinary request text."""
+
+    stripped_query = query.lstrip()
+    if not stripped_query.startswith("/"):
+        return None
+    tokens = stripped_query.split(maxsplit=1)
+    command_token = tokens[0]
+    return ExplicitCommandParseResult(
+        command=command_token[1:].lower(),
+        original_command=command_token,
+        request_text=tokens[1].strip() if len(tokens) == 2 else "",
+    )
+
+
+class RequestUnderstanding(BaseModel):
+    """Transient classification of the latest planner request."""
+
+    intent: PlannerIntent | None
+    request_text: str
+    source: Literal["explicit_command", "llm", "invalid_command", "invalid_llm"]
+    explicit_command: str | None = None
+    requires_user_correction: bool = False
+    error_message: str | None = None
+    supported_commands: tuple[str, ...] = ()
+
+
+class RequestUnderstandingModel(ABC):
+    """Injectable structured model used only to classify the latest request."""
+
+    @abstractmethod
+    def understand(self, prompt: str) -> RequestUnderstanding:
+        """Return a structured classification for the supplied request-only prompt."""
+
+
+@runtime_checkable
+class TaskManagementModel(Protocol):
+    """Dependency that produces typed draft data for /manage_task."""
+
+    def draft(self, prompt: str) -> Any: ...
+
+
+class TaskCreateDraft(BaseModel):
+    """Planner-owned draft for a Task-create operation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: NonEmptyStr
+    description: NonEmptyStr
+    lifecycle_state: TaskLifecycleState = TaskLifecycleState.ACTIVE
+    task_kind: TaskKind = TaskKind.ANALYTICAL
+    variables: list[NonEmptyStr] = Field(default_factory=list)
+    evidence_expectation: str | None = None
+
+    def operation_payload(self) -> TaskCreateOperationPayload:
+        """Serialize the reviewed draft at the PlannerOperation boundary."""
+
+        return TaskCreateOperationPayload(**self.model_dump(mode="python"))
 
 
 class _TargetedOperationDraft(BaseModel):
@@ -162,13 +255,47 @@ class ConflictFlagDraft(_TargetedOperationDraft):
         )
 
 
+class PendingUserInteraction(BaseModel):
+    """JSON-safe description of the exact operation batch awaiting approval."""
+
+    kind: Literal["planner_operation_approval"]
+    payload: dict[str, Any] = Field(default_factory=dict)
+    allowed_actions: list[str]
+    operation_ids: list[str] = Field(default_factory=list)
+    snapshot_hash: str
+    proposal_id: str
+
+
+class PlannerDecision(BaseModel):
+    """One normalized user response for a pending Planner interaction."""
+
+    action: Literal["approve", "cancel", "revise", "clarify"]
+    selected_ids: list[str] = Field(default_factory=list)
+    feedback: str | None = None
+    proposal_id: str | None = None
+
+
+class ControlledPlannerError(BaseModel):
+    """User-visible failure that does not expose internal object handles."""
+
+    code: str
+    message: str
+
+
 class State(BaseModel):
     """Internal Planner state."""
 
     query: str
+    request_understanding: RequestUnderstanding | None = None
+    planner_decision: PlannerDecision | None = None
+    resume_requested: bool = False
+    resume_operation_ids: list[UUID] = Field(default_factory=list)
+    pending_interaction: PendingUserInteraction | None = None
+    controlled_error: ControlledPlannerError | None = None
+    interaction_error: str | None = None
     session_id: str | None = None
     history: list[ModelMessage] = Field(default_factory=list)
-    task_create_payloads: list[Task] = Field(default_factory=list)
+    task_create_payloads: list[TaskCreateDraft] = Field(default_factory=list)
     task_update_payloads: list[TaskUpdateDraft] = Field(default_factory=list)
     task_state_change_payloads: list[TaskStateChangeDraft] = Field(default_factory=list)
     objective_update_payloads: list[ObjectiveUpdateDraft] = Field(default_factory=list)
@@ -185,8 +312,21 @@ class State(BaseModel):
 class Context(BaseModel):
     """Context for the Planner agent."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    database_url: str | None = None
+    session_id: str | None = None
+    request_understanding_model: RequestUnderstandingModel | None = None
+    task_management_model: TaskManagementModel | None = None
+
 
 class PlannerOutput(BaseModel):
     """PydanticAI output schema for planner-authored requests."""
+
+    pending_interaction: PendingUserInteraction | None = None
+    controlled_error: ControlledPlannerError | None = None
+    committed_operation_ids: list[UUID] = Field(default_factory=list)
+    planner_operations: list[PlannerOperation] = Field(default_factory=list)
+    commit_result: PlannerCommitResult | None = None
 
 
