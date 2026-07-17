@@ -330,6 +330,7 @@ class UserDecisionType(StrEnum):
     VALIDATION_STRATEGY = "validation_strategy"
     INTERPRETATION_REVIEW = "interpretation_review"
     REPORTING = "reporting"
+    OBJECTIVE_MANAGEMENT = "objective_management"
 
 
 class UserDecisionStatus(StrEnum):
@@ -348,6 +349,7 @@ class PlannerOperationType(StrEnum):
     UPDATE_TASK = "update_task"
     DELETE_TASK = "delete_task"
     CHANGE_TASK_STATE = "change_task_state"
+    CREATE_OBJECTIVE = "create_objective"
     UPDATE_OBJECTIVE = "update_objective"
     CREATE_ASSUMPTION = "create_assumption"
     UPDATE_ASSUMPTION_STATE = "update_assumption_state"

@@ -81,6 +81,17 @@ class TaskStateChangeOperationPayload(BaseModel):
     lifecycle_state: TaskLifecycleState
 
 
+class ObjectiveCreateOperationPayload(BaseModel):
+    """Persisted Objective creation payload."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    objective_id: UUID
+    title: str
+    statement: str
+    status: ObjectiveStatus = ObjectiveStatus.ACTIVE
+
+
 class ObjectiveUpdateOperationPayload(BaseModel):
     """Persisted Objective update payload."""
 
@@ -90,9 +101,10 @@ class ObjectiveUpdateOperationPayload(BaseModel):
     title: str | None = None
     statement: str | None = None
     status: ObjectiveStatus | None = None
-    revision_reason: str | None = None
-    user_decision_id: str | None = None
-    created_by: str | None = None
+    revision_reason: str
+    expected_updated_at: datetime
+    user_decision_id: UUID | None = None
+    actor: str = "user-approved-planner-operation"
 
 
 class AssumptionStateUpdateOperationPayload(BaseModel):

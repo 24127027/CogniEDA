@@ -71,7 +71,7 @@ from schemas.enums import (
     UserDecisionType,
 )
 from schemas.planner_operations import PlannerCommitResult, PlannerOperation
-from schemas.provenance import AnalysisFrame, ExecutionRun
+from schemas.provenance import AnalysisFrame, ExecutionRun, ObjectiveRevision
 
 __all__ = [
     "AnalysisFrame",
@@ -119,6 +119,7 @@ __all__ = [
     "MethodParameter",
     "NumericColumnSummary",
     "Objective",
+    "ObjectiveRevision",
     "ObjectiveStatus",
     "PlannerCommitResult",
     "PlannerNodeName",

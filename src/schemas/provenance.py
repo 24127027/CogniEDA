@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 from pydantic import Field, model_validator
 
 from schemas.common import CogniEDABaseModel, NonEmptyStr, utc_now
-from schemas.enums import ExecutionApprovalStatus, ExecutionRunStatus
+from schemas.enums import ExecutionApprovalStatus, ExecutionRunStatus, ObjectiveStatus
 
 
 class AnalysisFrame(CogniEDABaseModel):
@@ -112,3 +112,22 @@ class ExecutionApproval(CogniEDABaseModel):
     execution_run_id: UUID | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class ObjectiveRevision(CogniEDABaseModel):
+    """Immutable non-FCO provenance for one governed Objective mutation."""
+
+    objective_revision_id: UUID = Field(default_factory=uuid4)
+    objective_id: UUID
+    previous_title: NonEmptyStr
+    previous_statement: NonEmptyStr
+    previous_status: ObjectiveStatus
+    new_title: NonEmptyStr
+    new_statement: NonEmptyStr
+    new_status: ObjectiveStatus
+    changed_fields: list[NonEmptyStr]
+    reason: NonEmptyStr
+    planner_operation_id: UUID | None = None
+    user_decision_id: UUID | None = None
+    actor: NonEmptyStr
+    created_at: datetime = Field(default_factory=utc_now)
