@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, Column, Text, UniqueConstraint
+from sqlalchemy import JSON, Column, Index, Text, UniqueConstraint, text
 from sqlmodel import Field, SQLModel
 
 from schemas.enums import (
@@ -62,6 +62,34 @@ class ObjectiveRecord(TimestampedRecord, table=True):
         default=AnalysisIntent.EXPLORATORY, nullable=False, index=True
     )
     status: ObjectiveStatus = Field(default=ObjectiveStatus.ACTIVE, nullable=False, index=True)
+
+    __table_args__ = (
+        Index("uq_active_objective", "status", unique=True, sqlite_where=text("status = 'ACTIVE'")),
+    )
+
+
+class ObjectiveRevisionRecord(SQLModel, table=True):
+    """Append-only non-FCO provenance for a governed Objective mutation."""
+
+    __tablename__ = "objective_revisions"
+
+    objective_revision_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    objective_id: UUID = Field(foreign_key="objectives.objective_id", nullable=False, index=True)
+    previous_title: str = Field(sa_column=Column(Text, nullable=False))
+    previous_statement: str = Field(sa_column=Column(Text, nullable=False))
+    previous_status: ObjectiveStatus = Field(nullable=False, index=True)
+    new_title: str = Field(sa_column=Column(Text, nullable=False))
+    new_statement: str = Field(sa_column=Column(Text, nullable=False))
+    new_status: ObjectiveStatus = Field(nullable=False, index=True)
+    changed_fields: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    reason: str = Field(sa_column=Column(Text, nullable=False))
+    planner_operation_id: UUID | None = Field(default=None, index=True)
+    user_decision_id: UUID | None = Field(default=None, index=True)
+    actor: str = Field(nullable=False, index=True)
+    created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
 
 
 class DataProfileRecord(SQLModel, table=True):
@@ -181,7 +209,6 @@ class TaskRecord(TimestampedRecord, table=True):
     )
 
 
-
 class HypothesisRecord(TimestampedRecord, table=True):
     """Persisted Hypothesis FCO."""
 
@@ -256,13 +283,13 @@ class ExecutionRunRecord(SQLModel, table=True):
     lease_epoch: int = Field(default=0, nullable=False)
     lease_acquired_at: datetime | None = Field(default=None)
     lease_expires_at: datetime | None = Field(default=None)
-    
+
     attempt_version: int = Field(default=1, nullable=False)
     finalizer_owner_id: str | None = Field(default=None, index=True)
     finalization_fencing_epoch: int | None = Field(default=None)
     finalization_claimed_at: datetime | None = Field(default=None)
     finalization_expires_at: datetime | None = Field(default=None)
-    
+
     previous_attempt_id: UUID | None = Field(
         default=None, foreign_key="execution_runs.execution_run_id", index=True
     )
@@ -343,9 +370,7 @@ class ExecutionApprovalRecord(SQLModel, table=True):
     execution_approval_id: UUID = Field(default_factory=uuid4, primary_key=True)
     session_id: str = Field(index=True, nullable=False)
     task_id: UUID = Field(foreign_key="tasks.task_id", nullable=False, index=True)
-    profile_id: UUID = Field(
-        foreign_key="data_profiles.profile_id", nullable=False, index=True
-    )
+    profile_id: UUID = Field(foreign_key="data_profiles.profile_id", nullable=False, index=True)
     hypothesis_id: UUID | None = Field(
         default=None, foreign_key="hypotheses.hypothesis_id", index=True
     )

@@ -4,8 +4,13 @@ from __future__ import annotations
 
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
+from sqlmodel import SQLModel
 
-from db.models import ExecutionApprovalRecord, ExecutionInboxRecord, ExecutionOutboxRecord
+from db.models import (
+    ExecutionApprovalRecord,
+    ExecutionInboxRecord,
+    ExecutionOutboxRecord,
+)
 
 _EXECUTION_RUN_COLUMNS = {
     "dispatch_idempotency_key": "VARCHAR",
@@ -103,6 +108,97 @@ def upgrade_pre_repair_database(engine: Engine) -> None:
         )
 
 
+def upgrade_objective_lifecycle_schema(engine: Engine) -> None:
+    """Install active cardinality and preserve compatible revision history."""
+
+    if engine.dialect.name != "sqlite":
+        raise ValueError(
+            f"Objective lifecycle migration supports SQLite only; received {engine.dialect.name!r}."
+        )
+
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "objectives" not in tables:
+        return
+
+    with engine.begin() as connection:
+        # SQLite refuses this statement when legacy data contains more than one
+        # ACTIVE row. That explicit failure is safer than silently choosing one.
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_active_objective "
+                "ON objectives (status) WHERE status = 'ACTIVE'"
+            )
+        )
+
+    if "objective_revisions" not in tables:
+        SQLModel.metadata.tables["objective_revisions"].create(engine, checkfirst=True)
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("objective_revisions")}
+    foreign_keys = inspector.get_foreign_keys("objective_revisions")
+    if not any(
+        key.get("referred_table") == "objectives"
+        and key.get("constrained_columns") == ["objective_id"]
+        for key in foreign_keys
+    ):
+        raise ValueError(
+            "Existing objective_revisions table lacks its Objective foreign key; "
+            "repair is required."
+        )
+    legacy_mappings = {
+        "previous_statement": "previous_description",
+        "previous_status": "previous_lifecycle_state",
+        "new_statement": "new_description",
+        "new_status": "new_lifecycle_state",
+        "reason": "revision_reason",
+        "actor": "created_by",
+    }
+    with engine.begin() as connection:
+        for target, source in legacy_mappings.items():
+            if target in columns:
+                continue
+            if source not in columns:
+                raise ValueError(
+                    "Existing objective_revisions table cannot be upgraded without "
+                    f"source column {source!r}."
+                )
+            sql_type = "TEXT" if target not in {"previous_status", "new_status"} else "VARCHAR"
+            connection.execute(
+                text(f"ALTER TABLE objective_revisions ADD COLUMN {target} {sql_type}")
+            )
+            connection.execute(
+                text(f"UPDATE objective_revisions SET {target} = {source}")
+            )
+
+        malformed = connection.execute(
+            text(
+                "SELECT COUNT(*) FROM objective_revisions WHERE "
+                "previous_statement IS NULL OR trim(previous_statement) = '' OR "
+                "new_statement IS NULL OR trim(new_statement) = '' OR "
+                "previous_status IS NULL OR new_status IS NULL OR "
+                "reason IS NULL OR trim(reason) = '' OR "
+                "actor IS NULL OR trim(actor) = ''"
+            )
+        ).scalar_one()
+        if malformed:
+            raise ValueError(
+                "Existing objective_revisions contains malformed rows; repair is required."
+            )
+        for index_name, column_name in {
+            "ix_objective_revisions_objective_id": "objective_id",
+            "ix_objective_revisions_created_at": "created_at",
+            "ix_objective_revisions_planner_operation_id": "planner_operation_id",
+            "ix_objective_revisions_user_decision_id": "user_decision_id",
+        }.items():
+            connection.execute(
+                text(
+                    f"CREATE INDEX IF NOT EXISTS {index_name} "
+                    f"ON objective_revisions ({column_name})"
+                )
+            )
+
+
 def upgrade_task_motivation_schema(engine: Engine) -> None:
     """Upgrade Tasks schema to include motivated_by_discovery_ids.
 
@@ -144,9 +240,7 @@ def downgrade_task_motivation_schema(engine: Engine) -> None:
         existing_columns = {column["name"] for column in inspector.get_columns("tasks")}
         if "motivated_by_discovery_ids" in existing_columns:
             with engine.begin() as connection:
-                connection.execute(
-                    text("ALTER TABLE tasks DROP COLUMN motivated_by_discovery_ids")
-                )
+                connection.execute(text("ALTER TABLE tasks DROP COLUMN motivated_by_discovery_ids"))
 
 
 def upgrade_task_review_schema(engine: Engine) -> None:
@@ -154,8 +248,7 @@ def upgrade_task_review_schema(engine: Engine) -> None:
 
     if engine.dialect.name != "sqlite":
         raise ValueError(
-            "Task review schema migration supports SQLite only; "
-            f"received {engine.dialect.name!r}."
+            f"Task review schema migration supports SQLite only; received {engine.dialect.name!r}."
         )
     inspector = inspect(engine)
     if "tasks" not in set(inspector.get_table_names()):
