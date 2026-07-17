@@ -216,7 +216,11 @@ def process_scientific_result(
         return False, operations
 
     if (
-        observation.method != prepared.specification.validation_method
+        result.execution_run.executor_type != run.executor_type
+        or prepared.specification.executor_id != run.executor_type
+        or prepared.specification.validation_method != run.method_id
+        or _method_parameter_hash(prepared.specification.method_parameters) != run.parameter_hash
+        or observation.method != prepared.specification.validation_method
         or result.execution_run.method_id != prepared.specification.validation_method
         or observation.parameters != prepared.specification.method_parameters
         or result.analysis_frame.column_refs != prepared.specification.variable_bindings

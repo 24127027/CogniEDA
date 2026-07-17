@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -10,8 +11,14 @@ from sqlmodel import Session
 
 from application.orchestrator.execution_contracts import PreparedExecution
 from application.orchestrator.receiver import submit_execution_result
+from application.orchestrator.scientific_processing import _method_parameter_hash
 from application.orchestrator.transition_service import ExecutionAttemptTransitionService
-from db.models import ExecutionOutboxRecord
+from db.models import (
+    DataProfileRecord,
+    ExecutionOutboxRecord,
+    ExecutionRunRecord,
+    HypothesisRecord,
+)
 from repositories.execution_outbox_repository import ExecutionOutboxRepository
 
 logger = logging.getLogger(__name__)
@@ -19,10 +26,11 @@ logger = logging.getLogger(__name__)
 
 async def dispatch_pending_attempts(
     session: Session,
-    executor: Any,
+    executor_dispatcher: Any,
     worker_id: str,
     max_attempts: int = 10,
     lease_duration_seconds: int = 300,
+    context_factory: Callable[[], Any] | None = None,
 ) -> int:
     """Claim and dispatch durable work without Planner state or object handles."""
 
@@ -44,24 +52,23 @@ async def dispatch_pending_attempts(
         if record is None or record.status != "dispatching":
             continue
 
-        prepared = PreparedExecution.model_validate(record.prepared_payload).model_copy(
-            update={
-                "execution_run_id": run.execution_run_id,
-                "dispatch_idempotency_key": run.dispatch_idempotency_key,
-                "lease_epoch": run.lease_epoch,
-            }
-        )
-
-        transition_service.mark_running(run.execution_run_id, worker_id, run.lease_epoch)
-
         result = None
         executor_status = "failed"
         error_message: str | None = None
         try:
-            result = executor.execute(prepared)
+            from agents.executor.types import ExecutorContext
+
+            prepared = _reconstruct_prepared_execution(session, record, run)
+            if not transition_service.mark_running(
+                run.execution_run_id, worker_id, run.lease_epoch
+            ):
+                continue
+            context = context_factory() if context_factory is not None else ExecutorContext()
+            result = await executor_dispatcher.dispatch(prepared, context)
             executor_status = result.status
             error_message = result.error_message
         except Exception as exc:
+            result = None
             error_message = str(exc)
 
         envelope = submit_execution_result(
@@ -79,3 +86,49 @@ async def dispatch_pending_attempts(
             dispatched += 1
 
     return dispatched
+
+
+def _reconstruct_prepared_execution(
+    session: Session,
+    record: ExecutionOutboxRecord,
+    run: ExecutionRunRecord,
+) -> PreparedExecution:
+    """Bind the immutable payload to durable attempt and FCO identities."""
+    prepared = PreparedExecution.model_validate(record.prepared_payload)
+    hypothesis = session.get(HypothesisRecord, run.hypothesis_id)
+    if hypothesis is None or run.task_id is None or hypothesis.task_id != run.task_id:
+        raise ValueError("ExecutionRun has no matching durable Task and Hypothesis identity.")
+    profile = session.get(DataProfileRecord, hypothesis.profile_id)
+    if profile is None or prepared.dataset_path != profile.dataset_path:
+        raise ValueError("Prepared execution does not match its durable DataProfile.")
+    if (
+        prepared.hypothesis.statement != hypothesis.statement
+        or prepared.hypothesis.variables != hypothesis.variables
+        or prepared.hypothesis.scope != hypothesis.scope
+        or prepared.hypothesis.validation_method != hypothesis.validation_method
+        or prepared.hypothesis.evidence_expectation != hypothesis.evidence_expectation
+    ):
+        raise ValueError("Prepared execution does not match its durable Hypothesis.")
+    parameter_hash = _method_parameter_hash(prepared.specification.method_parameters)
+    if (
+        record.execution_run_id != run.execution_run_id
+        or record.dispatch_idempotency_key != run.dispatch_idempotency_key
+        or record.executor_type != run.executor_type
+        or record.method_id != run.method_id
+        or record.parameter_hash != run.parameter_hash
+        or prepared.specification.executor_id != run.executor_type
+        or prepared.specification.validation_method != run.method_id
+        or parameter_hash != run.parameter_hash
+    ):
+        raise ValueError("Prepared execution disagrees with immutable attempt identity.")
+
+    return prepared.model_copy(
+        update={
+            "task_ref": str(run.task_id),
+            "hypothesis_ref": str(hypothesis.hypothesis_id),
+            "data_profile_ref": str(hypothesis.profile_id),
+            "execution_run_id": run.execution_run_id,
+            "dispatch_idempotency_key": run.dispatch_idempotency_key,
+            "lease_epoch": run.lease_epoch,
+        }
+    )
