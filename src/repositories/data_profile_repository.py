@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import builtins
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlmodel import Session, desc, select
@@ -11,6 +12,10 @@ from db.models import DataProfileRecord
 from repositories.common import record_to_schema, schema_to_record_payload
 from schemas.artifacts import DataProfile
 from schemas.enums import DataProfileLifecycleState, DataProfileMethod
+
+if TYPE_CHECKING:
+    from repositories.discovery_repository import DiscoveryRepository
+    from repositories.evidence_repository import EvidenceRepository
 
 DATA_PROFILE_JSON_FIELDS = {
     "schema_summary",
@@ -98,3 +103,75 @@ class DataProfileRepository:
         if record is None:
             return None
         return record_to_schema(DataProfile, record)
+
+    def supersede(
+        self,
+        old_profile_id: UUID,
+        new_profile_id: UUID,
+        reason: str | None = None,
+        evidence_repository: EvidenceRepository | None = None,
+        discovery_repository: DiscoveryRepository | None = None,
+    ) -> DataProfile | None:
+        """Mark a DataProfile superseded and optionally flag scoped dependents."""
+
+        self._validate_propagation_repository_sessions(
+            evidence_repository,
+            discovery_repository,
+        )
+        if old_profile_id == new_profile_id:
+            raise ValueError("A DataProfile cannot supersede itself.")
+
+        old_record = self._session.get(DataProfileRecord, old_profile_id)
+        if old_record is None:
+            return None
+
+        if old_record.lifecycle_state == DataProfileLifecycleState.SUPERSEDED:
+            raise ValueError("DataProfile is already superseded.")
+
+        if self._session.get(DataProfileRecord, new_profile_id) is None:
+            raise ValueError("Superseding DataProfile requires an existing replacement.")
+
+        old_record.lifecycle_state = DataProfileLifecycleState.SUPERSEDED
+        old_record.superseded_by_data_profile_id = new_profile_id
+        self._session.add(old_record)
+        self._session.commit()
+        self._session.refresh(old_record)
+        superseded = record_to_schema(DataProfile, old_record)
+
+        # Future orchestration may own broader propagation; this is a narrow
+        # repository-level historical-scope signal.
+        if evidence_repository is not None:
+            evidence_repository.mark_historically_scoped_by_data_profile(
+                old_profile_id,
+                replacement_data_profile_id=new_profile_id,
+                reason=reason,
+            )
+        if discovery_repository is not None:
+            discovery_repository.mark_historically_scoped_by_data_profile(
+                old_profile_id,
+                replacement_data_profile_id=new_profile_id,
+                reason=reason,
+            )
+
+        return superseded
+
+    def _validate_propagation_repository_sessions(
+        self,
+        evidence_repository: EvidenceRepository | None,
+        discovery_repository: DiscoveryRepository | None,
+    ) -> None:
+        """Reject dependent propagation that would span SQLModel session objects."""
+
+        evidence_repository_matches = (
+            evidence_repository is None
+            or evidence_repository.uses_session(self._session)
+        )
+        discovery_repository_matches = (
+            discovery_repository is None
+            or discovery_repository.uses_session(self._session)
+        )
+        if not evidence_repository_matches or not discovery_repository_matches:
+            raise ValueError(
+                "DataProfile supersession and dependent Evidence/Discovery propagation "
+                "must share the same SQLModel session."
+            )

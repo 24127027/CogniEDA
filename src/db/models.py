@@ -18,6 +18,7 @@ from schemas.enums import (
     DataProfileMethod,
     DatasetSourceType,
     DiscoveryEpistemicStatus,
+    DiscoveryLifecycleState,
     EvidenceLifecycleState,
     EvidenceType,
     HypothesisStatus,
@@ -57,6 +58,42 @@ class ObjectiveRecord(TimestampedRecord, table=True):
     status: ObjectiveStatus = Field(default=ObjectiveStatus.ACTIVE, nullable=False, index=True)
 
 
+class ObjectiveRevisionRecord(SQLModel, table=True):
+    """Minimal provenance record for one Objective refinement."""
+
+    __tablename__ = "objective_revisions"
+
+    objective_revision_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    objective_id: UUID = Field(
+        foreign_key="objectives.objective_id",
+        nullable=False,
+        index=True,
+    )
+    previous_title: str = Field(sa_column=Column(Text, nullable=False))
+    previous_description: str = Field(sa_column=Column(Text, nullable=False))
+    previous_lifecycle_state: ObjectiveStatus | None = Field(
+        default=None,
+        nullable=True,
+        index=True,
+    )
+    new_title: str = Field(sa_column=Column(Text, nullable=False))
+    new_description: str = Field(sa_column=Column(Text, nullable=False))
+    new_lifecycle_state: ObjectiveStatus | None = Field(
+        default=None,
+        nullable=True,
+        index=True,
+    )
+    changed_fields: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    revision_reason: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    planner_operation_id: str | None = Field(default=None, index=True)
+    user_decision_id: str | None = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
+    created_by: str | None = Field(default=None, index=True)
+
+
 class DataProfileRecord(SQLModel, table=True):
     """Persisted immutable DataProfile snapshot."""
 
@@ -92,6 +129,11 @@ class DataProfileRecord(SQLModel, table=True):
     lifecycle_state: DataProfileLifecycleState = Field(
         default=DataProfileLifecycleState.DRAFT,
         nullable=False,
+        index=True,
+    )
+    superseded_by_data_profile_id: UUID | None = Field(
+        default=None,
+        foreign_key="data_profiles.profile_id",
         index=True,
     )
     accepted_as_ground_truth: bool = Field(default=False, nullable=False, index=True)
@@ -166,6 +208,51 @@ class HypothesisRecord(TimestampedRecord, table=True):
     status: HypothesisStatus = Field(default=HypothesisStatus.PROPOSED, nullable=False, index=True)
 
 
+class AnalysisFrameRecord(SQLModel, table=True):
+    """Minimal provenance record for the data view used by an analysis."""
+
+    __tablename__ = "analysis_frames"
+
+    analysis_frame_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    data_profile_id: UUID = Field(
+        foreign_key="data_profiles.profile_id",
+        nullable=False,
+        index=True,
+    )
+    frame_hash: str | None = Field(default=None, index=True)
+    frame_ref: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    column_refs: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    row_filter_description: str | None = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
+    )
+    created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
+
+
+class ExecutionRunRecord(SQLModel, table=True):
+    """Minimal provenance record for one executor attempt."""
+
+    __tablename__ = "execution_runs"
+
+    execution_run_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    task_id: UUID | None = Field(default=None, foreign_key="tasks.task_id", index=True)
+    hypothesis_id: UUID | None = Field(
+        default=None,
+        foreign_key="hypotheses.hypothesis_id",
+        index=True,
+    )
+    analysis_frame_id: UUID | None = Field(
+        default=None,
+        foreign_key="analysis_frames.analysis_frame_id",
+        index=True,
+    )
+    executor_type: str | None = Field(default=None, index=True)
+    method_id: str | None = Field(default=None, index=True)
+    parameter_hash: str | None = Field(default=None, index=True)
+    status: str = Field(default="pending", index=True, nullable=False)
+    created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
+
+
 class EvidenceRecord(SQLModel, table=True):
     """Persisted immutable Evidence FCO."""
 
@@ -194,6 +281,12 @@ class EvidenceRecord(SQLModel, table=True):
         nullable=False,
         index=True,
     )
+    superseded_by_evidence_id: UUID | None = Field(
+        default=None,
+        foreign_key="evidence.evidence_id",
+        index=True,
+    )
+    lifecycle_reason: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
 
 
@@ -211,6 +304,19 @@ class DiscoveryRecord(SQLModel, table=True):
     scope: str = Field(sa_column=Column(Text, nullable=False))
     validity_basis: dict[str, Any] = Field(
         default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    lifecycle_state: DiscoveryLifecycleState = Field(
+        default=DiscoveryLifecycleState.ACTIVE,
+        nullable=False,
+        index=True,
+    )
+    review_reasons: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    flagged_by_evidence_ids: list[str] = Field(
+        default_factory=list,
         sa_column=Column(JSON, nullable=False),
     )
     created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
@@ -267,8 +373,8 @@ class PlannerOperationRecord(SQLModel, table=True):
         index=True,
     )
     created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
-    approved_at: datetime | None = Field(default=None, nullable=True)
     committed_at: datetime | None = Field(default=None, nullable=True)
+    approved_at: datetime | None = Field(default=None, nullable=True)
     error_message: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
 
 
