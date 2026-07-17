@@ -12,6 +12,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from schemas.artifacts import AnalyticalSpecification
 from schemas.common import CogniEDABaseModel, NonEmptyStr, utc_now
 from schemas.enums import (
     AssumptionStatus,
@@ -70,6 +71,8 @@ class TaskCreateOperationPayload(BaseModel):
     readiness_reason: str | None = None
     parent_task_updated_at: datetime | None = None
     selected_motivating_discovery_ids: list[UUID] | None = None
+    motivation_data_profile_id: UUID | None = None
+    analytical_specification: AnalyticalSpecification | None = None
 
 
 class TaskStateChangeOperationPayload(BaseModel):
