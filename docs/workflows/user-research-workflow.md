@@ -23,9 +23,17 @@ Current implementation:
 - `Objective` schema/table/repository exist.
 - Default persistence is workspace-local SQLite.
 - No workspace initializer or registry exists.
-- `Objective.status` is the authoritative lifecycle field. Approved
-  `UPDATE_OBJECTIVE` PlannerOperations provide requested/approved/committed
-  mutation attribution without a dedicated Objective revision store.
+- `/objective` resolves current and historical Objectives to graph-local references,
+  produces a typed exact operation batch, and requires the matching session-bound
+  fingerprint plus ordered operation IDs before commit.
+- `Objective.status` is authoritative. At most one row may be `ACTIVE`; a partial
+  SQLite unique index enforces this across concurrent writers. Completion and
+  archival require explicit approval and are rejected while any proposed, active,
+  or paused Task remains in the workspace.
+- Governed updates atomically append an immutable non-FCO `ObjectiveRevision` and
+  a successor `SessionFrame`. Direct import/repair bypasses are explicitly named.
+- `PAUSED` remains a compatibility lifecycle state but is not the current Objective
+  used by Step 5 or default planning/answer retrieval.
 
 Status: Partially implemented.
 

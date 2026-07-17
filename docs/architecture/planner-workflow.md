@@ -45,7 +45,8 @@ The graph does **not** contain application worker dispatch, result receipt, scie
 | `manage_tasks` | Produces typed Task-create/update/state PlannerOperations from a configured structured-output adapter, without direct Task persistence | Implemented narrow Task-management scope |
 | `select_task` | Selects eligible task from supplied state/context | Implemented local stage |
 | `prepare_execution` | Builds/reuses Hypothesis and prepared execution/admission drafts | Implemented narrow stage |
-| `manage_objective` / `manage_assumptions` | Convert supplied drafts into operations | Partial; no public draft producer |
+| `manage_objective` | Resolves workspace Objective state, produces typed create/update plus successor-SessionFrame operations, and uses the exact durable approval batch | Implemented narrow Objective lifecycle scope |
+| `manage_assumptions` | Converts supplied drafts into operations | Partial; no public draft producer |
 | `review_result` / `review_conflict` | Placeholder hooks | Not implemented as detection/review |
 | `request_user_input` | Persists durable `ExecutionApproval` for execution and pending PlannerOperations for Task proposals | Implemented for execution and Task-operation approval |
 | `pause` | No body; execution and Task-operation resume use their durable records rather than relying on MemorySaver | Not a durable general pause boundary |
@@ -55,9 +56,9 @@ The graph does **not** contain application worker dispatch, result receipt, scie
 
 ## Current approval boundary
 
-`/manage_task` proposals persist pending Task-operation records before the user sees them. The caller must resume with the returned proposal fingerprint and exact ordered operation-id list; the Planner rejects unknown, stale, replayed, cross-session, or mismatched proposals. Approval marks the exact batch approved and commits it atomically. Cancellation, revision, or clarification rejects that batch.
+`/manage_task`, `/decompose`, and `/objective` proposals persist pending operation records before the user sees them. The caller must resume with the returned proposal fingerprint and exact ordered operation-id list; the Planner rejects unknown, stale, replayed, cross-session, reordered, or mismatched proposals. Approval marks the exact batch approved and commits it atomically. Cancellation, revision, or clarification rejects that batch.
 
-Plan/objective/assumption/conflict approvals remain target design, even though the graph retains route names for those future workflows.
+Plan/assumption/conflict approvals remain target design, even though the graph retains route names for those future workflows.
 
 ## Operation boundary
 
@@ -76,6 +77,7 @@ Known gaps:
 - public Task create/update translation resolves only supplied local references and preserves Task update fields, including supersession;
 - direct attempt/inbox writes are rejected because the transition service is the owner;
 - public planner output reports only operation IDs returned by the commit result.
+- Objective create/update operations cannot use `NOT_REQUIRED`; the commit boundary rechecks the persisted approved record, optimistic Objective version, transition matrix and active cardinality.
 
 ## Step status
 

@@ -20,6 +20,7 @@ These reports are pinned to the audited Git commit stated in each file. For newe
 - [SessionFrame](architecture/session-frame.md)
 - [Provenance And Cache](architecture/provenance-and-cache.md)
 - [Implementation Gap Analysis](architecture/implementation-gap-analysis.md)
+- [Steps 8-9 Objective Lifecycle And Revision Review](architecture/step-8-9-objective-lifecycle-revision-review.md)
 
 ## Workflows
 

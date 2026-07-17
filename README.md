@@ -13,7 +13,8 @@ Implemented or partially implemented today:
 - Baseline dataframe profiling under `src/data/`, producing immutable `DataProfile` records with dataset path and optional DVC identity.
 - A DVC adapter interface that makes executable DVC integration explicit but not yet implemented.
 - `SessionFrameBuilder` and `SessionContextBuilder` under `src/memory/session_frame.py`, including planning vs conclusion context projection.
-- A configured natural-language request-understanding adapter and a public `/manage_task` typed Task-proposal path. Proposed task operations remain uncommitted until the caller approves the exact persisted batch.
+- A configured natural-language request-understanding adapter plus public `/manage_task`, `/decompose`, and `/objective` typed proposal paths. Proposed operations remain uncommitted until the caller approves the exact persisted ordered batch.
+- A user-governed one-active-Objective lifecycle with explicit transitions, optimistic locking, immutable non-FCO revision provenance, and atomic successor SessionFrame updates.
 - A narrow approval-gated planner execution admission path that atomically persists `Hypothesis`, `ExecutionRun`, and execution outbox state.
 - A durable local worker protocol with lease/fencing transitions, result inbox, reconciliation helpers, and transactional scientific finalization.
 - A durable-worker-to-domain adapter and capability registry/dispatcher under `src/agents/executor/`; the concrete GraphMiner and HypothesisAnalyst graphs remain stubs.

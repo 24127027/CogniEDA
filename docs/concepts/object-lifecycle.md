@@ -10,7 +10,7 @@ Current enums in `src/schemas/enums.py`:
 
 | Object | Current lifecycle/status enum | Status |
 | --- | --- | --- |
-| `Objective` | `active`, `paused`, `completed`, `archived` | Implemented locally. |
+| `Objective` | `active`, `paused`, `completed`, `archived` | Implemented locally with exact approval, explicit transitions, one-active database constraint, optimistic locking, successor SessionFrame, and immutable non-FCO revisions. `paused` is compatibility-only for default retrieval. |
 | `DataProfile` | `draft`, `active`, `superseded`, `archived` | Implemented locally; records are immutable. |
 | `Assumption` | `proposed`, `active`, `flagged`, `retained`, `replaced`, `archived` | Partially implemented; source, testability, scope, scoped DataProfiles, contradiction refs, and replacement refs exist. |
 | `Task` | `proposed`, `active`, `paused`, `completed`, `failed`, `rejected`, `cancelled` | Implemented locally. Proposed Tasks can appear in planning SessionFrame context but cannot generate Hypotheses. |
@@ -23,15 +23,16 @@ Current enums in `src/schemas/enums.py`:
 
 No code was found for:
 
-- plan/objective/assumption/conflict approval beyond the implemented durable Task-operation batch
+- plan/assumption/conflict approval beyond the implemented durable Task/decomposition/Objective batches
 - full Discovery user-review workflow
 - atomic DataProfile supersession propagation (repository-level historical scoping exists but commits in multiple steps)
 - full runtime Evidence supersession propagation beyond the optional repository-level Discovery review flag
 - automatic Assumption contradiction review after Discovery creation
-- migration of older local databases to the current uniqueness constraints
+- automatic repair policy for malformed or ambiguous older local databases; current Objective migration fails explicitly instead of choosing data
 
 Current local guards found:
 
+- `ObjectiveRepository.stage_update()` enforces the transition matrix, current-version match, persisted authority provenance, global unfinished-Task policy, and one revision per real mutation; the database partial index enforces one active Objective across writers.
 - `HypothesisRepository.create()` enforces active terminal analytical Task admission and one Task to one Hypothesis.
 - `DiscoveryRepository.create()` enforces active same-Hypothesis Evidence and one Hypothesis to one Discovery.
 - `DiscoveryRepository.flag_by_evidence_change()` flags Discoveries for review after referenced Evidence is superseded or invalidated, while preserving the original claim and validity metadata.
