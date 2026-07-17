@@ -13,8 +13,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pydantic_ai.messages import ModelMessage
 
 from application.orchestrator import execution_contracts
-from schemas.artifacts import Assumption
+from schemas.artifacts import AnalyticalSpecification, Assumption
+from schemas.common import EvaluationThresholds, MethodParameter
 from schemas.enums import (
+    AnalysisIntent,
     AssumptionStatus,
     HypothesisStatus,
     ObjectiveStatus,
@@ -238,23 +240,44 @@ class TaskCreateDraft(BaseModel):
     data_profile_ref: str | None = None
     variables: list[str] = Field(default_factory=list)
     evidence_expectation: str | None = None
+    selected_motivating_discovery_refs: list[str] = Field(default_factory=list)
+
+    @field_validator("selected_motivating_discovery_refs")
+    @classmethod
+    def _reject_duplicate_motivation_refs(cls, refs: list[str]) -> list[str]:
+        if len(refs) != len(set(refs)):
+            raise ValueError("selected_motivating_discovery_refs must not contain duplicates")
+        return refs
 
     def operation_payload(
         self,
         *,
+        task_id: UUID | None = None,
         parent_task_id: UUID | None = None,
         profile_id: UUID | None = None,
+        motivated_by_discovery_ids: list[UUID] | None = None,
+        motivation_data_profile_id: UUID | None = None,
     ) -> TaskCreateOperationPayload:
         """Return the typed persisted payload without allowing model-authored ids."""
 
         payload = self.model_dump(
             mode="python",
-            exclude={"parent_task_ref", "data_profile_ref"},
+            exclude={
+                "parent_task_ref",
+                "data_profile_ref",
+                "selected_motivating_discovery_refs",
+            },
         )
+        if task_id is not None:
+            payload["task_id"] = task_id
         if "parent_task_ref" in self.model_fields_set:
             payload["parent_task_id"] = parent_task_id
         if "data_profile_ref" in self.model_fields_set:
             payload["profile_id"] = profile_id
+        if "selected_motivating_discovery_refs" in self.model_fields_set:
+            payload["motivated_by_discovery_ids"] = motivated_by_discovery_ids
+            payload["selected_motivating_discovery_ids"] = motivated_by_discovery_ids
+            payload["motivation_data_profile_id"] = motivation_data_profile_id
         return TaskCreateOperationPayload(**payload)
 
 
@@ -290,7 +313,12 @@ class TaskUpdateDraft(BaseModel):
 
         payload = self.model_dump(
             mode="python",
-            exclude={"task_ref", "parent_task_ref", "data_profile_ref", "superseded_by_task_ref"},
+            exclude={
+                "task_ref",
+                "parent_task_ref",
+                "data_profile_ref",
+                "superseded_by_task_ref",
+            },
             exclude_unset=True,
         )
         if "parent_task_ref" in self.model_fields_set:
@@ -341,6 +369,17 @@ class ChildTaskProposalDraft(BaseModel):
         "ready_analytical", "requires_decomposition", "operational", "blocked"
     ]
     readiness_reason: str | None = None
+    data_profile_ref: str | None = None
+    variables: list[str] = Field(default_factory=list)
+    evidence_expectation: str | None = None
+    hypothesis_statement: str | None = None
+    claim_type: Literal["association"] | None = None
+    analysis_intent: AnalysisIntent | None = None
+    decision_rule: EvaluationThresholds | None = None
+    validation_method: str | None = None
+    executor_id: Literal["deterministic"] | None = None
+    method_parameters: list[MethodParameter] = Field(default_factory=list)
+    deterministic_seed: int | None = None
 
     @field_validator("motivated_by_discovery_refs")
     @classmethod
@@ -351,8 +390,37 @@ class ChildTaskProposalDraft(BaseModel):
 
     @model_validator(mode="after")
     def _require_readiness_reason_when_not_ready(self) -> ChildTaskProposalDraft:
-        if self.readiness_status != "ready_analytical" and not self.readiness_reason:
-            raise ValueError("non-ready child proposals require readiness_reason")
+        analytical_fields = (
+            self.data_profile_ref,
+            self.variables,
+            self.evidence_expectation,
+            self.hypothesis_statement,
+            self.claim_type,
+            self.analysis_intent,
+            self.decision_rule,
+            self.validation_method,
+            self.executor_id,
+            self.method_parameters,
+            self.deterministic_seed,
+        )
+        if self.readiness_status == "ready_analytical":
+            required = (
+                self.data_profile_ref,
+                self.variables,
+                self.evidence_expectation,
+                self.hypothesis_statement,
+                self.claim_type,
+                self.decision_rule,
+                self.validation_method,
+                self.executor_id,
+            )
+            if any(value is None or value == [] for value in required):
+                raise ValueError("ready analytical children require a complete execution contract")
+        else:
+            if not self.readiness_reason:
+                raise ValueError("non-ready child proposals require readiness_reason")
+            if any(value not in (None, [], ()) for value in analytical_fields):
+                raise ValueError("non-ready children cannot carry an analytical execution contract")
         return self
 
     def operation_payload(
@@ -362,8 +430,34 @@ class ChildTaskProposalDraft(BaseModel):
         parent_task_id: UUID,
         motivated_by_discovery_ids: list[UUID],
         parent_task_updated_at: datetime,
+        profile_id: UUID | None = None,
+        motivation_data_profile_id: UUID | None = None,
     ) -> TaskCreateOperationPayload:
         """Return the typed operation payload for this child task."""
+        analytical_specification = None
+        if self.readiness_status == "ready_analytical":
+            if profile_id is None:
+                raise ValueError("ready analytical children require a resolved DataProfile")
+            assert self.hypothesis_statement is not None
+            assert self.claim_type is not None
+            assert self.decision_rule is not None
+            assert self.validation_method is not None
+            assert self.executor_id is not None
+            assert self.evidence_expectation is not None
+            analytical_specification = AnalyticalSpecification(
+                hypothesis_statement=self.hypothesis_statement,
+                claim_type=self.claim_type,
+                analysis_intent=self.analysis_intent or AnalysisIntent.EXPLORATORY,
+                data_profile_id=profile_id,
+                variable_bindings=self.variables,
+                scope=self.scope,
+                evidence_expectation=self.evidence_expectation,
+                decision_rule=self.decision_rule,
+                validation_method=self.validation_method,
+                executor_id=self.executor_id,
+                method_parameters=self.method_parameters,
+                deterministic_seed=self.deterministic_seed,
+            )
         return TaskCreateOperationPayload(
             task_id=task_id,
             title=self.title,
@@ -381,6 +475,11 @@ class ChildTaskProposalDraft(BaseModel):
             readiness_reason=self.readiness_reason,
             parent_task_updated_at=parent_task_updated_at,
             selected_motivating_discovery_ids=motivated_by_discovery_ids,
+            motivation_data_profile_id=motivation_data_profile_id,
+            profile_id=profile_id,
+            variables=self.variables,
+            evidence_expectation=self.evidence_expectation,
+            analytical_specification=analytical_specification,
         )
 
 

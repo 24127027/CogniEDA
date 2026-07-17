@@ -406,6 +406,10 @@ def expand_plan(state: State, runtime: Runtime[Context]) -> State:
             other_candidate_refs.append(reference)
             candidate_explanations[reference] = _retrieval_candidate_explanation(item)
 
+        active_profile_ref = state.bind_object_reference(
+            "data_profile", str(active_profile.profile_id)
+        )
+
         prompt = _task_decomposition_prompt(
             parent_ref=parent_ref,
             parent=parent,
@@ -414,6 +418,7 @@ def expand_plan(state: State, runtime: Runtime[Context]) -> State:
             other_candidate_refs=other_candidate_refs,
             candidate_explanations=candidate_explanations,
             retrieval_exclusion_notes=retrieval_result.exclusion_notes,
+            active_profile_ref=active_profile_ref,
         )
     finally:
         session.close()
@@ -429,6 +434,8 @@ def expand_plan(state: State, runtime: Runtime[Context]) -> State:
             frame=frame,
             draft=draft,
             candidate_refs=selectable_candidates,
+            active_profile_ref=active_profile_ref,
+            active_profile_id=active_profile.profile_id,
         )
     except Exception:
         state.controlled_error = ControlledPlannerError(
@@ -452,6 +459,7 @@ def _task_decomposition_prompt(
     other_candidate_refs: list[str],
     candidate_explanations: dict[str, dict[str, object]],
     retrieval_exclusion_notes: list[str],
+    active_profile_ref: str,
 ) -> str:
     """Build a bounded planning-only prompt; no global Discovery retrieval occurs."""
 
@@ -474,7 +482,12 @@ def _task_decomposition_prompt(
         f"Candidate explanations: {json.dumps(candidate_explanations)}\n"
         f"Retrieval warnings: {json.dumps(retrieval_exclusion_notes)}\n"
         "Other bounded Discovery candidates are context-only and must not appear in "
-        "motivated_by_discovery_refs. No other Task or Discovery reference is valid."
+        "motivated_by_discovery_refs. No other Task or Discovery reference is valid.\n"
+        "If a child is 'ready_analytical', it should include the full execution contract: "
+        f"data_profile_ref (use {active_profile_ref}), variables, evidence_expectation, "
+        "hypothesis_statement, claim_type, decision_rule, validation_method, executor_id, "
+        "method_parameters, and deterministic_seed. These are planning fields; do not author "
+        "a durable DataProfile UUID or an analytical_specification dictionary."
     )
 
 
@@ -500,6 +513,8 @@ def _decomposition_operations(
     frame: Any,
     draft: TaskDecompositionDraft,
     candidate_refs: dict[str, UUID],
+    active_profile_ref: str,
+    active_profile_id: UUID,
 ) -> tuple[list[PlannerOperation], PlannerOperation]:
     """Translate one validated draft to atomic child and frame operations."""
 
@@ -513,8 +528,20 @@ def _decomposition_operations(
             raise ValueError(
                 "Child proposal references a Discovery outside the bounded candidates."
             )
+        if child.readiness_status == "ready_analytical":
+            if child.data_profile_ref != active_profile_ref:
+                raise ValueError(
+                    "Analytical child must use the bounded active DataProfile reference."
+                )
+        elif child.data_profile_ref is not None:
+            raise ValueError("Non-analytical child cannot bind an execution DataProfile.")
         child_id = uuid4()
         child_ids.append(child_id)
+        profile_id = (
+            UUID(state.resolve_object_reference(child.data_profile_ref))
+            if child.data_profile_ref is not None
+            else None
+        )
         payload = child.operation_payload(
             task_id=child_id,
             parent_task_id=parent.task_id,
@@ -522,6 +549,8 @@ def _decomposition_operations(
                 candidate_refs[ref] for ref in child.motivated_by_discovery_refs
             ],
             parent_task_updated_at=parent.updated_at,
+            profile_id=profile_id,
+            motivation_data_profile_id=active_profile_id,
         )
         operations.append(
             PlannerOperation(
@@ -608,18 +637,103 @@ class _ConfiguredTaskManagementModel:
         return TaskManagementDraft.model_validate(result.output)
 
 
-def _task_management_prompt(query: str, state: State) -> str:
+def _task_management_prompt(
+    query: str,
+    state: State,
+    *,
+    motivation_candidate_refs: list[str],
+    other_relevant_discovery_refs: list[str],
+    candidate_explanations: dict[str, dict[str, object]],
+    retrieval_exclusion_notes: list[str],
+) -> str:
     """Build the prompt for drafting task operations."""
 
     references = ", ".join(sorted(state.object_reference_index)) or "(none)"
     return (
         "Translate the user's task management request into task operations.\n"
-        "Do not invent UUIDs or use identifiers not listed below. New tasks receive their "
-        "durable ids only at commit. Use listed local references for updates, parent tasks, "
-        "profiles, and supersession. Do not propose Discovery motivation.\n"
+        "Do not invent UUIDs or use identifiers not listed below. The Planner allocates new "
+        "Task ids, which become durable only after commit. Use listed local references for "
+        "updates, parent tasks, profiles, and supersession. A root Task may explicitly select "
+        "Discovery motivation "
+        "only from the bounded motivation candidates below. Put only those local references "
+        "in selected_motivating_discovery_refs. Context-only references cannot be selected. "
+        "Do not expose or author durable Discovery UUIDs. Child motivation belongs to "
+        "/decompose, not this surface.\n"
         f"Allowed existing local references: {references}\n"
+        f"Motivation candidate local references: {motivation_candidate_refs}\n"
+        f"Other relevant context-only Discovery references: {other_relevant_discovery_refs}\n"
+        f"Candidate explanations: {json.dumps(candidate_explanations)}\n"
+        f"Retrieval warnings: {json.dumps(retrieval_exclusion_notes)}\n"
         f"Latest raw user request:\n{query}"
     )
+
+
+def _root_task_motivation_context(
+    state: State,
+    context: Context | None,
+) -> tuple[
+    dict[str, UUID],
+    list[str],
+    dict[str, dict[str, object]],
+    list[str],
+    SessionFrame | None,
+    UUID | None,
+]:
+    """Return one bounded planning-only candidate set for root Task motivation."""
+
+    if context is None or context.database_url is None or context.session_frame_id is None:
+        return {}, [], {}, [], None, None
+    session = get_session(context.database_url)
+    try:
+        frame = SessionFrameRepository(session).get_by_id(context.session_frame_id)
+        objective = ObjectiveRepository(session).get_active()
+        if frame is None or objective is None:
+            return {}, [], {}, [], frame, None
+        planning = SessionContextBuilder().build(frame, mode=ContextMode.PLANNING)
+        active_profile_id = planning.data_profile_refs[0] if planning.data_profile_refs else None
+        if active_profile_id is None:
+            return {}, [], {}, [], frame, None
+        active_profile = DataProfileRepository(session).get_by_id(active_profile_id)
+        if (
+            active_profile is None
+            or active_profile.lifecycle_state != DataProfileLifecycleState.ACTIVE
+            or not active_profile.accepted_as_ground_truth
+        ):
+            return {}, [], {}, [], frame, None
+        retrieval_result = DiscoveryRetrievalEngine(session).retrieve(
+            RetrievalRequest(
+                objective_id=objective.objective_id,
+                active_data_profile_id=active_profile_id,
+                session_frame_id=frame.session_frame_id,
+                query_text=(
+                    state.request_understanding.request_text
+                    if state.request_understanding is not None
+                    else state.query
+                ),
+            ),
+            frame,
+        )
+        selectable: dict[str, UUID] = {}
+        contextual: list[str] = []
+        explanations: dict[str, dict[str, object]] = {}
+        for item in retrieval_result.motivation_candidates:
+            reference = state.bind_object_reference("discovery", str(item.discovery_id))
+            selectable[reference] = item.discovery_id
+            explanations[reference] = _retrieval_candidate_explanation(item)
+        for item in retrieval_result.other_relevant_discoveries:
+            reference = state.bind_object_reference("discovery", str(item.discovery_id))
+            contextual.append(reference)
+            explanations[reference] = _retrieval_candidate_explanation(item)
+        return (
+            selectable,
+            contextual,
+            explanations,
+            retrieval_result.exclusion_notes,
+            frame,
+            active_profile_id,
+        )
+    finally:
+        session.close()
 
 
 @registry.register()
@@ -630,6 +744,15 @@ def manage_tasks(state: State, runtime: Runtime[Context]) -> State:
     Later workflow code can decide which operations require user approval before
     commit applies them.
     """
+    context = _runtime_context(runtime)
+    (
+        motivation_candidates,
+        contextual_discovery_refs,
+        motivation_explanations,
+        motivation_warnings,
+        source_frame,
+        motivation_profile_id,
+    ) = _root_task_motivation_context(state, context)
     has_existing_drafts = any(
         (
             state.task_create_payloads,
@@ -638,12 +761,20 @@ def manage_tasks(state: State, runtime: Runtime[Context]) -> State:
         )
     )
     if not has_existing_drafts:
-        context = _runtime_context(runtime)
         model = context.task_management_model if context else None
         if model is None:
             model = _ConfiguredTaskManagementModel()
         try:
-            draft_result = model.draft(_task_management_prompt(state.query, state))
+            draft_result = model.draft(
+                _task_management_prompt(
+                    state.query,
+                    state,
+                    motivation_candidate_refs=list(motivation_candidates),
+                    other_relevant_discovery_refs=contextual_discovery_refs,
+                    candidate_explanations=motivation_explanations,
+                    retrieval_exclusion_notes=motivation_warnings,
+                )
+            )
             state.task_create_payloads.extend(draft_result.task_create_payloads)
             state.task_update_payloads.extend(draft_result.task_update_payloads)
             state.task_state_change_payloads.extend(draft_result.task_state_change_payloads)
@@ -656,8 +787,15 @@ def manage_tasks(state: State, runtime: Runtime[Context]) -> State:
 
     session_id = _session_id(state, runtime)
     operations: list[PlannerOperation] = []
+    root_task_summaries: list[TaskContextSummary] = []
     try:
         for task in state.task_create_payloads:
+            is_governed_root_motivation = (
+                source_frame is not None
+                and task.parent_task_ref is None
+                and "selected_motivating_discovery_refs" in task.model_fields_set
+            )
+            task_id = uuid4() if is_governed_root_motivation else None
             parent_task_id = (
                 UUID(state.resolve_object_reference(task.parent_task_ref))
                 if task.parent_task_ref is not None
@@ -668,17 +806,39 @@ def manage_tasks(state: State, runtime: Runtime[Context]) -> State:
                 if task.data_profile_ref is not None
                 else None
             )
+            if task.selected_motivating_discovery_refs and task.parent_task_ref is not None:
+                raise ValueError("Only root Tasks can use the governed root-motivation surface.")
+            if any(
+                reference not in motivation_candidates
+                for reference in task.selected_motivating_discovery_refs
+            ):
+                raise ValueError("Task selected a Discovery outside the bounded candidates.")
+            motivated_ids = [
+                motivation_candidates[reference]
+                for reference in task.selected_motivating_discovery_refs
+            ]
             operations.append(
                 PlannerOperation(
                     session_id=session_id,
                     operation_type=PlannerOperationType.CREATE_TASK,
                     payload=task.operation_payload(
+                        task_id=task_id,
                         parent_task_id=parent_task_id,
                         profile_id=profile_id,
+                        motivated_by_discovery_ids=motivated_ids,
+                        motivation_data_profile_id=motivation_profile_id,
                     ).model_dump(mode="json", exclude_none=True),
                     produced_by_node=PlannerNodeName.MANAGE_TASKS,
                 )
             )
+            if task_id is not None:
+                root_task_summaries.append(
+                    TaskContextSummary(
+                        task_id=task_id,
+                        title=task.title,
+                        lifecycle_state=TaskLifecycleState.ACTIVE.value,
+                    )
+                )
         for task_update in state.task_update_payloads:
             parent_task_id = (
                 UUID(state.resolve_object_reference(task_update.parent_task_ref))
@@ -725,6 +885,33 @@ def manage_tasks(state: State, runtime: Runtime[Context]) -> State:
             message="The task proposal contains an unknown or invalid object reference.",
         )
         return state
+    if root_task_summaries and source_frame is not None:
+        updated_frame = source_frame.model_copy(
+            update={
+                "session_frame_id": uuid4(),
+                "parent_session_frame_id": source_frame.session_frame_id,
+                "active_task_refs": [
+                    *source_frame.active_task_refs,
+                    *(summary.task_id for summary in root_task_summaries),
+                ],
+                "active_tasks": [*source_frame.active_tasks, *root_task_summaries],
+                "inclusion_reasons": {
+                    **source_frame.inclusion_reasons,
+                    **{
+                        str(summary.task_id): "approved governed root Task"
+                        for summary in root_task_summaries
+                    },
+                },
+            }
+        )
+        operations.append(
+            PlannerOperation(
+                session_id=session_id,
+                operation_type=PlannerOperationType.UPDATE_SESSION_FRAME,
+                payload=updated_frame.model_dump(mode="json"),
+                produced_by_node=PlannerNodeName.MANAGE_TASKS,
+            )
+        )
     state.planner_operations.extend(operations)
     return state
 
