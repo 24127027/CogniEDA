@@ -143,10 +143,10 @@ def _objective_exclusion_reason(
     mode_key: str,
     context_label: str,
 ) -> str | None:
-    if mode_key in {ContextMode.PLANNING.value, ContextMode.ANSWER.value} and state_key in {
-        ObjectiveStatus.ACTIVE.value,
-        ObjectiveStatus.PAUSED.value,
-    }:
+    if (
+        mode_key in {ContextMode.PLANNING.value, ContextMode.ANSWER.value}
+        and state_key == ObjectiveStatus.ACTIVE.value
+    ):
         return None
     return _state_not_allowed("Objective", state_key, context_label)
 

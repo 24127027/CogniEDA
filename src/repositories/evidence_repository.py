@@ -51,11 +51,11 @@ class EvidenceRepository:
         self._analysis_frame_repository: AnalysisFrameRepository | None
         self._execution_run_repository: ExecutionRunRepository | None
         if self._strict_provenance_validation:
-            self._analysis_frame_repository = (
-                analysis_frame_repository or AnalysisFrameRepository(session)
+            self._analysis_frame_repository = analysis_frame_repository or AnalysisFrameRepository(
+                session
             )
-            self._execution_run_repository = (
-                execution_run_repository or ExecutionRunRepository(session)
+            self._execution_run_repository = execution_run_repository or ExecutionRunRepository(
+                session
             )
         else:
             self._analysis_frame_repository = None
@@ -95,9 +95,7 @@ class EvidenceRepository:
         if self._session.get(DataProfileRecord, evidence.profile_id) is None:
             raise ValueError("Evidence creation requires an existing DataProfile.")
         if hypothesis_record.profile_id != evidence.profile_id:
-            raise ValueError(
-                "Evidence profile_id must match the referenced Hypothesis profile_id."
-            )
+            raise ValueError("Evidence profile_id must match the referenced Hypothesis profile_id.")
 
     def _validate_provenance_refs(self, evidence: Evidence) -> None:
         """Validate Evidence refs against minimal provenance repositories."""
@@ -312,9 +310,7 @@ class EvidenceRepository:
             f"historically_scoped_data_profile_id={old_data_profile_id}",
         ]
         if replacement_data_profile_id is not None:
-            reason_parts.append(
-                f"replacement_data_profile_id={replacement_data_profile_id}"
-            )
+            reason_parts.append(f"replacement_data_profile_id={replacement_data_profile_id}")
         if reason is not None and reason.strip():
             reason_parts.append(f"reason={reason.strip()}")
         return "; ".join(reason_parts)

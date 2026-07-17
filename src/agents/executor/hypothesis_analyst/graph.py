@@ -14,6 +14,5 @@ def build_graph() -> CompiledStateGraph[State, ExecutorContext, ExecutorInput, E
     """
 
     raise NotImplementedError(
-        "The build_graph function needs to be implemented with the actual graph "
-        "construction logic."
+        "The build_graph function needs to be implemented with the actual graph construction logic."
     )

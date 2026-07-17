@@ -76,8 +76,8 @@ class SessionFrameRepository:
     def list_recent(self, *, limit: int = 10) -> builtins.list[SessionFrame]:
         """List recent SessionFrames in this workspace graph."""
 
-        statement = select(SessionFrameRecord).order_by(desc(SessionFrameRecord.created_at)).limit(
-            limit
+        statement = (
+            select(SessionFrameRecord).order_by(desc(SessionFrameRecord.created_at)).limit(limit)
         )
         records = self._session.exec(statement).all()
         return [record_to_schema(SessionFrame, record) for record in records]
@@ -85,8 +85,8 @@ class SessionFrameRepository:
     def get_latest(self) -> SessionFrame | None:
         """Return the latest SessionFrame in this workspace graph."""
 
-        statement = select(SessionFrameRecord).order_by(desc(SessionFrameRecord.created_at)).limit(
-            1
+        statement = (
+            select(SessionFrameRecord).order_by(desc(SessionFrameRecord.created_at)).limit(1)
         )
         record = self._session.exec(statement).first()
         if record is None:

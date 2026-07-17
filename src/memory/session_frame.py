@@ -383,13 +383,11 @@ class SessionFrameBuilder:
         """Build a SessionFrame snapshot without promoting summaries to knowledge."""
 
         selected_profiles = list(data_profiles)[: self._options.max_profiles]
-        active_tasks = [
-            task for task in tasks if task.lifecycle_state in _PLANNING_TASK_STATES
-        ][: self._options.max_tasks]
+        active_tasks = [task for task in tasks if task.lifecycle_state in _PLANNING_TASK_STATES][
+            : self._options.max_tasks
+        ]
         active_assumptions = [
-            assumption
-            for assumption in assumptions
-            if assumption.status == AssumptionStatus.ACTIVE
+            assumption for assumption in assumptions if assumption.status == AssumptionStatus.ACTIVE
         ][: self._options.max_assumptions]
         active_hypotheses = [
             hypothesis
@@ -399,9 +397,7 @@ class SessionFrameBuilder:
         selected_discoveries = list(discoveries)[: self._options.max_discoveries]
         selected_evidence = list(evidence)[: self._options.max_evidence]
         selected_user_decisions = [
-            decision
-            for decision in user_decisions
-            if decision.status == UserDecisionStatus.ACTIVE
+            decision for decision in user_decisions if decision.status == UserDecisionStatus.ACTIVE
         ][: self._options.max_user_decisions]
 
         warnings = list(key_warnings or [])
@@ -427,9 +423,7 @@ class SessionFrameBuilder:
             active_assumptions=[
                 self._assumption_summary(assumption) for assumption in active_assumptions
             ],
-            active_assumption_refs=[
-                assumption.assumption_id for assumption in active_assumptions
-            ],
+            active_assumption_refs=[assumption.assumption_id for assumption in active_assumptions],
             active_hypotheses=[
                 self._hypothesis_summary(
                     hypothesis,
@@ -440,15 +434,11 @@ class SessionFrameBuilder:
                 )
                 for hypothesis in active_hypotheses
             ],
-            active_hypothesis_refs=[
-                hypothesis.hypothesis_id for hypothesis in active_hypotheses
-            ],
+            active_hypothesis_refs=[hypothesis.hypothesis_id for hypothesis in active_hypotheses],
             relevant_discoveries=[
                 self._discovery_summary(discovery) for discovery in selected_discoveries
             ],
-            relevant_discovery_refs=[
-                discovery.discovery_id for discovery in selected_discoveries
-            ],
+            relevant_discovery_refs=[discovery.discovery_id for discovery in selected_discoveries],
             supporting_evidence=[
                 self._evidence_summary(evidence_item) for evidence_item in selected_evidence
             ],
@@ -461,7 +451,8 @@ class SessionFrameBuilder:
             recent_user_decision_refs=[
                 decision.decision_id for decision in selected_user_decisions
             ],
-            pending_tasks=pending_tasks or self._infer_pending_tasks(
+            pending_tasks=pending_tasks
+            or self._infer_pending_tasks(
                 active_tasks,
                 active_assumptions,
             ),

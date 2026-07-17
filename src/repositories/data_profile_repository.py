@@ -163,12 +163,10 @@ class DataProfileRepository:
         """Reject dependent propagation that would span SQLModel session objects."""
 
         evidence_repository_matches = (
-            evidence_repository is None
-            or evidence_repository.uses_session(self._session)
+            evidence_repository is None or evidence_repository.uses_session(self._session)
         )
         discovery_repository_matches = (
-            discovery_repository is None
-            or discovery_repository.uses_session(self._session)
+            discovery_repository is None or discovery_repository.uses_session(self._session)
         )
         if not evidence_repository_matches or not discovery_repository_matches:
             raise ValueError(

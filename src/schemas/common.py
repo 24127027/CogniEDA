@@ -63,12 +63,8 @@ def reject_unqualified_absence_claim(value: str) -> str:
     """Reject over-strong absence wording for inconclusive analytical results."""
 
     normalized = value.lower()
-    has_absence_phrase = any(
-        phrase in normalized for phrase in _UNQUALIFIED_ABSENCE_PHRASES
-    )
-    has_qualifier = any(
-        qualifier in normalized for qualifier in _INSUFFICIENT_EVIDENCE_QUALIFIERS
-    )
+    has_absence_phrase = any(phrase in normalized for phrase in _UNQUALIFIED_ABSENCE_PHRASES)
+    has_qualifier = any(qualifier in normalized for qualifier in _INSUFFICIENT_EVIDENCE_QUALIFIERS)
     if has_absence_phrase and not has_qualifier:
         raise ValueError(
             "Use scoped insufficient-evidence wording instead of an unqualified "

@@ -122,11 +122,7 @@ class HypothesisRepository:
         """List hypotheses that can still appear in active working context."""
 
         active_statuses = (HypothesisStatus.PROPOSED, HypothesisStatus.TESTING)
-        return [
-            hypothesis
-            for hypothesis in self.list()
-            if hypothesis.status in active_statuses
-        ]
+        return [hypothesis for hypothesis in self.list() if hypothesis.status in active_statuses]
 
     def list_for_profile(self, profile_id: UUID) -> builtins.list[Hypothesis]:
         """List hypotheses scoped to a DataProfile."""

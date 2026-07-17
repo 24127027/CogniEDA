@@ -76,11 +76,7 @@ def filter_records_by_related_id[RecordModelT: SQLModel](
     """Filter JSON-backed relation arrays in Python using a UUID value."""
 
     related_id_str = str(related_id)
-    return [
-        record
-        for record in records
-        if related_id_str in getattr(record, field_name, [])
-    ]
+    return [record for record in records if related_id_str in getattr(record, field_name, [])]
 
 
 def dedupe_preserving_order[T](values: Iterable[T]) -> list[T]:

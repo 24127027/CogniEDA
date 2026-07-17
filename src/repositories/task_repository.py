@@ -134,7 +134,8 @@ class TaskRepository:
         discovery_str = str(discovery_id)
         # Using exact Python-side filtering because motivated_by_discovery_ids is JSON
         return [
-            task for task in all_tasks
+            task
+            for task in all_tasks
             if discovery_str in [str(d) for d in task.motivated_by_discovery_ids]
         ]
 

@@ -56,15 +56,10 @@ class PlannerOperationRepository:
     ) -> list[PlannerOperation]:
         """List PlannerOperations with simple skeleton-stage filters."""
 
-        statement = (
-            select(PlannerOperationRecord)
-            .order_by(asc(PlannerOperationRecord.created_at))
-        )
+        statement = select(PlannerOperationRecord).order_by(asc(PlannerOperationRecord.created_at))
         if session_id is not None:
             statement = statement.where(PlannerOperationRecord.session_id == session_id)
         if approval_state is not None:
-            statement = statement.where(
-                PlannerOperationRecord.approval_state == approval_state
-            )
+            statement = statement.where(PlannerOperationRecord.approval_state == approval_state)
         records = self._session.exec(statement).all()
         return [record_to_schema(PlannerOperation, record) for record in records]
