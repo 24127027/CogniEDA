@@ -5,6 +5,8 @@ from repositories.assumption_repository import AssumptionRepository, AssumptionU
 from repositories.data_profile_repository import DataProfileRepository
 from repositories.discovery_repository import DiscoveryRepository
 from repositories.evidence_repository import EvidenceRepository
+from repositories.execution_approval_repository import ExecutionApprovalRepository
+from repositories.execution_outbox_repository import ExecutionOutboxRepository
 from repositories.execution_run_repository import ExecutionRunRepository
 from repositories.hypothesis_repository import HypothesisRepository, HypothesisUpdate
 from repositories.objective_repository import ObjectiveRepository, ObjectiveUpdate
@@ -22,6 +24,8 @@ __all__ = [
     "DiscoveryRepository",
     "EvidenceRepository",
     "ExecutionRunRepository",
+    "ExecutionApprovalRepository",
+    "ExecutionOutboxRepository",
     "HypothesisRepository",
     "HypothesisUpdate",
     "ObjectiveRevisionRepository",

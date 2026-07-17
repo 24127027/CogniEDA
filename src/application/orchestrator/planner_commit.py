@@ -8,8 +8,10 @@ from uuid import UUID
 
 from sqlmodel import Session, asc, select
 
+from application.orchestrator.transition_service import ExecutionAttemptTransitionService
 from db.models import (
     AssumptionRecord,
+    ExecutionRunRecord,
     ObjectiveRecord,
     PlannerOperationRecord,
     SessionFrameRecord,
@@ -23,22 +25,30 @@ from repositories.task_repository import TASK_JSON_FIELDS, TaskUpdate
 from schemas.artifacts import Assumption, SessionFrame, Task
 from schemas.enums import (
     AssumptionStatus,
+    ExecutionRunStatus,
     PlannerOperationApprovalState,
     PlannerOperationType,
 )
 from schemas.planner_operations import (
     AssumptionStateUpdateOperationPayload,
     ConflictFlagOperationPayload,
+    ExecutionOutboxOperationPayload,
+    ExecutionRunOperationPayload,
     ObjectiveUpdateOperationPayload,
     PlannerCommitResult,
     TaskCreateOperationPayload,
     TaskStateChangeOperationPayload,
     TaskUpdateOperationPayload,
 )
+from schemas.provenance import ExecutionOutbox, ExecutionRun
 
 _COMMITTABLE_STATES = {
     PlannerOperationApprovalState.APPROVED,
     PlannerOperationApprovalState.NOT_REQUIRED,
+}
+_EXECUTION_ADMISSION_OPERATION_TYPES = {
+    PlannerOperationType.CREATE_EXECUTION_RUN,
+    PlannerOperationType.CREATE_EXECUTION_OUTBOX,
 }
 
 
@@ -68,9 +78,18 @@ def commit_planner_operations(
 
     current_record: PlannerOperationRecord | None = None
     try:
-        for record in committable_records:
-            current_record = record
-            _apply_operation(session, record)
+        execution_records = [
+            record
+            for record in committable_records
+            if record.operation_type in _EXECUTION_ADMISSION_OPERATION_TYPES
+        ]
+        if execution_records:
+            current_record = execution_records[-1]
+            _apply_execution_admission_bundle(session, committable_records)
+        else:
+            for record in committable_records:
+                current_record = record
+                _apply_operation(session, record)
 
         committed_at = datetime.now(UTC)
         for record in committable_records:
@@ -155,6 +174,81 @@ def _apply_operation(session: Session, record: PlannerOperationRecord) -> None:
                 "Unsupported PlannerOperation type for Phase 1 commit: "
                 f"{record.operation_type.value}"
             )
+
+
+def _apply_execution_admission_bundle(
+    session: Session,
+    records: list[PlannerOperationRecord],
+) -> None:
+    """Atomically admit one immutable attempt and its matching dispatch intent."""
+
+    if len(records) != 2 or {record.operation_type for record in records} != (
+        _EXECUTION_ADMISSION_OPERATION_TYPES
+    ):
+        raise ValueError("Execution admission requires exactly one ExecutionRun and one outbox.")
+    if any(
+        record.approval_state != PlannerOperationApprovalState.NOT_REQUIRED
+        for record in records
+    ):
+        raise ValueError("Execution admission operations must be produced after approval.")
+
+    run_record = next(
+        record
+        for record in records
+        if record.operation_type == PlannerOperationType.CREATE_EXECUTION_RUN
+    )
+    outbox_record = next(
+        record
+        for record in records
+        if record.operation_type == PlannerOperationType.CREATE_EXECUTION_OUTBOX
+    )
+    run = ExecutionRunOperationPayload.model_validate(run_record.payload)
+    outbox = ExecutionOutboxOperationPayload.model_validate(outbox_record.payload)
+    _validate_execution_admission_pair(run, outbox)
+    if session.get(ExecutionRunRecord, run.execution_run_id) is not None:
+        raise ValueError(f"ExecutionRun already exists: {run.execution_run_id}")
+    if run.task_id is None or run.hypothesis_id is None:
+        raise ValueError("Execution admission requires Task and Hypothesis identities.")
+    ExecutionAttemptTransitionService(session).stage_admit_attempt(
+        execution_run_id=run.execution_run_id,
+        task_id=run.task_id,
+        hypothesis_id=run.hypothesis_id,
+        executor_type=str(run.executor_type),
+        method_id=str(run.method_id),
+        parameter_hash=str(run.parameter_hash),
+        dispatch_idempotency_key=str(run.dispatch_idempotency_key),
+        prepared_payload=outbox.prepared_payload,
+        previous_attempt_id=run.previous_attempt_id,
+        retry_reason=run.retry_reason,
+        retry_authorization_metadata=run.retry_authorization_metadata,
+    )
+    for record in records:
+        record.target_object_id = run.execution_run_id
+        record.target_object_type = "execution_run"
+        session.add(record)
+    session.flush()
+
+
+def _validate_execution_admission_pair(run: ExecutionRun, outbox: ExecutionOutbox) -> None:
+    if run.status != ExecutionRunStatus.ADMITTED or run.attempt_version != 1:
+        raise ValueError("Execution admission requires an admitted version-one ExecutionRun.")
+    if (
+        run.execution_run_id != outbox.execution_run_id
+        or run.dispatch_idempotency_key != outbox.dispatch_idempotency_key
+        or run.executor_type != outbox.executor_type
+        or run.method_id != outbox.method_id
+        or run.parameter_hash != outbox.parameter_hash
+    ):
+        raise ValueError("ExecutionRun and outbox immutable identity fields must match.")
+    if outbox.status != "pending":
+        raise ValueError("Execution admission requires a pending ExecutionOutbox.")
+    if (
+        not run.executor_type
+        or not run.method_id
+        or not run.parameter_hash
+        or not run.dispatch_idempotency_key
+    ):
+        raise ValueError("Execution admission requires complete immutable attempt identity.")
 
 
 def _apply_create_task(session: Session, operation: PlannerOperationRecord) -> None:
