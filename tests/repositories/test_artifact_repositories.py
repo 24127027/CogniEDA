@@ -1663,17 +1663,17 @@ def test_task_and_non_fco_generated_view_guards() -> None:
 
 
 def test_planner_and_executor_authoring_contracts() -> None:
-    from agents.executor.types import ExecutorOutput
     from agents.planner.types import PlannerOutput
+    from application.orchestrator.execution_contracts import ExecutorResult
 
     planner_fields = set(PlannerOutput.model_fields)
-    executor_fields = set(ExecutorOutput.model_fields)
+    executor_fields = set(ExecutorResult.model_fields)
 
     assert "evidence_drafts" not in planner_fields
     assert "discovery_drafts" not in planner_fields
     assert {"planner_operations", "executor_dispatch_ref"} <= planner_fields
-    # ExecutorOutput remains a scaffold. Durable Evidence/Discovery admission
-    # belongs to the planner operation boundary, not free-form agent output.
+    # ExecutorResult validates execution results.
+    # It does not accept arbitrary drafts from the agent.
     assert {"evidence_drafts", "discovery_drafts", "execution_run_ref"}.isdisjoint(
         executor_fields
     )

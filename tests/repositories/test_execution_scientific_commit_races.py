@@ -126,7 +126,7 @@ def _setup_attempt_for_finalization(
             "evidence_expectation": "p_value < 0.05",
             "decision_rule": {"p_value": 0.05},
             "validation_method": "deterministic_test",
-            "executor_id": "reg_executor",
+            "executor_id": "regression_executor",
             "method_parameters": [{"name": "alpha", "value": 0.05}],
         },
         contract_fingerprint="fingerprint-123",

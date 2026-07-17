@@ -6,6 +6,8 @@ from uuid import UUID, uuid4
 import pytest
 from langgraph.runtime import Runtime
 
+from agents.executor import ExecutorContext, ExecutorDispatcher, ExecutorInput, ExecutorRegistry
+from agents.executor.capabilities import CapabilitySpec
 from agents.planner.agent import Planner
 from agents.planner.graph import build_graph
 from agents.planner.nodes import (
@@ -23,17 +25,19 @@ from agents.planner.types import (
     ExecutorResult,
     HypothesisEvaluationDraft,
     PlannerDecision,
-    PreparedExecution,
     RequestUnderstanding,
     RequestUnderstandingModel,
     State,
     TaskCreateDraft,
 )
 from application.orchestrator import reconciler as reconciliation_module
+from application.orchestrator.cancellation import authorize_retry
 from application.orchestrator.dispatcher import dispatch_pending_attempts
 from application.orchestrator.finalizer import finalize_attempt
 from application.orchestrator.planner_commit import commit_planner_operations
+from application.orchestrator.receiver import submit_execution_result
 from application.orchestrator.scientific_processing import _method_parameter_hash
+from db.models import ExecutionOutboxRecord
 from db.session import get_session
 from repositories import (
     AnalysisFrameRepository,
@@ -92,6 +96,8 @@ class FakeExecutor:
         outcome: HypothesisEvidenceOutcome = HypothesisEvidenceOutcome.SUPPORTS,
         advisory_outcome: HypothesisEvidenceOutcome | None = None,
         finalize: bool = True,
+        raise_error: bool = False,
+        output_executor_type: str | None = None,
         output_method: str | None = None,
         output_parameters: list[MethodParameter] | None = None,
     ) -> None:
@@ -99,18 +105,23 @@ class FakeExecutor:
         self.outcome = outcome
         self.advisory_outcome = advisory_outcome
         self.finalize = finalize
+        self.raise_error = raise_error
+        self.output_executor_type = output_executor_type
         self.output_method = output_method
         self.output_parameters = output_parameters
-        self.requests: list[PreparedExecution] = []
+        self.requests: list[ExecutorInput] = []
 
-    def execute(self, request: PreparedExecution) -> ExecutorResult:
+    async def run(self, input: ExecutorInput, context: ExecutorContext) -> ExecutorResult:
+        request = input
         self.requests.append(request)
+        if self.raise_error:
+            raise RuntimeError("deterministic executor exception")
         analysis_frame = AnalysisFrameObservation(
             frame_hash="test-frame-v1",
             column_refs=request.specification.variable_bindings,
         )
         execution_run = ExecutionRunObservation(
-            executor_type="test_fake",
+            executor_type=self.output_executor_type or request.specification.executor_id,
             method_id=self.output_method or request.specification.validation_method,
             parameter_hash=_method_parameter_hash(request.specification.method_parameters),
             status="failed" if self.fail else "completed",
@@ -251,7 +262,14 @@ def _dispatch_and_finalize(db_session, executor: FakeExecutor, task: Task) -> UU
     dispatch_session = get_session(database_url)
     try:
         assert (
-            asyncio.run(dispatch_pending_attempts(dispatch_session, executor, "test-worker")) == 1
+            asyncio.run(
+                dispatch_pending_attempts(
+                    dispatch_session,
+                    _dispatcher_for(executor),
+                    "test-worker",
+                )
+            )
+            == 1
         )
     finally:
         dispatch_session.close()
@@ -261,6 +279,15 @@ def _dispatch_and_finalize(db_session, executor: FakeExecutor, task: Task) -> UU
     finally:
         finalizer_session.close()
     return run.execution_run_id
+
+
+def _dispatcher_for(executor: FakeExecutor) -> ExecutorDispatcher:
+    registry = ExecutorRegistry()
+    registry.register_factory(
+        CapabilitySpec(id="deterministic", description="Deterministic test executor."),
+        lambda: executor,
+    )
+    return ExecutorDispatcher(registry)
 
 
 def test_select_task_requires_one_exact_existing_id_without_mutation(db_session) -> None:
@@ -544,13 +571,14 @@ def test_execute_graph_persists_one_authorized_chain_without_second_approval(
     _dispatch_and_finalize(db_session, executor, task)
     assert len(executor.requests) == 1
     request = executor.requests[0]
-    assert final_state.resolve_object_reference(request.task_ref) == str(task.task_id)
-    assert final_state.resolve_object_reference(request.data_profile_ref) == str(task.profile_id)
+    assert request.task_id == task.task_id
+    assert request.data_profile_id == task.profile_id
     assert request.specification.method_parameters == [MethodParameter(name="alpha", value=0.05)]
     assert request.deterministic_seed == 17
     assert "assumptions" not in type(request).model_fields
     hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)
     assert len(hypothesis) == 1
+    assert request.hypothesis_id == hypothesis[0].hypothesis_id
     analysis_frames = AnalysisFrameRepository(db_session).list(data_profile_id=task.profile_id)
     runs = ExecutionRunRepository(db_session).list(hypothesis_id=hypothesis[0].hypothesis_id)
     evidence = EvidenceRepository(db_session).list_for_hypothesis(hypothesis[0].hypothesis_id)
@@ -846,7 +874,11 @@ def test_durable_topology_survives_planner_and_dispatcher_replacement(db_session
     try:
         assert (
             asyncio.run(
-                dispatch_pending_attempts(dispatch_session, dispatcher_executor, "worker-b")
+                dispatch_pending_attempts(
+                    dispatch_session,
+                    _dispatcher_for(dispatcher_executor),
+                    "worker-b",
+                )
             )
             == 1
         )
@@ -854,8 +886,6 @@ def test_durable_topology_survives_planner_and_dispatcher_replacement(db_session
         dispatch_session.close()
     assert len(dispatcher_executor.requests) == 1
     assert dispatcher_executor.requests[0].execution_run_id == run_id
-    assert dispatcher_executor.requests[0].dispatch_idempotency_key is not None
-    assert dispatcher_executor.requests[0].lease_epoch == 1
     assert len(ExecutionInboxRepository(db_session).list(execution_run_id=run_id)) == 1
 
     finalizer_session = get_session(database_url)
@@ -865,6 +895,172 @@ def test_durable_topology_survives_planner_and_dispatcher_replacement(db_session
     finally:
         finalizer_session.close()
     hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)[0]
+    assert len(EvidenceRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)) == 1
+    assert len(DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)) == 1
+
+
+def test_malformed_durable_payload_fails_without_invoking_executor(db_session) -> None:
+    task = _persist_ready_task(db_session)
+    state = State.model_validate(
+        build_graph().invoke(
+            State(query=f"/execute {task.task_id}", planner_decision={"action": "approve"}),
+            context=_context(db_session, FailIfCalledRequestModel()),
+        )
+    )
+    assert state.execution_admission is not None
+    assert state.execution_admission.execution_run_ref is not None
+    run_id = UUID(
+        state.resolve_object_reference(state.execution_admission.execution_run_ref)
+    )
+    outbox = ExecutionOutboxRepository(db_session).list(execution_run_id=run_id)[0]
+    record = db_session.get(ExecutionOutboxRecord, outbox.outbox_id)
+    assert record is not None
+    record.prepared_payload = {}
+    db_session.add(record)
+    db_session.commit()
+
+    executor = FakeExecutor()
+    dispatch_session = get_session(str(db_session.get_bind().url))
+    try:
+        assert (
+            asyncio.run(
+                dispatch_pending_attempts(
+                    dispatch_session,
+                    _dispatcher_for(executor),
+                    "malformed-worker",
+                )
+            )
+            == 1
+        )
+    finally:
+        dispatch_session.close()
+
+    assert executor.requests == []
+    inbox = ExecutionInboxRepository(db_session).list(execution_run_id=run_id)
+    assert len(inbox) == 1
+    assert inbox[0].executor_status == "failed"
+    finalizer_session = get_session(str(db_session.get_bind().url))
+    try:
+        assert finalize_attempt(finalizer_session, run_id) is True
+    finally:
+        finalizer_session.close()
+    failed_run = ExecutionRunRepository(db_session).get_by_id(run_id)
+    assert failed_run is not None and failed_run.status == "execution_failed"
+
+
+@pytest.mark.parametrize("failure_mode", ["unknown", "factory", "executor"])
+def test_dispatch_resolution_and_executor_failures_reach_inbox(
+    db_session,
+    failure_mode: str,
+) -> None:
+    task = _persist_ready_task(db_session)
+    state = State.model_validate(
+        build_graph().invoke(
+            State(query=f"/execute {task.task_id}", planner_decision={"action": "approve"}),
+            context=_context(db_session, FailIfCalledRequestModel()),
+        )
+    )
+    assert state.execution_admission is not None
+    assert state.execution_admission.execution_run_ref is not None
+    run_id = UUID(
+        state.resolve_object_reference(state.execution_admission.execution_run_ref)
+    )
+
+    executor = FakeExecutor(raise_error=failure_mode == "executor")
+    registry = ExecutorRegistry()
+    if failure_mode == "factory":
+
+        def failing_factory():
+            raise RuntimeError("deterministic factory exception")
+
+        registry.register_factory(
+            CapabilitySpec(id="deterministic", description="Failing test factory."),
+            failing_factory,
+        )
+    elif failure_mode == "executor":
+        registry.register_factory(
+            CapabilitySpec(id="deterministic", description="Failing test executor."),
+            lambda: executor,
+        )
+
+    dispatch_session = get_session(str(db_session.get_bind().url))
+    try:
+        assert (
+            asyncio.run(
+                dispatch_pending_attempts(
+                    dispatch_session,
+                    ExecutorDispatcher(registry),
+                    f"{failure_mode}-worker",
+                )
+            )
+            == 1
+        )
+    finally:
+        dispatch_session.close()
+
+    inbox = ExecutionInboxRepository(db_session).list(execution_run_id=run_id)
+    assert len(inbox) == 1
+    assert inbox[0].executor_status == "failed"
+    assert inbox[0].error_message is not None
+    assert len(executor.requests) == (1 if failure_mode == "executor" else 0)
+
+
+def test_retry_reuses_contract_and_canonical_adapter_with_new_attempt(db_session) -> None:
+    task = _persist_ready_task(db_session)
+    state = State.model_validate(
+        build_graph().invoke(
+            State(query=f"/execute {task.task_id}", planner_decision={"action": "approve"}),
+            context=_context(db_session, FailIfCalledRequestModel()),
+        )
+    )
+    assert state.execution_admission is not None
+    assert state.execution_admission.execution_run_ref is not None
+    predecessor_id = UUID(
+        state.resolve_object_reference(state.execution_admission.execution_run_ref)
+    )
+    failed_executor = FakeExecutor(fail=True)
+    assert _dispatch_and_finalize(db_session, failed_executor, task) == predecessor_id
+
+    successor_id = authorize_retry(db_session, predecessor_id, retry_reason="technical_retry")
+    assert successor_id is not None
+    successor = ExecutionRunRepository(db_session).get_by_id(successor_id)
+    assert successor is not None
+    assert successor.execution_run_id != predecessor_id
+    assert successor.previous_attempt_id == predecessor_id
+    assert successor.hypothesis_id == failed_executor.requests[0].hypothesis_id
+
+    predecessor = ExecutionRunRepository(db_session).get_by_id(predecessor_id)
+    assert predecessor is not None
+    assert predecessor.dispatch_idempotency_key is not None
+    assert predecessor.method_id is not None
+    assert submit_execution_result(
+        db_session,
+        execution_run_id=predecessor_id,
+        dispatch_idempotency_key=predecessor.dispatch_idempotency_key,
+        lease_epoch=predecessor.lease_epoch,
+        worker_id="test-worker",
+        method_id=predecessor.method_id,
+        executor_status="failed",
+        result=None,
+        error_msg="late predecessor result",
+    ) is None
+
+    successful_executor = FakeExecutor()
+    assert (
+        _dispatch_and_finalize(db_session, successful_executor, task)
+        == successor.execution_run_id
+    )
+    first_input = failed_executor.requests[0]
+    retry_input = successful_executor.requests[0]
+    assert retry_input.execution_run_id != first_input.execution_run_id
+    assert retry_input.task_id == first_input.task_id
+    assert retry_input.hypothesis_id == first_input.hypothesis_id
+    assert retry_input.data_profile_id == first_input.data_profile_id
+    assert retry_input.hypothesis == first_input.hypothesis
+    assert retry_input.specification == first_input.specification
+
+    hypothesis = HypothesisRepository(db_session).get_by_id(retry_input.hypothesis_id)
+    assert hypothesis is not None
     assert len(EvidenceRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)) == 1
     assert len(DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)) == 1
 
@@ -976,6 +1172,7 @@ def test_hypothesis_accumulates_evidence_until_explicit_finalization(db_session)
     ("executor", "error_code"),
     [
         (FakeExecutor(output_method="unexpected_method"), "executor_method_mismatch"),
+        (FakeExecutor(output_executor_type="unexpected_executor"), "executor_type_mismatch"),
         (
             FakeExecutor(output_parameters=[MethodParameter(name="alpha", value=0.01)]),
             "executor_parameter_mismatch",
