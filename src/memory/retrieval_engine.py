@@ -71,9 +71,7 @@ class DiscoveryRetrievalEngine:
         excluded_ids = self._parse_discovery_ids(
             frame.user_exclusions if frame else [], label="exclusion", result=result
         )
-        active_data_profile_str = (
-            str(request.active_data_profile_id) if request.active_data_profile_id else None
-        )
+        active_data_profile_id = request.active_data_profile_id
 
         # 2. Generate a bounded candidate pool before scoring. Structural candidates
         # are always considered; the lexical fallback is a bounded recent window.
@@ -141,8 +139,8 @@ class DiscoveryRetrievalEngine:
                 candidate.structural_relations.append("ancestor_motivation")
                 candidate.inclusion_reasons.append("Motivates an ancestor task.")
 
-            if active_data_profile_str:
-                if discovery.validity_basis.data_profile_id == active_data_profile_str:
+            if active_data_profile_id:
+                if discovery.validity_basis.data_profile_id == active_data_profile_id:
                     candidate.structural_score += 2.0
                     candidate.structural_relations.append("active_profile_match")
                 elif discovery.validity_basis.data_profile_id:

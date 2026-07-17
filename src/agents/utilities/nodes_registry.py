@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from types import SimpleNamespace
 
 from langgraph.graph.state import StateNode  # type: ignore[attr-defined]

@@ -1,7 +1,8 @@
 import tomllib
 from pathlib import Path
-from typing import List
+
 from pydantic_ai_skills import SkillsCapability
+
 
 def load_skills(
     path: str | Path = "config/skills.toml"
