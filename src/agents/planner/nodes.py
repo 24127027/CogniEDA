@@ -26,14 +26,15 @@ from repositories import (
     SessionFrameRepository,
     TaskRepository,
 )
-from repositories.objective_repository import ObjectiveRepository
-from schemas.artifacts import Hypothesis
+from repositories.objective_repository import MultipleActiveObjectivesError, ObjectiveRepository
+from schemas.artifacts import Hypothesis, Objective, SessionFrame
 from schemas.common import TaskContextSummary
 from schemas.enums import (
     ContextMode,
     DataProfileLifecycleState,
     ExecutionApprovalStatus,
     HypothesisStatus,
+    ObjectiveStatus,
     PlannerNodeName,
     PlannerOperationApprovalState,
     PlannerOperationType,
@@ -55,6 +56,8 @@ from .types import (
     ExecutionRevalidation,
     ExecutionSpecification,
     HypothesisDraft,
+    ObjectiveCreateDraft,
+    ObjectiveUpdateDraft,
     PendingUserInteraction,
     PreparedExecution,
     RequestUnderstanding,
@@ -1109,23 +1112,234 @@ def commit_execution_contract(state: State, runtime: Runtime[Context]) -> State:
 
 @registry.register()
 def manage_objective(state: State, runtime: Runtime[Context]) -> State:
-    """Draft Objective update operations without mutating the Objective directly."""
-    session_id = _session_id(state, runtime)
-    for draft in state.objective_update_payloads:
-        state.planner_operations.append(
-            PlannerOperation(
-                session_id=session_id,
-                operation_type=PlannerOperationType.UPDATE_OBJECTIVE,
-                payload=draft.operation_payload(
-                    objective_id=UUID(state.resolve_object_reference(draft.objective_ref)),
-                ).model_dump(
-                    mode="json",
-                    exclude_unset=True,
-                ),
-                produced_by_node=PlannerNodeName.MANAGE_OBJECTIVE,
-            )
+    """Resolve current Objective state and draft an exact approval batch."""
+
+    context = _runtime_context(runtime)
+    if context is None or context.database_url is None:
+        state.controlled_error = ControlledPlannerError(
+            code="objective_store_unavailable",
+            message="Objective management requires a configured planner database.",
         )
+        return state
+
+    session = get_session(context.database_url)
+    try:
+        repository = ObjectiveRepository(session)
+        objectives = repository.list()
+        active = repository.get_active()
+        latest_frame = SessionFrameRepository(session).get_latest()
+    except MultipleActiveObjectivesError as exc:
+        state.controlled_error = ControlledPlannerError(
+            code="multiple_active_objectives",
+            message=str(exc),
+        )
+        return state
+    finally:
+        session.close()
+
+    objective_by_ref = {
+        state.bind_object_reference("objective", str(objective.objective_id)): objective
+        for objective in objectives
+    }
+    has_existing_drafts = bool(
+        state.objective_create_payloads or state.objective_update_payloads
+    )
+    if not has_existing_drafts:
+        model = context.objective_management_model or _ConfiguredObjectiveManagementModel()
+        try:
+            draft_result = ObjectiveManagementDraft.model_validate(
+                model.draft(
+                    _objective_management_prompt(
+                        state.request_understanding.request_text
+                        if state.request_understanding is not None
+                        else state.query,
+                        active=active,
+                        objective_by_ref=objective_by_ref,
+                    )
+                )
+            )
+            state.objective_update_payloads.extend(draft_result.objective_update_payloads)
+            state.objective_create_payloads.extend(draft_result.objective_create_payloads)
+        except Exception:
+            state.controlled_error = ControlledPlannerError(
+                code="objective_proposal_unavailable",
+                message="Unable to produce a valid Objective lifecycle proposal.",
+            )
+            return state
+
+    session_id = _session_id(state, runtime)
+    operations: list[PlannerOperation] = []
+    projected = {objective.objective_id: objective for objective in objectives}
+    last_changed: Objective | None = None
+    try:
+        # Updates precede creation so an approved replacement archives/completes
+        # the current Objective before the new ACTIVE row is inserted.
+        for update_draft in state.objective_update_payloads:
+            objective = objective_by_ref[update_draft.objective_ref]
+            update_payload = update_draft.operation_payload(
+                objective_id=objective.objective_id,
+                expected_updated_at=objective.updated_at,
+            )
+            operations.append(
+                PlannerOperation(
+                    session_id=session_id,
+                    operation_type=PlannerOperationType.UPDATE_OBJECTIVE,
+                    payload=update_payload.model_dump(mode="json", exclude_unset=True),
+                    produced_by_node=PlannerNodeName.MANAGE_OBJECTIVE,
+                )
+            )
+            update_values = update_draft.model_dump(
+                exclude={"objective_ref", "revision_reason", "user_decision_id"},
+                exclude_none=True,
+            )
+            last_changed = objective.model_copy(update=update_values)
+            projected[objective.objective_id] = last_changed
+
+        for create_draft in state.objective_create_payloads:
+            if create_draft.status != ObjectiveStatus.ACTIVE:
+                raise ValueError("Public Objective creation must be ACTIVE.")
+            objective_id = uuid4()
+            create_payload = create_draft.operation_payload(objective_id=objective_id)
+            operations.append(
+                PlannerOperation(
+                    session_id=session_id,
+                    operation_type=PlannerOperationType.CREATE_OBJECTIVE,
+                    payload=create_payload.model_dump(mode="json"),
+                    produced_by_node=PlannerNodeName.MANAGE_OBJECTIVE,
+                )
+            )
+            last_changed = Objective(**create_payload.model_dump())
+            projected[objective_id] = last_changed
+    except (KeyError, ValueError):
+        state.controlled_error = ControlledPlannerError(
+            code="invalid_objective_proposal",
+            message="The Objective proposal contains an invalid lifecycle or local reference.",
+        )
+        return state
+
+    if not operations or last_changed is None:
+        state.controlled_error = ControlledPlannerError(
+            code="empty_objective_proposal",
+            message="The Objective request did not produce a lifecycle change.",
+        )
+        return state
+
+    projected_active = [
+        objective for objective in projected.values() if objective.status == ObjectiveStatus.ACTIVE
+    ]
+    if len(projected_active) > 1:
+        state.controlled_error = ControlledPlannerError(
+            code="multiple_active_objective_proposal",
+            message="The proposal would leave more than one ACTIVE Objective.",
+        )
+        return state
+    frame_objective = projected_active[0] if projected_active else last_changed
+    frame = _successor_objective_frame(latest_frame, frame_objective)
+    operations.append(
+        PlannerOperation(
+            session_id=session_id,
+            operation_type=PlannerOperationType.UPDATE_SESSION_FRAME,
+            payload=frame.model_dump(mode="json"),
+            produced_by_node=PlannerNodeName.MANAGE_OBJECTIVE,
+        )
+    )
+    state.active_session_frame_id = frame.session_frame_id
+    state.planner_operations.extend(operations)
     return state
+
+
+class ObjectiveManagementDraft(BaseModel):
+    """Typed model output for governed Objective creation and mutation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    objective_update_payloads: list[ObjectiveUpdateDraft] = Field(default_factory=list)
+    objective_create_payloads: list[ObjectiveCreateDraft] = Field(default_factory=list)
+
+
+class _ConfiguredObjectiveManagementModel:
+    """Adapter over the repository LLM factory for Objective proposals."""
+
+    def __init__(self) -> None:
+        from agents.llm import ModelConfig, create_agent
+
+        self._agent = create_agent(
+            worker="planner",
+            config=ModelConfig(),
+            deps_type=type(None),
+            builtin_tools=[],
+        )
+
+    def draft(self, prompt: str) -> ObjectiveManagementDraft:
+        result = self._agent.run_sync(prompt, output_type=ObjectiveManagementDraft)
+        return ObjectiveManagementDraft.model_validate(result.output)
+
+
+def _objective_management_prompt(
+    query: str,
+    *,
+    active: Objective | None,
+    objective_by_ref: dict[str, Objective],
+) -> str:
+    """Give the model local references and lifecycle semantics, never UUIDs."""
+
+    inventory = [
+        {
+            "reference": reference,
+            "title": objective.title,
+            "statement": objective.statement,
+            "status": objective.status.value,
+        }
+        for reference, objective in objective_by_ref.items()
+    ]
+    active_ref = next(
+        (
+            reference
+            for reference, objective in objective_by_ref.items()
+            if active is not None and objective.objective_id == active.objective_id
+        ),
+        None,
+    )
+    return (
+        "Translate the user's Objective request into ObjectiveManagementDraft. "
+        "Use only the supplied local references; never invent UUIDs. Every update requires "
+        "a concrete revision_reason. ACTIVE is the singular current research intent. "
+        "COMPLETED means explicit user acceptance of completion; ARCHIVED does not claim "
+        "success. To switch, update the current Objective away from ACTIVE and then create "
+        "or reactivate exactly one Objective. Do not mutate Tasks, Hypotheses, Evidence, or "
+        "Discoveries.\n"
+        f"Current ACTIVE reference: {active_ref}\n"
+        f"Objective inventory: {json.dumps(inventory)}\n"
+        f"Latest raw user request:\n{query}"
+    )
+
+
+def _successor_objective_frame(
+    latest_frame: SessionFrame | None,
+    objective: Objective,
+) -> SessionFrame:
+    """Build the successor frame included in the exact approved operation batch."""
+
+    summary = (
+        None
+        if objective.status == ObjectiveStatus.ACTIVE
+        else f"Objective is {objective.status.value}: {objective.title}"
+    )
+    if latest_frame is None:
+        return SessionFrame(
+            frame_topic=objective.title,
+            objective_snapshot=objective.statement,
+            objective_summary=summary,
+        )
+    return latest_frame.model_copy(
+        update={
+            "session_frame_id": uuid4(),
+            "parent_session_frame_id": latest_frame.session_frame_id,
+            "frame_topic": objective.title,
+            "objective_snapshot": objective.statement,
+            "objective_summary": summary,
+        }
+    )
 
 
 @registry.register()
@@ -1361,13 +1575,13 @@ def resume_planner_operations(state: State, runtime: Runtime[Context]) -> State:
     if context is None or context.database_url is None or session_id is None or not requested_ids:
         state.controlled_error = ControlledPlannerError(
             code="planner_operation_resume_unavailable",
-            message="A task proposal decision must include its durable operation identifiers.",
+            message="A proposal decision must include its durable operation identifiers.",
         )
         return state
     if len(requested_ids) != len(set(requested_ids)):
         state.controlled_error = ControlledPlannerError(
             code="invalid_planner_operation_proposal",
-            message="The task proposal contains duplicate operation identifiers.",
+            message="The proposal contains duplicate operation identifiers.",
         )
         return state
 
@@ -1391,7 +1605,7 @@ def resume_planner_operations(state: State, runtime: Runtime[Context]) -> State:
         state.controlled_error = ControlledPlannerError(
             code="invalid_planner_operation_proposal",
             message=(
-                "The task proposal is unknown, belongs to another session, or is no longer pending."
+                "The proposal is unknown, belongs to another session, or is no longer pending."
             ),
         )
         return state
@@ -1400,6 +1614,15 @@ def resume_planner_operations(state: State, runtime: Runtime[Context]) -> State:
     snapshot_hash = _planner_operations_fingerprint(restored_operations)
     state.planner_operations = restored_operations
     state.operation_ids_to_commit = [str(operation_id) for operation_id in requested_ids]
+    frame_operations = [
+        operation
+        for operation in restored_operations
+        if operation.operation_type == PlannerOperationType.UPDATE_SESSION_FRAME
+    ]
+    if len(frame_operations) == 1 and frame_operations[0].payload.get("session_frame_id"):
+        state.active_session_frame_id = UUID(
+            str(frame_operations[0].payload["session_frame_id"])
+        )
     state.pending_interaction = PendingUserInteraction(
         kind="planner_operation_approval",
         payload={"operation_count": len(restored_operations)},
@@ -1520,7 +1743,7 @@ def _process_planner_operation_decision(
         or decision.proposal_id != interaction.proposal_id
         or decision.selected_ids != expected_ids
     ):
-        state.interaction_error = "The decision does not match the pending task proposal."
+        state.interaction_error = "The decision does not match the pending proposal."
         return state
     approval_state = (
         PlannerOperationApprovalState.APPROVED

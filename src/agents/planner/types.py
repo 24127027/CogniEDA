@@ -26,6 +26,7 @@ from schemas.enums import (
 from schemas.planner_operations import (
     AssumptionStateUpdateOperationPayload,
     ConflictFlagOperationPayload,
+    ObjectiveCreateOperationPayload,
     ObjectiveUpdateOperationPayload,
     PlannerCommitResult,
     PlannerOperation,
@@ -400,6 +401,26 @@ class TaskDecompositionDraft(BaseModel):
         return self
 
 
+class ObjectiveCreateDraft(BaseModel):
+    """Planner Objective-create draft."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    statement: str
+    status: ObjectiveStatus = ObjectiveStatus.ACTIVE
+
+    def operation_payload(self, *, objective_id: UUID) -> ObjectiveCreateOperationPayload:
+        """Return the typed operation payload for this Objective creation."""
+
+        return ObjectiveCreateOperationPayload(
+            objective_id=objective_id,
+            title=self.title,
+            statement=self.statement,
+            status=self.status,
+        )
+
+
 class ObjectiveUpdateDraft(BaseModel):
     """Planner Objective-update draft addressed by a graph-local Objective reference."""
 
@@ -409,11 +430,15 @@ class ObjectiveUpdateDraft(BaseModel):
     title: str | None = None
     statement: str | None = None
     status: ObjectiveStatus | None = None
-    revision_reason: str | None = None
-    user_decision_id: str | None = None
-    created_by: str | None = None
+    revision_reason: str
+    user_decision_id: UUID | None = None
 
-    def operation_payload(self, *, objective_id: UUID) -> ObjectiveUpdateOperationPayload:
+    def operation_payload(
+        self,
+        *,
+        objective_id: UUID,
+        expected_updated_at: datetime,
+    ) -> ObjectiveUpdateOperationPayload:
         """Return the typed operation payload for this Objective update."""
 
         payload = self.model_dump(
@@ -423,6 +448,7 @@ class ObjectiveUpdateDraft(BaseModel):
         )
         return ObjectiveUpdateOperationPayload(
             objective_id=objective_id,
+            expected_updated_at=expected_updated_at,
             **payload,
         )
 
@@ -592,6 +618,7 @@ class State(BaseModel):
     task_update_payloads: list[TaskUpdateDraft] = Field(default_factory=list)
     task_state_change_payloads: list[TaskStateChangeDraft] = Field(default_factory=list)
     task_decomposition_payloads: list[TaskDecompositionDraft] = Field(default_factory=list)
+    objective_create_payloads: list[ObjectiveCreateDraft] = Field(default_factory=list)
     objective_update_payloads: list[ObjectiveUpdateDraft] = Field(default_factory=list)
     assumption_create_payloads: list[Assumption] = Field(default_factory=list)
     assumption_state_update_payloads: list[AssumptionStateUpdateDraft] = Field(default_factory=list)
@@ -645,6 +672,13 @@ class TaskManagementModel(Protocol):
 
 
 @runtime_checkable
+class ObjectiveManagementModel(Protocol):
+    """Abstract dependency for Objective lifecycle proposals."""
+
+    def draft(self, prompt: str) -> Any: ...
+
+
+@runtime_checkable
 class TaskDecompositionModel(Protocol):
     """Abstract dependency for bounded child-Task proposals."""
 
@@ -661,6 +695,7 @@ class Context(BaseModel):
     database_url: str | None = None
     request_understanding_model: RequestUnderstandingModel | None = None
     task_management_model: TaskManagementModel | None = None
+    objective_management_model: ObjectiveManagementModel | None = None
     task_decomposition_model: TaskDecompositionModel | None = None
     governance_mode: GovernanceMode = GovernanceMode.RISK_BASED
 
