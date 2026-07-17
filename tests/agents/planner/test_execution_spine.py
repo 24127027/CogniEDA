@@ -909,9 +909,7 @@ def test_malformed_durable_payload_fails_without_invoking_executor(db_session) -
     )
     assert state.execution_admission is not None
     assert state.execution_admission.execution_run_ref is not None
-    run_id = UUID(
-        state.resolve_object_reference(state.execution_admission.execution_run_ref)
-    )
+    run_id = UUID(state.resolve_object_reference(state.execution_admission.execution_run_ref))
     outbox = ExecutionOutboxRepository(db_session).list(execution_run_id=run_id)[0]
     record = db_session.get(ExecutionOutboxRecord, outbox.outbox_id)
     assert record is not None
@@ -962,9 +960,7 @@ def test_dispatch_resolution_and_executor_failures_reach_inbox(
     )
     assert state.execution_admission is not None
     assert state.execution_admission.execution_run_ref is not None
-    run_id = UUID(
-        state.resolve_object_reference(state.execution_admission.execution_run_ref)
-    )
+    run_id = UUID(state.resolve_object_reference(state.execution_admission.execution_run_ref))
 
     executor = FakeExecutor(raise_error=failure_mode == "executor")
     registry = ExecutorRegistry()
@@ -1033,22 +1029,24 @@ def test_retry_reuses_contract_and_canonical_adapter_with_new_attempt(db_session
     assert predecessor is not None
     assert predecessor.dispatch_idempotency_key is not None
     assert predecessor.method_id is not None
-    assert submit_execution_result(
-        db_session,
-        execution_run_id=predecessor_id,
-        dispatch_idempotency_key=predecessor.dispatch_idempotency_key,
-        lease_epoch=predecessor.lease_epoch,
-        worker_id="test-worker",
-        method_id=predecessor.method_id,
-        executor_status="failed",
-        result=None,
-        error_msg="late predecessor result",
-    ) is None
+    assert (
+        submit_execution_result(
+            db_session,
+            execution_run_id=predecessor_id,
+            dispatch_idempotency_key=predecessor.dispatch_idempotency_key,
+            lease_epoch=predecessor.lease_epoch,
+            worker_id="test-worker",
+            method_id=predecessor.method_id,
+            executor_status="failed",
+            result=None,
+            error_msg="late predecessor result",
+        )
+        is None
+    )
 
     successful_executor = FakeExecutor()
     assert (
-        _dispatch_and_finalize(db_session, successful_executor, task)
-        == successor.execution_run_id
+        _dispatch_and_finalize(db_session, successful_executor, task) == successor.execution_run_id
     )
     first_input = failed_executor.requests[0]
     retry_input = successful_executor.requests[0]

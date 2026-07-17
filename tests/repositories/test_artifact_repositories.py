@@ -19,6 +19,7 @@ from repositories import (
     EvidenceRepository,
     HypothesisRepository,
     HypothesisUpdate,
+    ObjectiveMutationContext,
     ObjectiveRepository,
     ObjectiveUpdate,
     SessionFrameRepository,
@@ -80,6 +81,29 @@ def build_objective(**overrides: object) -> Objective:
     }
     payload.update(overrides)
     return Objective(**payload)
+
+
+def objective_mutation_context(
+    objective: Objective,
+    decision_id: UUID,
+    reason: str = "User-approved Objective change.",
+) -> ObjectiveMutationContext:
+    return ObjectiveMutationContext(
+        reason=reason,
+        actor="test-user",
+        expected_updated_at=objective.updated_at,
+        user_decision_id=decision_id,
+    )
+
+
+def objective_management_decision(db_session, decision: str) -> UserDecision:
+    return UserDecisionRepository(db_session).create(
+        UserDecision(
+            decision_type=UserDecisionType.OBJECTIVE_MANAGEMENT,
+            decision=decision,
+            rationale="Explicit repository-level Objective governance test.",
+        )
+    )
 
 
 def build_data_profile(**overrides: object) -> DataProfile:
@@ -305,10 +329,12 @@ def test_objective_task_profile_repositories_round_trip_without_project_ids(db_s
     profile_repository = DataProfileRepository(db_session)
     task_repository = TaskRepository(db_session)
 
-    objective = objective_repository.create(build_objective())
+    objective = objective_repository.create_for_bootstrap(build_objective())
+    objective_decision = objective_management_decision(db_session, "Refine Objective wording.")
     updated_objective = objective_repository.update(
         objective.objective_id,
         ObjectiveUpdate(statement="Refined churn objective."),
+        context=objective_mutation_context(objective, objective_decision.decision_id),
     )
     profile = profile_repository.create(build_data_profile())
     task = task_repository.create(build_task(profile.profile_id))
@@ -330,33 +356,43 @@ def test_objective_task_profile_repositories_round_trip_without_project_ids(db_s
 
 def test_objective_lifecycle_is_explicit_and_active_lookup_excludes_history(db_session) -> None:
     repository = ObjectiveRepository(db_session)
-    active = repository.create(build_objective())
-    archived = repository.create(build_objective(title="Archived investigation"))
-
-    updated = repository.update(
-        archived.objective_id,
-        ObjectiveUpdate(status=ObjectiveStatus.ARCHIVED),
+    active = repository.create_for_bootstrap(build_objective())
+    archived = repository.create_for_bootstrap(
+        build_objective(
+            title="Archived investigation",
+            status=ObjectiveStatus.ARCHIVED,
+        )
     )
 
-    assert updated is not None
-    assert updated.objective_id == archived.objective_id
-    assert updated.status == ObjectiveStatus.ARCHIVED
-    assert repository.get_by_id(archived.objective_id) == updated
+    assert archived.status == ObjectiveStatus.ARCHIVED
+    assert repository.get_by_id(archived.objective_id) == archived
     assert repository.get_active() == active
-    assert repository.list(status=ObjectiveStatus.ARCHIVED) == [updated]
+    assert repository.list(status=ObjectiveStatus.ARCHIVED) == [archived]
 
 
 def test_objective_lifecycle_transition_preserves_identity(db_session) -> None:
     repository = ObjectiveRepository(db_session)
-    objective = repository.create(build_objective())
+    objective = repository.create_for_bootstrap(build_objective())
+    completion_decision = objective_management_decision(db_session, "Complete Objective.")
 
     completed = repository.update(
         objective.objective_id,
         ObjectiveUpdate(status=ObjectiveStatus.COMPLETED),
+        context=objective_mutation_context(
+            objective,
+            completion_decision.decision_id,
+            "Accept Objective completion.",
+        ),
     )
+    archive_decision = objective_management_decision(db_session, "Archive Objective history.")
     archived = repository.update(
         objective.objective_id,
         ObjectiveUpdate(status=ObjectiveStatus.ARCHIVED),
+        context=objective_mutation_context(
+            completed,
+            archive_decision.decision_id,
+            "Archive completed Objective.",
+        ),
     )
 
     assert completed is not None
@@ -822,7 +858,12 @@ def test_analysis_frame_and_execution_run_are_minimal_provenance_refs(db_session
         analysis_frame
     ]
     from sqlmodel import select
-    runs = db_session.exec(select(ExecutionRunRecord).where(ExecutionRunRecord.hypothesis_id == hypothesis.hypothesis_id)).all()
+
+    runs = db_session.exec(
+        select(ExecutionRunRecord).where(
+            ExecutionRunRecord.hypothesis_id == hypothesis.hypothesis_id
+        )
+    ).all()
     assert len(runs) == 1
     assert runs[0].execution_run_id == execution_run.execution_run_id
     assert evidence.analysis_frame_ref == str(analysis_frame.analysis_frame_id)
@@ -1624,7 +1665,9 @@ def test_workspace_databases_are_isolated(tmp_path: Path) -> None:
     first_session = get_session(first_url)
     second_session = get_session(second_url)
     try:
-        created = ObjectiveRepository(first_session).create(build_objective(title="First"))
+        created = ObjectiveRepository(first_session).create_for_bootstrap(
+            build_objective(title="First")
+        )
 
         assert ObjectiveRepository(first_session).get_by_id(created.objective_id) == created
         assert ObjectiveRepository(second_session).get_by_id(created.objective_id) is None
@@ -1674,9 +1717,7 @@ def test_planner_and_executor_authoring_contracts() -> None:
     assert {"planner_operations", "executor_dispatch_ref"} <= planner_fields
     # ExecutorResult validates execution results.
     # It does not accept arbitrary drafts from the agent.
-    assert {"evidence_drafts", "discovery_drafts", "execution_run_ref"}.isdisjoint(
-        executor_fields
-    )
+    assert {"evidence_drafts", "discovery_drafts", "execution_run_ref"}.isdisjoint(executor_fields)
 
 
 def test_repository_queries_do_not_require_project_fco(db_session) -> None:

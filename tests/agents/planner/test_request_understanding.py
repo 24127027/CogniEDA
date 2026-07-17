@@ -40,14 +40,17 @@ class FakeTaskManagementModel:
     def draft(self, prompt: str) -> Any:
         self.prompts.append(prompt)
         from agents.planner.nodes import TaskManagementDraft
+
         return self.result or TaskManagementDraft()
 
 
 def runtime_with(model: RequestUnderstandingModel | None = None) -> Runtime[Context]:
-    return Runtime(context=Context(
-        request_understanding_model=model,
-        task_management_model=FakeTaskManagementModel(),
-    ))
+    return Runtime(
+        context=Context(
+            request_understanding_model=model,
+            task_management_model=FakeTaskManagementModel(),
+        )
+    )
 
 
 @pytest.mark.parametrize(

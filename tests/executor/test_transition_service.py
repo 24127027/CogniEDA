@@ -230,6 +230,7 @@ def test_authorize_new_attempt_reuses_hypothesis_and_idempotent(memory_session: 
 
     # We need a hypothesis record
     from db.models import HypothesisRecord
+
     hyp = HypothesisRecord(
         hypothesis_id=hyp_id,
         task_id=uuid.uuid4(),
@@ -240,7 +241,7 @@ def test_authorize_new_attempt_reuses_hypothesis_and_idempotent(memory_session: 
         scope="scope",
         validation_method="method",
         evidence_expectation="expect",
-        status="approved"
+        status="approved",
     )
     memory_session.add(hyp)
     memory_session.commit()
@@ -270,6 +271,7 @@ def test_authorize_new_attempt_reuses_hypothesis_and_idempotent(memory_session: 
 
     # Check hypothesis count
     from sqlmodel import select
+
     hyp_count = len(memory_session.exec(select(HypothesisRecord)).all())
     assert hyp_count == 1
 

@@ -79,7 +79,7 @@ class FakeGraph:
             },
             "execution_run": {
                 "status": "failed",
-            }
+            },
         }
 
 

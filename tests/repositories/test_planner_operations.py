@@ -344,16 +344,14 @@ def test_commit_updates_session_frame_after_task_change(db_session) -> None:
 
 
 def test_commit_updates_objective_and_assumption_through_operations(db_session) -> None:
-    objective = ObjectiveRepository(db_session).create(
+    objective = ObjectiveRepository(db_session).create_for_bootstrap(
         Objective(
             title="Churn Investigation",
             statement="Understand churn.",
             status=ObjectiveStatus.ACTIVE,
         )
     )
-    assumption = AssumptionRepository(db_session).create(
-        Assumption(**build_assumption_payload())
-    )
+    assumption = AssumptionRepository(db_session).create(Assumption(**build_assumption_payload()))
     repository = PlannerOperationRepository(db_session)
     objective_operation = repository.create(
         build_operation(
@@ -362,6 +360,8 @@ def test_commit_updates_objective_and_assumption_through_operations(db_session) 
                 "objective_id": str(objective.objective_id),
                 "statement": "Understand churn drivers.",
                 "revision_reason": "Refine objective from planner operation.",
+                "expected_updated_at": objective.updated_at.isoformat(),
+                "actor": "test-user",
             },
             approval_state=PlannerOperationApprovalState.APPROVED,
             produced_by_node=PlannerNodeName.MANAGE_OBJECTIVE,
