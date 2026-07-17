@@ -1,10 +1,11 @@
 import re
 from uuid import uuid4
 
+import pytest
 from langgraph.checkpoint.memory import MemorySaver
 
 from agents.planner.graph import build_graph
-from agents.planner.types import Context, TaskDecompositionDraft
+from agents.planner.types import ChildTaskProposalDraft, Context, TaskDecompositionDraft
 from application.orchestrator.planner_commit import commit_planner_operations
 from db.models import (
     DataProfileRecord,
@@ -13,8 +14,9 @@ from db.models import (
     ObjectiveRecord,
     TaskRecord,
 )
-from repositories import SessionFrameRepository, TaskRepository
-from schemas.artifacts import SessionFrame, Task
+from repositories import DataProfileRepository, SessionFrameRepository, TaskRepository
+from schemas.artifacts import DataProfile, SessionFrame, Task
+from schemas.common import BaselineSummary, EvaluationThresholds, MethodParameter, SchemaSummary
 from schemas.enums import (
     DataProfileLifecycleState,
     DataProfileMethod,
@@ -22,6 +24,7 @@ from schemas.enums import (
     DiscoveryLifecycleState,
     PlannerOperationApprovalState,
     PlannerOperationType,
+    TaskKind,
 )
 from schemas.planner_operations import PlannerOperation
 
@@ -52,6 +55,38 @@ class EmptyMotivationDecompositionModel:
                     }
                 ],
             }
+        )
+
+
+class ReadyAnalyticalDecompositionModel:
+    def draft(self, prompt: str) -> TaskDecompositionDraft:
+        parent_match = re.search(r"Parent local reference: (task:[^\n]+)", prompt)
+        profile_match = re.search(r"data_profile_ref \(use ([^\)]+)\)", prompt)
+        assert parent_match is not None
+        assert profile_match is not None
+        return TaskDecompositionDraft(
+            parent_task_ref=parent_match.group(1),
+            child_task_proposals=[
+                ChildTaskProposalDraft(
+                    title="Ready child",
+                    description="Execute one bounded test.",
+                    scope="accepted profile",
+                    parent_task_ref=parent_match.group(1),
+                    motivated_by_discovery_refs=[],
+                    decomposition_rationale="Terminal analytical follow-up.",
+                    readiness_status="ready_analytical",
+                    data_profile_ref=profile_match.group(1),
+                    variables=["x", "y"],
+                    evidence_expectation="A deterministic p-value.",
+                    hypothesis_statement="x is associated with y.",
+                    claim_type="association",
+                    decision_rule=EvaluationThresholds(p_value=0.05),
+                    validation_method="deterministic_test",
+                    executor_id="deterministic",
+                    method_parameters=[MethodParameter(name="alpha", value=0.05)],
+                    deterministic_seed=11,
+                )
+            ],
         )
 
 
@@ -219,3 +254,131 @@ def test_decomposition_rejects_missing_active_data_profile(db_session) -> None:
     )
 
     assert result["controlled_error"].code == "decomposition_data_profile_missing"
+
+
+def test_child_kind_contract_is_typed_and_not_forced_onto_non_analytical_children() -> None:
+    parent_ref = "task:parent"
+    profile_id = uuid4()
+    ready = ReadyAnalyticalDecompositionModel().draft(
+        "Parent local reference: task:parent\n"
+        "data_profile_ref (use data_profile:active)"
+    ).child_task_proposals[0]
+    payload = ready.operation_payload(
+        task_id=uuid4(),
+        parent_task_id=uuid4(),
+        motivated_by_discovery_ids=[],
+        parent_task_updated_at=Task(title="P", description="P").updated_at,
+        profile_id=profile_id,
+        motivation_data_profile_id=profile_id,
+    )
+    assert payload.task_kind == TaskKind.ANALYTICAL
+    assert payload.analytical_specification is not None
+    assert payload.analytical_specification.data_profile_id == profile_id
+    assert payload.analytical_specification.variable_bindings == ["x", "y"]
+
+    for readiness_status in ("operational", "blocked", "requires_decomposition"):
+        child = ChildTaskProposalDraft(
+            title="Non-analytical child",
+            description="No analytical contract.",
+            scope="workflow",
+            parent_task_ref=parent_ref,
+            motivated_by_discovery_refs=[],
+            decomposition_rationale="Workflow-only child.",
+            readiness_status=readiness_status,
+            readiness_reason="Not a terminal analytical leaf.",
+        )
+        non_analytical_payload = child.operation_payload(
+            task_id=uuid4(),
+            parent_task_id=uuid4(),
+            motivated_by_discovery_ids=[],
+            parent_task_updated_at=Task(title="P", description="P").updated_at,
+        )
+        assert non_analytical_payload.task_kind == TaskKind.ORGANIZING
+        assert non_analytical_payload.analytical_specification is None
+
+    with pytest.raises(ValueError, match="cannot carry an analytical execution contract"):
+        ChildTaskProposalDraft(
+            title="Technical child",
+            description="Invalid analytical leakage.",
+            scope="workflow",
+            parent_task_ref=parent_ref,
+            motivated_by_discovery_refs=[],
+            decomposition_rationale="Invalid.",
+            readiness_status="operational",
+            readiness_reason="Technical.",
+            variables=["x"],
+        )
+    with pytest.raises(ValueError, match="must not contain duplicates"):
+        ChildTaskProposalDraft(
+            title="Duplicate motivation",
+            description="Invalid duplicate refs.",
+            scope="workflow",
+            parent_task_ref=parent_ref,
+            motivated_by_discovery_refs=["discovery:a", "discovery:a"],
+            decomposition_rationale="Invalid.",
+            readiness_status="blocked",
+            readiness_reason="Blocked.",
+        )
+
+
+def test_ready_child_commit_rejects_stale_profile_and_rolls_back_frame(db_session) -> None:
+    db_session.add(ObjectiveRecord(title="Objective", statement="Stale profile guard"))
+    db_session.commit()
+    profiles = DataProfileRepository(db_session)
+    old_profile = profiles.create(
+        DataProfile(
+            dataset_path="data/old.csv",
+            method=DataProfileMethod.BASELINE_SUMMARY,
+            schema_summary=SchemaSummary(column_order=["x", "y"]),
+            baseline_summary=BaselineSummary(column_names=["x", "y"]),
+            row_count=2,
+            column_count=2,
+            lifecycle_state=DataProfileLifecycleState.ACTIVE,
+            accepted_as_ground_truth=True,
+        )
+    )
+    replacement = profiles.create(
+        old_profile.model_copy(
+            update={
+                "profile_id": uuid4(),
+                "dataset_path": "data/replacement.csv",
+            }
+        )
+    )
+    parent = TaskRepository(db_session).create(
+        Task(title="Parent", description="Parent", profile_id=old_profile.profile_id)
+    )
+    frame = SessionFrameRepository(db_session).create(
+        SessionFrame(
+            frame_topic="stale profile",
+            objective_snapshot="Guard the active profile",
+            active_data_profile_refs=[old_profile.profile_id],
+        )
+    )
+    result = build_graph(checkpointer=MemorySaver()).invoke(
+        {"query": f"/decompose {parent.task_id}"},
+        config={"configurable": {"thread_id": "stale-profile-decomposition"}},
+        context=Context(
+            database_url=_database_url(db_session),
+            session_id="stale-profile-decomposition",
+            session_frame_id=frame.session_frame_id,
+            task_decomposition_model=ReadyAnalyticalDecompositionModel(),
+        ),
+    )
+    operations = [
+        PlannerOperation.model_validate(operation) for operation in result["planner_operations"]
+    ]
+    assert len(operations) == 2
+    profiles.supersede(old_profile.profile_id, replacement.profile_id)
+    for operation in operations:
+        operation.approval_state = PlannerOperationApprovalState.APPROVED
+
+    outcome = commit_planner_operations(
+        db_session,
+        operations=operations,
+        session_id="stale-profile-decomposition",
+    )
+
+    assert not outcome.succeeded
+    assert TaskRepository(db_session).list(parent_task_id=parent.task_id) == []
+    assert SessionFrameRepository(db_session).list_recent(limit=2) == [frame]
