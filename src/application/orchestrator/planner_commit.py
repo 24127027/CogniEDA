@@ -14,7 +14,6 @@ from db.models import (
     DiscoveryRecord,
     ExecutionRunRecord,
     HypothesisRecord,
-    ObjectiveRecord,
     PlannerOperationRecord,
     SessionFrameRecord,
     TaskRecord,
@@ -25,7 +24,11 @@ from repositories.common import apply_update, record_to_schema, schema_to_record
 from repositories.discovery_repository import DiscoveryRepository
 from repositories.evidence_repository import EvidenceRepository
 from repositories.hypothesis_repository import HypothesisRepository, HypothesisUpdate
-from repositories.objective_repository import ObjectiveUpdate
+from repositories.objective_repository import (
+    ObjectiveMutationContext,
+    ObjectiveRepository,
+    ObjectiveUpdate,
+)
 from repositories.session_frame_repository import SESSION_FRAME_JSON_FIELDS
 from repositories.task_repository import TASK_JSON_FIELDS, TaskUpdate
 from schemas.artifacts import (
@@ -33,6 +36,7 @@ from schemas.artifacts import (
     Discovery,
     Evidence,
     Hypothesis,
+    Objective,
     SessionFrame,
     Task,
 )
@@ -44,7 +48,12 @@ from schemas.enums import (
     PlannerOperationType,
     TaskLifecycleState,
 )
-from schemas.planner_operations import PlannerCommitResult, PlannerOperation
+from schemas.planner_operations import (
+    ObjectiveCreateOperationPayload,
+    ObjectiveUpdateOperationPayload,
+    PlannerCommitResult,
+    PlannerOperation,
+)
 from schemas.provenance import AnalysisFrame, ExecutionOutbox, ExecutionRun
 
 _COMMITTABLE_STATES = {
@@ -345,6 +354,10 @@ def _apply_operation(session: Session, operation: PlannerOperation) -> None:
             _apply_create_assumption(session, operation)
         case PlannerOperationType.UPDATE_ASSUMPTION_STATE:
             _apply_update_assumption_state(session, operation)
+        case PlannerOperationType.CREATE_OBJECTIVE:
+            _apply_create_objective(session, operation)
+        case PlannerOperationType.UPDATE_OBJECTIVE:
+            _apply_update_objective(session, operation)
         case PlannerOperationType.CREATE_HYPOTHESIS:
             _apply_create_hypothesis(session, operation)
         case PlannerOperationType.CHANGE_HYPOTHESIS_STATE:
@@ -363,8 +376,6 @@ def _apply_operation(session: Session, operation: PlannerOperation) -> None:
             _apply_create_evidence(session, operation)
         case PlannerOperationType.CREATE_DISCOVERY:
             _apply_create_discovery(session, operation)
-        case PlannerOperationType.UPDATE_OBJECTIVE:
-            _apply_update_objective(session, operation)
         case PlannerOperationType.UPDATE_SESSION_FRAME:
             _apply_update_session_frame(session, operation)
         case PlannerOperationType.FLAG_OBJECT:
@@ -574,18 +585,56 @@ def _apply_update_assumption_state(session: Session, operation: PlannerOperation
     session.add(assumption_record)
 
 
+def _apply_create_objective(session: Session, operation: PlannerOperation) -> None:
+    _require_objective_user_approval(session, operation)
+    payload = ObjectiveCreateOperationPayload(**operation.payload)
+    if payload.status.value != "active":
+        raise ValueError("Public Objective creation must create the ACTIVE Objective.")
+    repository = ObjectiveRepository(session)
+    if repository.get_active() is not None:
+        raise ValueError(
+            "Another Objective is already ACTIVE; switch it in the same approved batch."
+        )
+    repository.stage_create_for_planner_commit(
+        Objective(**payload.model_dump()),
+        planner_operation_id=operation.operation_id,
+    )
+
+
 def _apply_update_objective(session: Session, operation: PlannerOperation) -> None:
-    objective_id = _require_payload_uuid(operation, "objective_id")
-    objective_record = _require_record(session, ObjectiveRecord, objective_id, "Objective")
-    payload = dict(operation.payload)
-    payload.pop("objective_id", None)
-    payload.pop("revision_reason", None)
-    payload.pop("user_decision_id", None)
-    payload.pop("created_by", None)
-    update = ObjectiveUpdate(**payload)
+    _require_objective_user_approval(session, operation)
+    proposal = ObjectiveUpdateOperationPayload(**operation.payload)
+    update = ObjectiveUpdate(
+        **proposal.model_dump(
+            include={"title", "statement", "status"},
+            exclude_none=True,
+        )
+    )
     _require_update_payload(update.model_fields_set, operation.operation_type.value)
-    apply_update(objective_record, update)
-    session.add(objective_record)
+    ObjectiveRepository(session).stage_update(
+        proposal.objective_id,
+        update,
+        context=ObjectiveMutationContext(
+            reason=proposal.revision_reason,
+            actor=proposal.actor,
+            expected_updated_at=proposal.expected_updated_at,
+            planner_operation_id=operation.operation_id,
+            user_decision_id=proposal.user_decision_id,
+        ),
+    )
+
+
+def _require_objective_user_approval(
+    session: Session,
+    operation: PlannerOperation,
+) -> None:
+    if operation.approval_state != PlannerOperationApprovalState.APPROVED:
+        raise ValueError("Objective lifecycle operations require explicit user approval.")
+    record = session.get(PlannerOperationRecord, operation.operation_id)
+    if record is None or record.approval_state != PlannerOperationApprovalState.APPROVED:
+        raise ValueError(
+            "Objective lifecycle operation must be the persisted approved proposal."
+        )
 
 
 def _apply_update_session_frame(session: Session, operation: PlannerOperation) -> None:
