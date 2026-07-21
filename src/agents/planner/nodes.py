@@ -1,5 +1,6 @@
 import json
 from hashlib import sha256
+from uuid import UUID
 
 from langgraph.runtime import Runtime
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -7,13 +8,15 @@ from sqlmodel import Session
 
 from application.orchestrator.planner_commit import commit_planner_operations
 from db.session import get_session
-from repositories import PlannerOperationRepository
+from memory.retrieval_engine import DiscoveryRetrievalEngine
+from repositories import PlannerOperationRepository, TaskRepository
 from schemas.enums import (
     PlannerNodeName,
     PlannerOperationApprovalState,
     PlannerOperationType,
 )
 from schemas.planner_operations import PlannerOperation
+from schemas.retrieval import RetrievalRequest
 
 from ..utilities.nodes_registry import NodeRegistry
 from .types import (
@@ -25,6 +28,8 @@ from .types import (
     RequestUnderstandingModel,
     State,
     TaskCreateDraft,
+    TaskDecompositionDraft,
+    TaskDecompositionModel,
     parse_explicit_command,
 )
 
@@ -195,16 +200,163 @@ def propose_questions(state: State, runtime: Runtime[Context]):
     pass
 
 
-@registry.register()
-def expand_plan(state: State, runtime: Runtime[Context]):
-    """
-    LLM expands an approved research direction into executable Tasks.
+class _ConfiguredTaskDecompositionModel:
+    """Adapter for bounded child-Task proposal drafting."""
 
-    This may include refining scope, decomposing large Tasks into
-    subtasks, identifying dependencies, and determining a concrete
-    execution plan.
-    """
-    pass
+    def __init__(self) -> None:
+        from agents.llm import ModelConfig, create_agent
+
+        self._agent = create_agent(
+            worker="planner",
+            config=ModelConfig(),
+            deps_type=type(None),
+            builtin_tools=[],
+        )
+
+    def draft(self, prompt: str) -> TaskDecompositionDraft:
+        result = self._agent.run_sync(prompt, output_type=TaskDecompositionDraft)
+        return TaskDecompositionDraft.model_validate(result.output)
+
+
+def _task_decomposition_prompt(
+    *,
+    parent_title: str,
+    parent_description: str,
+    query_text: str,
+    retrieval_candidates: list[dict[str, object]],
+    retrieval_exclusion_notes: list[str],
+) -> str:
+    """Build a planning-only prompt without exposing durable Discovery identifiers."""
+
+    return (
+        "Decompose one existing Task into bounded child Task proposals. "
+        "Return only the typed TaskDecompositionDraft. Every child is planning-only: "
+        "choose task_kind 'organizing' or 'review'; never choose analytical, add a "
+        "DataProfile, variables, hypothesis, executor, or execution contract. "
+        "The caller must obtain user approval before any child is persisted.\n\n"
+        f"Parent title: {parent_title}\n"
+        f"Parent description: {parent_description}\n"
+        f"Decomposition request: {query_text}\n"
+        f"Bounded Discovery context: {json.dumps(retrieval_candidates)}\n"
+        f"Retrieval exclusions: {json.dumps(retrieval_exclusion_notes)}"
+    )
+
+
+def _decomposition_operations(
+    *,
+    state: State,
+    runtime: Runtime[Context],
+    parent_task_id: UUID,
+    draft: TaskDecompositionDraft,
+) -> list[PlannerOperation]:
+    """Translate a validated non-executable child proposal into pending operations."""
+
+    session_id = _session_id(state, runtime)
+    return [
+        PlannerOperation(
+            session_id=session_id,
+            operation_type=PlannerOperationType.CREATE_TASK,
+            payload=child.operation_payload(parent_task_id=parent_task_id).model_dump(
+                mode="json",
+                exclude_none=True,
+                exclude_defaults=True,
+            ),
+            produced_by_node=PlannerNodeName.EXPAND_PLAN,
+        )
+        for child in draft.child_task_proposals
+    ]
+
+
+@registry.register()
+def expand_plan(state: State, runtime: Runtime[Context]) -> State:
+    """Propose non-executable child Tasks for one resolved ``/decompose`` parent."""
+
+    if state.planner_operations:
+        return state
+    understanding = state.request_understanding
+    if understanding is None or understanding.intent != "decompose":
+        state.controlled_error = ControlledPlannerError(
+            code="invalid_decomposition_request",
+            message="Task decomposition requires an explicit /decompose request.",
+        )
+        return state
+    try:
+        parent_task_id = UUID(understanding.request_text)
+    except ValueError:
+        state.controlled_error = ControlledPlannerError(
+            code="malformed_decomposition_parent",
+            message="/decompose requires one exact parent Task UUID.",
+        )
+        return state
+
+    context = _runtime_context(runtime)
+    if context is None or context.database_url is None:
+        state.controlled_error = ControlledPlannerError(
+            code="planner_operation_store_unavailable",
+            message="Task decomposition requires a configured planner database.",
+        )
+        return state
+
+    session = get_session(context.database_url)
+    try:
+        parent = TaskRepository(session).get_by_id(parent_task_id)
+        if parent is None:
+            state.controlled_error = ControlledPlannerError(
+                code="unknown_decomposition_parent",
+                message="The requested parent Task does not exist.",
+            )
+            return state
+        retrieval = DiscoveryRetrievalEngine(session).retrieve(
+            RetrievalRequest(
+                parent_task_id=parent.task_id,
+                query_text=f"{parent.title} {parent.description}",
+            )
+        )
+    finally:
+        session.close()
+
+    prompt_candidates = [
+        {
+            "claim": item.claim_statement,
+            "status": item.epistemic_status.value,
+            "lifecycle": item.lifecycle_state.value,
+            "reasons": item.inclusion_reasons,
+            "warnings": item.flags,
+        }
+        for item in retrieval.candidates
+    ]
+    model: TaskDecompositionModel = (
+        context.task_decomposition_model or _ConfiguredTaskDecompositionModel()
+    )
+    try:
+        draft = TaskDecompositionDraft.model_validate(
+            model.draft(
+                _task_decomposition_prompt(
+                    parent_title=parent.title,
+                    parent_description=parent.description,
+                    query_text="Create bounded child proposals for the resolved parent Task.",
+                    retrieval_candidates=prompt_candidates,
+                    retrieval_exclusion_notes=retrieval.exclusion_notes,
+                )
+            )
+        )
+    except (TypeError, ValueError, ValidationError, RuntimeError):
+        state.controlled_error = ControlledPlannerError(
+            code="invalid_decomposition_proposal",
+            message="Unable to produce a valid non-executable child-Task proposal.",
+        )
+        return state
+
+    state.task_decomposition_payloads.append(draft)
+    state.planner_operations.extend(
+        _decomposition_operations(
+            state=state,
+            runtime=runtime,
+            parent_task_id=parent.task_id,
+            draft=draft,
+        )
+    )
+    return state
 
 
 # --------------------

@@ -93,6 +93,7 @@ class DiscoveryRepository:
         hypothesis_id: UUID | None = None,
         epistemic_status: DiscoveryEpistemicStatus | None = None,
         lifecycle_state: DiscoveryLifecycleState | None = None,
+        limit: int | None = None,
     ) -> list[Discovery]:
         """List Discoveries by source Hypothesis, epistemic status, or lifecycle state."""
 
@@ -103,6 +104,8 @@ class DiscoveryRepository:
             statement = statement.where(DiscoveryRecord.epistemic_status == epistemic_status)
         if lifecycle_state is not None:
             statement = statement.where(DiscoveryRecord.lifecycle_state == lifecycle_state)
+        if limit is not None:
+            statement = statement.limit(limit)
         records = self._session.exec(statement).all()
         return [record_to_schema(Discovery, record) for record in records]
 
