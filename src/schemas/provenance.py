@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import Field, model_validator
 
 from schemas.common import CogniEDABaseModel, NonEmptyStr, utc_now
-from schemas.enums import ObjectiveStatus
+from schemas.enums import ExecutionApprovalStatus, ExecutionRunStatus, ObjectiveStatus
 
 
 class AnalysisFrame(CogniEDABaseModel):
@@ -41,8 +42,50 @@ class ExecutionRun(CogniEDABaseModel):
     executor_type: NonEmptyStr | None = None
     method_id: NonEmptyStr | None = None
     parameter_hash: NonEmptyStr | None = None
+    status: NonEmptyStr = ExecutionRunStatus.PENDING_APPROVAL.value
+    dispatch_idempotency_key: NonEmptyStr | None = None
+    worker_id: NonEmptyStr | None = None
+    lease_epoch: int = 0
+    lease_acquired_at: datetime | None = None
+    lease_expires_at: datetime | None = None
+    attempt_version: int = 1
+    previous_attempt_id: UUID | None = None
+    retry_reason: NonEmptyStr | None = None
+    retry_authorization_metadata: dict[str, Any] | None = None
+    recovery_status: NonEmptyStr | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class ExecutionOutbox(CogniEDABaseModel):
+    """Durable dispatch intent created atomically with an admitted attempt."""
+
+    outbox_id: UUID = Field(default_factory=uuid4)
+    execution_run_id: UUID
+    dispatch_idempotency_key: NonEmptyStr
+    executor_type: NonEmptyStr
+    method_id: NonEmptyStr
+    parameter_hash: NonEmptyStr
+    prepared_payload: dict[str, Any] = Field(default_factory=dict)
     status: NonEmptyStr = "pending"
     created_at: datetime = Field(default_factory=utc_now)
+    dispatched_at: datetime | None = None
+
+
+class ExecutionApproval(CogniEDABaseModel):
+    """Durable, session-bound approval record for an execution contract."""
+
+    execution_approval_id: UUID = Field(default_factory=uuid4)
+    session_id: NonEmptyStr
+    task_id: UUID
+    profile_id: UUID
+    hypothesis_id: UUID | None = None
+    execution_ref: NonEmptyStr
+    contract_fingerprint: NonEmptyStr
+    prepared_payload: dict[str, Any] = Field(default_factory=dict)
+    status: ExecutionApprovalStatus = ExecutionApprovalStatus.PENDING
+    execution_run_id: UUID | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
 
 class ObjectiveRevision(CogniEDABaseModel):

@@ -8,6 +8,7 @@ from sqlmodel import Session, desc, select
 
 from db.models import ExecutionRunRecord
 from repositories.common import record_to_schema, schema_to_record_payload
+from schemas.enums import ExecutionRunStatus
 from schemas.provenance import ExecutionRun
 
 
@@ -18,8 +19,16 @@ class ExecutionRunRepository:
         self._session = session
 
     def create(self, execution_run: ExecutionRun) -> ExecutionRun:
-        """Persist and return a new ExecutionRun record."""
+        """Persist legacy terminal provenance without bypassing attempt admission."""
 
+        if execution_run.status in {
+            ExecutionRunStatus.ADMITTED,
+            ExecutionRunStatus.DISPATCH_CLAIMED,
+            ExecutionRunStatus.RUNNING,
+        }:
+            raise ValueError(
+                "Admitted execution attempts must use ExecutionAttemptTransitionService."
+            )
         record = ExecutionRunRecord(**schema_to_record_payload(execution_run))
         self._session.add(record)
         self._session.commit()

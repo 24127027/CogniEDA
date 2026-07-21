@@ -22,6 +22,7 @@ from schemas.enums import (
     TaskKind,
     TaskLifecycleState,
 )
+from schemas.provenance import ExecutionOutbox, ExecutionRun
 
 
 class TaskCreateOperationPayload(BaseModel):
@@ -99,6 +100,18 @@ class ConflictFlagOperationPayload(BaseModel):
     discovery_id: UUID | None = None
     contradicted_by_discovery_id: UUID | None = None
     reason: str | None = None
+
+
+class ExecutionRunOperationPayload(ExecutionRun):
+    """Exact immutable attempt identity admitted at the commit boundary."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExecutionOutboxOperationPayload(ExecutionOutbox):
+    """Exact durable dispatch intent paired with one admitted attempt."""
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class PlannerOperation(CogniEDABaseModel):

@@ -203,6 +203,30 @@ class HypothesisEvidenceOutcome(StrEnum):
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
 
 
+class ExecutionRunStatus(StrEnum):
+    """Durable lifecycle states for one execution attempt."""
+
+    PENDING_APPROVAL = "pending_approval"
+    ADMITTED = "admitted"
+    DISPATCH_CLAIMED = "dispatch_claimed"
+    RUNNING = "running"
+    DISPATCH_FAILED = "dispatch_failed"
+    EXECUTION_FAILED = "execution_failed"
+    EXPIRED = "expired"
+    ABANDONED = "abandoned"
+    CANCELLED = "cancelled"
+
+
+class ExecutionApprovalStatus(StrEnum):
+    """Lifecycle for an execution contract awaiting explicit user approval."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    CANCELLED = "cancelled"
+    STALE = "stale"
+    CONSUMED = "consumed"
+
+
 class EvidenceType(StrEnum):
     """Evidence categories for directly observed analytical results."""
 
@@ -275,6 +299,8 @@ class PlannerOperationType(StrEnum):
     CREATE_ASSUMPTION = "create_assumption"
     UPDATE_ASSUMPTION_STATE = "update_assumption_state"
     CREATE_HYPOTHESIS = "create_hypothesis"
+    CREATE_EXECUTION_RUN = "create_execution_run"
+    CREATE_EXECUTION_OUTBOX = "create_execution_outbox"
     CREATE_EVIDENCE = "create_evidence"
     CREATE_DISCOVERY = "create_discovery"
     UPDATE_SESSION_FRAME = "update_session_frame"

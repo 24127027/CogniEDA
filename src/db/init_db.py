@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlmodel import SQLModel
 
 from db import models  # noqa: F401
+from db.migrations import upgrade_execution_attempt_schema
 from db.session import create_db_engine, get_database_url
 
 
@@ -13,6 +14,7 @@ def init_db(database_url: str | None = None) -> str:
 
     resolved_url = database_url or get_database_url()
     engine = create_db_engine(resolved_url)
+    upgrade_execution_attempt_schema(engine)
     SQLModel.metadata.create_all(engine)
     return resolved_url
 
