@@ -5,10 +5,11 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Protocol
 
 from sqlmodel import Session
 
+from agents.executor.types import DataExplorerExecutionContext
 from application.orchestrator.execution_contracts import PreparedExecution
 from application.orchestrator.execution_identity import method_parameter_hash
 from application.orchestrator.receiver import submit_execution_result
@@ -23,18 +24,26 @@ from repositories.execution_outbox_repository import ExecutionOutboxRepository
 from schemas.data_explorer_contracts import (
     DataExplorerFailureReason,
     DataExplorerFailureResult,
+    DataExplorerResult,
 )
 
 logger = logging.getLogger(__name__)
 
 
+class DataExplorerDispatcherProtocol(Protocol):
+    async def dispatch(
+        self, prepared: PreparedExecution, context: DataExplorerExecutionContext
+    ) -> DataExplorerResult:
+        ...
+
+
 async def dispatch_pending_attempts(
     session: Session,
-    executor_dispatcher: Any,
+    executor_dispatcher: DataExplorerDispatcherProtocol,
     worker_id: str,
     max_attempts: int = 10,
     lease_duration_seconds: int = 300,
-    context_factory: Callable[[], Any] | None = None,
+    context_factory: Callable[[], DataExplorerExecutionContext] | None = None,
 ) -> int:
     """Claim and dispatch durable work without Planner state or object handles."""
 
@@ -56,12 +65,10 @@ async def dispatch_pending_attempts(
         if record is None or record.status != "dispatching":
             continue
 
-        result = None
+        result: DataExplorerResult | None = None
         executor_status = "failed"
         error_message: str | None = None
         try:
-            from agents.executor.types import ExecutorContext
-
             prepared = _reconstruct_prepared_execution(session, record, run)
             if not transition_service.mark_running(
                 run.execution_run_id, worker_id, run.lease_epoch
@@ -71,7 +78,11 @@ async def dispatch_pending_attempts(
             if current_run is None:
                 raise ValueError("Claimed ExecutionRun disappeared before executor dispatch.")
 
-            context = context_factory() if context_factory is not None else ExecutorContext()
+            context = (
+                context_factory()
+                if context_factory is not None
+                else DataExplorerExecutionContext()
+            )
             raw_result = await executor_dispatcher.dispatch(prepared, context)
             if raw_result.status == "success":
                 executor_status = "completed"

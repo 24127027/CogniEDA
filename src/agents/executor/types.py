@@ -16,8 +16,8 @@ class Task(BaseModel):
     """
 
 
-class ExecutorInput(BaseModel):
-    """Shared input for all executors, containing the analytical request."""
+class DataExplorerInput(BaseModel):
+    """Input contract for Data Explorer execution, containing the analytical request."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -31,8 +31,8 @@ class ExecutorInput(BaseModel):
     deterministic_seed: int | None = None
 
 
-class ExecutorContext(BaseModel):
-    """Shared context for all executors, containing operational dependencies."""
+class DataExplorerExecutionContext(BaseModel):
+    """Operational context seam for Data Explorer execution."""
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 

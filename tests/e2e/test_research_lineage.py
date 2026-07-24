@@ -18,7 +18,12 @@ import pytest
 from pydantic import TypeAdapter
 from pydantic_ai.models.test import TestModel
 
-from agents.executor import ExecutorContext, ExecutorDispatcher, ExecutorInput, ExecutorRegistry
+from agents.executor import (
+    DataExplorerDispatcher,
+    DataExplorerExecutionContext,
+    DataExplorerInput,
+    DataExplorerRegistry,
+)
 from agents.executor.capabilities import CapabilitySpec
 from agents.executor.hypothesis_analyst.nodes import build_hypothesis_analyst_agent
 from agents.planner.agent import Planner
@@ -316,10 +321,12 @@ class DeterministicExecutor:
 
     def __init__(self, *, fail: bool = False) -> None:
         self.fail = fail
-        self.requests: list[ExecutorInput] = []
+        self.requests: list[DataExplorerInput] = []
         self.results: list[DataExplorerResult] = []
 
-    async def run(self, input: ExecutorInput, context: ExecutorContext) -> DataExplorerResult:
+    async def run(
+        self, input: DataExplorerInput, context: DataExplorerExecutionContext
+    ) -> DataExplorerResult:
         self.requests.append(input)
         analysis_frame = AnalysisFrameObservation(
             frame_hash=f"frame-{input.execution_run_id}",
@@ -520,13 +527,13 @@ def _bootstrap_discovery(
     return discovery, evidence
 
 
-def _dispatcher_for(executor: DeterministicExecutor) -> ExecutorDispatcher:
-    registry = ExecutorRegistry()
+def _dispatcher_for(executor: DeterministicExecutor) -> DataExplorerDispatcher:
+    registry = DataExplorerRegistry()
     registry.register_factory(
         CapabilitySpec(id="deterministic", description="Deterministic test seam."),
         lambda: executor,
     )
-    return ExecutorDispatcher(registry)
+    return DataExplorerDispatcher(registry)
 
 
 @pytest.mark.parametrize(

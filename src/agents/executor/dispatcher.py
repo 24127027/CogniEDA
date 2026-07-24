@@ -8,16 +8,16 @@ from application.orchestrator.execution_contracts import PreparedExecution
 from schemas.data_explorer_contracts import DataExplorerResult
 
 from .capabilities import Capability
-from .registry import ExecutorRegistry
-from .types import ExecutorContext, ExecutorInput
+from .registry import DataExplorerRegistry
+from .types import DataExplorerExecutionContext, DataExplorerInput
 
 
-class ExecutorDispatcher:
-    def __init__(self, registry: ExecutorRegistry) -> None:
+class DataExplorerDispatcher:
+    def __init__(self, registry: DataExplorerRegistry) -> None:
         self._registry = registry
 
     async def dispatch(
-        self, prepared: PreparedExecution, context: ExecutorContext
+        self, prepared: PreparedExecution, context: DataExplorerExecutionContext
     ) -> DataExplorerResult:
         if prepared.execution_run_id is None:
             raise ValueError("Durable executor dispatch requires an ExecutionRun identity.")
@@ -35,7 +35,7 @@ class ExecutorDispatcher:
 
         executor = self._registry.get(prepared.specification.executor_id)
 
-        input_data = ExecutorInput(
+        input_data = DataExplorerInput(
             execution_run_id=prepared.execution_run_id,
             task_id=_durable_id(prepared.task_ref, "Task"),
             hypothesis_id=_durable_id(prepared.hypothesis_ref, "Hypothesis"),

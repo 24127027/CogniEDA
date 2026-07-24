@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 from .capabilities import CAPABILITY_IDS, PLANNER_CAPABILITIES, Capability, CapabilitySpec
-from .dispatcher import ExecutorDispatcher
-from .executor import DataExplorerExecutor
+from .dispatcher import DataExplorerDispatcher
+from .executor import DataExplorerAdapter, DataExplorerExecutor
 from .graph_miner.agent import GraphMiner, GraphMinerExecutor
 from .hypothesis_analyst.agent import HypothesisAnalyst, HypothesisAnalystExecutor
 from .registry import (
-    ExecutorRegistry,
+    DataExplorerFactory,
+    DataExplorerRegistry,
     build_capability_selection_instructions,
     build_capability_selection_model,
     render_capabilities,
 )
 from .types import (
-    ExecutorContext,
-    ExecutorInput,
+    DataExplorerExecutionContext,
+    DataExplorerInput,
     Task,
 )
 
@@ -21,11 +22,13 @@ __all__ = (
     "Capability",
     "CapabilitySpec",
     "CAPABILITY_IDS",
-    "ExecutorContext",
+    "DataExplorerAdapter",
+    "DataExplorerDispatcher",
+    "DataExplorerExecutionContext",
     "DataExplorerExecutor",
-    "ExecutorDispatcher",
-    "ExecutorInput",
-    "ExecutorRegistry",
+    "DataExplorerFactory",
+    "DataExplorerInput",
+    "DataExplorerRegistry",
     "GraphMiner",
     "GraphMinerExecutor",
     "HypothesisAnalyst",

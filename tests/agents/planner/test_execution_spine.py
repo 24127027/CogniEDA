@@ -7,7 +7,12 @@ import pytest
 from langgraph.runtime import Runtime
 from pydantic import TypeAdapter, ValidationError
 
-from agents.executor import ExecutorContext, ExecutorDispatcher, ExecutorInput, ExecutorRegistry
+from agents.executor import (
+    DataExplorerDispatcher,
+    DataExplorerExecutionContext,
+    DataExplorerInput,
+    DataExplorerRegistry,
+)
 from agents.executor.capabilities import CapabilitySpec
 from agents.planner.agent import Planner
 from agents.planner.graph import build_graph
@@ -101,9 +106,11 @@ class FakeExecutor:
         self.raise_error = raise_error
         self.output_method = output_method
         self.output_parameters = output_parameters
-        self.requests: list[ExecutorInput] = []
+        self.requests: list[DataExplorerInput] = []
 
-    async def run(self, input: ExecutorInput, context: ExecutorContext) -> DataExplorerResult:
+    async def run(
+        self, input: DataExplorerInput, context: DataExplorerExecutionContext
+    ) -> DataExplorerResult:
         request = input
         self.requests.append(request)
         if self.raise_error:
@@ -268,13 +275,13 @@ def _dispatch_and_finalize(db_session, executor: FakeExecutor, task: Task) -> UU
     return run.execution_run_id
 
 
-def _dispatcher_for(executor: FakeExecutor) -> ExecutorDispatcher:
-    registry = ExecutorRegistry()
+def _dispatcher_for(executor: FakeExecutor) -> DataExplorerDispatcher:
+    registry = DataExplorerRegistry()
     registry.register_factory(
         CapabilitySpec(id="deterministic", description="Deterministic test executor."),
         lambda: executor,
     )
-    return ExecutorDispatcher(registry)
+    return DataExplorerDispatcher(registry)
 
 
 def test_select_task_requires_one_exact_existing_id_without_mutation(db_session) -> None:
@@ -953,7 +960,7 @@ def test_dispatch_resolution_and_executor_failures_reach_inbox(
     run_id = UUID(state.resolve_object_reference(state.execution_admission.execution_run_ref))
 
     executor = FakeExecutor(raise_error=failure_mode == "executor")
-    registry = ExecutorRegistry()
+    registry = DataExplorerRegistry()
     if failure_mode == "factory":
 
         def failing_factory():
@@ -975,7 +982,7 @@ def test_dispatch_resolution_and_executor_failures_reach_inbox(
             asyncio.run(
                 dispatch_pending_attempts(
                     dispatch_session,
-                    ExecutorDispatcher(registry),
+                    DataExplorerDispatcher(registry),
                     f"{failure_mode}-worker",
                 )
             )

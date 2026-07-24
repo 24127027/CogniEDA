@@ -6,23 +6,25 @@ from typing import Any, Literal, cast
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from .capabilities import CAPABILITY_IDS, CapabilitySpec
-from .executor import Executor
+from .executor import DataExplorerAdapter
 
-ExecutorFactory = Callable[[], Executor[Any]]
+DataExplorerFactory = Callable[[], DataExplorerAdapter[Any]]
 
 
-class ExecutorRegistry:
+class DataExplorerRegistry:
     def __init__(self) -> None:
-        self._factories: dict[str, ExecutorFactory] = {}
-        self._instances: dict[str, Executor[Any]] = {}
+        self._factories: dict[str, DataExplorerFactory] = {}
+        self._instances: dict[str, DataExplorerAdapter[Any]] = {}
         self._specs: dict[str, CapabilitySpec] = {}
 
     def register(
         self,
         capability: CapabilitySpec,
-    ) -> Callable[[type[Executor[Any]]], type[Executor[Any]]]:
-        def decorator(executor_type: type[Executor[Any]]) -> type[Executor[Any]]:
-            self.register_factory(capability, cast(ExecutorFactory, executor_type))
+    ) -> Callable[[type[DataExplorerAdapter[Any]]], type[DataExplorerAdapter[Any]]]:
+        def decorator(
+            executor_type: type[DataExplorerAdapter[Any]],
+        ) -> type[DataExplorerAdapter[Any]]:
+            self.register_factory(capability, cast(DataExplorerFactory, executor_type))
             return executor_type
 
         return decorator
@@ -30,16 +32,16 @@ class ExecutorRegistry:
     def register_factory(
         self,
         capability: CapabilitySpec,
-        factory: ExecutorFactory,
+        factory: DataExplorerFactory,
     ) -> None:
-        """Register one lazily invoked executor factory for a capability."""
+        """Register one lazily invoked Data Explorer factory for a capability."""
         if capability.id in self._factories:
             raise ValueError(f"Capability already registered: {capability.id}")
 
         self._specs[capability.id] = capability
         self._factories[capability.id] = factory
 
-    def get(self, capability_id: str) -> Executor[Any]:
+    def get(self, capability_id: str) -> DataExplorerAdapter[Any]:
         if capability_id not in self._factories:
             raise KeyError(f"No executor registered for capability: {capability_id}")
 

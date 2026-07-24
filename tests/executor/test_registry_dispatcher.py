@@ -8,11 +8,11 @@ from pydantic import ValidationError
 
 from agents.executor import (
     Capability,
-    DataExplorerExecutor,
-    ExecutorContext,
-    ExecutorDispatcher,
-    ExecutorInput,
-    ExecutorRegistry,
+    DataExplorerAdapter,
+    DataExplorerDispatcher,
+    DataExplorerExecutionContext,
+    DataExplorerInput,
+    DataExplorerRegistry,
     build_capability_selection_instructions,
     build_capability_selection_model,
 )
@@ -66,12 +66,12 @@ def make_prepared_execution(executor_id: str = "data_exploration") -> PreparedEx
 
 class FakeGraph:
     def __init__(self) -> None:
-        self.calls: list[tuple[ExecutorInput, ExecutorContext]] = []
+        self.calls: list[tuple[DataExplorerInput, DataExplorerExecutionContext]] = []
 
     async def ainvoke(
         self,
-        input: ExecutorInput,
-        context: ExecutorContext,
+        input: DataExplorerInput,
+        context: DataExplorerExecutionContext,
     ) -> dict[str, object]:
         self.calls.append((input, context))
         return {
@@ -81,18 +81,18 @@ class FakeGraph:
         }
 
 
-class GraphBackedExecutor(DataExplorerExecutor[BaseState]):
+class GraphBackedExecutor(DataExplorerAdapter[BaseState]):
     def __init__(self) -> None:
         self.fake_graph = FakeGraph()
         super().__init__(lambda: self.fake_graph)
 
 
-class FakeExecutor(DataExplorerExecutor[BaseState]):
+class FakeExecutor(DataExplorerAdapter[BaseState]):
     instance_count = 0
 
     def __init__(self) -> None:
         FakeExecutor.instance_count += 1
-        self.calls: list[tuple[ExecutorInput, ExecutorContext]] = []
+        self.calls: list[tuple[DataExplorerInput, DataExplorerExecutionContext]] = []
         self.result = DataExplorerFailureResult(
             status="failed",
             failure_reason=DataExplorerFailureReason.METHOD_EXECUTION_FAILURE,
@@ -101,8 +101,8 @@ class FakeExecutor(DataExplorerExecutor[BaseState]):
 
     async def run(
         self,
-        input: ExecutorInput,
-        context: ExecutorContext,
+        input: DataExplorerInput,
+        context: DataExplorerExecutionContext,
     ) -> DataExplorerResult:
         self.calls.append((input, context))
         return self.result
@@ -110,7 +110,7 @@ class FakeExecutor(DataExplorerExecutor[BaseState]):
 
 def test_registry_reuses_lazy_singleton() -> None:
     FakeExecutor.instance_count = 0
-    registry = ExecutorRegistry()
+    registry = DataExplorerRegistry()
 
     registry.register(Capability.DATA_EXPLORATION)(FakeExecutor)
 
@@ -122,7 +122,7 @@ def test_registry_reuses_lazy_singleton() -> None:
 
 
 def test_registry_rejects_duplicate_capability() -> None:
-    registry = ExecutorRegistry()
+    registry = DataExplorerRegistry()
     registry.register(Capability.DATA_EXPLORATION)(FakeExecutor)
 
     with pytest.raises(ValueError, match="Capability already registered: data_exploration"):
@@ -130,14 +130,14 @@ def test_registry_rejects_duplicate_capability() -> None:
 
 
 def test_registry_reports_unknown_capability() -> None:
-    registry = ExecutorRegistry()
+    registry = DataExplorerRegistry()
 
     with pytest.raises(KeyError, match="No executor registered for capability: missing"):
         registry.get("missing")
 
 
 def test_registry_lists_capability_specs() -> None:
-    registry = ExecutorRegistry()
+    registry = DataExplorerRegistry()
 
     registry.register(Capability.DATA_EXPLORATION)(FakeExecutor)
 
@@ -146,13 +146,13 @@ def test_registry_lists_capability_specs() -> None:
 
 
 def test_dispatcher_invokes_registered_executor() -> None:
-    registry = ExecutorRegistry()
+    registry = DataExplorerRegistry()
     registry.register(Capability.DATA_EXPLORATION)(FakeExecutor)
-    dispatcher = ExecutorDispatcher(registry)
+    dispatcher = DataExplorerDispatcher(registry)
     executor = registry.get(Capability.DATA_EXPLORATION.id)
 
     prepared = make_prepared_execution(Capability.DATA_EXPLORATION.id)
-    context = ExecutorContext()
+    context = DataExplorerExecutionContext()
 
     result = asyncio.run(dispatcher.dispatch(prepared, context))
 
@@ -166,15 +166,15 @@ def test_dispatcher_invokes_registered_executor() -> None:
 
 
 def test_dispatcher_rejects_non_durable_identity_before_registry_resolution() -> None:
-    dispatcher = ExecutorDispatcher(ExecutorRegistry())
+    dispatcher = DataExplorerDispatcher(DataExplorerRegistry())
     prepared = make_prepared_execution().model_copy(update={"execution_run_id": None})
 
     with pytest.raises(ValueError, match="ExecutionRun identity"):
-        asyncio.run(dispatcher.dispatch(prepared, ExecutorContext()))
+        asyncio.run(dispatcher.dispatch(prepared, DataExplorerExecutionContext()))
 
 
 def test_registry_invokes_factory_lazily_and_propagates_factory_failure() -> None:
-    registry = ExecutorRegistry()
+    registry = DataExplorerRegistry()
     calls = 0
 
     def failing_factory():
@@ -221,7 +221,7 @@ def test_executor_run_returns_validated_graph_execution_result() -> None:
     executor = GraphBackedExecutor()
     prepared = make_prepared_execution()
 
-    input_data = ExecutorInput(
+    input_data = DataExplorerInput(
         execution_run_id=prepared.execution_run_id,
         task_id=prepared.task_ref,
         hypothesis_id=prepared.hypothesis_ref,
@@ -231,7 +231,7 @@ def test_executor_run_returns_validated_graph_execution_result() -> None:
         specification=prepared.specification,
         deterministic_seed=prepared.deterministic_seed,
     )
-    context = ExecutorContext()
+    context = DataExplorerExecutionContext()
 
     result = asyncio.run(executor.run(input=input_data, context=context))
 
@@ -243,7 +243,9 @@ def test_executor_run_returns_validated_graph_execution_result() -> None:
 
 def test_dispatcher_runtime_seam_rejects_executor_scientific_authority() -> None:
     class MaliciousExecutor:
-        async def run(self, input: ExecutorInput, context: ExecutorContext) -> dict[str, object]:
+        async def run(
+            self, input: DataExplorerInput, context: DataExplorerExecutionContext
+        ) -> dict[str, object]:
             return {
                 "status": "failed",
                 "failure_reason": DataExplorerFailureReason.METHOD_EXECUTION_FAILURE,
@@ -251,21 +253,21 @@ def test_dispatcher_runtime_seam_rejects_executor_scientific_authority() -> None
                 "evaluation": {"outcome": "supports", "finalize": True},
             }
 
-    registry = ExecutorRegistry()
+    registry = DataExplorerRegistry()
     registry.register_factory(Capability.DATA_EXPLORATION, MaliciousExecutor)
 
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         asyncio.run(
-            ExecutorDispatcher(registry).dispatch(
+            DataExplorerDispatcher(registry).dispatch(
                 make_prepared_execution(Capability.DATA_EXPLORATION.id),
-                ExecutorContext(),
+                DataExplorerExecutionContext(),
             )
         )
 
 
 def test_graph_miner_and_hypothesis_analyst_are_not_data_explorer_executors() -> None:
-    assert not issubclass(GraphMiner, DataExplorerExecutor)
-    assert not issubclass(HypothesisAnalyst, DataExplorerExecutor)
+    assert not issubclass(GraphMiner, DataExplorerAdapter)
+    assert not issubclass(HypothesisAnalyst, DataExplorerAdapter)
 
 
 @pytest.mark.parametrize(
@@ -274,17 +276,19 @@ def test_graph_miner_and_hypothesis_analyst_are_not_data_explorer_executors() ->
 )
 def test_data_explorer_dispatcher_rejects_other_specialist_capabilities(capability) -> None:
     class OtherSpecialist:
-        async def run(self, input: ExecutorInput, context: ExecutorContext):
+        async def run(
+            self, input: DataExplorerInput, context: DataExplorerExecutionContext
+        ):
             raise AssertionError("Other specialists must not cross the Data Explorer result seam.")
 
-    registry = ExecutorRegistry()
+    registry = DataExplorerRegistry()
     registry.register_factory(capability, OtherSpecialist)
 
     with pytest.raises(ValueError, match="cannot invoke Graph Miner or Hypothesis Analyst"):
         asyncio.run(
-            ExecutorDispatcher(registry).dispatch(
+            DataExplorerDispatcher(registry).dispatch(
                 make_prepared_execution(capability.id),
-                ExecutorContext(),
+                DataExplorerExecutionContext(),
             )
         )
 
@@ -295,6 +299,10 @@ def test_executor_package_has_no_global_or_cross_specialist_registry() -> None:
 
     assert not hasattr(package, "executor_registry")
     assert not hasattr(registry_module, "executor_registry")
+    assert not hasattr(package, "ExecutorRegistry")
+    assert not hasattr(package, "ExecutorDispatcher")
+    assert not hasattr(package, "ExecutorInput")
+    assert not hasattr(package, "ExecutorContext")
 
 
 def test_executor_scientific_input_excludes_planner_and_retrieval_context() -> None:
@@ -305,11 +313,11 @@ def test_executor_scientific_input_excludes_planner_and_retrieval_context() -> N
         "session_frame",
         "raw_chat",
         "planner_state",
-    }.isdisjoint(ExecutorInput.model_fields)
+    }.isdisjoint(DataExplorerInput.model_fields)
 
 
 def test_graph_miner_remains_outside_data_explorer_registry() -> None:
-    registry = ExecutorRegistry()
+    registry = DataExplorerRegistry()
     with pytest.raises(NotImplementedError):
         GraphMiner()
     with pytest.raises(KeyError, match="No executor registered"):

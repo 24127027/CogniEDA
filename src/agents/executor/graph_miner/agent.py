@@ -1,21 +1,17 @@
-"""Graph-miner agent wrapper."""
+"""Graph-miner agent wrapper kept outside Data Explorer dispatch."""
 
 from __future__ import annotations
 
 from tools.builtin_tools import AvailableBuiltinTools
 
-from ..executor import Executor
-from .graph import build_graph
-from .state import State
 
-
-class GraphMiner(Executor[State]):
-    """Infrastructure agent for graph search."""
+class GraphMiner:
+    """Infrastructure agent for graph search (unimplemented target-only facade)."""
 
     builtin_tools: tuple[AvailableBuiltinTools, ...] = (AvailableBuiltinTools.GRAPH,)
 
     def __init__(self) -> None:
-        super().__init__(build_graph)
+        raise NotImplementedError("GraphMiner graph is not implemented yet.")
 
 
 GraphMinerExecutor = GraphMiner

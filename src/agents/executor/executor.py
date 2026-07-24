@@ -7,34 +7,32 @@ from pydantic import TypeAdapter
 from schemas.data_explorer_contracts import DataExplorerResult
 
 from .capabilities import CapabilitySpec
-from .types import BaseState, ExecutorContext, ExecutorInput
+from .types import BaseState, DataExplorerExecutionContext, DataExplorerInput
 
 
-class Executor[StateT: BaseState]:
-    """Role-neutral LangGraph scaffold with no durable-state ownership."""
+class DataExplorerAdapter[StateT: BaseState]:
+    """LangGraph adapter whose public output is the canonical Data Explorer result."""
 
     subcapabilities: list[CapabilitySpec]
 
     def __init__(
         self,
         graph_builder: Callable[
-            ..., CompiledStateGraph[StateT, ExecutorContext, ExecutorInput, Any]
+            ..., CompiledStateGraph[StateT, DataExplorerExecutionContext, DataExplorerInput, Any]
         ],
     ) -> None:
         if not callable(graph_builder):
             raise ValueError("graph_builder must be a callable that returns a CompiledStateGraph.")
         self.graph = graph_builder()
 
-    async def run(self, input: ExecutorInput, context: ExecutorContext) -> Any:
-        return await self.graph.ainvoke(
+    async def run(
+        self, input: DataExplorerInput, context: DataExplorerExecutionContext
+    ) -> DataExplorerResult:
+        result = await self.graph.ainvoke(
             input=input,
             context=context,
         )
-
-
-class DataExplorerExecutor[StateT: BaseState](Executor[StateT]):
-    """LangGraph adapter whose public output is the canonical Data Explorer result."""
-
-    async def run(self, input: ExecutorInput, context: ExecutorContext) -> DataExplorerResult:
-        result = await super().run(input=input, context=context)
         return TypeAdapter(DataExplorerResult).validate_python(result)
+
+
+DataExplorerExecutor = DataExplorerAdapter

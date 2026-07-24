@@ -296,3 +296,34 @@ def test_supported_package_has_no_cli_surface() -> None:
     assert 'py-modules = ["main"]' not in project
     assert not Path("main.py").exists()
     assert not Path("src/cli").exists()
+
+
+def test_package_s1a_generic_executor_symbols_are_absent_from_active_code() -> None:
+    """Active production code must use canonical DataExplorer names without generic aliases."""
+
+    forbidden_symbols = {
+        "ExecutorRegistry",
+        "ExecutorDispatcher",
+        "ExecutorInput",
+        "ExecutorContext",
+    }
+    violations: list[str] = []
+    for path in SOURCE_ROOT.rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.ClassDef, ast.FunctionDef)):
+                if node.name in forbidden_symbols:
+                    violations.append(f"{path.as_posix()}: defines {node.name}")
+            elif isinstance(node, ast.ImportFrom):
+                for alias in node.names:
+                    if alias.name in forbidden_symbols or alias.asname in forbidden_symbols:
+                        violations.append(
+                            f"{path.as_posix()}: imports {alias.name} (as {alias.asname})"
+                        )
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id in forbidden_symbols:
+                        violations.append(f"{path.as_posix()}: assigns to {target.id}")
+
+    assert not violations, f"Forbidden generic executor symbols found in src: {violations}"

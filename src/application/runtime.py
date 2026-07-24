@@ -12,10 +12,10 @@ from pydantic_ai.models import Model
 from sqlmodel import Session
 
 from agents.executor.capabilities import Capability
-from agents.executor.dispatcher import ExecutorDispatcher
+from agents.executor.dispatcher import DataExplorerDispatcher
 from agents.executor.hypothesis_analyst.nodes import build_hypothesis_analyst_agent
-from agents.executor.registry import ExecutorFactory, ExecutorRegistry
-from agents.executor.types import ExecutorContext
+from agents.executor.registry import DataExplorerFactory, DataExplorerRegistry
+from agents.executor.types import DataExplorerExecutionContext
 from agents.planner.agent import Planner
 from application.orchestrator.discovery_admission_coordinator import (
     DiscoveryAdmissionCoordinator,
@@ -31,11 +31,18 @@ from application.orchestrator.evaluator_runner import (
     run_evaluation_attempt,
 )
 from application.orchestrator.reconciler import reconcile_execution_attempts
+from application.orchestrator.validity_propagation_service import (
+    AtomicValidityPropagationService,
+)
 from db.init_db import init_db
 from db.models import GovernanceAuthorityRecord, ProposalDecisionRecord
 from db.session import get_session
 from schemas.discovery_admission_contracts import AuthenticatedPrincipal
 from schemas.enums import GovernanceDecisionOutcome
+from schemas.validity_propagation_contracts import (
+    ValidityPropagationCommand,
+    ValidityPropagationResult,
+)
 
 
 class RuntimeConfigurationError(RuntimeError):
@@ -65,8 +72,8 @@ class CogniEDARuntime:
         *,
         principal_resolver: AuthenticatedPrincipalResolver,
         analyst_model: Model,
-        data_explorer_factory: ExecutorFactory,
-        executor_context_factory: Callable[[], ExecutorContext],
+        data_explorer_factory: DataExplorerFactory,
+        executor_context_factory: Callable[[], DataExplorerExecutionContext],
     ) -> None:
         if principal_resolver is None:
             raise RuntimeConfigurationError(
@@ -89,10 +96,10 @@ class CogniEDARuntime:
         self._database_url = init_db(configuration.database_url)
         self._principal_resolver = principal_resolver
         self._executor_context_factory = executor_context_factory
-        registry = ExecutorRegistry()
+        registry = DataExplorerRegistry()
         registry.register_factory(Capability.DATA_EXPLORATION, data_explorer_factory)
         self._executor_registry = registry
-        self._executor_dispatcher = ExecutorDispatcher(registry)
+        self._executor_dispatcher = DataExplorerDispatcher(registry)
         self._analyst_agent = build_hypothesis_analyst_agent(model=analyst_model)
         self._planner = Planner(database_url=self._database_url)
 
@@ -234,3 +241,12 @@ class CogniEDARuntime:
                 workspace_id=principal.workspace_id,
                 session_id=principal.session_id,
             )
+
+    def propagate_validity(
+        self,
+        command: ValidityPropagationCommand,
+    ) -> ValidityPropagationResult:
+        """Execute one atomic validity propagation command under the runtime session."""
+
+        with self.session() as session:
+            return AtomicValidityPropagationService(session).execute_propagation(command)

@@ -9,7 +9,7 @@ import pytest
 from pydantic_ai.models.test import TestModel
 
 from agents.executor.capabilities import Capability
-from agents.executor.types import ExecutorContext
+from agents.executor.types import DataExplorerExecutionContext
 from application.runtime import (
     CogniEDARuntime,
     RuntimeConfiguration,
@@ -17,6 +17,8 @@ from application.runtime import (
 )
 from application.runtime_loader import load_runtime_from_environment
 from schemas.discovery_admission_contracts import AuthenticatedPrincipal
+from schemas.enums import ValidityEventType, ValiditySourceType
+from schemas.validity_propagation_contracts import ValidityPropagationCommand
 
 
 class Resolver:
@@ -60,7 +62,7 @@ def _runtime(tmp_path: Path, resolver: Resolver | None = None) -> CogniEDARuntim
         principal_resolver=resolver or Resolver(_principal()),
         analyst_model=TestModel(),
         data_explorer_factory=UnusedDataExplorer,
-        executor_context_factory=ExecutorContext,
+        executor_context_factory=DataExplorerExecutionContext,
     )
 
 
@@ -80,7 +82,7 @@ def test_runtime_fails_closed_when_required_adapter_is_missing(
         "principal_resolver": Resolver(_principal()),
         "analyst_model": TestModel(),
         "data_explorer_factory": UnusedDataExplorer,
-        "executor_context_factory": ExecutorContext,
+        "executor_context_factory": DataExplorerExecutionContext,
     }
     adapters[missing] = None
     with pytest.raises(RuntimeConfigurationError):
@@ -124,6 +126,15 @@ def test_runtime_authentication_binding_and_expiry_are_fail_closed(
     )
     with pytest.raises(RuntimeConfigurationError, match="future"):
         future.resolve_principal("auth-context")
+
+
+def test_runtime_exposes_validity_propagation_facade(
+    tmp_path: Path,
+) -> None:
+    runtime = _runtime(tmp_path)
+    # Validates that propagate_validity delegates directly to AtomicValidityPropagationService
+    with pytest.raises(AttributeError, match="idempotency_key"):
+        runtime.propagate_validity(None)  # type: ignore[arg-type]
 
 
 def test_runtime_loader_fails_predictably_without_deployment_hook(
