@@ -19,5 +19,6 @@ class RuntimePayload(BaseModel):
     The runtime interprets this payload to persist changes, dispatch further
     execution, update the user interface, or continue orchestration.
     """
-    payload: Any # Placeholder for the actual payload data. This can be any type of data that the agent wants to return to the runtime.
-    
+
+    # Placeholder for payload data returned to runtime.
+    payload: Any
