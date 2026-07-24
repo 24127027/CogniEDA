@@ -24,7 +24,6 @@ from agents.executor import (
     DataExplorerInput,
     DataExplorerRegistry,
 )
-from agents.executor.capabilities import CapabilitySpec
 from agents.executor.hypothesis_analyst.nodes import build_hypothesis_analyst_agent
 from agents.planner.agent import Planner
 from agents.planner.nodes import ObjectiveManagementDraft, TaskManagementDraft
@@ -530,7 +529,7 @@ def _bootstrap_discovery(
 def _dispatcher_for(executor: DeterministicExecutor) -> DataExplorerDispatcher:
     registry = DataExplorerRegistry()
     registry.register_factory(
-        CapabilitySpec(id="deterministic", description="Deterministic test seam."),
+        "deterministic",
         lambda: executor,
     )
     return DataExplorerDispatcher(registry)

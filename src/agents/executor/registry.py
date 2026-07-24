@@ -1,106 +1,61 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Literal, cast
+from inspect import iscoroutinefunction
 
-from pydantic import BaseModel, ConfigDict, Field, create_model
+from .executor import DataExplorerAdapterProtocol
 
-from .capabilities import CAPABILITY_IDS, CapabilitySpec
-from .executor import DataExplorerAdapter
-
-DataExplorerFactory = Callable[[], DataExplorerAdapter[Any]]
+DataExplorerFactory = Callable[[], DataExplorerAdapterProtocol]
+_SEPARATE_SPECIALIST_IDS = frozenset({"graph_mining", "hypothesis_testing"})
 
 
 class DataExplorerRegistry:
+    """One explicitly configured Data Explorer adapter per runtime."""
+
     def __init__(self) -> None:
         self._factories: dict[str, DataExplorerFactory] = {}
-        self._instances: dict[str, DataExplorerAdapter[Any]] = {}
-        self._specs: dict[str, CapabilitySpec] = {}
-
-    def register(
-        self,
-        capability: CapabilitySpec,
-    ) -> Callable[[type[DataExplorerAdapter[Any]]], type[DataExplorerAdapter[Any]]]:
-        def decorator(
-            executor_type: type[DataExplorerAdapter[Any]],
-        ) -> type[DataExplorerAdapter[Any]]:
-            self.register_factory(capability, cast(DataExplorerFactory, executor_type))
-            return executor_type
-
-        return decorator
+        self._instances: dict[str, DataExplorerAdapterProtocol] = {}
 
     def register_factory(
         self,
-        capability: CapabilitySpec,
+        executor_id: str,
         factory: DataExplorerFactory,
     ) -> None:
-        """Register one lazily invoked Data Explorer factory for a capability."""
-        if capability.id in self._factories:
-            raise ValueError(f"Capability already registered: {capability.id}")
+        """Register the runtime's one lazily constructed Data Explorer adapter."""
 
-        self._specs[capability.id] = capability
-        self._factories[capability.id] = factory
+        executor_id = executor_id.strip()
+        if not executor_id:
+            raise ValueError("Data Explorer executor id cannot be empty.")
+        if executor_id in _SEPARATE_SPECIALIST_IDS:
+            raise ValueError(
+                f"Executor id {executor_id!r} belongs to a separate specialist boundary."
+            )
+        if not callable(factory):
+            raise TypeError("Data Explorer factory must be callable.")
+        if self._factories:
+            registered_id = next(iter(self._factories))
+            raise ValueError(
+                "Data Explorer registry already has an explicit registration: "
+                f"{registered_id}"
+            )
 
-    def get(self, capability_id: str) -> DataExplorerAdapter[Any]:
-        if capability_id not in self._factories:
-            raise KeyError(f"No executor registered for capability: {capability_id}")
+        self._factories[executor_id] = factory
 
-        if capability_id not in self._instances:
-            self._instances[capability_id] = self._factories[capability_id]()
+    def get(self, executor_id: str) -> DataExplorerAdapterProtocol:
+        if executor_id not in self._factories:
+            raise KeyError(f"No Data Explorer registered for executor id: {executor_id}")
 
-        return self._instances[capability_id]
+        if executor_id not in self._instances:
+            adapter = self._factories[executor_id]()
+            if not isinstance(adapter, DataExplorerAdapterProtocol) or not iscoroutinefunction(
+                adapter.run
+            ):
+                raise TypeError(
+                    "Data Explorer factory must return an adapter with an async run method."
+                )
+            self._instances[executor_id] = adapter
 
-    def get_spec(self, capability_id: str) -> CapabilitySpec:
-        if capability_id not in self._specs:
-            raise KeyError(f"No capability registered: {capability_id}")
+        return self._instances[executor_id]
 
-        return self._specs[capability_id]
-
-    def list_specs(self) -> tuple[CapabilitySpec, ...]:
-        return tuple(self._specs.values())
-
-
-def render_capabilities(capabilities: tuple[CapabilitySpec, ...]) -> str:
-    return "\n".join(
-        f"- {capability.id}: {capability.description}" for capability in capabilities
-    )
-
-
-def build_capability_selection_model(
-    capabilities: tuple[CapabilitySpec, ...],
-) -> type[BaseModel]:
-    capability_ids = tuple(capability.id for capability in capabilities)
-
-    if not capability_ids:
-        raise ValueError("At least one capability is required to build a selection model.")
-
-    unknown_ids = tuple(
-        capability_id for capability_id in capability_ids if capability_id not in CAPABILITY_IDS
-    )
-    if unknown_ids:
-        raise ValueError(f"Unknown capability ids: {', '.join(unknown_ids)}")
-
-    capability_type = Literal[capability_ids]
-
-    return create_model(
-        "CapabilitySelection",
-        __config__=ConfigDict(extra="forbid"),
-        capability=(
-            capability_type,
-            Field(description="Selected executor capability id."),
-        ),
-    )
-
-
-def build_capability_selection_instructions(
-    capabilities: tuple[CapabilitySpec, ...],
-) -> str:
-    if not capabilities:
-        raise ValueError("At least one capability is required to build selection instructions.")
-
-    return (
-        "Choose exactly one executor capability for the task.\n"
-        "Use only these capability ids:\n\n"
-        f"{render_capabilities(capabilities)}\n\n"
-        "Return the selected id in the `capability` field. Do not invent capability ids."
-    )
+    def list_executor_ids(self) -> tuple[str, ...]:
+        return tuple(self._factories)

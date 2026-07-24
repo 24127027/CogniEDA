@@ -12,6 +12,4 @@ class HypothesisAnalyst:
     build_agent = staticmethod(build_hypothesis_analyst_agent)
 
 
-HypothesisAnalystExecutor = HypothesisAnalyst
-
-__all__ = ("HypothesisAnalyst", "HypothesisAnalystExecutor")
+__all__ = ("HypothesisAnalyst",)

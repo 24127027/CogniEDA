@@ -1,19 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic_ai.messages import ModelMessage
+from pydantic import BaseModel, ConfigDict
 
 from application.orchestrator.execution_contracts import ExecutionSpecification, HypothesisDraft
-
-
-class Task(BaseModel):
-    """Placeholder for a Task object.
-
-    # TODO: Import the actual Task class later
-    """
 
 
 class DataExplorerInput(BaseModel):
@@ -38,10 +29,3 @@ class DataExplorerExecutionContext(BaseModel):
 
     # Runtime dependencies will be added here (e.g., logger, artifact paths).
     pass
-
-
-class BaseState(BaseModel):
-    """Base state for all executors."""
-
-    task: Task
-    messages: Sequence[ModelMessage] = Field(default_factory=tuple)

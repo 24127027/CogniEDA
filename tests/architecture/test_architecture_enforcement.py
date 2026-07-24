@@ -302,10 +302,13 @@ def test_package_s1a_generic_executor_symbols_are_absent_from_active_code() -> N
     """Active production code must use canonical DataExplorer names without generic aliases."""
 
     forbidden_symbols = {
+        "DataExplorerExecutor",
         "ExecutorRegistry",
         "ExecutorDispatcher",
         "ExecutorInput",
         "ExecutorContext",
+        "GraphMinerExecutor",
+        "HypothesisAnalystExecutor",
     }
     violations: list[str] = []
     for path in SOURCE_ROOT.rglob("*.py"):
@@ -327,3 +330,38 @@ def test_package_s1a_generic_executor_symbols_are_absent_from_active_code() -> N
                         violations.append(f"{path.as_posix()}: assigns to {target.id}")
 
     assert not violations, f"Forbidden generic executor symbols found in src: {violations}"
+
+
+def test_package_s1a_registry_has_no_decorator_or_cross_specialist_catalog() -> None:
+    """The Data Explorer registry is explicit, singular, and role-specific."""
+
+    registry_path = Path("src/agents/executor/registry.py")
+    tree = ast.parse(registry_path.read_text(encoding="utf-8"))
+    registry_class = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "DataExplorerRegistry"
+    )
+    method_names = {
+        node.name for node in registry_class.body if isinstance(node, ast.FunctionDef)
+    }
+    assert "register" not in method_names
+    assert "register_factory" in method_names
+    assert not Path("src/agents/executor/capabilities.py").exists()
+
+    source = registry_path.read_text(encoding="utf-8")
+    assert "GraphMiner" not in source
+    assert "HypothesisAnalyst" not in source
+    assert "CapabilitySpec" not in source
+
+
+def test_package_s1a_specialists_have_no_compatibility_executor_surface() -> None:
+    """Graph Miner and Analyst stay outside Data Explorer invocation contracts."""
+
+    assert not Path("src/agents/executor/graph_miner/state.py").exists()
+    assert not Path("src/agents/executor/hypothesis_analyst/state.py").exists()
+    assert not Path("src/agents/executor/hypothesis_analyst/graph.py").exists()
+
+    package_source = Path("src/agents/executor/__init__.py").read_text(encoding="utf-8")
+    assert "graph_miner" not in package_source
+    assert "hypothesis_analyst" not in package_source

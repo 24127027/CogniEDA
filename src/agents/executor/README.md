@@ -1,6 +1,6 @@
-# Data Explorer Capability Adapter
+# Data Explorer Runtime Adapter
 
-This package is the non-persistent Data Explorer capability invocation layer used by the durable application
+This package is the non-persistent Data Explorer adapter invocation layer used by the durable application
 worker. It does not own Planner admission, attempt transitions, result receipt, Evidence admission,
 evaluation, governance, Discovery admission, or validity propagation.
 
@@ -10,7 +10,8 @@ evaluation, governance, Discovery admission, or validity propagation.
 | --- | --- |
 | `DataExplorerInput` | Scientific request with durable ExecutionRun, Task, Hypothesis and DataProfile UUIDs plus the admitted analytical contract |
 | `DataExplorerExecutionContext` | Process-local operational context seam; currently has no concrete fields |
-| `DataExplorerRegistry` | Registers Data Explorer capability specs and lazy factories, rejects duplicates and caches successful instances |
+| `DataExplorerAdapterProtocol` | Narrow role-specific `run(input, context) -> DataExplorerResult` boundary accepted by dispatch |
+| `DataExplorerRegistry` | Registers exactly one explicit Data Explorer executor id and lazy factory per runtime, rejects any second registration, validates the constructed adapter, and caches the successful instance |
 | `DataExplorerAdapter` | Data Explorer-specific LangGraph adapter that validates graph output as `DataExplorerResult` |
 | `DataExplorerDispatcher` | Validates claimed attempt identity, builds `DataExplorerInput`, invokes one configured Data Explorer adapter, and validates its returned value as `DataExplorerResult` |
 | `DataExplorerResult` | Canonical observation-only result imported from `schemas.data_explorer_contracts` |
@@ -26,11 +27,16 @@ result = await DataExplorerDispatcher(data_explorer_registry).dispatch(prepared,
 
 ## Registration is not runnability
 
-There is no global or default registry. The supported composition root creates one private registry and
-registers only the deployment-supplied `data_exploration` factory. Graph Miner and Hypothesis
-Analyst are not Data Explorer dispatcher capabilities and are not registered in this registry.
+There is no global or default registry. The supported composition root creates one private registry
+and registers the deployment-supplied Data Explorer factory under its explicit executor id. That id
+must exactly match the `executor_id` reconstructed from durable run/outbox state; there is no
+fallback adapter. The current admitted analytical contract permits `deterministic`, so a runtime
+intended to execute current planner work must configure that exact id.
 
-`register_factory(...)` exists for explicit lazy factories and test replacement. A factory exception is not cached. The durable worker converts resolution, factory, adapter and executor exceptions into a failed result receipt without creating Evidence or Discovery.
+`register_factory(...)` is an ordinary method, not a decorator. A factory exception or malformed
+factory product is not cached. The durable worker converts resolution, factory, adapter and
+invocation exceptions into a failed result receipt without creating Evidence or Discovery. Graph
+Miner and Hypothesis Analyst have no registry entry or package-level executor alias.
 
 ## Boundary rules
 
@@ -41,17 +47,26 @@ Analyst are not Data Explorer dispatcher capabilities and are not registered in 
 - The receiver persists the same canonical observation-only result. The fenced Evidence-admission
   coordinator can create only AnalysisFrame and Evidence.
 - Graph Miner and Hypothesis Analyst remain outside Data Explorer dispatch and do not use the
-  Data Explorer result specialization. `DataExplorerDispatcher` rejects those capability IDs before
-  invocation.
+  Data Explorer result specialization. Their identifiers fail exact registry lookup.
 
 ## Removed generic executor symbols
 
-Generic `ExecutorRegistry`, `ExecutorDispatcher`, `ExecutorInput`, and `ExecutorContext` names were replaced by role-specific `DataExplorer*` symbols. `ExecutionRequest`, `ExecutorOutput`, the duplicate capability-layer `ExecutionResult`, legacy `ExecutorResult`, and compatibility bridges were removed. The canonical type is `schemas.data_explorer_contracts.DataExplorerResult`.
+Generic `ExecutorRegistry`, `ExecutorDispatcher`, `ExecutorInput`, and `ExecutorContext` names were
+replaced by role-specific `DataExplorer*` symbols. `DataExplorerExecutor`,
+`GraphMinerExecutor`, `HypothesisAnalystExecutor`, the generic executor state, decorator
+registration, cross-specialist capability-selection helpers, `ExecutionRequest`, `ExecutorOutput`,
+the duplicate capability-layer `ExecutionResult`, legacy `ExecutorResult`, and compatibility
+bridges were removed. The canonical output type is
+`schemas.data_explorer_contracts.DataExplorerResult`.
 
 ## Not yet implemented
 
 - runnable default executor graphs;
 - concrete runtime dependencies or cooperative cancellation in `DataExplorerExecutionContext`;
 - production worker bootstrap;
+- deployment-supplied authentication, Analyst model, and concrete Data Explorer adapters;
 - delegation/authorization/tracing policy;
 - executor-authored Evidence or Discovery (these remain forbidden; executors return observations only).
+
+The local runtime and validity facade are SQLite-only, expose no supported CLI, and do not start a
+worker or service loop. Package S1-B directory/module restructuring remains deferred.

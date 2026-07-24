@@ -1,24 +1,33 @@
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import TypeAdapter
 
 from schemas.data_explorer_contracts import DataExplorerResult
 
-from .capabilities import CapabilitySpec
-from .types import BaseState, DataExplorerExecutionContext, DataExplorerInput
+from .types import DataExplorerExecutionContext, DataExplorerInput
 
 
-class DataExplorerAdapter[StateT: BaseState]:
+@runtime_checkable
+class DataExplorerAdapterProtocol(Protocol):
+    """The complete callable surface accepted by Data Explorer dispatch."""
+
+    async def run(
+        self,
+        input: DataExplorerInput,
+        context: DataExplorerExecutionContext,
+    ) -> DataExplorerResult:
+        ...
+
+
+class DataExplorerAdapter:
     """LangGraph adapter whose public output is the canonical Data Explorer result."""
-
-    subcapabilities: list[CapabilitySpec]
 
     def __init__(
         self,
         graph_builder: Callable[
-            ..., CompiledStateGraph[StateT, DataExplorerExecutionContext, DataExplorerInput, Any]
+            ..., CompiledStateGraph[Any, DataExplorerExecutionContext, DataExplorerInput, Any]
         ],
     ) -> None:
         if not callable(graph_builder):
@@ -33,6 +42,3 @@ class DataExplorerAdapter[StateT: BaseState]:
             context=context,
         )
         return TypeAdapter(DataExplorerResult).validate_python(result)
-
-
-DataExplorerExecutor = DataExplorerAdapter

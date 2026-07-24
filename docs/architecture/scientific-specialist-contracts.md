@@ -142,7 +142,9 @@ Implemented through Package 6:
 - Executor-facing contracts no longer import, produce, or expose legacy mixed `ExecutorResult` or scientific evaluation/finalization fields.
 - Durable attempt identities (`execution_run_id`, `task_id`, `hypothesis_id`, `data_profile_id`, `dispatch_idempotency_key`, `lease_epoch`) are bound exclusively by durable application state.
 - The durable receiver accepts the same canonical `DataExplorerResult`; no mirror DTO or compatibility bridge remains.
-- The Data Explorer dispatcher rejects Graph Miner and Hypothesis Analyst, and the composition root registers only an explicit Data Explorer factory.
+- The Data Explorer dispatcher resolves only the exact executor id explicitly registered by its
+  runtime. Graph Miner and Hypothesis Analyst have no registry entry, dispatcher input, or
+  compatibility executor alias.
 - The unused `PlannerState.executor_result` mixed-result field and Planner `ExecutorResult` re-export were removed; no active Planner route reads legacy scientific advice.
 - Hypothesis Analyst consumes only the protected bundle and is the sole source of the exact
   `DiscoveryProposal`; atomic admission cannot rewrite that proposal.

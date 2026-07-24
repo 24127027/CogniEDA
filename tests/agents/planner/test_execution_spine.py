@@ -13,7 +13,6 @@ from agents.executor import (
     DataExplorerInput,
     DataExplorerRegistry,
 )
-from agents.executor.capabilities import CapabilitySpec
 from agents.planner.agent import Planner
 from agents.planner.graph import build_graph
 from agents.planner.nodes import (
@@ -278,7 +277,7 @@ def _dispatch_and_finalize(db_session, executor: FakeExecutor, task: Task) -> UU
 def _dispatcher_for(executor: FakeExecutor) -> DataExplorerDispatcher:
     registry = DataExplorerRegistry()
     registry.register_factory(
-        CapabilitySpec(id="deterministic", description="Deterministic test executor."),
+        "deterministic",
         lambda: executor,
     )
     return DataExplorerDispatcher(registry)
@@ -967,12 +966,12 @@ def test_dispatch_resolution_and_executor_failures_reach_inbox(
             raise RuntimeError("deterministic factory exception")
 
         registry.register_factory(
-            CapabilitySpec(id="deterministic", description="Failing test factory."),
+            "deterministic",
             failing_factory,
         )
     elif failure_mode == "executor":
         registry.register_factory(
-            CapabilitySpec(id="deterministic", description="Failing test executor."),
+            "deterministic",
             lambda: executor,
         )
 

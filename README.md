@@ -20,7 +20,7 @@ Implemented or partially implemented today:
 - A narrow approval-gated planner execution admission path that atomically persists `Hypothesis`, `ExecutionRun`, and execution outbox state.
 - A durable local worker protocol with lease/fencing transitions, an observation-only result inbox,
   reconciliation helpers, and atomic AnalysisFrame/Evidence admission.
-- A durable-worker-to-domain adapter and capability registry/dispatcher under
+- A durable-worker-to-domain adapter and per-runtime Data Explorer registry/dispatcher under
   `src/agents/executor/`. Its only durable output is the canonical observation-only
   `DataExplorerResult`. The Hypothesis Analyst has an isolated PydanticAI protected-evaluation
   boundary and durable fenced proposal/failure control. Exact proposal governance, atomic

@@ -14,7 +14,6 @@ from agents.executor.hypothesis_analyst.nodes import (
     HypothesisAnalystDependencies,
     build_hypothesis_analyst_agent,
 )
-from agents.executor.hypothesis_analyst.state import State
 from tools.builtin_tools import AvailableBuiltinTools
 
 FORBIDDEN_IMPORT_FRAGMENTS = (
@@ -51,7 +50,6 @@ def test_active_analyst_has_no_forbidden_import_or_generic_dependency_surface() 
         if any(fragment in name.lower() for fragment in FORBIDDEN_IMPORT_FRAGMENTS)
     }
     assert set(HypothesisAnalystDependencies.__dataclass_fields__) == {"bundle"}
-    assert State.__annotations__ == {}
 
 
 def test_real_pydantic_ai_agent_has_typed_output_bounded_retries_and_zero_tools() -> None:

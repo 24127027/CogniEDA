@@ -7,7 +7,6 @@ from pydantic import TypeAdapter
 from application.orchestrator.execution_contracts import PreparedExecution
 from schemas.data_explorer_contracts import DataExplorerResult
 
-from .capabilities import Capability
 from .registry import DataExplorerRegistry
 from .types import DataExplorerExecutionContext, DataExplorerInput
 
@@ -25,15 +24,8 @@ class DataExplorerDispatcher:
             raise ValueError("Durable executor dispatch requires attempt fencing identity.")
         if prepared.hypothesis_ref is None:
             raise ValueError("Durable executor dispatch requires a Hypothesis identity.")
-        if prepared.specification.executor_id in {
-            Capability.GRAPH_MINING.id,
-            Capability.HYPOTHESIS_TESTING.id,
-        }:
-            raise ValueError(
-                "The Data Explorer dispatcher cannot invoke Graph Miner or Hypothesis Analyst."
-            )
 
-        executor = self._registry.get(prepared.specification.executor_id)
+        adapter = self._registry.get(prepared.specification.executor_id)
 
         input_data = DataExplorerInput(
             execution_run_id=prepared.execution_run_id,
@@ -46,7 +38,7 @@ class DataExplorerDispatcher:
             deterministic_seed=prepared.deterministic_seed,
         )
 
-        raw_result = await executor.run(
+        raw_result = await adapter.run(
             input=input_data,
             context=context,
         )

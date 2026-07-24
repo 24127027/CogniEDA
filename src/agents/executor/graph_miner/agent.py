@@ -14,6 +14,4 @@ class GraphMiner:
         raise NotImplementedError("GraphMiner graph is not implemented yet.")
 
 
-GraphMinerExecutor = GraphMiner
-
-__all__ = ("GraphMiner", "GraphMinerExecutor")
+__all__ = ("GraphMiner",)

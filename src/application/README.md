@@ -4,7 +4,8 @@
 
 `application/runtime.py` is the supported Wave 1 composition root. It requires a database URL,
 authenticated-principal resolver, Hypothesis Analyst model, Data Explorer factory, and executor
-context factory. Missing adapters fail closed. `runtime_loader.py` loads an explicit deployment
+identifier/context factory. The identifier must exactly match durable admitted work; current
+analytical contracts use `deterministic`. Missing adapters fail closed. `runtime_loader.py` loads an explicit deployment
 factory; it does not synthesize defaults.
 
 `application/orchestrator/` owns the durable protocol after planner approval:

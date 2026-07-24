@@ -11,7 +11,6 @@ from uuid import UUID
 from pydantic_ai.models import Model
 from sqlmodel import Session
 
-from agents.executor.capabilities import Capability
 from agents.executor.dispatcher import DataExplorerDispatcher
 from agents.executor.hypothesis_analyst.nodes import build_hypothesis_analyst_agent
 from agents.executor.registry import DataExplorerFactory, DataExplorerRegistry
@@ -72,6 +71,7 @@ class CogniEDARuntime:
         *,
         principal_resolver: AuthenticatedPrincipalResolver,
         analyst_model: Model,
+        data_explorer_id: str,
         data_explorer_factory: DataExplorerFactory,
         executor_context_factory: Callable[[], DataExplorerExecutionContext],
     ) -> None:
@@ -83,9 +83,13 @@ class CogniEDARuntime:
             raise RuntimeConfigurationError(
                 "Runtime requires an explicit Hypothesis Analyst model provider."
             )
+        if not data_explorer_id or not data_explorer_id.strip():
+            raise RuntimeConfigurationError(
+                "Runtime requires an explicit Data Explorer executor identifier."
+            )
         if data_explorer_factory is None:
             raise RuntimeConfigurationError(
-                "Runtime requires an explicitly registered Data Explorer capability."
+                "Runtime requires an explicitly registered Data Explorer adapter."
             )
         if executor_context_factory is None:
             raise RuntimeConfigurationError(
@@ -97,7 +101,7 @@ class CogniEDARuntime:
         self._principal_resolver = principal_resolver
         self._executor_context_factory = executor_context_factory
         registry = DataExplorerRegistry()
-        registry.register_factory(Capability.DATA_EXPLORATION, data_explorer_factory)
+        registry.register_factory(data_explorer_id, data_explorer_factory)
         self._executor_registry = registry
         self._executor_dispatcher = DataExplorerDispatcher(registry)
         self._analyst_agent = build_hypothesis_analyst_agent(model=analyst_model)
@@ -110,10 +114,10 @@ class CogniEDARuntime:
         return self._planner
 
     @property
-    def registered_executor_capabilities(self) -> tuple[str, ...]:
-        """Expose the explicit executor registry for startup diagnostics."""
+    def registered_data_explorer_ids(self) -> tuple[str, ...]:
+        """Expose the exact Data Explorer adapter identifier for diagnostics."""
 
-        return tuple(capability.id for capability in self._executor_registry.list_specs())
+        return self._executor_registry.list_executor_ids()
 
     @contextmanager
     def session(self) -> Iterator[Session]:

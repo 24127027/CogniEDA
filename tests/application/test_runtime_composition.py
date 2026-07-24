@@ -4,20 +4,31 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from pydantic_ai.models.test import TestModel
 
-from agents.executor.capabilities import Capability
 from agents.executor.types import DataExplorerExecutionContext
+from application.orchestrator.validity_propagation_service import (
+    AtomicValidityPropagationService,
+    validity_authority_scope,
+)
 from application.runtime import (
     CogniEDARuntime,
     RuntimeConfiguration,
     RuntimeConfigurationError,
 )
 from application.runtime_loader import load_runtime_from_environment
+from db.models import EvidenceRecord, ValidityEventRecord
+from package2_helpers import persist_governance_authority, persist_package2_lineage
 from schemas.discovery_admission_contracts import AuthenticatedPrincipal
-from schemas.enums import ValidityEventType, ValiditySourceType
+from schemas.enums import (
+    AuthorizationClass,
+    EvidenceLifecycleState,
+    ValidityEventType,
+    ValiditySourceType,
+)
 from schemas.validity_propagation_contracts import ValidityPropagationCommand
 
 
@@ -61,6 +72,7 @@ def _runtime(tmp_path: Path, resolver: Resolver | None = None) -> CogniEDARuntim
         _configuration(tmp_path),
         principal_resolver=resolver or Resolver(_principal()),
         analyst_model=TestModel(),
+        data_explorer_id="deterministic",
         data_explorer_factory=UnusedDataExplorer,
         executor_context_factory=DataExplorerExecutionContext,
     )
@@ -71,6 +83,7 @@ def _runtime(tmp_path: Path, resolver: Resolver | None = None) -> CogniEDARuntim
     [
         "principal_resolver",
         "analyst_model",
+        "data_explorer_id",
         "data_explorer_factory",
         "executor_context_factory",
     ],
@@ -81,6 +94,7 @@ def test_runtime_fails_closed_when_required_adapter_is_missing(
     adapters = {
         "principal_resolver": Resolver(_principal()),
         "analyst_model": TestModel(),
+        "data_explorer_id": "deterministic",
         "data_explorer_factory": UnusedDataExplorer,
         "executor_context_factory": DataExplorerExecutionContext,
     }
@@ -95,9 +109,30 @@ def test_runtime_owns_one_planner_and_only_explicit_data_explorer(
     runtime = _runtime(tmp_path)
 
     assert runtime.planner is runtime.planner
-    assert runtime.registered_executor_capabilities == (Capability.DATA_EXPLORATION.id,)
-    with pytest.raises(KeyError, match="No executor registered"):
-        runtime._executor_registry.get(Capability.GRAPH_MINING.id)
+    assert runtime.registered_data_explorer_ids == ("deterministic",)
+    assert isinstance(runtime._executor_registry.get("deterministic"), UnusedDataExplorer)
+    with pytest.raises(KeyError, match="No Data Explorer registered"):
+        runtime._executor_registry.get("graph_mining")
+
+
+def test_runtime_instances_own_independent_data_explorer_registries(
+    tmp_path: Path,
+) -> None:
+    first = _runtime(tmp_path / "first")
+    second = CogniEDARuntime(
+        _configuration(tmp_path / "second"),
+        principal_resolver=Resolver(_principal()),
+        analyst_model=TestModel(),
+        data_explorer_id="other-data-explorer",
+        data_explorer_factory=UnusedDataExplorer,
+        executor_context_factory=DataExplorerExecutionContext,
+    )
+
+    assert first._executor_registry is not second._executor_registry
+    assert first.registered_data_explorer_ids == ("deterministic",)
+    assert second.registered_data_explorer_ids == ("other-data-explorer",)
+    with pytest.raises(KeyError, match="No Data Explorer registered"):
+        first._executor_registry.get("other-data-explorer")
 
 
 def test_runtime_authentication_binding_and_expiry_are_fail_closed(
@@ -132,9 +167,58 @@ def test_runtime_exposes_validity_propagation_facade(
     tmp_path: Path,
 ) -> None:
     runtime = _runtime(tmp_path)
-    # Validates that propagate_validity delegates directly to AtomicValidityPropagationService
-    with pytest.raises(AttributeError, match="idempotency_key"):
-        runtime.propagate_validity(None)  # type: ignore[arg-type]
+    with runtime.session() as session:
+        lineage = persist_package2_lineage(session)
+        purpose, operation = validity_authority_scope(
+            event_type=ValidityEventType.EVIDENCE_INVALIDATION,
+            source_type=ValiditySourceType.EVIDENCE,
+            source_id=lineage.evidence_id,
+        )
+        authority = persist_governance_authority(
+            session,
+            authority_class=AuthorizationClass.TRUSTED_INTERNAL,
+            actor_identity="system_integrity",
+            workspace_id="workspace:one",
+            purpose=purpose,
+            operation_type=operation,
+        )
+        source_state, source_fingerprint = AtomicValidityPropagationService(
+            session
+        ).load_source_guard(ValiditySourceType.EVIDENCE, lineage.evidence_id)
+    command = ValidityPropagationCommand(
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=lineage.evidence_id,
+        event_type=ValidityEventType.EVIDENCE_INVALIDATION,
+        reason="Runtime facade integration test.",
+        authority_id=authority.authority_id,
+        workspace_id="workspace:one",
+        expected_source_state=source_state,
+        expected_source_fingerprint=source_fingerprint,
+        idempotency_key="runtime-validity-facade-1",
+    )
+
+    result = runtime.propagate_validity(command)
+    replay = runtime.propagate_validity(command)
+
+    assert result.replayed is False
+    assert replay.replayed is True
+    assert replay.event_id == result.event_id
+    with runtime.session() as session:
+        evidence = session.get(EvidenceRecord, lineage.evidence_id)
+        event = session.get(ValidityEventRecord, result.event_id)
+        assert evidence is not None
+        assert evidence.lifecycle_state == EvidenceLifecycleState.INVALIDATED
+        assert event is not None
+        assert event.authority_id == authority.authority_id
+
+    unauthorized = command.model_copy(
+        update={
+            "authority_id": uuid4(),
+            "idempotency_key": "runtime-validity-missing-authority",
+        }
+    )
+    with pytest.raises(PermissionError, match="grant not found"):
+        runtime.propagate_validity(unauthorized)
 
 
 def test_runtime_loader_fails_predictably_without_deployment_hook(
