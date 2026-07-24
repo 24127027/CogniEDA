@@ -14,6 +14,7 @@ from db.models import (
     ObjectiveRecord,
     TaskRecord,
 )
+from package2_helpers import propagate_validity_for_test
 from repositories import DataProfileRepository, SessionFrameRepository, TaskRepository
 from schemas.artifacts import DataProfile, SessionFrame, Task
 from schemas.common import BaselineSummary, EvaluationThresholds, MethodParameter, SchemaSummary
@@ -24,7 +25,10 @@ from schemas.enums import (
     DiscoveryLifecycleState,
     PlannerOperationApprovalState,
     PlannerOperationType,
+    SessionFrameStatus,
     TaskKind,
+    ValidityEventType,
+    ValiditySourceType,
 )
 from schemas.planner_operations import PlannerOperation
 
@@ -259,10 +263,11 @@ def test_decomposition_rejects_missing_active_data_profile(db_session) -> None:
 def test_child_kind_contract_is_typed_and_not_forced_onto_non_analytical_children() -> None:
     parent_ref = "task:parent"
     profile_id = uuid4()
-    ready = ReadyAnalyticalDecompositionModel().draft(
-        "Parent local reference: task:parent\n"
-        "data_profile_ref (use data_profile:active)"
-    ).child_task_proposals[0]
+    ready = (
+        ReadyAnalyticalDecompositionModel()
+        .draft("Parent local reference: task:parent\ndata_profile_ref (use data_profile:active)")
+        .child_task_proposals[0]
+    )
     payload = ready.operation_payload(
         task_id=uuid4(),
         parent_task_id=uuid4(),
@@ -337,14 +342,6 @@ def test_ready_child_commit_rejects_stale_profile_and_rolls_back_frame(db_sessio
             accepted_as_ground_truth=True,
         )
     )
-    replacement = profiles.create(
-        old_profile.model_copy(
-            update={
-                "profile_id": uuid4(),
-                "dataset_path": "data/replacement.csv",
-            }
-        )
-    )
     parent = TaskRepository(db_session).create(
         Task(title="Parent", description="Parent", profile_id=old_profile.profile_id)
     )
@@ -369,7 +366,14 @@ def test_ready_child_commit_rejects_stale_profile_and_rolls_back_frame(db_sessio
         PlannerOperation.model_validate(operation) for operation in result["planner_operations"]
     ]
     assert len(operations) == 2
-    profiles.supersede(old_profile.profile_id, replacement.profile_id)
+    propagate_validity_for_test(
+        db_session,
+        source_type=ValiditySourceType.DATA_PROFILE,
+        source_id=old_profile.profile_id,
+        event_type=ValidityEventType.DATA_PROFILE_INVALIDATION,
+        reason="Profile became stale before approval.",
+        idempotency_key="stale-profile-before-child-commit",
+    )
     for operation in operations:
         operation.approval_state = PlannerOperationApprovalState.APPROVED
 
@@ -381,4 +385,6 @@ def test_ready_child_commit_rejects_stale_profile_and_rolls_back_frame(db_sessio
 
     assert not outcome.succeeded
     assert TaskRepository(db_session).list(parent_task_id=parent.task_id) == []
-    assert SessionFrameRepository(db_session).list_recent(limit=2) == [frame]
+    frames = SessionFrameRepository(db_session).list_recent(limit=2)
+    assert [item.session_frame_id for item in frames] == [frame.session_frame_id]
+    assert frames[0].frame_status == SessionFrameStatus.SUPERSEDED

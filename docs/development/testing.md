@@ -10,15 +10,13 @@ uv run mypy src
 
 `pyproject.toml` configures pytest for `tests/` plus README doctests, Ruff for all rules with a small ignore set, and mypy strict mode for `src`.
 
-## Verified snapshot — 2026-07-16
+## Verified snapshot — Gate 0 Baseline (2026-07-24)
 
 | Check | Result |
 | --- | --- |
-| Full pytest on `tests` + `README.md` | **210 passed** in 12.94 seconds on the final post-doc rerun |
-| Ruff on `src` + `tests` | **Failed: 12 findings**, 8 auto-fixable |
-| Strict mypy on `src` | **Failed: 132 errors in 14 files** |
-
-The authoritative invocation used absolute `--project` and `--rootdir` paths because the audit sandbox denied `Set-Location`. A first run accidentally collected from `C:\` and produced 234 system-permission collection errors; that run is an environment artifact, not a repository test result.
+| Full pytest on `tests` + `README.md` | **564 passed** |
+| Ruff on `src` + `tests` | **Passed clean** |
+| Strict mypy on `src` | **Failed: 358 errors in 24 files** (baseline technical debt) |
 
 ## Covered behavior
 

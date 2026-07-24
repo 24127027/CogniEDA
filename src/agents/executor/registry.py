@@ -102,9 +102,3 @@ def build_capability_selection_instructions(
         f"{render_capabilities(capabilities)}\n\n"
         "Return the selected id in the `capability` field. Do not invent capability ids."
     )
-
-
-executor_registry = ExecutorRegistry()
-
-# Backward-compatible module-level name while the planner scaffold is migrated.
-registry = executor_registry

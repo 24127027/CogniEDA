@@ -88,11 +88,13 @@ Steps 1-3, Step 3.5A, and the narrow Step 3.5B execution-attempt correction are 
 ```text
 commit_execution_contract -> ExecutionRun + outbox -> END
 
-external worker:
+external worker loop:
   dispatch_pending_attempts
-    -> receive_executor_result
-    -> finalize_pending_result
-    -> process_scientific_result
+    -> Data Explorer execution -> canonical observation receiver
+    -> fenced Evidence admission -> AnalysisFrame + Evidence
+    -> Hypothesis Analyst protected evaluation -> DiscoveryProposal
+    -> governance decision -> atomic Discovery admission
+    -> atomic validity propagation
 ```
 
 This split is current implementation, not merely target topology.

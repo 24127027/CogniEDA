@@ -9,7 +9,12 @@ from uuid import UUID, uuid4
 from pydantic import Field, model_validator
 
 from schemas.common import CogniEDABaseModel, NonEmptyStr, utc_now
-from schemas.enums import ExecutionApprovalStatus, ExecutionRunStatus, ObjectiveStatus
+from schemas.enums import (
+    ExecutionApprovalStatus,
+    ExecutionRunStatus,
+    ObjectiveStatus,
+    ValiditySourceState,
+)
 
 
 class AnalysisFrame(CogniEDABaseModel):
@@ -21,6 +26,8 @@ class AnalysisFrame(CogniEDABaseModel):
     frame_ref: NonEmptyStr | None = None
     column_refs: list[NonEmptyStr] = Field(default_factory=list)
     row_filter_description: str | None = None
+    validity_state: ValiditySourceState = ValiditySourceState.ACTIVE
+    validity_reason: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
 
     @model_validator(mode="after")
@@ -43,6 +50,8 @@ class ExecutionRun(CogniEDABaseModel):
     method_id: NonEmptyStr | None = None
     parameter_hash: NonEmptyStr | None = None
     status: ExecutionRunStatus = ExecutionRunStatus.PENDING_APPROVAL
+    validity_state: ValiditySourceState = ValiditySourceState.ACTIVE
+    validity_reason: str | None = None
 
     dispatch_idempotency_key: NonEmptyStr | None = None
     worker_id: NonEmptyStr | None = None

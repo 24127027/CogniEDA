@@ -107,6 +107,14 @@ class SessionContextBuilder:
     def build(self, session_frame: SessionFrame, *, mode: ContextMode) -> ContextBundle:
         """Build a typed context projection for the requested mode."""
 
+        if not is_allowed_in_context(
+            FirstClassObjectType.SESSION_FRAME,
+            session_frame.frame_status,
+            mode,
+        ):
+            raise ValueError(
+                f"SessionFrame {session_frame.session_frame_id} is not active for {mode.value}."
+            )
         if mode == ContextMode.PLANNING:
             return self._planning_context(session_frame)
         if mode == ContextMode.ANSWER:
@@ -392,7 +400,13 @@ class SessionFrameBuilder:
         active_hypotheses = [
             hypothesis
             for hypothesis in hypotheses
-            if hypothesis.status in {HypothesisStatus.PROPOSED, HypothesisStatus.TESTING}
+            if hypothesis.status
+            in {
+                HypothesisStatus.PROPOSED,
+                HypothesisStatus.TESTING,
+                HypothesisStatus.AWAITING_ADDITIONAL_EVIDENCE,
+                HypothesisStatus.READY_FOR_EVALUATION,
+            }
         ][: self._options.max_hypotheses]
         selected_discoveries = list(discoveries)[: self._options.max_discoveries]
         selected_evidence = list(evidence)[: self._options.max_evidence]

@@ -4,6 +4,7 @@ import pytest
 from sqlmodel import Session
 
 from db.models import TaskRecord
+from discovery_seed_helpers import seed_historical_discovery
 from memory.retrieval_engine import DiscoveryRetrievalEngine
 from memory.semantic_scorer import LexicalScorer
 from schemas.artifacts import Discovery, Objective, SessionFrame, Task
@@ -119,11 +120,10 @@ def test_retrieval_separates_motivation_from_context(db_session: Session, create
         validity_basis=v2,
     )
 
-    from repositories.discovery_repository import DiscoveryRepository
     from repositories.task_repository import TaskRepository
 
-    DiscoveryRepository(db_session).create(direct_motivation)
-    DiscoveryRepository(db_session).create(other_discovery)
+    seed_historical_discovery(db_session, direct_motivation)
+    seed_historical_discovery(db_session, other_discovery)
     TaskRepository(db_session).create(parent_task)
 
     engine = DiscoveryRetrievalEngine(db_session)
@@ -190,12 +190,11 @@ def test_retrieval_ranks_by_structural_relations(db_session: Session, create_val
     ancestor_task.motivated_by_discovery_ids = [d_ancestor.discovery_id]
     parent_task.motivated_by_discovery_ids = [d_direct.discovery_id]
 
-    from repositories.discovery_repository import DiscoveryRepository
     from repositories.task_repository import TaskRepository
 
-    DiscoveryRepository(db_session).create(d_direct)
-    DiscoveryRepository(db_session).create(d_ancestor)
-    DiscoveryRepository(db_session).create(d_unrelated)
+    seed_historical_discovery(db_session, d_direct)
+    seed_historical_discovery(db_session, d_ancestor)
+    seed_historical_discovery(db_session, d_unrelated)
     TaskRepository(db_session).create(ancestor_task)
     TaskRepository(db_session).create(parent_task)
 
@@ -254,11 +253,9 @@ def test_retrieval_excludes_invalid_lifecycle_states(db_session: Session, create
         review_reasons=["Needs review"],
     )
 
-    from repositories.discovery_repository import DiscoveryRepository
-
-    DiscoveryRepository(db_session).create(d_active)
-    DiscoveryRepository(db_session).create(d_invalidated)
-    DiscoveryRepository(db_session).create(d_flagged)
+    seed_historical_discovery(db_session, d_active)
+    seed_historical_discovery(db_session, d_invalidated)
+    seed_historical_discovery(db_session, d_flagged)
 
     engine = DiscoveryRetrievalEngine(db_session)
     request = RetrievalRequest(
@@ -310,10 +307,8 @@ def test_retrieval_respects_session_frame_pins_and_exclusions(
         validity_basis=v2,
     )
 
-    from repositories.discovery_repository import DiscoveryRepository
-
-    DiscoveryRepository(db_session).create(d_pinned)
-    DiscoveryRepository(db_session).create(d_excluded)
+    seed_historical_discovery(db_session, d_pinned)
+    seed_historical_discovery(db_session, d_excluded)
 
     frame = SessionFrame(
         frame_topic="Test Frame",

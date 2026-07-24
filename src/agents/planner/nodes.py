@@ -8,11 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlmodel import Session
 
 from application.orchestrator.execution_admission import build_execution_admission_operations
-from application.orchestrator.planner_commit import commit_planner_operations
-from application.orchestrator.scientific_processing import (
-    _execution_operation,
-    _method_parameter_hash,
+from application.orchestrator.execution_identity import (
+    method_parameter_hash as _method_parameter_hash,
 )
+from application.orchestrator.planner_commit import commit_planner_operations
 from db.models import ExecutionApprovalRecord, PlannerOperationRecord
 from db.session import get_session
 from memory.retrieval_engine import DiscoveryRetrievalEngine
@@ -73,6 +72,22 @@ from .types import (
 
 registry = NodeRegistry[State, Context]()
 R = registry.R
+
+
+def _execution_operation(
+    session_id: str | None,
+    operation_type: PlannerOperationType,
+    payload: BaseModel,
+    produced_by_node: PlannerNodeName,
+) -> PlannerOperation:
+    """Serialize a typed draft only at the PlannerOperation persistence boundary."""
+    return PlannerOperation(
+        session_id=session_id,
+        operation_type=operation_type,
+        payload=payload.model_dump(mode="json"),
+        produced_by_node=produced_by_node,
+        approval_state=PlannerOperationApprovalState.NOT_REQUIRED,
+    )
 
 # --------------------
 # Core
@@ -1099,10 +1114,8 @@ def prepare_execution(state: State, runtime: Runtime[Context]) -> State:
                 "The Task Hypothesis already has a final Discovery.",
             )
         if existing_hypothesis.status in {
-            HypothesisStatus.CONFIRMED,
-            HypothesisStatus.CONTRADICTED,
-            HypothesisStatus.INCONCLUSIVE,
-            HypothesisStatus.INSUFFICIENT_EVIDENCE,
+            HypothesisStatus.READY_FOR_EVALUATION,
+            HypothesisStatus.EVALUATED,
             HypothesisStatus.CANCELLED,
             HypothesisStatus.ARCHIVED,
         }:

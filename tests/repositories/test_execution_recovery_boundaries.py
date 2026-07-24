@@ -7,11 +7,26 @@ from uuid import uuid4
 
 from sqlalchemy import inspect, text
 
+from application.orchestrator.execution_identity import result_payload_digest
 from application.orchestrator.transition_service import ExecutionAttemptTransitionService
 from db.init_db import init_db
 from db.models import DataProfileRecord, ExecutionRunRecord, HypothesisRecord, TaskRecord
 from db.session import create_db_engine, get_session
-from schemas.enums import ExecutionRunStatus
+from schemas.common import EvidenceResultSummary
+from schemas.data_explorer_contracts import DataExplorerSuccessResult
+from schemas.enums import EvidenceType, ExecutionRunStatus
+from schemas.execution_observations import AnalysisFrameObservation, EvidenceObservation
+
+
+def _observation_payload() -> dict:
+    return DataExplorerSuccessResult(
+        analysis_frame=AnalysisFrameObservation(frame_hash="upgrade-frame"),
+        evidence_observation=EvidenceObservation(
+            evidence_type=EvidenceType.STATISTICAL_TEST,
+            method="test",
+            result_summary=EvidenceResultSummary(summary="Observed upgrade result."),
+        ),
+    ).model_dump(mode="json")
 
 
 def test_lease_claim_and_renewal_fence_stale_owners(db_session) -> None:
@@ -147,9 +162,13 @@ def test_init_db_upgrades_a_prior_execution_runs_table_without_create_all_migrat
                 "INSERT INTO execution_runs "
                 "(execution_run_id, task_id, hypothesis_id, analysis_frame_id, executor_type, "
                 "method_id, parameter_hash, status, created_at) VALUES "
-                "('legacy-incomplete', 'legacy-task', 'legacy-hypothesis', NULL, 'legacy', "
+                "('11111111111111111111111111111111', "
+                "'00000000000000000000000000000003', "
+                "'00000000000000000000000000000004', NULL, 'legacy', "
                 "'method', 'parameters', 'running', '2026-07-14 00:00:00'), "
-                "('legacy-completed', 'legacy-task', 'legacy-hypothesis', NULL, 'legacy', "
+                "('22222222222222222222222222222222', "
+                "'00000000000000000000000000000003', "
+                "'00000000000000000000000000000004', NULL, 'legacy', "
                 "'method', 'parameters', 'completed', '2026-07-14 00:00:00')"
             )
         )
@@ -179,8 +198,8 @@ def test_init_db_upgrades_a_prior_execution_runs_table_without_create_all_migrat
         statuses = dict(
             connection.execute(text("SELECT execution_run_id, status FROM execution_runs")).all()
         )
-    assert statuses["legacy-incomplete"] == ExecutionRunStatus.ABANDONED.value
-    assert statuses["legacy-completed"] == ExecutionRunStatus.COMPLETED.value
+    assert statuses["11111111111111111111111111111111"] == ExecutionRunStatus.ABANDONED.value
+    assert statuses["22222222222222222222222222222222"] == ExecutionRunStatus.ABANDONED.value
 
     session = get_session(database_url)
     try:
@@ -240,33 +259,35 @@ def test_init_db_upgrades_a_prior_execution_runs_table_without_create_all_migrat
         )
         assert claimed is not None
         assert service.mark_running(run_id, "worker", claimed.lease_epoch)
+        payload = _observation_payload()
         assert service.accept_authoritative_result(
             execution_run_id=run_id,
             dispatch_idempotency_key="upgrade-key",
             worker_id="worker",
             lease_epoch=claimed.lease_epoch,
-            result_digest="upgrade-result",
+            result_digest=result_payload_digest(payload),
             executor_status="completed",
-            serialized_observations={},
+            serialized_observations=payload,
             error_message=None,
             method_id="test",
             producer_identity="worker",
         )
         received = session.get(ExecutionRunRecord, run_id)
-        assert service.claim_finalization(
+        assert service.claim_evidence_admission(
             run_id,
             "finalizer",
             received.attempt_version,
             datetime.now(UTC) + timedelta(minutes=1),
         )
         finalizing = session.get(ExecutionRunRecord, run_id)
-        assert service.stage_complete_finalization(
+        assert service.stage_admit_evidence(
             execution_run_id=run_id,
             finalizer_owner_id="finalizer",
             finalization_fencing_epoch=finalizing.finalization_fencing_epoch,
             attempt_version=finalizing.attempt_version,
         )
         session.commit()
-        assert session.get(ExecutionRunRecord, run_id).status == ExecutionRunStatus.COMPLETED
+        rec = session.get(ExecutionRunRecord, run_id)
+        assert rec is not None and rec.status == ExecutionRunStatus.EVIDENCE_ADMITTED
     finally:
         session.close()

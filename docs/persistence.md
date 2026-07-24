@@ -1,6 +1,6 @@
 # Persistence Notes
 
-This file is retained as a legacy entry point. See [architecture/storage-layers.md](architecture/storage-layers.md) and [implementation/SRC_IMPLEMENTATION_STATUS.md](implementation/SRC_IMPLEMENTATION_STATUS.md) for the audited current comparison.
+This file is retained as a legacy entry point. See [architecture/storage-layers.md](architecture/storage-layers.md) and [architecture/implementation-gap-analysis.md](architecture/implementation-gap-analysis.md) for the current status comparison.
 
 ## Current Implementation
 

@@ -12,15 +12,18 @@ from schemas.artifacts import (
     Hypothesis,
     Objective,
     Task,
+    UserDecision,
 )
 from schemas.common import (
     BaselineSummary,
+    DeadEndSummary,
     DiscoveryClaim,
     DiscoveryContextSummary,
     EvidenceProvenance,
     EvidenceResultSummary,
     MethodParameter,
     SchemaSummary,
+    StaleContextMarker,
     ToolResultCacheSummary,
     ValidityBasis,
 )
@@ -34,11 +37,14 @@ from schemas.enums import (
     EvidenceLifecycleState,
     EvidenceType,
     HypothesisStatus,
+    MemorySourceType,
     MemoryStatus,
     ObjectiveStatus,
     SessionFrameStatus,
     TaskKind,
     TaskLifecycleState,
+    UserDecisionStatus,
+    UserDecisionType,
 )
 
 
@@ -238,7 +244,7 @@ def test_session_frame_builder_uses_profile_and_evidence_context() -> None:
     )
 
 
-def test_session_context_builder_separates_planning_and_conclusion_context() -> None:
+def test_session_context_builder_separates_planning_answer_and_protected_synthesis() -> None:
     objective = build_objective()
     profile = build_profile()
     task = build_task(profile.profile_id)
@@ -253,6 +259,12 @@ def test_session_context_builder_separates_planning_and_conclusion_context() -> 
     hypothesis = build_hypothesis(task.task_id, profile.profile_id)
     evidence = build_evidence(hypothesis.hypothesis_id, profile.profile_id)
     discovery = build_discovery(hypothesis.hypothesis_id, profile.profile_id, evidence.evidence_id)
+    decision = UserDecision(
+        decision_type=UserDecisionType.TASK_MANAGEMENT,
+        decision="approved",
+        rationale="Approved task for testing",
+        status=UserDecisionStatus.ACTIVE,
+    )
 
     frame = SessionFrameBuilder().build(
         objective=objective,
@@ -262,33 +274,67 @@ def test_session_context_builder_separates_planning_and_conclusion_context() -> 
         hypotheses=[hypothesis],
         evidence=[evidence],
         discoveries=[discovery],
+        user_decisions=[decision],
         pending_tasks=["Review account-month grain before deeper modeling."],
         open_questions=["Does retention exclude trial accounts?"],
+        stale_context=[
+            StaleContextMarker(artifact_type="task", ref_id=task.task_id, reason="stale")
+        ],
+        dead_ends=[DeadEndSummary(summary="Rejected path", reason="Insufficient provenance")],
+        cached_tool_results=[
+            ToolResultCacheSummary(
+                cache_key="retention_v1.profile",
+                summary="Unverified cached profile summary.",
+                status=MemoryStatus.ACTIVE,
+                created_at=evidence.created_at,
+            )
+        ],
     )
+
+    # A raw SessionFrame contains planning/audit material and is unsafe as synthesis input.
+    assert frame.active_assumption_refs == [assumption.assumption_id]
+    assert frame.active_task_refs == [task.task_id]
+    assert frame.relevant_discovery_refs == [discovery.discovery_id]
+    assert frame.recent_user_decision_refs == [decision.decision_id]
+    assert frame.pending_tasks and frame.open_questions
+    assert frame.stale_context and frame.dead_ends and frame.cached_tool_results
 
     context_builder = SessionContextBuilder()
     planning_context = context_builder.build(frame, mode=ContextMode.PLANNING)
-    conclusion_context = context_builder.build(frame, mode=ContextMode.CONCLUSION)
+    synthesis_context = context_builder.build(frame, mode=ContextMode.DISCOVERY_SYNTHESIS)
     answer_context = context_builder.build(frame, mode=ContextMode.ANSWER)
 
     assert planning_context.assumption_refs == (assumption.assumption_id,)
     assert planning_context.task_refs == (task.task_id,)
     assert planning_context.pending_tasks == ("Review account-month grain before deeper modeling.",)
 
-    assert conclusion_context.assumptions == ()
-    assert conclusion_context.assumption_refs == ()
-    assert conclusion_context.tasks == ()
-    assert conclusion_context.task_refs == ()
-    assert conclusion_context.user_decisions == ()
-    assert conclusion_context.pending_tasks == ()
-    assert conclusion_context.open_questions == ()
-    assert conclusion_context.cached_tool_results == ()
-    assert conclusion_context.data_profile_refs == (profile.profile_id,)
-    assert conclusion_context.hypothesis_refs == (hypothesis.hypothesis_id,)
-    assert conclusion_context.evidence_refs == (evidence.evidence_id,)
-    assert conclusion_context.discovery_refs == ()
+    assert synthesis_context.assumptions == ()
+    assert synthesis_context.assumption_refs == ()
+    assert synthesis_context.tasks == ()
+    assert synthesis_context.task_refs == ()
+    assert synthesis_context.discoveries == ()
+    assert synthesis_context.discovery_refs == ()
+    assert synthesis_context.user_decisions == ()
+    assert synthesis_context.user_decision_refs == ()
+    assert synthesis_context.pending_tasks == ()
+    assert synthesis_context.open_questions == ()
+    assert synthesis_context.stale_context == ()
+    assert synthesis_context.dead_ends == ()
+    assert synthesis_context.cached_tool_results == ()
+    assert synthesis_context.data_profile_refs == (profile.profile_id,)
+    assert synthesis_context.hypothesis_refs == (hypothesis.hypothesis_id,)
+    assert synthesis_context.evidence_refs == (evidence.evidence_id,)
+    assert synthesis_context.data_profile_summaries[0].accepted_as_ground_truth is True
+    assert synthesis_context.hypotheses[0].validation_method == hypothesis.validation_method
+    assert synthesis_context.evidence[0].method == evidence.method
+    assert {
+        (item.source_type, item.reference) for item in synthesis_context.evidence[0].provenance
+    } == {
+        (MemorySourceType.EXECUTION_RUN, evidence.execution_run_ref),
+        (MemorySourceType.ANALYSIS_FRAME, evidence.analysis_frame_ref),
+    }
     assert answer_context.discovery_refs == (discovery.discovery_id,)
-    assert "Assumptions are excluded" in conclusion_context.exclusion_notes[0]
+    assert "Assumptions are excluded" in synthesis_context.exclusion_notes[0]
 
 
 def test_answer_context_excludes_flagged_discovery() -> None:
@@ -409,7 +455,7 @@ def test_conclusion_context_filters_stale_rejected_or_completed_items() -> None:
     completed_hypothesis = build_hypothesis(
         task.task_id,
         profile.profile_id,
-        status=HypothesisStatus.CONFIRMED,
+        status=HypothesisStatus.EVALUATED,
     )
     evidence = build_evidence(hypothesis.hypothesis_id, profile.profile_id)
     superseded_evidence = build_evidence(

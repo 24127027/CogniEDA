@@ -22,7 +22,11 @@ The current `SessionFrame` model is in `src/schemas/artifacts.py`. It includes:
 
 Persistence is implemented by `SessionFrameRepository`. Construction is implemented by `SessionFrameBuilder`.
 
-`SessionContextBuilder` can derive non-persistent `planning`, `answer`, `conclusion`, and `discovery_synthesis` context bundles from repository-backed state or a persisted `SessionFrame`. The scientific finalizer also appends a minimal governed SessionFrame snapshot after successful Evidence/Discovery creation. These are guards/snapshots, not a retrieval engine or new durable object type.
+`SessionContextBuilder` can derive non-persistent `planning`, `answer`, `conclusion`, and
+`discovery_synthesis` context bundles from repository-backed state or a persisted `SessionFrame`.
+The scientific finalizer also appends a minimal governed SessionFrame snapshot after successful
+Evidence/Discovery creation. These are guards/snapshots, separate from the bounded SQL-backed
+`DiscoveryRetrievalEngine`; neither is a new durable object type.
 
 ## Implementation Status
 
@@ -45,7 +49,7 @@ Not yet implemented:
 - target inclusion reasons and audit notes per item
 - user-governed pin/remove/reorder/exclude behavior
 - explicit active vs excluded object ID sets
-- graph/vector retrieval engine, ranking and production prompt assembly
+- graph/vector retrieval, Graph Miner orchestration, and production protected-context prompt assembly
 
 ## Known Deviation
 

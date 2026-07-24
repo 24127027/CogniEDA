@@ -28,9 +28,9 @@ def cancel_execution_attempt(session: Session, attempt_id: UUID) -> bool:
 
     if run.status == ExecutionRunStatus.CANCELLED:
         return True
-    if run.status == ExecutionRunStatus.FINALIZING:
+    if run.status == ExecutionRunStatus.EVIDENCE_ADMITTING:
         raise AlreadyFinalizingError("already_finalizing")
-    if run.status == ExecutionRunStatus.COMPLETED:
+    if run.status == ExecutionRunStatus.EVIDENCE_ADMITTED:
         raise AlreadyCompletedError("already_completed")
 
     transition_service = ExecutionAttemptTransitionService(session)
@@ -43,9 +43,13 @@ def cancel_execution_attempt(session: Session, attempt_id: UUID) -> bool:
         if run_refreshed:
             if run_refreshed.status == ExecutionRunStatus.CANCELLED:
                 return True
-            if run_refreshed.status == ExecutionRunStatus.FINALIZING:
+            if run_refreshed.status in {
+                ExecutionRunStatus.EVIDENCE_ADMITTING,
+            }:
                 raise AlreadyFinalizingError("already_finalizing")
-            elif run_refreshed.status == ExecutionRunStatus.COMPLETED:
+            elif run_refreshed.status in {
+                ExecutionRunStatus.EVIDENCE_ADMITTED,
+            }:
                 raise AlreadyCompletedError("already_completed")
     return res
 

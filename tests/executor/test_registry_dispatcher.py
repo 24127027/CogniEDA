@@ -8,29 +8,32 @@ from pydantic import ValidationError
 
 from agents.executor import (
     Capability,
+    DataExplorerExecutor,
     ExecutorContext,
     ExecutorDispatcher,
     ExecutorInput,
     ExecutorRegistry,
     build_capability_selection_instructions,
     build_capability_selection_model,
-    executor_registry,
 )
-from agents.executor.executor import Executor
+from agents.executor.graph_miner.agent import GraphMiner
+from agents.executor.hypothesis_analyst.agent import HypothesisAnalyst
 from agents.executor.types import BaseState
 from agents.planner.types import PlannerOutput
 from application.orchestrator.execution_contracts import (
-    AnalysisFrameObservation,
-    ExecutionRunObservation,
     ExecutionSpecification,
-    ExecutorResult,
     HypothesisDraft,
     PreparedExecution,
 )
 from schemas.common import EvaluationThresholds
+from schemas.specialist_contracts import (
+    DataExplorerFailureReason,
+    DataExplorerFailureResult,
+    DataExplorerResult,
+)
 
 
-def make_prepared_execution(executor_id: str = "graph_mining") -> PreparedExecution:
+def make_prepared_execution(executor_id: str = "data_exploration") -> PreparedExecution:
     task_id = uuid4()
     hypothesis_id = uuid4()
     profile_id = uuid4()
@@ -73,40 +76,34 @@ class FakeGraph:
         self.calls.append((input, context))
         return {
             "status": "failed",
-            "error_message": "test error",
-            "analysis_frame": {
-                "frame_hash": "test",
-            },
-            "execution_run": {
-                "status": "failed",
-            },
+            "failure_reason": DataExplorerFailureReason.METHOD_EXECUTION_FAILURE,
+            "message": "test error",
         }
 
 
-class GraphBackedExecutor(Executor[BaseState]):
+class GraphBackedExecutor(DataExplorerExecutor[BaseState]):
     def __init__(self) -> None:
         self.fake_graph = FakeGraph()
         super().__init__(lambda: self.fake_graph)
 
 
-class FakeExecutor(Executor[BaseState]):
+class FakeExecutor(DataExplorerExecutor[BaseState]):
     instance_count = 0
 
     def __init__(self) -> None:
         FakeExecutor.instance_count += 1
         self.calls: list[tuple[ExecutorInput, ExecutorContext]] = []
-        self.result = ExecutorResult(
+        self.result = DataExplorerFailureResult(
             status="failed",
-            error_message="test failure",
-            analysis_frame=AnalysisFrameObservation(frame_hash="test"),
-            execution_run=ExecutionRunObservation(status="failed"),
+            failure_reason=DataExplorerFailureReason.METHOD_EXECUTION_FAILURE,
+            message="test failure",
         )
 
     async def run(
         self,
         input: ExecutorInput,
         context: ExecutorContext,
-    ) -> ExecutorResult:
+    ) -> DataExplorerResult:
         self.calls.append((input, context))
         return self.result
 
@@ -115,10 +112,10 @@ def test_registry_reuses_lazy_singleton() -> None:
     FakeExecutor.instance_count = 0
     registry = ExecutorRegistry()
 
-    registry.register(Capability.GRAPH_MINING)(FakeExecutor)
+    registry.register(Capability.DATA_EXPLORATION)(FakeExecutor)
 
-    first = registry.get(Capability.GRAPH_MINING.id)
-    second = registry.get(Capability.GRAPH_MINING.id)
+    first = registry.get(Capability.DATA_EXPLORATION.id)
+    second = registry.get(Capability.DATA_EXPLORATION.id)
 
     assert first is second
     assert FakeExecutor.instance_count == 1
@@ -126,10 +123,10 @@ def test_registry_reuses_lazy_singleton() -> None:
 
 def test_registry_rejects_duplicate_capability() -> None:
     registry = ExecutorRegistry()
-    registry.register(Capability.GRAPH_MINING)(FakeExecutor)
+    registry.register(Capability.DATA_EXPLORATION)(FakeExecutor)
 
-    with pytest.raises(ValueError, match="Capability already registered: graph_mining"):
-        registry.register(Capability.GRAPH_MINING)(FakeExecutor)
+    with pytest.raises(ValueError, match="Capability already registered: data_exploration"):
+        registry.register(Capability.DATA_EXPLORATION)(FakeExecutor)
 
 
 def test_registry_reports_unknown_capability() -> None:
@@ -142,19 +139,19 @@ def test_registry_reports_unknown_capability() -> None:
 def test_registry_lists_capability_specs() -> None:
     registry = ExecutorRegistry()
 
-    registry.register(Capability.GRAPH_MINING)(FakeExecutor)
+    registry.register(Capability.DATA_EXPLORATION)(FakeExecutor)
 
-    assert registry.get_spec(Capability.GRAPH_MINING.id) is Capability.GRAPH_MINING
-    assert registry.list_specs() == (Capability.GRAPH_MINING,)
+    assert registry.get_spec(Capability.DATA_EXPLORATION.id) is Capability.DATA_EXPLORATION
+    assert registry.list_specs() == (Capability.DATA_EXPLORATION,)
 
 
 def test_dispatcher_invokes_registered_executor() -> None:
     registry = ExecutorRegistry()
-    registry.register(Capability.GRAPH_MINING)(FakeExecutor)
+    registry.register(Capability.DATA_EXPLORATION)(FakeExecutor)
     dispatcher = ExecutorDispatcher(registry)
-    executor = registry.get(Capability.GRAPH_MINING.id)
+    executor = registry.get(Capability.DATA_EXPLORATION.id)
 
-    prepared = make_prepared_execution(Capability.GRAPH_MINING.id)
+    prepared = make_prepared_execution(Capability.DATA_EXPLORATION.id)
     context = ExecutorContext()
 
     result = asyncio.run(dispatcher.dispatch(prepared, context))
@@ -239,15 +236,65 @@ def test_executor_run_returns_validated_graph_execution_result() -> None:
     result = asyncio.run(executor.run(input=input_data, context=context))
 
     assert result.status == "failed"
-    assert result.error_message == "test error"
-    assert result.analysis_frame.frame_hash == "test"
+    assert result.message == "test error"
+    assert result.failure_reason == DataExplorerFailureReason.METHOD_EXECUTION_FAILURE
     assert executor.fake_graph.calls == [(input_data, context)]
 
 
-def test_executor_package_initializes_existing_default_executors() -> None:
-    registered = {spec.id for spec in executor_registry.list_specs()}
+def test_dispatcher_runtime_seam_rejects_executor_scientific_authority() -> None:
+    class MaliciousExecutor:
+        async def run(self, input: ExecutorInput, context: ExecutorContext) -> dict[str, object]:
+            return {
+                "status": "failed",
+                "failure_reason": DataExplorerFailureReason.METHOD_EXECUTION_FAILURE,
+                "message": "technical failure",
+                "evaluation": {"outcome": "supports", "finalize": True},
+            }
 
-    assert {Capability.GRAPH_MINING.id, Capability.HYPOTHESIS_TESTING.id} <= registered
+    registry = ExecutorRegistry()
+    registry.register_factory(Capability.DATA_EXPLORATION, MaliciousExecutor)
+
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        asyncio.run(
+            ExecutorDispatcher(registry).dispatch(
+                make_prepared_execution(Capability.DATA_EXPLORATION.id),
+                ExecutorContext(),
+            )
+        )
+
+
+def test_graph_miner_and_hypothesis_analyst_are_not_data_explorer_executors() -> None:
+    assert not issubclass(GraphMiner, DataExplorerExecutor)
+    assert not issubclass(HypothesisAnalyst, DataExplorerExecutor)
+
+
+@pytest.mark.parametrize(
+    "capability",
+    [Capability.GRAPH_MINING, Capability.HYPOTHESIS_TESTING],
+)
+def test_data_explorer_dispatcher_rejects_other_specialist_capabilities(capability) -> None:
+    class OtherSpecialist:
+        async def run(self, input: ExecutorInput, context: ExecutorContext):
+            raise AssertionError("Other specialists must not cross the Data Explorer result seam.")
+
+    registry = ExecutorRegistry()
+    registry.register_factory(capability, OtherSpecialist)
+
+    with pytest.raises(ValueError, match="cannot invoke Graph Miner or Hypothesis Analyst"):
+        asyncio.run(
+            ExecutorDispatcher(registry).dispatch(
+                make_prepared_execution(capability.id),
+                ExecutorContext(),
+            )
+        )
+
+
+def test_executor_package_has_no_global_or_cross_specialist_registry() -> None:
+    import agents.executor as package
+    import agents.executor.registry as registry_module
+
+    assert not hasattr(package, "executor_registry")
+    assert not hasattr(registry_module, "executor_registry")
 
 
 def test_executor_scientific_input_excludes_planner_and_retrieval_context() -> None:
@@ -261,10 +308,9 @@ def test_executor_scientific_input_excludes_planner_and_retrieval_context() -> N
     }.isdisjoint(ExecutorInput.model_fields)
 
 
-@pytest.mark.parametrize(
-    "capability_id",
-    [Capability.GRAPH_MINING.id, Capability.HYPOTHESIS_TESTING.id],
-)
-def test_registered_default_executor_graphs_fail_explicitly(capability_id: str) -> None:
+def test_graph_miner_remains_outside_data_explorer_registry() -> None:
+    registry = ExecutorRegistry()
     with pytest.raises(NotImplementedError):
-        executor_registry.get(capability_id)
+        GraphMiner()
+    with pytest.raises(KeyError, match="No executor registered"):
+        registry.get(Capability.GRAPH_MINING.id)

@@ -18,12 +18,17 @@ from schemas.common import EvaluationThresholds, MethodParameter
 from schemas.enums import (
     AnalysisIntent,
     AssumptionStatus,
-    HypothesisStatus,
     ObjectiveStatus,
     PlannerCapability,
     TaskDependencyType,
     TaskKind,
     TaskLifecycleState,
+)
+from schemas.execution_observations import (
+    AnalysisFrameObservation as AnalysisFrameObservation,
+)
+from schemas.execution_observations import (
+    EvidenceObservation as EvidenceObservation,
 )
 from schemas.planner_operations import (
     AssumptionStateUpdateOperationPayload,
@@ -37,15 +42,8 @@ from schemas.planner_operations import (
     TaskUpdateOperationPayload,
 )
 
-# Compatibility re-exports: executor callers retain their existing import paths
-# while durable execution contracts no longer belong to the Planner module.
-AnalysisFrameObservation = execution_contracts.AnalysisFrameObservation
-EvidenceObservation = execution_contracts.EvidenceObservation
-ExecutionRunObservation = execution_contracts.ExecutionRunObservation
 ExecutionSpecification = execution_contracts.ExecutionSpecification
-ExecutorResult = execution_contracts.ExecutorResult
 HypothesisDraft = execution_contracts.HypothesisDraft
-HypothesisEvaluationDraft = execution_contracts.HypothesisEvaluationDraft
 PreparedExecution = execution_contracts.PreparedExecution
 
 PlannerIntent = Literal[
@@ -679,14 +677,6 @@ class EvidenceAdmission(BaseModel):
     error_message: str | None = None
 
 
-class HypothesisEvaluation(BaseModel):
-    """Result of evaluating all admitted evidence for a Hypothesis."""
-
-    evaluated: bool = False
-    new_status: HypothesisStatus | None = None
-    discovery_draft: dict[str, Any] | None = None
-
-
 class State(BaseModel):
     """Internal Planner state."""
 
@@ -700,9 +690,7 @@ class State(BaseModel):
     execution_revalidation: ExecutionRevalidation | None = None
     prepared_execution: PreparedExecution | None = None
     execution_admission: ExecutionAdmission | None = None
-    executor_result: ExecutorResult | None = None
     evidence_admission: EvidenceAdmission | None = None
-    hypothesis_evaluation: HypothesisEvaluation | None = None
     execution_review: ExecutionReviewResult | None = None
     session_id: str | None = None
     resume_approval_id: UUID | None = None

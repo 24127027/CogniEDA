@@ -1,18 +1,15 @@
-from langgraph.graph.state import CompiledStateGraph
+"""Compatibility guard: Hypothesis Analyst is not a generic executor graph."""
 
-from application.orchestrator.execution_contracts import ExecutorResult
+from __future__ import annotations
+
+from typing import Any
+
+from langgraph.graph.state import CompiledStateGraph
 
 from ..types import ExecutorContext, ExecutorInput
 from .state import State
 
 
-def build_graph() -> CompiledStateGraph[State, ExecutorContext, ExecutorInput, ExecutorResult]:
-    """
-    Builds a graph representation of the planning problem.
-    This function is a placeholder and should be implemented with the actual logic
-    to construct the graph based on the specific planning requirements.
-    """
-
-    raise NotImplementedError(
-        "The build_graph function needs to be implemented with the actual graph construction logic."
-    )
+def build_graph() -> CompiledStateGraph[State, ExecutorContext, ExecutorInput, Any]:
+    """Build the compiled state graph for HypothesisAnalyst."""
+    raise NotImplementedError("HypothesisAnalyst uses its isolated PydanticAI evaluation boundary.")

@@ -25,7 +25,7 @@ The design explicitly excludes `Workspace`, `Question`, `AnalysisFrame`, `Genera
 | `DataProfile` | Implemented locally | Immutable schema, table, repository, and profiler exist. It stores dataset path, optional DVC identity, source metadata, summaries, preprocessing history, lifecycle state, replacement profile id when superseded, and ground-truth acceptance. |
 | `Assumption` | Partially implemented | Schema, table, and repository exist. Assumptions are planning context only and are excluded from conclusion projection. |
 | `Task` | Partially implemented | Schema, table, repository, lifecycle, motivation provenance, PlannerOperation handlers, and local hypothesis-readiness guard exist. General planning/approval remains incomplete. |
-| `Hypothesis` | Implemented locally | Schema, table, repository and execution-admission path exist. Fresh schemas enforce one Hypothesis per Task with a unique constraint. Retry code currently conflicts with this invariant. |
+| `Hypothesis` | Implemented locally | Schema, table, repository and execution-admission path exist. Fresh schemas enforce one Hypothesis per Task with a unique constraint; retries reuse the existing Hypothesis, while changed-contract rerun semantics remain unspecified. |
 | `Evidence` | Implemented locally | Immutable schema, table, and append-only repository exist. It references Hypothesis, DataProfile, AnalysisFrame, and ExecutionRun. |
 | `Discovery` | Implemented locally | Immutable schema, table, repository, structured claim, epistemic status, and `validity_basis` enforcement exist. |
 | `SessionFrame` | Partially implemented | Schema, table, repository, builder, and planning/conclusion projection exist. Target user-governed context-item audit details remain incomplete. |

@@ -46,7 +46,7 @@ def test_create_agent_forwards_agent_owned_builtin_tools(
     )
 
 
-def test_concrete_agent_classes_own_their_builtin_tool_selections() -> None:
+def test_concrete_agent_classes_respect_role_specific_tool_boundaries() -> None:
     assert Planner.builtin_tools == (AvailableBuiltinTools.GRAPH,)
     assert GraphMiner.builtin_tools == (AvailableBuiltinTools.GRAPH,)
-    assert HypothesisAnalyst.builtin_tools == (AvailableBuiltinTools.DATASET,)
+    assert AvailableBuiltinTools.DATASET not in HypothesisAnalyst.builtin_tools

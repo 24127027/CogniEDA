@@ -90,6 +90,7 @@ class DataProfileLifecycleState(StrEnum):
     DRAFT = "draft"
     ACTIVE = "active"
     SUPERSEDED = "superseded"
+    INVALIDATED = "invalidated"
     ARCHIVED = "archived"
 
 
@@ -192,10 +193,7 @@ class HypothesisStatus(StrEnum):
     TESTING = "testing"
     AWAITING_ADDITIONAL_EVIDENCE = "awaiting_additional_evidence"
     READY_FOR_EVALUATION = "ready_for_evaluation"
-    CONFIRMED = "confirmed"
-    CONTRADICTED = "contradicted"
-    INCONCLUSIVE = "inconclusive"
-    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    EVALUATED = "evaluated"
     FAILED = "failed"
     CANCELLED = "cancelled"
     ARCHIVED = "archived"
@@ -218,14 +216,28 @@ class ExecutionRunStatus(StrEnum):
     DISPATCH_CLAIMED = "dispatch_claimed"
     RUNNING = "running"
     RESULT_RECEIVED = "result_received"
-    FINALIZING = "finalizing"
-    COMPLETED = "completed"
+    EVIDENCE_ADMITTING = "evidence_admitting"
+    EVIDENCE_ADMITTED = "evidence_admitted"
     DISPATCH_FAILED = "dispatch_failed"
     EXECUTION_FAILED = "execution_failed"
     EXPIRED = "expired"
     ABANDONED = "abandoned"
     CANCELLED = "cancelled"
     RESULT_CONFLICT = "result_conflict"
+
+
+class EvaluationControlState(StrEnum):
+    """Operational states for durable non-FCO evaluation control."""
+
+    PENDING = "pending"
+    CLAIMED = "claimed"
+    PROPOSAL_READY = "proposal_ready"
+    RETRYABLE_FAILED = "retryable_failed"
+    NON_RETRYABLE_FAILED = "non_retryable_failed"
+    INVALIDATED = "invalidated"
+    CANCELLED = "cancelled"
+    CONFLICT = "conflict"
+    COMMITTED = "committed"
 
 
 class ExecutionApprovalStatus(StrEnum):
@@ -436,3 +448,70 @@ class PlannerCapability(StrEnum):
     ACCEPT_PROFILE = "accept_profile"
     REVIEW_RESULT = "review_result"
     REVIEW_CONFLICT = "review_conflict"
+
+
+class AuthorizationClass(StrEnum):
+    """Authorization category for proposed mutations."""
+
+    USER_GOVERNED = "user_governed"
+    TRUSTED_INTERNAL = "trusted_internal"
+    UNAUTHORIZED = "unauthorized"
+
+
+class GovernanceDecisionOutcome(StrEnum):
+    """Outcome for a durable proposal governance decision."""
+
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+
+
+class DiscoveryAdmissionReplayDisposition(StrEnum):
+    """Content-equivalence result for a DiscoveryAdmissionPlan attempt."""
+
+    NEW = "new"
+    IDEMPOTENT = "idempotent"
+    CONFLICT = "conflict"
+
+
+class DiscoveryAdmissionClaimState(StrEnum):
+    """Active operational states for Discovery admission claims."""
+
+    PENDING = "pending"
+    CLAIMED = "claimed"
+    COMMITTED = "committed"
+    CONFLICT = "conflict"
+    CANCELLED = "cancelled"
+    INVALIDATED = "invalidated"
+
+
+
+class ValiditySourceType(StrEnum):
+    """Source object types for validity events."""
+
+    EVIDENCE = "evidence"
+    DATA_PROFILE = "data_profile"
+    ANALYSIS_FRAME = "analysis_frame"
+    EXECUTION_RUN = "execution_run"
+
+
+class ValiditySourceState(StrEnum):
+    """Validity state for mutable provenance metadata on non-FCO sources."""
+
+    ACTIVE = "active"
+    INVALIDATED = "invalidated"
+    CONFLICT = "conflict"
+    UNVERIFIED = "unverified"
+
+
+class ValidityEventType(StrEnum):
+    """Supported source validity events."""
+
+    EVIDENCE_INVALIDATION = "evidence_invalidation"
+    EVIDENCE_SUPERSESSION = "evidence_supersession"
+    EVIDENCE_CONFLICT = "evidence_conflict"
+    DATA_PROFILE_INVALIDATION = "data_profile_invalidation"
+    DATA_PROFILE_SUPERSESSION = "data_profile_supersession"
+    ANALYSIS_FRAME_INVALIDITY = "analysis_frame_invalidity"
+    EXECUTION_RUN_CONFLICT = "execution_run_conflict"
+    PROVENANCE_CORRUPTION = "provenance_corruption"

@@ -205,14 +205,16 @@ def _hypothesis_exclusion_reason(
     if mode_key in {ContextMode.PLANNING.value, ContextMode.ANSWER.value} and state_key in {
         HypothesisStatus.PROPOSED.value,
         HypothesisStatus.TESTING.value,
+        HypothesisStatus.AWAITING_ADDITIONAL_EVIDENCE.value,
+        HypothesisStatus.READY_FOR_EVALUATION.value,
     }:
         return None
     if mode_key in {ContextMode.CONCLUSION.value, ContextMode.DISCOVERY_SYNTHESIS.value}:
         if state_key == HypothesisStatus.TESTING.value:
             return None
-        if state_key == HypothesisStatus.CONFIRMED.value:
+        if state_key == HypothesisStatus.EVALUATED.value:
             return f"Completed Hypothesis is excluded by default from {context_label}."
-    if state_key == HypothesisStatus.CONFIRMED.value:
+    if state_key == HypothesisStatus.EVALUATED.value:
         return f"Completed Hypothesis is excluded by default from {context_label}."
     return _state_not_allowed("Hypothesis", state_key, context_label)
 
@@ -279,10 +281,10 @@ def _discovery_exclusion_reason(
 
 def _session_frame_exclusion_reason(
     state_key: str | None,
-    mode_key: str,
+    _mode_key: str,
     context_label: str,
 ) -> str | None:
-    if mode_key in {ContextMode.PLANNING.value, ContextMode.ANSWER.value} and state_key in {
+    if state_key in {
         SessionFrameStatus.ACTIVE.value,
         SessionFrameStatus.CHECKPOINT.value,
         SessionFrameStatus.HANDOFF.value,

@@ -10,6 +10,7 @@ from sqlmodel import Session, desc, select
 from db.models import SessionFrameRecord
 from repositories.common import record_to_schema, schema_to_record_payload
 from schemas.artifacts import SessionFrame
+from schemas.enums import SessionFrameStatus
 
 SESSION_FRAME_JSON_FIELDS = {
     "data_profile_summaries",
@@ -50,6 +51,10 @@ class SessionFrameRepository:
     def create(self, session_frame: SessionFrame) -> SessionFrame:
         """Persist and return a new SessionFrame."""
 
+        if session_frame.frame_outcome is not None and session_frame.relevant_discovery_refs:
+            raise RuntimeError(
+                "Conclusion SessionFrame creation is owned by AtomicDiscoveryAdmissionService."
+            )
         record = SessionFrameRecord(
             **schema_to_record_payload(session_frame, json_fields=SESSION_FRAME_JSON_FIELDS)
         )
@@ -87,6 +92,28 @@ class SessionFrameRepository:
 
         statement = (
             select(SessionFrameRecord).order_by(desc(SessionFrameRecord.created_at)).limit(1)
+        )
+        record = self._session.exec(statement).first()
+        if record is None:
+            return None
+        return record_to_schema(SessionFrame, record)
+
+    def get_latest_active(self) -> SessionFrame | None:
+        """Return the latest frame eligible for active context projection."""
+
+        statement = (
+            select(SessionFrameRecord)
+            .where(
+                SessionFrameRecord.frame_status.in_(
+                    [
+                        SessionFrameStatus.ACTIVE,
+                        SessionFrameStatus.CHECKPOINT,
+                        SessionFrameStatus.HANDOFF,
+                    ]
+                )
+            )
+            .order_by(desc(SessionFrameRecord.created_at))
+            .limit(1)
         )
         record = self._session.exec(statement).first()
         if record is None:

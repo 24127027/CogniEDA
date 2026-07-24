@@ -1,5 +1,6 @@
-def main():
-    print("Hello from cognieda!")
+def main() -> None:
+    """Non-product entry point placeholder."""
+    pass
 
 
 if __name__ == "__main__":

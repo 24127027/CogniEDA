@@ -1,5 +1,8 @@
 # Task To Discovery Lifecycle
 
+> **Classification:** current lifecycle-guard note, partially superseded by the
+> [Agent Responsibility Boundaries](../architecture/agent-responsibility-boundaries.md).
+
 ## Target Design
 
 The target lifecycle is:
@@ -42,7 +45,9 @@ Current implementation:
 - `GeneratedView` does not exist.
 - `Evidence` exists as an immutable schema/table/repository and requires `analysis_frame_ref` and `execution_run_ref`.
 - Minimal durable `AnalysisFrame` and execution-attempt `ExecutionRun` records are persisted; they do not yet provide a full reproducibility envelope.
-- Planner task selection, execution preparation, durable approval and execution admission are implemented. Dispatch, result receipt and scientific finalization run independently under `application/orchestrator`, not as planner graph nodes.
+- Planner task selection, execution preparation, durable approval and execution admission are
+  implemented. Dispatch, receipt, Evidence admission, protected evaluation, governance, Discovery
+  admission, and validity propagation run independently under `application/orchestrator`.
 
 ## Implementation Status
 
@@ -64,8 +69,16 @@ Current `Task`, `Hypothesis`, `Evidence`, and `Discovery` repositories support:
 - repository-level Discovery review flagging after referenced Evidence changes
 - one Hypothesis to one Discovery guard at repository and fresh-database schema level
 
-This enforcement is exercised by one narrow approved deterministic-test path from execution admission through scientific finalization. It is not a general end-to-end analytical product because default executors, natural-language planning, general approvals and service/worker bootstrap remain incomplete.
+This enforcement is exercised by a four-outcome persistent E2E path from approved execution through
+retrieval and invalidation. It is not a general product because default executors, general planning,
+deployment adapters, service/API, and worker process remain incomplete.
 
 ## Architectural Risk
 
-The main remaining lifecycle risk is not local repository admission; it is orchestration consistency. Retry currently attempts to clone a Hypothesis for the same Task and fails, approval is currently implemented only for Task-operation batches and execution contracts, an orphan outbox operation can be marked committed without a row, and supersession propagation is not atomic across dependent records.
+The main remaining lifecycle risk is not local repository admission; it is orchestration and
+authority consistency. Retry reuses the existing Hypothesis for the Task, but changed-contract rerun
+semantics are unspecified. Approval is durable for the public Task/decomposition/Objective and
+execution paths, while the general commit boundary can still trust caller-authored in-memory
+approval states. DataProfile/Evidence lifecycle propagation is also not atomic across dependent
+records. Planner still authors the operational contract, while concrete Data Explorer and
+deployment adapters remain absent.

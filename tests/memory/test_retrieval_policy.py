@@ -33,16 +33,17 @@ def assert_excluded(
     [
         (FirstClassObjectType.ASSUMPTION, AssumptionStatus.ACTIVE),
         (FirstClassObjectType.DISCOVERY, DiscoveryLifecycleState.ACTIVE),
-        (FirstClassObjectType.HYPOTHESIS, HypothesisStatus.CONFIRMED),
+        (FirstClassObjectType.HYPOTHESIS, HypothesisStatus.EVALUATED),
         (FirstClassObjectType.TASK, TaskLifecycleState.REJECTED),
         (FirstClassObjectType.DATA_PROFILE, DataProfileLifecycleState.SUPERSEDED),
         (FirstClassObjectType.EVIDENCE, EvidenceLifecycleState.HISTORICALLY_SCOPED),
         (FirstClassObjectType.EVIDENCE, EvidenceLifecycleState.SUPERSEDED),
         (FirstClassObjectType.EVIDENCE, EvidenceLifecycleState.INVALIDATED),
+        ("generated_summary", "active"),
     ],
 )
 def test_discovery_synthesis_excludes_unsafe_roles_and_states(
-    object_type: FirstClassObjectType,
+    object_type: FirstClassObjectType | str,
     lifecycle_state: object,
 ) -> None:
     assert_excluded(object_type, lifecycle_state, ContextMode.DISCOVERY_SYNTHESIS)

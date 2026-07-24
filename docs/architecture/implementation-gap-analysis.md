@@ -1,82 +1,109 @@
 # Implementation Gap Analysis
 
-> **Current implementation snapshot:** 2026-07-17 working tree at committed HEAD `1a586ca7561a82dee4a76d1b10d54d0b78a9d7ad`, including the reviewed uncommitted Steps 3.5A-10 changes.
-> Code is the source of truth for current behavior. This page separates implemented local contracts from target product behavior.
+> **Current implementation snapshot:** working tree reviewed 2026-07-24; repository-wide audit
+> baseline revision `ced5575`.
+> Code is the source of truth for current behavior. Detailed evidence and severity are in the
+> [Codebase Alignment Audit](../audits/codebase-alignment-audit.md).
 
-## Current implementation versus target
+## Current Implementation Versus Target
 
-| Concept | Target design | Current implementation | Status | Remaining gap/risk |
-| --- | --- | --- | --- | --- |
-| FCO ontology | Exactly `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, `SessionFrame` | Schema, SQLModel records and repositories use exactly this FCO set | Implemented locally | No graph-store ontology runtime |
-| Workspace boundary | Workspace is filesystem/runtime scope with isolated durable state | SQLite URL defaults to `.local/cognieda_graph.sqlite3`; tests cover URL isolation | Partial | No workspace registry, initializer command or service boundary |
-| Immutable knowledge | `DataProfile` and `Evidence` are immutable; Discovery remains evidence-bound | Frozen schemas, append/supersede/invalidate repositories and Discovery admission guards exist | Implemented locally | Supersession/review propagation uses multiple commits and is not atomic end-to-end |
-| Task/Hypothesis cardinality | Only active leaf analytical Tasks execute; one Task produces one Hypothesis | Repository admission guards, fresh-schema unique constraint on `hypotheses.task_id`, and technical retry reuse the same Hypothesis | Implemented locally | No governed changed-analysis rerun path |
-| Hypothesis/Discovery cardinality | One Hypothesis produces one evidence-bound Discovery | Repository guards and fresh-schema unique constraint on `discoveries.hypothesis_id` | Implemented locally | No migration framework for arbitrary older schemas; no review UI |
-| Provenance | Evidence traces DataProfile, AnalysisFrame, ExecutionRun, method, parameters and artifacts | Minimal durable `AnalysisFrame`/`ExecutionRun`; strict Evidence dereference is optional | Partial | Full reproducibility envelope, environment/code identity and artifact integrity are incomplete |
-| Planner operations | Nodes produce pending operations; approved operations commit atomically | Durable `PlannerOperation`, normal commit and special atomic execution bundle exist. Governed root motivation through `/manage_task`, `/decompose <parent-task-uuid>`, and `/objective` persist exact pending batches before approval, and only the restored, session-bound ordered batch can commit. | Partial | `DELETE_TASK` unsupported; plan/assumption/conflict approval remains incomplete |
-| Objective lifecycle | One user-governed current research intent with traceable revisions | At most one `ACTIVE` Objective is database-enforced; public create/update/switch/reactivation is exact-batch approval-gated; explicit transitions, optimistic version checks, global unfinished-Task policy, atomic successor SessionFrame, and immutable non-FCO revisions are implemented | Implemented locally | `PAUSED` is compatibility-only; no history UI; direct import/repair bypasses remain intentionally explicit; databases with ambiguous active rows or malformed legacy revisions require manual repair |
-| Planner request understanding | Natural language and explicit commands route deterministically | Explicit commands bypass classification; configured request-only adapter uses the LLM factory contract and returns controlled invalid results on invalid output or model failure | Partially implemented | Contextual grounding and most downstream capability nodes remain scaffold-level; live model credentials/service are required outside tests |
-| Planner execution admission | User approves a revalidated execution contract before dispatch | Durable `ExecutionApproval`; approved path commits Hypothesis/Run/Outbox | Implemented narrow path | Task/decomposition/Objective approval is also end-to-end, but plan/assumption/conflict approval remains incomplete |
-| Durable attempt protocol | Worker claims, renews, receives, finalizes, cancels and recovers with fencing | Transition service, outbox/inbox, lease/epoch/version, finalization fencing and reconciler exist; retry creates a successor attempt under the existing Hypothesis | Implemented locally | No process bootstrap; external side effects remain at-least-once |
-| Scientific finalization | Executor observations become Evidence/Discovery only through deterministic admission | One deterministic-test processor validates contract and creates AnalysisFrame/Evidence/Discovery/lifecycle/SessionFrame operations | Implemented narrow method | No generic method registry, effect-size/sample-size policy, multiple testing or full diagnostics |
-| Executor capability dispatch | Durable attempts reach one registered domain executor without weakening attempt ownership | Worker validates run/outbox/FCO identity, binds UUIDs, and reaches one `ExecutorInput` adapter plus lazy registry; receiver/finalizer remain separate | Partial | Default GraphMiner/HypothesisAnalyst graph builders raise `NotImplementedError`; `data_exploration` and production worker bootstrap are absent |
-| Context type safety | Planning may use Assumptions; synthesis must exclude them and existing Discoveries | Pure `RetrievalPolicy`, local planning/synthesis/answer projections, and bounded structural-plus-lexical Discovery retrieval for governed root motivation and `/decompose` exist | Partial | No vector/embedding retrieval, historical-review mode, complete indexed search, cache, or production prompt assembly |
-| SessionFrame | Durable scoped active-context/checkpoint artifact | Append-only repository, builder and scientific finalizer snapshot exist; approved root Task motivation, decomposition, and Objective lifecycle batches append successor snapshots | Partial | Planner does not automatically refresh/pin/prune/synchronize frames outside those narrow approved paths |
-| Data versioning | Physical versions plus immutable DataProfiles and explicit transformation lineage | CSV/Parquet loading and baseline profiler exist; DVC boundary is explicit | Partial | DVC methods are not implemented; no cleaning/derived-version workflow |
-| Evidence cache | Validity-keyed optimization that cannot author Discovery | No cache record/service | Not implemented | Key design, invalidation and runtime integration remain target-only |
-| Product surface | User-facing CLI/service and independent worker loop | No production entrypoint | Not implemented | Current modules require external bootstrap/injected executor |
-| End-to-end lineage proof | D1/D2 motivate governed T0 decomposition; executable T3 reaches H3/retry/E3/D3 without epistemic leakage | One integration test uses public approved T0 motivation, public approved typed decomposition, public execution admission, real retry/adapter/receiver/finalizer boundaries, and repository lineage reads | Implemented locally | This is not a production product loop; executor implementation is a permitted deterministic test adapter |
-| Quality gates | Tests, lint and strict type checks pass in CI | Local Python pytest passes 279 tests; the focused Step 3.5A-10 regression union passes 211 tests; Ruff passes on every Step 10-touched source/test file; focused mypy reports 109 existing dependency/type errors in five files; no tracked CI workflow | Partial / failing gates | Global mypy and production integration readiness remain unresolved |
+| Area | Target | Current implementation | Status / principal gap |
+| --- | --- | --- | --- |
+| FCO ontology | Exactly Objective, DataProfile, Assumption, Task, Hypothesis, Evidence, Discovery, SessionFrame | Pydantic schemas, SQLModel tables and repositories use this set | Implemented locally; no production graph abstraction |
+| Planner governance | Understand, route, manage Tasks/Objectives/Assumptions/approvals, coordinate specialists, emit operations | Request classification and narrow Task/decomposition/Objective/execution approvals exist | Partial; answer/suggest/review/pause and several approval workflows are placeholders |
+| Hypothesis Analyst | Operationalize Task and evaluate Evidence in protected context without raw-data access | A no-tool PydanticAI evaluation mode consumes only a canonical repository-built bundle and durably publishes a fenced proposal/failure; Planner still authors the operational contract | Evidence evaluation implemented; operationalization ownership remains misaligned |
+| Data Explorer | Execute approved contract, produce provenance and Evidence proposal | Capability label only; no registered implementation | Absent |
+| Graph Miner | Typed graph retrieval, lineage/staleness/conflict/coverage analysis | Stub wrapper plus separate bounded SQL-backed Discovery retrieval | Partial and misassigned |
+| PydanticAI boundary | Canonical LLM construction, deps, tools, typed output, validation and retry | Used by selected Planner adapters; default checked-in tool config fails assembly | Partial / configuration-blocked |
+| LangGraph boundary | Deterministic routing, interruption, checkpoint and workflow state only | Planner topology uses it; Hypothesis Analyst evaluation uses PydanticAI directly, while Graph Miner remains a stub and `DataExplorerExecutor` owns observation output | Retain narrowly; Graph Miner and concrete Data Explorer remain absent |
+| Task/Hypothesis/Discovery lineage | Active terminal Task -> one Hypothesis -> active Evidence -> one Discovery | Repository constraints plus atomic Evidence and Discovery admission enforce cardinality and sole terminal writers | Implemented locally |
+| Approval | Exact durable proposal and user decision before governed mutation/execution | Public Task/decomposition/Objective and execution paths bind exact proposals | Partial; commit can trust caller-authored in-memory approval for other operations |
+| Atomic commit | Approved ordered operations and validity changes persist all-or-nothing | Planner, Evidence admission, finalization, validity propagation and Discovery admission each use an application-owned atomic transaction | Implemented for these local SQLite paths; broader cross-service effects remain outside one transaction |
+| Execution attempts | Durable outbox/inbox, fencing, idempotency, cancellation, retry | Transition service and race/recovery tests exist | Implemented locally; no worker bootstrap and external effects remain at-least-once |
+| Evidence admission | Observation-only, deterministic AnalysisFrame/Evidence materialization in one fenced transaction | Active execution finalization routes through fenced transaction, materializes AnalysisFrame and Evidence, advances ExecutionRun to `EVIDENCE_ADMITTED` and Hypothesis to `READY_FOR_EVALUATION` in one atomic commit with zero automatic Discovery creation | Implemented (Package 1 Cutover); active production path terminates at durable Evidence |
+| Context type safety | Assumptions only in planning; protected Discovery synthesis | Package 2 builds immutable repository-authoritative evaluation snapshots, a closed provenance manifest, and a complete digest; the Analyst receives only that bundle | Implemented for Hypothesis evaluation; broader Graph Miner and generated-view context remain absent |
+| Discovery admission governance | Exact persisted proposal and independently authorized decision produce one atomic Discovery chain | Package 5 resolves authenticated principal context through an injected adapter, persists an exact decision, durably claims admission, reconstructs under the SQLite writer lock, and atomically commits Discovery plus lifecycle, decision, claim and conclusion-frame companions | Implemented locally for SQLite; the product composition root still needs a real authentication adapter |
+| Validity propagation | One authorized source event atomically invalidates every applicable dependent and current retrieval path | Package 4 supports eight typed DataProfile, AnalysisFrame, Evidence, ExecutionRun, conflict, supersession, invalidation, and provenance-corruption events through one fenced transaction and immutable event record | Implemented locally; no production authority issuer, only explicit SQLite upgrade/trigger support |
+| SessionFrame | User-governed current context with auditable item inclusion | Append snapshots, narrow successor updates and deterministic atomic conclusion frames exist | Partial; no item governance, session scoping/cardinality or general refresh |
+| Provenance | Reproducible data view, method, code, environment, seed, artifacts | Minimal AnalysisFrame/ExecutionRun and Evidence refs | Partial; insufficient for general reproducibility/invalidation |
+| Dataset versioning/cleaning | DVC/physical versions and approved cleaning produce new DataProfile | CSV/Parquet profiler plus DVC interface | Partial; DVC and cleaning execution absent |
+| Retrieval/graph | Durable FCO relations and governed Graph Miner traversal | SQLModel/JSON relations and bounded Discovery retrieval | Partial; no graph-store abstraction or Graph Miner workflow |
+| Evidence cache | Validity-keyed reuse that cannot author Discovery | No table/service | Absent |
+| Product surface | Supported CLI/service/worker loop | Package 6 provides a fail-closed composition root and admission CLI loaded through an explicit deployment factory | Partial; no concrete deployment adapters, API, or worker process |
+| Quality gates | Reproducible pytest, lint, format, type, import/startup, migration checks in CI | Extensive local tests; no tracked CI and static debt remains | Partial; see verification record in the audit |
 
-## Reviewed boundaries
+## Protected Invariants Already Present
 
-### Step 3.5B: execution-attempt correctness (implemented narrow scope)
+- Frozen DataProfile/Evidence Pydantic payloads and append-oriented repositories
+  (`src/schemas/common.py:82-90`, `src/schemas/artifacts.py:74-96`, `206-234`).
+- Only active terminal analytical Tasks using an accepted DataProfile admit a Hypothesis; unique
+  Task/Hypothesis and Hypothesis/Discovery constraints exist
+  (`src/repositories/hypothesis_repository.py:56-92`, `src/db/models.py:212-229`, `429-466`).
+- Atomic Discovery admission requires active same-Hypothesis Evidence and structured validity
+  metadata; the generic repository writer is sealed
+  (`src/application/orchestrator/atomic_discovery_admission.py`,
+  `src/repositories/discovery_repository.py`, `src/schemas/artifacts.py`).
+- Failed execution creates no Evidence/Discovery, and Evidence admission is fenced and atomic
+  (`src/application/orchestrator/finalizer.py:24-188`).
+- Local Discovery Synthesis projection excludes Assumptions, Tasks and existing Discoveries
+  (`src/memory/session_frame.py:196-251`).
 
-Technical retry preserves Task/DataProfile/Hypothesis identity, creates a new `ExecutionRun` plus outbox from the persisted predecessor contract, and records predecessor lineage. A unique direct-successor constraint makes a retry chain deterministic under concurrent authorization. A retry of a failed successor must target that successor rather than fork the original attempt.
+## Highest-Risk Gaps
 
-### Step 10: local lineage proof implemented
+1. Commit authorization is not uniformly tied to a durable approved proposal outside the covered
+   Task, decomposition, Objective, execution, and Discovery paths.
+2. Planner authors the operational contract and no concrete Data Explorer exists.
+3. The composition root requires a trusted `AuthenticatedPrincipalResolver`, but no deployment
+   authentication implementation is checked in.
+4. Validity propagation has no production authority-issuance workflow and its explicit upgrade
+   path/immutability triggers support SQLite only.
+5. Package 1 now keeps a technically failed Hypothesis in `testing`, admits an exact-contract retry,
+   and durably consumes repeated-failure inboxes. Changed-contract successor creation remains
+   intentionally outside Package 1.
 
-`/manage_task` obtains a bounded same-profile Discovery candidate set, exposes only local
-references, and atomically commits a motivated root Task plus successor SessionFrame.
-`/decompose` can author the typed current deterministic analytical contract without a
-model-authored UUID or duplicate specification dictionary. Commit revalidates lifecycle,
-profile compatibility, accepted active profile state, and analytical contract integrity.
-The genuine integration proof and its permitted adapters are documented in
+Wave 0.1 removes the raw-dataset builtin from the Hypothesis Analyst scaffold. Wave 1.1A adds Data
+Explorer output, protected synthesis input, and Hypothesis Analyst result contracts. Wave 1.1B-1
+rewires the executor-facing runtime to `DataExplorerResult` through one private application bridge
+without migrating the durable receiver payload. It does not implement either specialist or remove
+application-authored scientific synthesis.
 
-The review also retains the UUID-to-UUID comparison correction in
-`DiscoveryRetrievalEngine` that makes valid same-profile Discoveries eligible for
-motivation.
+Wave 1.1B-2A introduced the observation-only admission contract. Package 1 activates it: the
+production finalizer now persists deterministic AnalysisFrame and immutable Evidence records,
+advances the run to `EVIDENCE_ADMITTED` and the Hypothesis to `READY_FOR_EVALUATION`, and consumes
+the authoritative inbox in one fenced commit. Package 2 now performs protected Evidence evaluation
+and stops at a durable `proposal_ready` or typed failure. Package 3 now verifies the exact proposal
+and a durable actor-authorized decision and returns a deterministic detached
+`DiscoveryAdmissionPlan`. Package 4 provides atomic validity propagation for persisted source
+validity events. Package 5 durably claims, reconstructs and commits the exact Discovery chain in
+one SQLite transaction, including its conclusion SessionFrame and Package 4 interaction.
+Package 6 removes obsolete scientific compatibility modules, provides schema-level quarantine and
+legacy migration, and wires Packages 1–5 through the fail-closed
+`src/application/runtime.py` composition root. The root requires external authentication, Analyst
+model and Data Explorer adapters; it supplies none by default. The persistent E2E matrix proves all
+four epistemic outcomes through proposal, governance, Discovery admission, retrieval, invalidation,
+and retrieval exclusion.
 
-Execution admission validates duplicate operation IDs, one matching run/outbox pair, common session, immutable identifiers, admitted status, and persisted Task/Hypothesis compatibility before staging the pair. Staged `commit=False` operations are not reported as committed before their enclosing transaction commits.
+## Dependency Order
 
-### Remaining planner approval limitation
+1. Lock the responsibility and framework contracts (completed by audit documents).
+2. Add authorization/context boundary tests and versioned specialist proposal contracts
+   (completed through the Package 5 authority boundary; product authentication-adapter integration
+   remains).
+3. Move operationalization to Hypothesis Analyst.
+4. Introduce Data Explorer observation-only output and Graph Miner retrieval contract.
+5. Move Evidence evaluation/Discovery proposal to Hypothesis Analyst (completed by Package 2).
+6. Implement the atomic Discovery admission transaction (completed by reviewed Package 5 for the
+   SQLite persistence boundary).
+7. Complete Planner branches, bootstrap, DVC/cleaning, then cache.
 
-Task/decomposition/Objective proposals persist as pending `PlannerOperation` records and are resumed only when the caller supplies the matching proposal fingerprint and exact ordered operation-id list for the same session. The remaining plan/assumption/conflict approval routes are still not public workflows.
+See [Remediation Backlog](../audits/remediation-backlog.md) for exact modules, prerequisites,
+migration impact, tests and completion criteria.
 
-Evidence: `src/agents/planner/nodes.py`; `src/agents/planner/agent.py`; `src/agents/planner/graph.py`.
+## Owner Decisions Required
 
-## Step status
-
-Steps 1-3, Step 3.5A, and the narrow Step 3.5B execution-attempt correction are complete for the currently implemented scope. Step 4 remains a narrow approval-gated `/decompose <parent-task-uuid>` path. Step 5 remains partial: a typed bounded structural-plus-lexical engine now supports governed root motivation and decomposition, filters lifecycle/profile ineligibility, ranks deterministically, separates context from motivation, exposes local-reference explanations, and revalidates selections at commit. Steps 6-7 define and locally implement one durable-worker-to-domain executor contract. Steps 8-9 implement the narrow governed Objective lifecycle and retain `ObjectiveRevision` as non-FCO provenance. Step 10 is complete as a local integration proof joining governed root motivation, typed execution-ready decomposition, execution admission, retry, receiver, finalizer, and lineage reads. No default executor graph or production bootstrap is runnable. This is not semantic/vector retrieval, Objective graph traversal, a historical-review retrieval mode, autonomous general planning, or a broader product workflow.
-
-## Verified commands
-
-| Command class | Result |
-| --- | --- |
-| Full pytest | `279 passed in 48.60s` (final run) |
-| Focused Step 3.5A-10 regression union | `211 passed in 18.28s` |
-| Focused Step 10 guards | `7 passed in 5.92s` (final run) |
-| Ruff on all Step 10-touched source and tests | Passed |
-| Focused mypy | Failed with 109 existing dependency/type errors in five files: migration `__table__`, transition-service SQLModel/SQLAlchemy, registry/decorator scaffold, finalizer nullable identity, and existing Planner placeholder/type errors; no new Step 10 contract/schema/commit/retrieval error |
-| `git diff --check` | Passed |
-
-These results are not interchangeable: passing tests validate covered behavior, while failing lint/type gates remain real implementation debt.
-
-## Owner decisions required
-
-1. Define a scientifically governed rerun path for changed analytical contracts; technical retry intentionally reuses the existing contract and Hypothesis.
-2. Define the public approval behavior for plan/assumption/conflict workflows beyond the implemented Task/decomposition/Objective batches.
-3. Decide the supported migration policy for local databases created before current unique constraints and attempt columns.
-4. Decide whether SQLModel/SQLite remains the durable runtime store or is a convergence layer before a graph store.
-5. Define the minimum runnable executor and product bootstrap required before describing CogniEDA as an end-to-end product rather than a local integration proof.
-6. Define when Ruff/mypy/CI become release gates.
+- SQLModel relational graph abstraction versus another graph store.
+- Hypothesis approval/transition semantics and changed-contract reruns.
+- Minimum reproducibility envelope for Evidence admission.
+- Governance policy for plan, Assumption, cleaning, conflict and SessionFrame changes.
+- SessionFrame current-cardinality/scoping and legacy database migration support.
+- Release-gate policy for lint, format, mypy and CI.

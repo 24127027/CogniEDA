@@ -91,6 +91,7 @@ class DataProfile(ImmutableCogniEDABaseModel):
     artifact_refs: list[NonEmptyStr] = Field(default_factory=list)
     lifecycle_state: DataProfileLifecycleState = DataProfileLifecycleState.DRAFT
     superseded_by_data_profile_id: UUID | None = None
+    lifecycle_reason: str | None = None
     accepted_as_ground_truth: bool = False
     created_at: datetime = Field(default_factory=utc_now)
 
@@ -199,6 +200,7 @@ class Hypothesis(CogniEDABaseModel):
     validation_method: NonEmptyStr
     evidence_expectation: NonEmptyStr
     status: HypothesisStatus = HypothesisStatus.PROPOSED
+    review_reasons: list[NonEmptyStr] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -246,6 +248,7 @@ class Discovery(ImmutableCogniEDABaseModel):
     uncertainty: str | None = None
     scope: NonEmptyStr
     validity_basis: ValidityBasis
+    limitations: list[NonEmptyStr] = Field(default_factory=list)
     invalidators: list[NonEmptyStr] = Field(default_factory=list)
     lifecycle_state: DiscoveryLifecycleState = DiscoveryLifecycleState.ACTIVE
     review_reasons: list[NonEmptyStr] = Field(default_factory=list)

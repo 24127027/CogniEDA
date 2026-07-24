@@ -111,6 +111,15 @@ class TaskRepository:
         record = self._session.get(TaskRecord, task_id)
         if record is None:
             return None
+        if (
+            "lifecycle_state" in update.model_fields_set
+            and update.lifecycle_state == TaskLifecycleState.COMPLETED
+            and record.task_kind == TaskKind.ANALYTICAL
+            and record.lifecycle_state != TaskLifecycleState.COMPLETED
+        ):
+            raise RuntimeError(
+                "Analytical Task COMPLETED transition is owned by AtomicDiscoveryAdmissionService."
+            )
         if "motivated_by_discovery_ids" in update.model_fields_set:
             self._validate_motivating_discoveries(update.motivated_by_discovery_ids or [])
         if "parent_task_id" in update.model_fields_set:

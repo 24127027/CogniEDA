@@ -22,7 +22,6 @@ from schemas.enums import (
     DiscoveryLifecycleState,
     EvidenceLifecycleState,
     EvidenceType,
-    HypothesisEvidenceOutcome,
     HypothesisStatus,
     InvalidationTrigger,
     LineageOperationType,
@@ -192,14 +191,6 @@ class EvidenceProvenance(CogniEDABaseModel):
     code_reference: str | None = None
     environment_reference: str | None = None
     artifact_paths: list[NonEmptyStr] = Field(default_factory=list)
-
-
-class HypothesisEvaluation(CogniEDABaseModel):
-    """Typed observed outcome for one hypothesis."""
-
-    hypothesis_id: UUID
-    outcome: HypothesisEvidenceOutcome
-    note: str | None = None
 
 
 class EvidenceResultSummary(CogniEDABaseModel):

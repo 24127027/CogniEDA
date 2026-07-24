@@ -1,24 +1,15 @@
-"""Hypothesis-analysis executor wrapper."""
+"""Hypothesis Analyst facade kept outside generic Data Explorer dispatch."""
 
 from __future__ import annotations
 
-from tools.builtin_tools import AvailableBuiltinTools
-
-from ..capabilities import Capability
-from ..executor import Executor
-from ..registry import executor_registry
-from .graph import build_graph
-from .state import State
+from .nodes import build_hypothesis_analyst_agent
 
 
-@executor_registry.register(Capability.HYPOTHESIS_TESTING)
-class HypothesisAnalyst(Executor[State]):
-    """Executor that can produce Evidence and Discovery drafts."""
+class HypothesisAnalyst:
+    """No-tool factory facade for protected evidence evaluation."""
 
-    builtin_tools: tuple[AvailableBuiltinTools, ...] = (AvailableBuiltinTools.DATASET,)
-
-    def __init__(self) -> None:
-        super().__init__(build_graph)
+    builtin_tools: tuple[()] = ()
+    build_agent = staticmethod(build_hypothesis_analyst_agent)
 
 
 HypothesisAnalystExecutor = HypothesisAnalyst

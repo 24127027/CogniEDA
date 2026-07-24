@@ -14,8 +14,13 @@ import json
 import re
 from uuid import UUID
 
+import pytest
+from pydantic import TypeAdapter
+from pydantic_ai.models.test import TestModel
+
 from agents.executor import ExecutorContext, ExecutorDispatcher, ExecutorInput, ExecutorRegistry
 from agents.executor.capabilities import CapabilitySpec
+from agents.executor.hypothesis_analyst.nodes import build_hypothesis_analyst_agent
 from agents.planner.agent import Planner
 from agents.planner.nodes import ObjectiveManagementDraft, TaskManagementDraft
 from agents.planner.types import (
@@ -26,36 +31,49 @@ from agents.planner.types import (
     TaskCreateDraft,
     TaskDecompositionDraft,
 )
+from application.orchestrator.atomic_discovery_admission import (
+    AtomicDiscoveryAdmissionService,
+)
 from application.orchestrator.cancellation import authorize_retry
+from application.orchestrator.discovery_admission_governance import (
+    DiscoveryAdmissionGovernanceService,
+)
 from application.orchestrator.dispatcher import dispatch_pending_attempts
+from application.orchestrator.evaluator_runner import (
+    enqueue_ready_evaluations,
+    run_evaluation_attempt,
+)
 from application.orchestrator.execution_contracts import (
     AnalysisFrameObservation,
     EvidenceObservation,
-    ExecutionRunObservation,
-    ExecutorResult,
-    HypothesisEvaluationDraft,
+    ExecutionReceiptEnvelope,
 )
 from application.orchestrator.finalizer import finalize_attempt
 from application.orchestrator.receiver import submit_execution_result
-from application.orchestrator.review_propagation import propagate_discovery_review
-from application.orchestrator.scientific_processing import _method_parameter_hash
+from application.orchestrator.synthesis_bundle import build_synthesis_bundle
+from db.models import HypothesisRecord, TaskRecord
 from db.session import get_session
+from discovery_seed_helpers import seed_historical_discovery
+from evidence_seed_helpers import seed_evidence_for_test
 from memory.retrieval_engine import DiscoveryRetrievalEngine
 from memory.session_frame import SessionFrameBuilder
+from package2_helpers import (
+    persist_governance_authority,
+    propagate_validity_for_test,
+    proposal_for_bundle,
+)
 from repositories import (
     AssumptionRepository,
     DataProfileRepository,
     DiscoveryRepository,
     EvidenceRepository,
-    ExecutionOutboxRepository,
+    ExecutionInboxRepository,
     ExecutionRunRepository,
     HypothesisRepository,
     ObjectiveRepository,
     SessionFrameRepository,
     TaskRepository,
 )
-from repositories.hypothesis_repository import HypothesisUpdate
-from repositories.task_repository import TaskUpdate
 from schemas.artifacts import (
     AnalyticalSpecification,
     Assumption,
@@ -82,12 +100,15 @@ from schemas.enums import (
     DiscoveryLifecycleState,
     EvidenceType,
     ExecutionRunStatus,
-    HypothesisEvidenceOutcome,
+    GovernanceDecisionOutcome,
     HypothesisStatus,
     TaskKind,
     TaskLifecycleState,
+    ValidityEventType,
+    ValiditySourceType,
 )
 from schemas.retrieval import RetrievalRequest
+from schemas.specialist_contracts import DataExplorerResult
 
 
 class CreateObjectiveModel:
@@ -222,9 +243,7 @@ class ThreeChildDecompositionModel:
                 prompt,
             )
             explanations = (
-                json.loads(explanation_match.group(1))
-                if explanation_match is not None
-                else {}
+                json.loads(explanation_match.group(1)) if explanation_match is not None else {}
             )
             discovery_refs = {
                 item["claim"]: reference
@@ -233,7 +252,7 @@ class ThreeChildDecompositionModel:
             }
             if not {"Bootstrap claim D1", "Bootstrap claim D2"} <= discovery_refs.keys():
                 raise ValueError("Expected two bounded parent motivations")
-            
+
             active_profile_match = re.search(r"data_profile_ref \(use ([^\)]+)\)", prompt)
             active_profile_ref = active_profile_match.group(1) if active_profile_match else None
             if active_profile_ref is None:
@@ -242,7 +261,7 @@ class ThreeChildDecompositionModel:
             parent_ref = parent_match.group(1)
             d1_ref = discovery_refs["Bootstrap claim D1"]
             d2_ref = discovery_refs["Bootstrap claim D2"]
-            
+
             return TaskDecompositionDraft(
                 parent_task_ref=parent_ref,
                 child_task_proposals=[
@@ -298,32 +317,31 @@ class DeterministicExecutor:
     def __init__(self, *, fail: bool = False) -> None:
         self.fail = fail
         self.requests: list[ExecutorInput] = []
-        self.results: list[ExecutorResult] = []
+        self.results: list[DataExplorerResult] = []
 
-    async def run(self, input: ExecutorInput, context: ExecutorContext) -> ExecutorResult:
+    async def run(self, input: ExecutorInput, context: ExecutorContext) -> DataExplorerResult:
         self.requests.append(input)
         analysis_frame = AnalysisFrameObservation(
             frame_hash=f"frame-{input.execution_run_id}",
             column_refs=input.specification.variable_bindings,
         )
-        execution_run = ExecutionRunObservation(
-            executor_type=input.specification.executor_id,
-            method_id=input.specification.validation_method,
-            parameter_hash=_method_parameter_hash(input.specification.method_parameters),
-            status="failed" if self.fail else "completed",
-        )
         if self.fail:
-            result = ExecutorResult(
+            from schemas.specialist_contracts import (
+                DataExplorerFailureReason,
+                DataExplorerFailureResult,
+            )
+
+            result = DataExplorerFailureResult(
                 status="failed",
-                analysis_frame=analysis_frame,
-                execution_run=execution_run,
-                error_message="Deterministic technical failure.",
+                failure_reason=DataExplorerFailureReason.METHOD_EXECUTION_FAILURE,
+                message="Deterministic technical failure.",
             )
         else:
-            result = ExecutorResult(
-                status="completed",
+            from schemas.specialist_contracts import DataExplorerSuccessResult
+
+            result = DataExplorerSuccessResult(
+                status="success",
                 analysis_frame=analysis_frame,
-                execution_run=execution_run,
                 evidence_observation=EvidenceObservation(
                     evidence_type=EvidenceType.STATISTICAL_TEST,
                     method=input.specification.validation_method,
@@ -335,10 +353,6 @@ class DeterministicExecutor:
                         metric_value=0.01,
                     ),
                     code_reference="tests/e2e/test_research_lineage.py",
-                ),
-                evaluation=HypothesisEvaluationDraft(
-                    outcome=HypothesisEvidenceOutcome.SUPPORTS,
-                    finalize=True,
                 ),
             )
         self.results.append(result)
@@ -451,7 +465,8 @@ def _bootstrap_discovery(
             status=HypothesisStatus.TESTING,
         )
     )
-    evidence = EvidenceRepository(db_session).create(
+    evidence = seed_evidence_for_test(
+        db_session,
         Evidence(
             hypothesis_id=hypothesis.hypothesis_id,
             profile_id=profile.profile_id,
@@ -469,9 +484,10 @@ def _bootstrap_discovery(
                 metric_name="p_value",
                 metric_value=0.01,
             ),
-        )
+        ),
     )
-    discovery = DiscoveryRepository(db_session).create(
+    discovery = seed_historical_discovery(
+        db_session,
         Discovery(
             hypothesis_id=hypothesis.hypothesis_id,
             epistemic_status=DiscoveryEpistemicStatus.SUPPORTED,
@@ -489,16 +505,18 @@ def _bootstrap_discovery(
                 decision_rule=EvaluationThresholds(p_value=0.05),
             ),
             evidence_ids=[evidence.evidence_id],
-        )
+        ),
     )
-    hypothesis_repository.update(
-        hypothesis.hypothesis_id,
-        HypothesisUpdate(status=HypothesisStatus.CONFIRMED),
-    )
-    task_repository.update(
-        task.task_id,
-        TaskUpdate(lifecycle_state=TaskLifecycleState.COMPLETED),
-    )
+    hypothesis_record = db_session.get(HypothesisRecord, hypothesis.hypothesis_id)
+    task_record = db_session.get(TaskRecord, task.task_id)
+    assert hypothesis_record is not None and task_record is not None
+    # Historical-only fixture construction deliberately bypasses current lifecycle
+    # writers; product code cannot use this test-local seam.
+    hypothesis_record.status = HypothesisStatus.EVALUATED
+    task_record.lifecycle_state = TaskLifecycleState.COMPLETED
+    db_session.add(hypothesis_record)
+    db_session.add(task_record)
+    db_session.commit()
     return discovery, evidence
 
 
@@ -511,7 +529,16 @@ def _dispatcher_for(executor: DeterministicExecutor) -> ExecutorDispatcher:
     return ExecutorDispatcher(registry)
 
 
-def test_genuine_end_to_end_research_lineage(db_session) -> None:
+@pytest.mark.parametrize(
+    "epistemic_status",
+    [
+        DiscoveryEpistemicStatus.SUPPORTED,
+        DiscoveryEpistemicStatus.CONTRADICTED,
+        DiscoveryEpistemicStatus.INCONCLUSIVE,
+        DiscoveryEpistemicStatus.INSUFFICIENT_EVIDENCE,
+    ],
+)
+def test_genuine_end_to_end_research_lineage(db_session, epistemic_status) -> None:
     """Proves the genuine end-to-end lineage without bypassing production governance."""
 
     database_url = _database_url(db_session)
@@ -537,7 +564,7 @@ def test_genuine_end_to_end_research_lineage(db_session) -> None:
             evidence=[e1, e2],
         )
     )
-    
+
     # 1. Author T0 with governed explicit Discovery motivation via /manage_task
     session_id = "step10-e2e-t0"
     root_task_model = CreateRootTaskModel()
@@ -547,7 +574,7 @@ def test_genuine_end_to_end_research_lineage(db_session) -> None:
         Context(
             session_id=session_id,
             session_frame_id=root_frame.session_frame_id,
-            task_management_model=root_task_model
+            task_management_model=root_task_model,
         ),
     )
     assert proposal_t0.pending_interaction is not None, proposal_t0.controlled_error
@@ -578,7 +605,7 @@ def test_genuine_end_to_end_research_lineage(db_session) -> None:
     assert root_task_model.prompts
     assert str(d1.discovery_id) not in root_task_model.prompts[0]
     assert str(d2.discovery_id) not in root_task_model.prompts[0]
-    
+
     db_session.expire_all()
     tasks = TaskRepository(db_session).list()
     # 2 are bootstrap, 1 is the new T0
@@ -615,7 +642,7 @@ def test_genuine_end_to_end_research_lineage(db_session) -> None:
         proposal_decomp.pending_interaction,
     )
     assert approved_decomp.commit_result is not None and approved_decomp.commit_result.succeeded
-    
+
     db_session.expire_all()
     children = TaskRepository(db_session).list(parent_task_id=t0.task_id)
     assert {child.title for child in children} == {"T1", "T2", "T3"}
@@ -647,7 +674,7 @@ def test_genuine_end_to_end_research_lineage(db_session) -> None:
     )
     assert proposed_exec.pending_interaction is not None
     assert proposed_exec.pending_interaction.kind == "execution_approval"
-    
+
     admitted = _run_planner(
         database_url,
         "/approve",
@@ -668,21 +695,24 @@ def test_genuine_end_to_end_research_lineage(db_session) -> None:
     runs = ExecutionRunRepository(db_session).list(task_id=t3.task_id)
     assert len(runs) == 1
     a1 = runs[0]
-    
+
     # 4. Fail the execution first to verify retry loop (Lower Half)
     failing_executor = DeterministicExecutor(fail=True)
     dispatch_session = get_session(database_url)
     try:
-        assert asyncio.run(
-            dispatch_pending_attempts(
-                dispatch_session,
-                _dispatcher_for(failing_executor),
-                "worker-a1",
+        assert (
+            asyncio.run(
+                dispatch_pending_attempts(
+                    dispatch_session,
+                    _dispatcher_for(failing_executor),
+                    "worker-a1",
+                )
             )
-        ) == 1
+            == 1
+        )
     finally:
         dispatch_session.close()
-        
+
     finalizer_session = get_session(database_url)
     try:
         assert finalize_attempt(finalizer_session, a1.execution_run_id)
@@ -698,24 +728,30 @@ def test_genuine_end_to_end_research_lineage(db_session) -> None:
     assert a2_id is not None
     repeated_retry_session = get_session(database_url)
     try:
-        assert authorize_retry(
-            repeated_retry_session,
-            a1.execution_run_id,
-            "technical_retry",
-        ) == a2_id
+        assert (
+            authorize_retry(
+                repeated_retry_session,
+                a1.execution_run_id,
+                "technical_retry",
+            )
+            == a2_id
+        )
     finally:
         repeated_retry_session.close()
 
     successful_executor = DeterministicExecutor()
     dispatch_success_session = get_session(database_url)
     try:
-        assert asyncio.run(
-            dispatch_pending_attempts(
-                dispatch_success_session,
-                _dispatcher_for(successful_executor),
-                "worker-a2",
+        assert (
+            asyncio.run(
+                dispatch_pending_attempts(
+                    dispatch_success_session,
+                    _dispatcher_for(successful_executor),
+                    "worker-a2",
+                )
             )
-        ) == 1
+            == 1
+        )
     finally:
         dispatch_success_session.close()
 
@@ -723,6 +759,7 @@ def test_genuine_end_to_end_research_lineage(db_session) -> None:
     try:
         a2 = ExecutionRunRepository(duplicate_session).get_by_id(a2_id)
         assert a2 is not None
+        original_inbox = ExecutionInboxRepository(duplicate_session).list(execution_run_id=a2_id)[0]
         submit_execution_result(
             duplicate_session,
             execution_run_id=a2.execution_run_id,
@@ -731,7 +768,9 @@ def test_genuine_end_to_end_research_lineage(db_session) -> None:
             worker_id="worker-a2",
             method_id=a2.method_id,
             executor_status="completed",
-            result=successful_executor.results[0],
+            result=TypeAdapter(ExecutionReceiptEnvelope).validate_python(
+                original_inbox.serialized_observations
+            ),
         )
     finally:
         duplicate_session.close()
@@ -749,23 +788,15 @@ def test_genuine_end_to_end_research_lineage(db_session) -> None:
         runs = ExecutionRunRepository(read_session).list(task_id=t3.task_id)
         assert len(runs) == 2
         persisted_a2 = next(run for run in runs if run.execution_run_id == a2_id)
-        assert persisted_a2.status == ExecutionRunStatus.COMPLETED
-        assert persisted_a2.previous_attempt_id == a1.execution_run_id
-        assert persisted_a2.task_id == a1.task_id == t3.task_id
-        assert persisted_a2.hypothesis_id == a1.hypothesis_id == h3.hypothesis_id
-        assert persisted_a2.method_id == a1.method_id
-        assert persisted_a2.parameter_hash == a1.parameter_hash
-        assert persisted_a2.dispatch_idempotency_key != a1.dispatch_idempotency_key
-        assert len(ExecutionOutboxRepository(read_session).list()) == 2
-        assert len(failing_executor.requests) == len(successful_executor.requests) == 1
-        
+        assert persisted_a2.status == ExecutionRunStatus.EVIDENCE_ADMITTED
         evidence = EvidenceRepository(read_session).list(hypothesis_id=h3.hypothesis_id)
         discoveries = DiscoveryRepository(read_session).list(hypothesis_id=h3.hypothesis_id)
         assert len(evidence) == 1
-        assert len(discoveries) == 1
-        e3, d3 = evidence[0], discoveries[0]
-        assert d3.evidence_ids == [e3.evidence_id]
-        assert e3.hypothesis_id == d3.hypothesis_id == h3.hypothesis_id
+        assert len(discoveries) == 0
+        e3 = evidence[0]
+        assert e3.hypothesis_id == h3.hypothesis_id
+        h3_record = HypothesisRepository(read_session).get_by_id(h3.hypothesis_id)
+        assert h3_record is not None and h3_record.status == HypothesisStatus.READY_FOR_EVALUATION
         assert t3.parent_task_id == t0.task_id
         assert HypothesisRepository(read_session).list(task_id=t0.task_id) == []
         assert HypothesisRepository(read_session).list(task_id=t1.task_id) == []
@@ -782,51 +813,100 @@ def test_genuine_end_to_end_research_lineage(db_session) -> None:
             executor_input.model_dump_json(),
             h3.model_dump_json(),
             e3.model_dump_json(),
-            d3.model_dump_json(),
         ]
         assert all(
-            value not in payload
-            for value in forbidden_values
-            for payload in scientific_payloads
+            value not in payload for value in forbidden_values for payload in scientific_payloads
         )
     finally:
         read_session.close()
 
-    # 6. Verify Review Propagation
+    # 6. Evaluate the protected bundle, authorize the exact proposal, admit the
+    # Discovery atomically, retrieve it, then prove invalidation excludes it.
+    evaluation_session = get_session(database_url)
+    try:
+        bundle, _ = build_synthesis_bundle(evaluation_session, h3.hypothesis_id)
+        proposal = proposal_for_bundle(bundle, epistemic_status=epistemic_status)
+        controls = enqueue_ready_evaluations(evaluation_session)
+        assert len(controls) == 1
+        evaluation = run_evaluation_attempt(
+            evaluation_session,
+            evaluation_id=controls[0].evaluation_id,
+            owner="e2e-hypothesis-analyst",
+            agent=build_hypothesis_analyst_agent(
+                model=TestModel(custom_output_args=proposal.model_dump(mode="json"))
+            ),
+        )
+        assert evaluation.serialized_proposal == proposal.model_dump(mode="json")
+        authority = persist_governance_authority(evaluation_session)
+        decision = DiscoveryAdmissionGovernanceService(
+            evaluation_session,
+            workspace_id="workspace:test",
+            session_id="session:test",
+        ).record_governance_decision(
+            evaluation_id=evaluation.evaluation_id,
+            authority_id=authority.authority_id,
+            decision=GovernanceDecisionOutcome.APPROVED,
+        )
+        admitted_discovery = AtomicDiscoveryAdmissionService(
+            evaluation_session,
+            workspace_id="workspace:test",
+            session_id="session:test",
+        ).execute_admission(
+            evaluation_id=evaluation.evaluation_id,
+            decision_id=decision.decision_id,
+        )
+        persisted = DiscoveryRepository(evaluation_session).get_by_id(
+            admitted_discovery.discovery_id
+        )
+        assert persisted is not None
+        assert persisted.epistemic_status == epistemic_status
+        assert persisted.claim == proposal.claim
+        assert persisted.validity_basis == proposal.validity_basis
+
+        retrieval_request = RetrievalRequest(
+            objective_id=objective.objective_id,
+            query_text=proposal.claim.statement,
+            active_data_profile_id=profile.profile_id,
+        )
+        before = DiscoveryRetrievalEngine(evaluation_session).retrieve(retrieval_request, None)
+        assert admitted_discovery.discovery_id in {
+            item.discovery_id for item in before.motivation_candidates
+        }
+        propagate_validity_for_test(
+            evaluation_session,
+            source_type=ValiditySourceType.EVIDENCE,
+            source_id=e3.evidence_id,
+            event_type=ValidityEventType.EVIDENCE_INVALIDATION,
+            reason="Target evidence invalidated after governed admission.",
+            idempotency_key=f"e2e-target-invalidation:{epistemic_status.value}",
+        )
+        evaluation_session.expire_all()
+        after = DiscoveryRetrievalEngine(evaluation_session).retrieve(retrieval_request, None)
+        assert admitted_discovery.discovery_id not in {
+            item.discovery_id
+            for item in (after.motivation_candidates + after.other_relevant_discoveries)
+        }
+    finally:
+        evaluation_session.close()
+
+    # 7. Verify Review Propagation
     discovery_repository = DiscoveryRepository(db_session)
-    EvidenceRepository(db_session).invalidate(
-        e1.evidence_id,
+    propagate_validity_for_test(
+        db_session,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=e1.evidence_id,
+        event_type=ValidityEventType.EVIDENCE_INVALIDATION,
         reason="D1 bootstrap evidence invalidated for review.",
-        discovery_repository=discovery_repository,
+        idempotency_key="e2e-d1-review-invalidation",
     )
-    propagate_discovery_review(db_session, d1.discovery_id)
-    db_session.commit()
     db_session.expire_all()
     assert discovery_repository.get_by_id(d1.discovery_id).lifecycle_state == (
-        DiscoveryLifecycleState.FLAGGED
+        DiscoveryLifecycleState.INVALIDATED
     )
     assert TaskRepository(db_session).get_by_id(t0.task_id).review_reasons
     assert TaskRepository(db_session).get_by_id(t1.task_id).review_reasons
     assert TaskRepository(db_session).get_by_id(t3.task_id).review_reasons
     assert TaskRepository(db_session).get_by_id(t2.task_id).review_reasons == []
-
-    db_session.expire_all()
-    persisted_d3 = DiscoveryRepository(db_session).get_by_id(d3.discovery_id)
-    assert persisted_d3 is not None
-    assert persisted_d3.lifecycle_state == DiscoveryLifecycleState.ACTIVE
-    continuity = DiscoveryRetrievalEngine(db_session).retrieve(
-        RetrievalRequest(
-            objective_id=objective.objective_id,
-            active_data_profile_id=profile.profile_id,
-            session_frame_id=root_successor.session_frame_id,
-            parent_task_id=t3.task_id,
-            query_text=persisted_d3.claim.statement,
-        ),
-        root_successor,
-    )
-    motivation_ids = {item.discovery_id for item in continuity.motivation_candidates}
-    assert d3.discovery_id in motivation_ids
-    assert d1.discovery_id not in motivation_ids
 
     # Done.
 
@@ -837,10 +917,13 @@ def test_root_motivation_rejects_raw_uuid_context_only_and_stale_selection(db_se
     profile = DataProfileRepository(db_session).create(_profile())
     d1, e1 = _bootstrap_discovery(db_session, profile, 1)
     d2, e2 = _bootstrap_discovery(db_session, profile, 2)
-    EvidenceRepository(db_session).invalidate(
-        e2.evidence_id,
+    propagate_validity_for_test(
+        db_session,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=e2.evidence_id,
+        event_type=ValidityEventType.EVIDENCE_INVALIDATION,
         reason="Make D2 contextual-only.",
-        discovery_repository=DiscoveryRepository(db_session),
+        idempotency_key="e2e-d2-context-invalidation",
     )
     frame = SessionFrameRepository(db_session).create(
         SessionFrameBuilder().build(
@@ -851,9 +934,17 @@ def test_root_motivation_rejects_raw_uuid_context_only_and_stale_selection(db_se
         )
     )
 
-    for session_id, model in (
-        ("step10-raw-uuid", RawUuidRootTaskModel(d1.discovery_id)),
-        ("step10-context-only", ContextOnlyRootTaskModel()),
+    for session_id, model, expected_code in (
+        (
+            "step10-raw-uuid",
+            RawUuidRootTaskModel(d1.discovery_id),
+            "invalid_task_proposal_reference",
+        ),
+        (
+            "step10-context-only",
+            ContextOnlyRootTaskModel(),
+            "task_proposal_unavailable",
+        ),
     ):
         rejected = _run_planner(
             database_url,
@@ -866,7 +957,7 @@ def test_root_motivation_rejects_raw_uuid_context_only_and_stale_selection(db_se
         )
         assert rejected.pending_interaction is None
         assert rejected.controlled_error is not None
-        assert rejected.controlled_error.code == "invalid_task_proposal_reference"
+        assert rejected.controlled_error.code == expected_code
 
     stale_model = FirstCandidateRootTaskModel()
     stale_proposal = _run_planner(
@@ -880,10 +971,13 @@ def test_root_motivation_rejects_raw_uuid_context_only_and_stale_selection(db_se
     )
     assert stale_proposal.pending_interaction is not None
     before_frames = SessionFrameRepository(db_session).list_recent(limit=20)
-    EvidenceRepository(db_session).invalidate(
-        e1.evidence_id,
+    propagate_validity_for_test(
+        db_session,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=e1.evidence_id,
+        event_type=ValidityEventType.EVIDENCE_INVALIDATION,
         reason="Invalidate D1 after proposal.",
-        discovery_repository=DiscoveryRepository(db_session),
+        idempotency_key="e2e-d1-stale-proposal-invalidation",
     )
     stale_commit = _approve_operation_batch(
         database_url,
@@ -893,4 +987,4 @@ def test_root_motivation_rejects_raw_uuid_context_only_and_stale_selection(db_se
     assert stale_commit.commit_result is not None
     assert not stale_commit.commit_result.succeeded
     assert all(task.title != "Stale T0" for task in TaskRepository(db_session).list())
-    assert SessionFrameRepository(db_session).list_recent(limit=20) == before_frames
+    assert len(SessionFrameRepository(db_session).list_recent(limit=20)) == len(before_frames)

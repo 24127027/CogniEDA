@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, Column, Index, Text, UniqueConstraint, text
+from sqlalchemy import JSON, CheckConstraint, Column, Index, Text, UniqueConstraint, text
 from sqlmodel import Field, SQLModel
 
 from schemas.enums import (
@@ -14,15 +14,19 @@ from schemas.enums import (
     AssumptionSource,
     AssumptionStatus,
     AssumptionTestability,
+    AuthorizationClass,
     ConfidenceLevel,
     DataProfileLifecycleState,
     DataProfileMethod,
     DatasetSourceType,
+    DiscoveryAdmissionClaimState,
     DiscoveryEpistemicStatus,
     DiscoveryLifecycleState,
+    EvaluationControlState,
     EvidenceLifecycleState,
     EvidenceType,
     ExecutionApprovalStatus,
+    GovernanceDecisionOutcome,
     HypothesisStatus,
     ObjectiveStatus,
     PlannerNodeName,
@@ -34,6 +38,9 @@ from schemas.enums import (
     TaskLifecycleState,
     UserDecisionStatus,
     UserDecisionType,
+    ValidityEventType,
+    ValiditySourceState,
+    ValiditySourceType,
 )
 
 
@@ -134,6 +141,7 @@ class DataProfileRecord(SQLModel, table=True):
         foreign_key="data_profiles.profile_id",
         index=True,
     )
+    lifecycle_reason: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     accepted_as_ground_truth: bool = Field(default=False, nullable=False, index=True)
     created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
 
@@ -227,6 +235,10 @@ class HypothesisRecord(TimestampedRecord, table=True):
     validation_method: str = Field(sa_column=Column(Text, nullable=False))
     evidence_expectation: str = Field(sa_column=Column(Text, nullable=False))
     status: HypothesisStatus = Field(default=HypothesisStatus.PROPOSED, nullable=False, index=True)
+    review_reasons: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
 
 
 class AnalysisFrameRecord(SQLModel, table=True):
@@ -247,6 +259,12 @@ class AnalysisFrameRecord(SQLModel, table=True):
         default=None,
         sa_column=Column(Text, nullable=True),
     )
+    validity_state: ValiditySourceState = Field(
+        default=ValiditySourceState.ACTIVE,
+        nullable=False,
+        index=True,
+    )
+    validity_reason: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
 
 
@@ -276,6 +294,12 @@ class ExecutionRunRecord(SQLModel, table=True):
     method_id: str | None = Field(default=None, index=True)
     parameter_hash: str | None = Field(default=None, index=True)
     status: str = Field(default="pending_approval", index=True, nullable=False)
+    validity_state: ValiditySourceState = Field(
+        default=ValiditySourceState.ACTIVE,
+        nullable=False,
+        index=True,
+    )
+    validity_reason: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
 
     # Execution Attempt Recovery fields
     dispatch_idempotency_key: str | None = Field(default=None, index=True)
@@ -446,6 +470,10 @@ class DiscoveryRecord(SQLModel, table=True):
         default_factory=dict,
         sa_column=Column(JSON, nullable=False),
     )
+    limitations: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
     invalidators: list[str] = Field(
         default_factory=list,
         sa_column=Column(JSON, nullable=False),
@@ -464,6 +492,77 @@ class DiscoveryRecord(SQLModel, table=True):
         sa_column=Column(JSON, nullable=False),
     )
     created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
+
+
+class EvaluationControlRecord(TimestampedRecord, table=True):
+    """Persisted non-FCO operational evaluation control record."""
+
+    __tablename__ = "evaluation_controls"
+    __table_args__ = (
+        UniqueConstraint(
+            "hypothesis_id",
+            "bundle_digest",
+            "contract_version",
+            name="uq_evaluation_controls_bundle_identity",
+        ),
+        UniqueConstraint("evaluation_key", name="uq_evaluation_controls_evaluation_key"),
+        Index(
+            "uq_evaluation_controls_active_hypothesis",
+            "hypothesis_id",
+            unique=True,
+            sqlite_where=text(
+                "state IN ('PENDING', 'CLAIMED', 'PROPOSAL_READY', 'RETRYABLE_FAILED')"
+            ),
+        ),
+        Index(
+            "uq_evaluation_controls_proposal_digest",
+            "proposal_digest",
+            unique=True,
+            sqlite_where=text("proposal_digest IS NOT NULL"),
+        ),
+        CheckConstraint(
+            "fencing_epoch >= 0 AND attempt_number >= 1",
+            name="ck_evaluation_controls_positive_fence_attempt",
+        ),
+        CheckConstraint(
+            "state != 'CLAIMED' OR "
+            "(owner IS NOT NULL AND claim_time IS NOT NULL AND claim_expiry IS NOT NULL)",
+            name="ck_evaluation_controls_claim_authority",
+        ),
+        CheckConstraint(
+            "state != 'PROPOSAL_READY' OR "
+            "(proposal_digest IS NOT NULL AND serialized_proposal IS NOT NULL)",
+            name="ck_evaluation_controls_proposal_provenance",
+        ),
+    )
+
+    evaluation_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    hypothesis_id: UUID = Field(foreign_key="hypotheses.hypothesis_id", nullable=False, index=True)
+    evidence_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    evidence_set_digest: str = Field(nullable=False, index=True)
+    bundle_digest: str = Field(nullable=False, index=True)
+    contract_version: str = Field(default="1.0", nullable=False)
+    evaluation_key: str = Field(nullable=False, index=True)
+    serialized_manifest: dict[str, Any] = Field(
+        default_factory=dict, sa_column=Column(JSON, nullable=False)
+    )
+    state: EvaluationControlState = Field(
+        default=EvaluationControlState.PENDING, nullable=False, index=True
+    )
+    owner: str | None = Field(default=None, index=True)
+    claim_time: datetime | None = Field(default=None)
+    claim_expiry: datetime | None = Field(default=None)
+    fencing_epoch: int = Field(default=0, nullable=False)
+    attempt_number: int = Field(default=1, nullable=False)
+    proposal_digest: str | None = Field(default=None, index=True)
+    serialized_proposal: dict[str, Any] | None = Field(
+        default=None, sa_column=Column(JSON, nullable=True)
+    )
+    failure_reason: str | None = Field(default=None, index=True)
+    serialized_failure: dict[str, Any] | None = Field(
+        default=None, sa_column=Column(JSON, nullable=True)
+    )
+    invalidation_reason: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
 
 
 class UserDecisionRecord(TimestampedRecord, table=True):
@@ -626,3 +725,200 @@ class SessionFrameRecord(SQLModel, table=True):
         sa_column=Column(JSON, nullable=False),
     )
     created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
+
+
+class GovernanceAuthorityRecord(TimestampedRecord, table=True):
+    """Durable non-FCO authority issued outside proposal-decision submission."""
+
+    __tablename__ = "governance_authorities"
+    __table_args__ = (
+        UniqueConstraint(
+            "authority_fingerprint",
+            name="uq_governance_authorities_fingerprint",
+        ),
+        CheckConstraint(
+            "authority_class != 'UNAUTHORIZED'",
+            name="ck_governance_authorities_authorized_class",
+        ),
+        CheckConstraint(
+            "authority_class != 'USER_GOVERNED' OR session_id IS NOT NULL",
+            name="ck_governance_authorities_user_session",
+        ),
+    )
+
+    authority_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    actor_identity: str = Field(nullable=False, index=True)
+    authority_class: AuthorizationClass = Field(nullable=False, index=True)
+    workspace_id: str = Field(nullable=False, index=True)
+    session_id: str | None = Field(default=None, index=True)
+    purpose: str = Field(nullable=False, index=True)
+    operation_type: str = Field(nullable=False, index=True)
+    issued_by: str = Field(nullable=False, index=True)
+    issued_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
+    expires_at: datetime | None = Field(default=None, index=True)
+    active: bool = Field(default=True, nullable=False, index=True)
+    authority_fingerprint: str = Field(nullable=False, index=True)
+
+
+class ProposalDecisionRecord(TimestampedRecord, table=True):
+    """Persisted non-FCO governance decision record for an evaluation proposal."""
+
+    __tablename__ = "proposal_decisions"
+    __table_args__ = (
+        UniqueConstraint(
+            "evaluation_id",
+            name="uq_proposal_decisions_evaluation",
+        ),
+        UniqueConstraint(
+            "decision_fingerprint",
+            name="uq_proposal_decisions_fingerprint",
+        ),
+        CheckConstraint(
+            "(consumed = 0 AND consumed_at IS NULL AND consumed_by IS NULL) OR "
+            "(consumed = 1 AND consumed_at IS NOT NULL AND consumed_by IS NOT NULL)",
+            name="ck_proposal_decisions_consumption",
+        ),
+    )
+
+    decision_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    authority_id: UUID = Field(
+        foreign_key="governance_authorities.authority_id", nullable=False, index=True
+    )
+    evaluation_id: UUID = Field(
+        foreign_key="evaluation_controls.evaluation_id", nullable=False, index=True
+    )
+    evaluation_key: str = Field(nullable=False, index=True)
+    hypothesis_id: UUID = Field(foreign_key="hypotheses.hypothesis_id", nullable=False, index=True)
+    task_id: UUID = Field(foreign_key="tasks.task_id", nullable=False, index=True)
+    proposal_digest: str = Field(nullable=False, index=True)
+    bundle_digest: str = Field(nullable=False, index=True)
+    evidence_set_digest: str = Field(nullable=False, index=True)
+    decision: GovernanceDecisionOutcome = Field(nullable=False, index=True)
+    actor: str = Field(nullable=False, index=True)
+    actor_authority_type: AuthorizationClass = Field(nullable=False, index=True)
+    workspace_id: str = Field(nullable=False, index=True)
+    session_id: str | None = Field(default=None, index=True)
+    purpose: str = Field(nullable=False, index=True)
+    operation_type: str = Field(nullable=False, index=True)
+    decision_timestamp: datetime = Field(default_factory=utc_now, nullable=False, index=True)
+    reason: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    decision_fingerprint: str = Field(nullable=False, index=True)
+    consumed: bool = Field(default=False, nullable=False, index=True)
+    consumed_at: datetime | None = Field(default=None)
+    consumed_by: str | None = Field(default=None)
+
+
+class ValidityEventRecord(TimestampedRecord, table=True):
+    """Persisted non-FCO durable validity event record."""
+
+    __tablename__ = "validity_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "idempotency_key",
+            name="uq_validity_events_idempotency_key",
+        ),
+        UniqueConstraint(
+            "event_fingerprint",
+            name="uq_validity_events_fingerprint",
+        ),
+    )
+
+    event_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    source_type: ValiditySourceType = Field(nullable=False, index=True)
+    source_id: UUID = Field(nullable=False, index=True)
+    source_fingerprint: str | None = Field(default=None, index=True)
+    event_type: ValidityEventType = Field(nullable=False, index=True)
+    reason: str = Field(sa_column=Column(Text, nullable=False))
+    authority_id: UUID = Field(
+        foreign_key="governance_authorities.authority_id",
+        nullable=False,
+        index=True,
+    )
+    authority_identity: str = Field(nullable=False, index=True)
+    authority_class: AuthorizationClass = Field(nullable=False, index=True)
+    workspace_id: str = Field(nullable=False, index=True)
+    session_id: str | None = Field(default=None, index=True)
+    replacement_id: UUID | None = Field(default=None, index=True)
+    replacement_fingerprint: str | None = Field(default=None, index=True)
+    expected_source_state: str = Field(nullable=False)
+    source_post_state: str = Field(nullable=False)
+    idempotency_key: str = Field(nullable=False, index=True)
+    event_fingerprint: str = Field(nullable=False, index=True)
+    plan_fingerprint: str = Field(nullable=False, index=True)
+    affected_targets: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    processing_state: str = Field(default="COMMITTED", nullable=False, index=True)
+    committed_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
+
+
+class DiscoveryAdmissionClaimRecord(TimestampedRecord, table=True):
+    """Persisted non-FCO operational admission claim record."""
+
+    __tablename__ = "discovery_admission_claims"
+    __table_args__ = (
+        UniqueConstraint(
+            "evaluation_id",
+            name="uq_discovery_admission_claims_evaluation",
+        ),
+        UniqueConstraint(
+            "admission_fingerprint",
+            name="uq_discovery_admission_claims_fingerprint",
+        ),
+        UniqueConstraint(
+            "decision_id",
+            name="uq_discovery_admission_claims_decision",
+        ),
+        CheckConstraint(
+            "fencing_epoch >= 0 AND attempt_number >= 1",
+            name="ck_discovery_admission_claims_positive_fence_attempt",
+        ),
+        CheckConstraint(
+            "state != 'CLAIMED' OR "
+            "(owner IS NOT NULL AND claim_time IS NOT NULL AND claim_expiry IS NOT NULL "
+            "AND claim_token_digest IS NOT NULL)",
+            name="ck_discovery_admission_claims_claim_authority",
+        ),
+        CheckConstraint(
+            "state != 'COMMITTED' OR "
+            "(discovery_id IS NOT NULL AND discovery_fingerprint IS NOT NULL "
+            "AND session_frame_id IS NOT NULL AND session_frame_fingerprint IS NOT NULL "
+            "AND committed_at IS NOT NULL)",
+            name="ck_discovery_admission_claims_committed_chain",
+        ),
+    )
+
+    claim_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    evaluation_id: UUID = Field(
+        foreign_key="evaluation_controls.evaluation_id", nullable=False, index=True
+    )
+    decision_id: UUID = Field(
+        foreign_key="proposal_decisions.decision_id", nullable=False, index=True
+    )
+    proposal_digest: str = Field(nullable=False, index=True)
+    bundle_digest: str = Field(nullable=False, index=True)
+    admission_fingerprint: str = Field(nullable=False, index=True)
+    owner: str | None = Field(default=None, index=True)
+    claim_time: datetime | None = Field(default=None)
+    claim_expiry: datetime | None = Field(default=None)
+    claim_token_digest: str | None = Field(default=None)
+    fencing_epoch: int = Field(default=0, nullable=False)
+    attempt_number: int = Field(default=1, nullable=False)
+    state: DiscoveryAdmissionClaimState = Field(
+        default=DiscoveryAdmissionClaimState.PENDING, nullable=False, index=True
+    )
+    discovery_id: UUID | None = Field(
+        default=None,
+        foreign_key="discoveries.discovery_id",
+        index=True,
+    )
+    discovery_fingerprint: str | None = Field(default=None, index=True)
+    session_frame_id: UUID | None = Field(
+        default=None,
+        foreign_key="session_frames.session_frame_id",
+        index=True,
+    )
+    session_frame_fingerprint: str | None = Field(default=None, index=True)
+    committed_at: datetime | None = Field(default=None, index=True)
+    invalidation_reason: str | None = Field(default=None, sa_column=Column(Text, nullable=True))

@@ -58,7 +58,11 @@ Current code provides:
 - Discovery Synthesis Context excludes assumptions, tasks, existing Discoveries, user decisions, pending tasks, open questions, stale context, dead ends, and cached tool-result summaries.
 - Discovery Synthesis Context filters by safe memory status and active profile/evidence lifecycle.
 - `src/memory/retrieval_policy.py` defines a pure type/lifecycle admission policy for planning, answer, conclusion, and discovery-synthesis roles.
-- no retrieval engine
+- `src/schemas/specialist_contracts.py` defines an immutable, versioned
+  `DiscoverySynthesisBundle` from evaluation-specific Hypothesis, DataProfile, and AnalysisFrame
+  snapshots plus active Evidence. Its schema cannot carry planning/context roles or generic bags.
+- a bounded SQL-backed `DiscoveryRetrievalEngine` provides structural task-motivation matching,
+  lexical scoring, deterministic ranking, and inclusion/exclusion reasons
 - no graph retrieval context mode selector
 - no graph-level Discovery Synthesis Context constructor
 
@@ -66,7 +70,11 @@ Current code provides:
 
 Partially implemented.
 
-The current code enforces a local Planning/Answer/Discovery Synthesis split for `SessionFrame` snapshots and provides a pure retrieval policy. Full target Context Type Safety remains incomplete because there is no graph/vector retrieval engine, ranking, production candidate assembly, or prompt-construction boundary.
+The current code enforces a local Planning/Answer/Discovery Synthesis split for `SessionFrame`
+snapshots, provides a pure retrieval policy, and implements bounded SQL-backed Discovery retrieval.
+Full target Context Type Safety remains incomplete because there is no graph/vector retrieval,
+runnable Graph Miner, production candidate-to-prompt boundary, or runtime path that constructs and
+passes the canonical protected bundle to Hypothesis Analyst.
 
 ## Architectural Risk
 

@@ -15,12 +15,14 @@ from sqlmodel import Session, select
 from agents.planner.types import (
     AnalysisFrameObservation,
     EvidenceObservation,
-    ExecutionRunObservation,
-    ExecutorResult,
-    HypothesisEvaluationDraft,
     PreparedExecution,
 )
 from application.orchestrator.cancellation import cancel_execution_attempt
+from application.orchestrator.execution_contracts import ExecutionReceiptEnvelope
+from application.orchestrator.execution_identity import (
+    method_parameter_hash,
+    result_payload_digest,
+)
 from application.orchestrator.finalizer import finalize_attempt
 from application.orchestrator.receiver import submit_execution_result
 from application.orchestrator.transition_service import (
@@ -38,11 +40,22 @@ from db.models import (
     ExecutionOutboxRecord,
     ExecutionRunRecord,
     HypothesisRecord,
+    PlannerOperationRecord,
+    SessionFrameRecord,
     TaskRecord,
 )
 from db.session import get_session
 from schemas.common import EvidenceResultSummary, MethodParameter
-from schemas.enums import EvidenceType, ExecutionRunStatus, HypothesisEvidenceOutcome
+from schemas.enums import (
+    AnalysisIntent,
+    DataProfileLifecycleState,
+    DataProfileMethod,
+    EvidenceType,
+    ExecutionRunStatus,
+    HypothesisStatus,
+    TaskKind,
+    TaskLifecycleState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +68,12 @@ def _assert_sqlite_concurrency_config(session: Session) -> None:
 
 
 def _setup_attempt_for_finalization(
-    db_session: Session, run_id: UUID, *, admit_result: bool = True
-) -> tuple[UUID, UUID, UUID, ExecutorResult]:
+    db_session: Session,
+    run_id: UUID,
+    *,
+    admit_result: bool = True,
+    p_value: float = 0.01,
+) -> tuple[UUID, UUID, UUID, ExecutionReceiptEnvelope]:
     profile_id = uuid4()
     task_id = uuid4()
     hypothesis_id = uuid4()
@@ -70,23 +87,26 @@ def _setup_attempt_for_finalization(
             baseline_summary={"column_names": ["x", "y"]},
             row_count=100,
             column_count=2,
-            method="baseline_summary",
+            method=DataProfileMethod.BASELINE_SUMMARY,
+            lifecycle_state=DataProfileLifecycleState.ACTIVE,
+            accepted_as_ground_truth=True,
         )
     )
     db_session.flush()
-
     db_session.add(
         TaskRecord(
             task_id=task_id,
             profile_id=profile_id,
-            title="Analytical Task",
-            description="Run linear regression",
+            title="Statistical Association Task",
+            description="Test association between X and Y",
+            intent=AnalysisIntent.EXPLORATORY,
+            kind=TaskKind.ANALYTICAL,
             variables=["x", "y"],
-            task_kind="analytical",
+            evidence_expectation="p_value < 0.05",
+            status=TaskLifecycleState.ACTIVE,
         )
     )
     db_session.flush()
-
     db_session.add(
         HypothesisRecord(
             hypothesis_id=hypothesis_id,
@@ -97,20 +117,19 @@ def _setup_attempt_for_finalization(
             scope="test scope",
             validation_method="deterministic_test",
             evidence_expectation="p_value < 0.05",
-            status="testing",
+            status=HypothesisStatus.TESTING,
         )
     )
     db_session.flush()
-
-    from agents.planner.nodes import _method_parameter_hash
+    db_session.commit()
 
     params = [MethodParameter(name="alpha", value=0.05)]
-    param_hash = _method_parameter_hash(params)
+    param_hash = method_parameter_hash(params)
 
     prepared = PreparedExecution(
-        task_ref="task:durable",
-        data_profile_ref="data_profile:durable",
-        task_title="Analytical Task",
+        task_ref=str(task_id),
+        data_profile_ref=str(profile_id),
+        task_title="Statistical Association Task",
         dataset_path="test_dataset.csv",
         hypothesis={
             "statement": "X is associated with Y.",
@@ -132,36 +151,27 @@ def _setup_attempt_for_finalization(
         contract_fingerprint="fingerprint-123",
     )
 
-    result = ExecutorResult(
-        status="completed",
+    from schemas.data_explorer_contracts import DataExplorerSuccessResult
+
+    dx_result = DataExplorerSuccessResult(
+        status="success",
         analysis_frame=AnalysisFrameObservation(
             frame_hash="frame-hash-123",
             column_refs=["x", "y"],
-        ),
-        execution_run=ExecutionRunObservation(
-            executor_type="regression_executor",
-            method_id="deterministic_test",
-            parameter_hash=param_hash,
-            status="completed",
         ),
         evidence_observation=EvidenceObservation(
             evidence_type=EvidenceType.STATISTICAL_TEST,
             method="deterministic_test",
             parameters=params,
             result_summary=EvidenceResultSummary(
-                summary="Regression shows significant association.",
-                key_findings=["p_value is small"],
+                summary=f"Observed p_value: {p_value}.",
+                key_findings=["p_value was observed"],
                 metric_name="p_value",
-                metric_value=0.01,
+                metric_value=p_value,
             ),
             code_reference="tests/repositories/test_execution_scientific_commit_races.py",
         ),
-        evaluation=HypothesisEvaluationDraft(
-            outcome=HypothesisEvidenceOutcome.SUPPORTS,
-            finalize=True,
-        ),
     )
-
     transition_service = ExecutionAttemptTransitionService(db_session)
     transition_service.admit_attempt(
         execution_run_id=run_id,
@@ -182,23 +192,71 @@ def _setup_attempt_for_finalization(
     )
     assert claimed is not None
     assert transition_service.mark_running(run_id, "worker-123", claimed.lease_epoch)
+    durable_prepared = prepared.model_copy(
+        update={
+            "task_ref": str(task_id),
+            "data_profile_ref": str(profile_id),
+            "hypothesis_ref": str(hypothesis_id),
+            "execution_run_id": run_id,
+            "execution_run_ref": str(run_id),
+            "dispatch_idempotency_key": "idempotency-key-123",
+            "lease_epoch": claimed.lease_epoch,
+        }
+    )
+    current_run = db_session.get(ExecutionRunRecord, run_id)
+    current_outbox = db_session.exec(
+        select(ExecutionOutboxRecord).where(ExecutionOutboxRecord.execution_run_id == run_id)
+    ).one()
+    current_outbox.prepared_payload = durable_prepared.model_dump(mode="json")
+    db_session.add(current_outbox)
+    db_session.flush()
+    assert current_run is not None
+
+    receipt = dx_result
 
     if admit_result:
+        serialized_result = receipt.model_dump(mode="json")
         inbox = transition_service.accept_authoritative_result(
             execution_run_id=run_id,
             dispatch_idempotency_key="idempotency-key-123",
             worker_id="worker-123",
             lease_epoch=claimed.lease_epoch,
-            result_digest="digest-123",
+            result_digest=result_payload_digest(serialized_result),
             executor_status="completed",
-            serialized_observations=result.model_dump(),
+            serialized_observations=serialized_result,
             error_message=None,
             method_id="deterministic_test",
             producer_identity="worker-123",
         )
         assert inbox is not None
 
-    return run_id, hypothesis_id, task_id, result
+    return run_id, hypothesis_id, task_id, receipt
+
+
+def test_p_values_on_both_sides_of_threshold_have_identical_lifecycle(db_session: Session) -> None:
+    attempts = [
+        _setup_attempt_for_finalization(db_session, uuid4(), p_value=p_value)
+        for p_value in (0.01, 0.9)
+    ]
+    db_session.commit()
+
+    for run_id, _, _, _ in attempts:
+        assert finalize_attempt(db_session, run_id) is True
+
+    for run_id, hypothesis_id, task_id, _ in attempts:
+        run = db_session.get(ExecutionRunRecord, run_id)
+        hypothesis = db_session.get(HypothesisRecord, hypothesis_id)
+        task = db_session.get(TaskRecord, task_id)
+        assert run is not None and run.status == ExecutionRunStatus.EVIDENCE_ADMITTED
+        assert hypothesis is not None
+        assert hypothesis.status == HypothesisStatus.READY_FOR_EVALUATION
+        assert task is not None and task.lifecycle_state == TaskLifecycleState.ACTIVE
+        assert (
+            db_session.exec(
+                select(DiscoveryRecord).where(DiscoveryRecord.hypothesis_id == hypothesis_id)
+            ).all()
+            == []
+        )
 
 
 def test_concurrent_identical_result_admission_is_idempotent(db_session: Session) -> None:
@@ -280,7 +338,7 @@ def test_concurrent_conflicting_result_admission_quarantines_attempt(db_session:
     barrier = threading.Barrier(2)
     outcomes: list[tuple[object | None, Exception | None]] = []
 
-    def receiver_worker(payload: ExecutorResult) -> None:
+    def receiver_worker(payload: ExecutionReceiptEnvelope) -> None:
         session = get_session(database_url)
         try:
             _assert_sqlite_concurrency_config(session)
@@ -383,7 +441,7 @@ def test_concurrent_full_finalizer_invocation_races_claim(db_session: Session) -
     try:
         run = fresh_session.get(ExecutionRunRecord, run_id)
         assert run is not None
-        assert run.status == ExecutionRunStatus.COMPLETED
+        assert run.status == ExecutionRunStatus.EVIDENCE_ADMITTED
 
         # Ensure scientific writes are created exactly once
         hyp_id = run.hypothesis_id
@@ -398,7 +456,7 @@ def test_concurrent_full_finalizer_invocation_races_claim(db_session: Session) -
         discoveries = fresh_session.exec(
             select(DiscoveryRecord).where(DiscoveryRecord.hypothesis_id == hyp_id)
         ).all()
-        assert len(discoveries) == 1
+        assert len(discoveries) == 0
 
         frames = fresh_session.exec(
             select(AnalysisFrameRecord).where(AnalysisFrameRecord.data_profile_id == hyp.profile_id)
@@ -497,11 +555,35 @@ def test_cancellation_wins_against_finalization(db_session: Session) -> None:
         assert run is not None
         assert run.status == ExecutionRunStatus.CANCELLED
 
-        # No Evidence or Discovery created
+        # Cancellation retains attempt provenance without creating scientific state.
+        frames = fresh_session.exec(select(AnalysisFrameRecord)).all()
         evidences = fresh_session.exec(
             select(EvidenceRecord).where(EvidenceRecord.hypothesis_id == run.hypothesis_id)
         ).all()
-        assert len(evidences) == 0
+        discoveries = fresh_session.exec(
+            select(DiscoveryRecord).where(DiscoveryRecord.hypothesis_id == run.hypothesis_id)
+        ).all()
+        session_frames = fresh_session.exec(select(SessionFrameRecord)).all()
+        inbox = fresh_session.exec(
+            select(ExecutionInboxRecord).where(ExecutionInboxRecord.execution_run_id == run_id)
+        ).one()
+        task = fresh_session.get(TaskRecord, run.task_id)
+        hypothesis = fresh_session.get(HypothesisRecord, run.hypothesis_id)
+
+        assert frames == []
+        assert evidences == []
+        assert discoveries == []
+        assert session_frames == []
+        assert inbox.status == "cancelled"
+        assert inbox.processed_at is not None
+        assert task is not None and task.lifecycle_state == TaskLifecycleState.ACTIVE
+        assert hypothesis is not None
+        assert hypothesis.status not in {
+            HypothesisStatus.EVALUATED,
+            HypothesisStatus.FAILED,
+            HypothesisStatus.CANCELLED,
+            HypothesisStatus.ARCHIVED,
+        }
 
         # Repeated cancellation is idempotent and returns True
         assert cancel_execution_attempt(fresh_session, run_id) is True
@@ -525,7 +607,7 @@ def test_finalization_wins_against_cancellation(db_session: Session) -> None:
         try:
 
             def test_hook(event: str, sess: Session) -> None:
-                if event == "before_commit":
+                if event in {"before_complete", "before_commit"}:
                     finalizer_claimed.set()
                     assert canceller_done.wait(timeout=5.0)
 
@@ -574,7 +656,7 @@ def test_finalization_wins_against_cancellation(db_session: Session) -> None:
     try:
         run = fresh_session.get(ExecutionRunRecord, run_id)
         assert run is not None
-        assert run.status == ExecutionRunStatus.COMPLETED
+        assert run.status == ExecutionRunStatus.EVIDENCE_ADMITTED
 
         # Evidence exists
         evidences = fresh_session.exec(
@@ -632,7 +714,7 @@ def test_stale_finalizer_is_fenced_after_reclaim(db_session: Session) -> None:
     try:
         run = controller_session.get(ExecutionRunRecord, run_id)
         assert run is not None
-        assert run.status == ExecutionRunStatus.FINALIZING
+        assert run.status == ExecutionRunStatus.EVIDENCE_ADMITTING
         assert run.finalizer_owner_id == "finalizer-A"
 
         # Backdate the claim expiry
@@ -670,7 +752,7 @@ def test_stale_finalizer_is_fenced_after_reclaim(db_session: Session) -> None:
     try:
         run = fresh_session.get(ExecutionRunRecord, run_id)
         assert run is not None
-        assert run.status == ExecutionRunStatus.COMPLETED
+        assert run.status == ExecutionRunStatus.EVIDENCE_ADMITTED
         assert run.finalizer_owner_id == "finalizer-B"
 
         # Evidence and Discovery exist exactly once (from B)
@@ -682,24 +764,36 @@ def test_stale_finalizer_is_fenced_after_reclaim(db_session: Session) -> None:
         fresh_session.close()
 
 
-def test_finalization_rollback_under_failure_and_eventual_retry(
+@pytest.mark.parametrize(
+    "failure_event",
+    [
+        "after_analysis_frame",
+        "after_evidence",
+        "after_run_transition",
+        "after_hypothesis_transition",
+        "after_inbox_consumption",
+        "before_commit",
+    ],
+)
+def test_finalization_rollback_after_each_staged_component_and_eventual_retry(
     db_session: Session,
+    failure_event: str,
 ) -> None:
     database_url = str(db_session.get_bind().url)
     run_id = uuid4()
     run_id, hypothesis_id, task_id, _ = _setup_attempt_for_finalization(db_session, run_id)
     db_session.commit()
 
-    # 1. Run finalizer with test_hook that raises exception right before commit
+    # Inject after every staged component and at the final pre-commit boundary.
     session_a = get_session(database_url)
     _assert_sqlite_concurrency_config(session_a)
     try:
 
         def test_hook(event: str, sess: Session) -> None:
-            if event == "before_commit":
-                raise RuntimeError("Injected transaction commit failure")
+            if event == failure_event:
+                raise RuntimeError(f"Injected transaction failure after {failure_event}")
 
-        with pytest.raises(RuntimeError, match="Injected transaction commit failure"):
+        with pytest.raises(RuntimeError, match="Injected transaction failure"):
             finalize_attempt(
                 session_a, run_id, finalizer_owner_id="finalizer-A", test_hook=test_hook
             )
@@ -718,11 +812,26 @@ def test_finalization_rollback_under_failure_and_eventual_retry(
         assert inbox is not None
         assert inbox.status == "pending"
 
-        # No Evidence or Discovery created
+        # No scientific artifact, lifecycle change, frame, or operation survives rollback.
+        frames = fresh_session.exec(select(AnalysisFrameRecord)).all()
         evidences = fresh_session.exec(
             select(EvidenceRecord).where(EvidenceRecord.hypothesis_id == hypothesis_id)
         ).all()
-        assert len(evidences) == 0
+        discoveries = fresh_session.exec(
+            select(DiscoveryRecord).where(DiscoveryRecord.hypothesis_id == hypothesis_id)
+        ).all()
+        session_frames = fresh_session.exec(select(SessionFrameRecord)).all()
+        operations = fresh_session.exec(select(PlannerOperationRecord)).all()
+        task = fresh_session.get(TaskRecord, task_id)
+        hypothesis = fresh_session.get(HypothesisRecord, hypothesis_id)
+
+        assert frames == []
+        assert evidences == []
+        assert discoveries == []
+        assert session_frames == []
+        assert operations == []
+        assert task is not None and task.lifecycle_state == "active"
+        assert hypothesis is not None and hypothesis.status == "testing"
 
         # Now, since the claim is active, a replacement finalizer needs
         # to wait for expiry or reclaim.
@@ -741,14 +850,42 @@ def test_finalization_rollback_under_failure_and_eventual_retry(
         finally:
             session_b.close()
 
-        # Verify retry is successful and scientific state is committed
+        # Verify retry is successful and the complete scientific transaction is committed once.
         fresh_session.refresh(run)
-        assert run.status == ExecutionRunStatus.COMPLETED
+        assert run.status == ExecutionRunStatus.EVIDENCE_ADMITTED
         assert run.finalizer_owner_id == "finalizer-B"
 
+        inbox = fresh_session.exec(
+            select(ExecutionInboxRecord).where(ExecutionInboxRecord.execution_run_id == run_id)
+        ).one()
+        frames = fresh_session.exec(select(AnalysisFrameRecord)).all()
         evidences = fresh_session.exec(
             select(EvidenceRecord).where(EvidenceRecord.hypothesis_id == run.hypothesis_id)
         ).all()
+        discoveries = fresh_session.exec(
+            select(DiscoveryRecord).where(DiscoveryRecord.hypothesis_id == run.hypothesis_id)
+        ).all()
+        session_frames = fresh_session.exec(select(SessionFrameRecord)).all()
+        operations = fresh_session.exec(select(PlannerOperationRecord)).all()
+        task = fresh_session.get(TaskRecord, task_id)
+        hypothesis = fresh_session.get(HypothesisRecord, hypothesis_id)
+
+        assert inbox.status == "processed"
+        assert len(frames) == 1
         assert len(evidences) == 1
+        assert len(discoveries) == 0
+        assert len(session_frames) == 0
+        assert operations == []
+        assert task is not None and task.lifecycle_state == TaskLifecycleState.ACTIVE
+        assert hypothesis is not None
+        assert hypothesis.status == HypothesisStatus.READY_FOR_EVALUATION
+
+        # Finalizer replay is idempotent and cannot duplicate any cardinality-bound artifact.
+        assert finalize_attempt(fresh_session, run_id, finalizer_owner_id="finalizer-C") is True
+        assert len(fresh_session.exec(select(AnalysisFrameRecord)).all()) == 1
+        assert len(fresh_session.exec(select(EvidenceRecord)).all()) == 1
+        assert len(fresh_session.exec(select(DiscoveryRecord)).all()) == 0
+        assert len(fresh_session.exec(select(SessionFrameRecord)).all()) == 0
+        assert fresh_session.exec(select(PlannerOperationRecord)).all() == []
     finally:
         fresh_session.close()

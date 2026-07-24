@@ -112,48 +112,13 @@ class DataProfileRepository:
         evidence_repository: EvidenceRepository | None = None,
         discovery_repository: DiscoveryRepository | None = None,
     ) -> DataProfile | None:
-        """Mark a DataProfile superseded and optionally flag scoped dependents."""
+        """Reject the removed split-transaction DataProfile supersession path."""
 
-        self._validate_propagation_repository_sessions(
-            evidence_repository,
-            discovery_repository,
+        del old_profile_id, new_profile_id, reason, evidence_repository, discovery_repository
+        raise RuntimeError(
+            "DataProfile supersession requires AtomicValidityPropagationService "
+            "with independently persisted authority."
         )
-        if old_profile_id == new_profile_id:
-            raise ValueError("A DataProfile cannot supersede itself.")
-
-        old_record = self._session.get(DataProfileRecord, old_profile_id)
-        if old_record is None:
-            return None
-
-        if old_record.lifecycle_state == DataProfileLifecycleState.SUPERSEDED:
-            raise ValueError("DataProfile is already superseded.")
-
-        if self._session.get(DataProfileRecord, new_profile_id) is None:
-            raise ValueError("Superseding DataProfile requires an existing replacement.")
-
-        old_record.lifecycle_state = DataProfileLifecycleState.SUPERSEDED
-        old_record.superseded_by_data_profile_id = new_profile_id
-        self._session.add(old_record)
-        self._session.commit()
-        self._session.refresh(old_record)
-        superseded = record_to_schema(DataProfile, old_record)
-
-        # Future orchestration may own broader propagation; this is a narrow
-        # repository-level historical-scope signal.
-        if evidence_repository is not None:
-            evidence_repository.mark_historically_scoped_by_data_profile(
-                old_profile_id,
-                replacement_data_profile_id=new_profile_id,
-                reason=reason,
-            )
-        if discovery_repository is not None:
-            discovery_repository.mark_historically_scoped_by_data_profile(
-                old_profile_id,
-                replacement_data_profile_id=new_profile_id,
-                reason=reason,
-            )
-
-        return superseded
 
     def _validate_propagation_repository_sessions(
         self,

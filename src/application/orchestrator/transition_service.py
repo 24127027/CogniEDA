@@ -6,17 +6,26 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from pydantic import TypeAdapter
 from sqlalchemy import func, or_, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
+from application.orchestrator.execution_identity import result_payload_digest
 from db.models import (
     ExecutionInboxRecord,
     ExecutionOutboxRecord,
     ExecutionRunRecord,
     HypothesisRecord,
+    TaskRecord,
 )
-from schemas.enums import ExecutionRunStatus
+from schemas.data_explorer_contracts import DataExplorerResult
+from schemas.enums import (
+    ExecutionRunStatus,
+    HypothesisStatus,
+    TaskLifecycleState,
+    ValiditySourceState,
+)
 
 
 class ExecutionTransitionError(ValueError):
@@ -57,6 +66,17 @@ class ExecutionAttemptTransitionService:
     @staticmethod
     def _now() -> datetime:
         return datetime.now(UTC)
+
+    def stage_assert_validity_active(self, execution_run_id: UUID) -> bool:
+        """Acquire a write fence only if Package 4 validity remains active."""
+
+        result = self._session.exec(
+            update(ExecutionRunRecord)
+            .where(ExecutionRunRecord.execution_run_id == execution_run_id)
+            .where(ExecutionRunRecord.validity_state == ValiditySourceState.ACTIVE)
+            .values(validity_state=ExecutionRunRecord.validity_state)
+        )
+        return result.rowcount == 1
 
     def stage_admit_attempt(
         self,
@@ -135,20 +155,12 @@ class ExecutionAttemptTransitionService:
         self, execution_run_id: UUID, worker_id: str, expires_at: datetime
     ) -> ExecutionRunRecord | None:
         now = self._now()
+        if expires_at <= now:
+            raise ValueError("Dispatch claim expiry must be in the future.")
         claimed = self._session.execute(
             update(ExecutionRunRecord)
             .where(ExecutionRunRecord.execution_run_id == execution_run_id)
-            .where(
-                or_(
-                    ExecutionRunRecord.status == ExecutionRunStatus.ADMITTED,
-                    (
-                        ExecutionRunRecord.status.in_(
-                            [ExecutionRunStatus.DISPATCH_CLAIMED, ExecutionRunStatus.RUNNING]
-                        )
-                        & (ExecutionRunRecord.lease_expires_at < now)
-                    ),
-                )
-            )
+            .where(ExecutionRunRecord.status == ExecutionRunStatus.ADMITTED)
             .values(
                 worker_id=worker_id,
                 lease_epoch=ExecutionRunRecord.lease_epoch + 1,
@@ -162,27 +174,37 @@ class ExecutionAttemptTransitionService:
         if claimed.rowcount != 1:
             self._session.rollback()
             return None
+        run = self._session.get(ExecutionRunRecord, execution_run_id)
         outbox = self._session.exec(
             select(ExecutionOutboxRecord).where(
-                ExecutionOutboxRecord.execution_run_id == execution_run_id
+                ExecutionOutboxRecord.execution_run_id == execution_run_id,
+                ExecutionOutboxRecord.dispatch_idempotency_key
+                == run.dispatch_idempotency_key,
+                ExecutionOutboxRecord.executor_type == run.executor_type,
+                ExecutionOutboxRecord.method_id == run.method_id,
+                ExecutionOutboxRecord.parameter_hash == run.parameter_hash,
             )
-        ).first()
-        if outbox is not None:
-            consumed = self._session.execute(
-                update(ExecutionOutboxRecord)
-                .where(ExecutionOutboxRecord.outbox_id == outbox.outbox_id)
-                .where(ExecutionOutboxRecord.status == "pending")
-                .values(status="dispatching")
-            )
-            if consumed.rowcount != 1:
-                self._session.rollback()
-                return None
+        ).first() if run is not None else None
+        if outbox is None:
+            self._session.rollback()
+            return None
+        consumed = self._session.execute(
+            update(ExecutionOutboxRecord)
+            .where(ExecutionOutboxRecord.outbox_id == outbox.outbox_id)
+            .where(ExecutionOutboxRecord.status == "pending")
+            .values(status="dispatching")
+        )
+        if consumed.rowcount != 1:
+            self._session.rollback()
+            return None
         self._session.commit()
         return self._session.get(ExecutionRunRecord, execution_run_id)
 
     def renew_dispatch_lease(
         self, execution_run_id: UUID, worker_id: str, lease_epoch: int, expires_at: datetime
     ) -> bool:
+        if expires_at <= self._now():
+            raise ValueError("Renewed dispatch lease expiry must be in the future.")
         updated = self._session.execute(
             update(ExecutionRunRecord)
             .where(ExecutionRunRecord.execution_run_id == execution_run_id)
@@ -212,6 +234,7 @@ class ExecutionAttemptTransitionService:
             .where(ExecutionRunRecord.worker_id == worker_id)
             .where(ExecutionRunRecord.lease_epoch == lease_epoch)
             .where(ExecutionRunRecord.status == ExecutionRunStatus.DISPATCH_CLAIMED)
+            .where(ExecutionRunRecord.lease_expires_at > self._now())
             .values(
                 status=ExecutionRunStatus.RUNNING,
                 attempt_version=ExecutionRunRecord.attempt_version + 1,
@@ -239,6 +262,15 @@ class ExecutionAttemptTransitionService:
         producer_identity: str | None,
     ) -> ExecutionInboxRecord | None:
         """CAS result receipt; duplicate payloads replay and conflicts quarantine."""
+
+        observation = TypeAdapter(DataExplorerResult).validate_python(
+            serialized_observations
+        )
+        expected_status = "completed" if observation.status == "success" else "failed"
+        if executor_status != expected_status:
+            raise ValueError("Executor status disagrees with canonical Data Explorer result.")
+        if result_digest != result_payload_digest(serialized_observations):
+            raise ValueError("Result digest does not match canonical Data Explorer payload.")
         now = self._now()
         transitioned = self._session.execute(
             update(ExecutionRunRecord)
@@ -247,6 +279,7 @@ class ExecutionAttemptTransitionService:
             .where(ExecutionRunRecord.worker_id == worker_id)
             .where(ExecutionRunRecord.lease_epoch == lease_epoch)
             .where(ExecutionRunRecord.method_id == method_id)
+            .where(ExecutionRunRecord.lease_expires_at > now)
             .where(
                 ExecutionRunRecord.status.in_(
                     [ExecutionRunStatus.DISPATCH_CLAIMED, ExecutionRunStatus.RUNNING]
@@ -273,12 +306,15 @@ class ExecutionAttemptTransitionService:
                 created_at=now,
             )
             self._session.add(inbox)
-            self._session.execute(
+            outbox_updated = self._session.execute(
                 update(ExecutionOutboxRecord)
                 .where(ExecutionOutboxRecord.execution_run_id == execution_run_id)
                 .where(ExecutionOutboxRecord.status == "dispatching")
                 .values(status="processed", dispatched_at=now)
             )
+            if outbox_updated.rowcount != 1:
+                self._session.rollback()
+                return None
             try:
                 self._session.commit()
             except Exception:
@@ -343,14 +379,19 @@ class ExecutionAttemptTransitionService:
         self._session.commit()
         return True
 
-    def claim_finalization(
+    def claim_evidence_admission(
         self,
         execution_run_id: UUID,
         finalizer_owner_id: str,
         expected_attempt_version: int,
-        expires_at: datetime | None = None,
+        expires_at: datetime,
     ) -> bool:
+        """Claim an Evidence-admission fence for a result_received attempt
+        or reclaim an expired claim.
+        """
         now = self._now()
+        if expires_at <= now:
+            raise ValueError("Evidence-admission claim expiry must be in the future.")
         updated = self._session.execute(
             update(ExecutionRunRecord)
             .where(ExecutionRunRecord.execution_run_id == execution_run_id)
@@ -358,13 +399,15 @@ class ExecutionAttemptTransitionService:
             .where(
                 or_(
                     ExecutionRunRecord.status == ExecutionRunStatus.RESULT_RECEIVED,
-                    (ExecutionRunRecord.status == ExecutionRunStatus.FINALIZING)
+                    (
+                        ExecutionRunRecord.status == ExecutionRunStatus.EVIDENCE_ADMITTING
+                    )
                     & (ExecutionRunRecord.finalization_expires_at.is_not(None))
                     & (ExecutionRunRecord.finalization_expires_at < now),
                 )
             )
             .values(
-                status=ExecutionRunStatus.FINALIZING,
+                status=ExecutionRunStatus.EVIDENCE_ADMITTING,
                 attempt_version=ExecutionRunRecord.attempt_version + 1,
                 finalizer_owner_id=finalizer_owner_id,
                 finalization_fencing_epoch=func.coalesce(
@@ -382,67 +425,188 @@ class ExecutionAttemptTransitionService:
         self._session.commit()
         return True
 
-    def stage_complete_finalization(
+    def stage_admit_evidence(
         self,
         *,
         execution_run_id: UUID,
         finalizer_owner_id: str,
         finalization_fencing_epoch: int,
         attempt_version: int,
-        final_status: ExecutionRunStatus = ExecutionRunStatus.COMPLETED,
+        analysis_frame_id: UUID | None = None,
     ) -> bool:
-        """Stage the final CAS with scientific writes; caller commits or rolls back all."""
+        """Stage the final CAS for evidence admission; caller commits
+        or rolls back companion writes.
+        """
+        values: dict[str, Any] = {
+            "status": ExecutionRunStatus.EVIDENCE_ADMITTED,
+            "attempt_version": ExecutionRunRecord.attempt_version + 1,
+            "finalization_expires_at": None,
+        }
+        if analysis_frame_id is not None:
+            values["analysis_frame_id"] = analysis_frame_id
+
         updated = self._session.execute(
             update(ExecutionRunRecord)
             .where(ExecutionRunRecord.execution_run_id == execution_run_id)
-            .where(ExecutionRunRecord.status == ExecutionRunStatus.FINALIZING)
+            .where(
+                ExecutionRunRecord.status == ExecutionRunStatus.EVIDENCE_ADMITTING
+            )
             .where(ExecutionRunRecord.finalizer_owner_id == finalizer_owner_id)
             .where(ExecutionRunRecord.finalization_fencing_epoch == finalization_fencing_epoch)
             .where(ExecutionRunRecord.attempt_version == attempt_version)
+            .where(ExecutionRunRecord.finalization_expires_at > self._now())
+            .values(**values)
+            .execution_options(synchronize_session=False)
+        )
+        return updated.rowcount == 1
+
+    def stage_consume_authoritative_inbox(
+        self,
+        *,
+        inbox_id: UUID,
+        execution_run_id: UUID,
+        dispatch_idempotency_key: str,
+        result_digest: str,
+    ) -> bool:
+        """Stage consumption of the exact immutable inbox authority."""
+
+        updated = self._session.execute(
+            update(ExecutionInboxRecord)
+            .where(ExecutionInboxRecord.inbox_id == inbox_id)
+            .where(ExecutionInboxRecord.execution_run_id == execution_run_id)
+            .where(
+                ExecutionInboxRecord.dispatch_idempotency_key == dispatch_idempotency_key
+            )
+            .where(ExecutionInboxRecord.result_digest == result_digest)
+            .where(ExecutionInboxRecord.status == "pending")
+            .values(status="processed", processed_at=self._now())
+        )
+        return updated.rowcount == 1
+
+    def stage_mark_authoritative_inbox_conflict(
+        self,
+        *,
+        inbox_id: UUID,
+        execution_run_id: UUID,
+        dispatch_idempotency_key: str,
+        result_digest: str,
+    ) -> bool:
+        """Disposition the exact pending inbox when artifact replay conflicts."""
+
+        updated = self._session.execute(
+            update(ExecutionInboxRecord)
+            .where(ExecutionInboxRecord.inbox_id == inbox_id)
+            .where(ExecutionInboxRecord.execution_run_id == execution_run_id)
+            .where(
+                ExecutionInboxRecord.dispatch_idempotency_key == dispatch_idempotency_key
+            )
+            .where(ExecutionInboxRecord.result_digest == result_digest)
+            .where(ExecutionInboxRecord.status == "pending")
+            .values(status="conflict", processed_at=self._now())
+        )
+        return updated.rowcount == 1
+
+    def stage_hypothesis_ready_for_evaluation(self, hypothesis_id: UUID) -> bool:
+        """Stage Hypothesis transition from testing to ready_for_evaluation
+        in the caller's transaction.
+        """
+        updated = self._session.execute(
+            update(HypothesisRecord)
+            .where(HypothesisRecord.hypothesis_id == hypothesis_id)
+            .where(HypothesisRecord.status == HypothesisStatus.TESTING)
+            .values(status=HypothesisStatus.READY_FOR_EVALUATION)
+            .execution_options(synchronize_session=False)
+        )
+        return updated.rowcount == 1
+
+    def stage_hypothesis_testing_for_execution(self, hypothesis_id: UUID) -> bool:
+        """Stage the event-specific approved-to-testing execution handoff."""
+
+        hypothesis = self._session.get(HypothesisRecord, hypothesis_id)
+        if hypothesis is None:
+            return False
+        if hypothesis.status == HypothesisStatus.TESTING:
+            return True
+        updated = self._session.execute(
+            update(HypothesisRecord)
+            .where(HypothesisRecord.hypothesis_id == hypothesis_id)
+            .where(HypothesisRecord.status == HypothesisStatus.APPROVED)
+            .values(status=HypothesisStatus.TESTING)
+            .execution_options(synchronize_session=False)
+        )
+        return updated.rowcount == 1
+
+    def stage_fail_execution(
+        self,
+        *,
+        execution_run_id: UUID,
+        finalizer_owner_id: str,
+        finalization_fencing_epoch: int,
+        attempt_version: int,
+    ) -> bool:
+        """Atomically stage technical failure of an attempt while keeping Hypothesis in testing."""
+        return self._stage_claimed_attempt_terminal(
+            execution_run_id=execution_run_id,
+            finalizer_owner_id=finalizer_owner_id,
+            finalization_fencing_epoch=finalization_fencing_epoch,
+            attempt_version=attempt_version,
+            target_status=ExecutionRunStatus.EXECUTION_FAILED,
+        )
+
+    def stage_quarantine_evidence_conflict(
+        self,
+        *,
+        execution_run_id: UUID,
+        finalizer_owner_id: str,
+        finalization_fencing_epoch: int,
+        attempt_version: int,
+        reason: str,
+    ) -> bool:
+        """Stage durable quarantine for incompatible or partial prior artifacts."""
+
+        return self._stage_claimed_attempt_terminal(
+            execution_run_id=execution_run_id,
+            finalizer_owner_id=finalizer_owner_id,
+            finalization_fencing_epoch=finalization_fencing_epoch,
+            attempt_version=attempt_version,
+            target_status=ExecutionRunStatus.RESULT_CONFLICT,
+            recovery_status=reason,
+        )
+
+    def _stage_claimed_attempt_terminal(
+        self,
+        *,
+        execution_run_id: UUID,
+        finalizer_owner_id: str,
+        finalization_fencing_epoch: int,
+        attempt_version: int,
+        target_status: ExecutionRunStatus,
+        recovery_status: str | None = None,
+    ) -> bool:
+        if target_status not in {
+            ExecutionRunStatus.EXECUTION_FAILED,
+            ExecutionRunStatus.RESULT_CONFLICT,
+        }:
+            raise ValueError("Unsupported claimed-attempt terminal event.")
+        updated = self._session.execute(
+            update(ExecutionRunRecord)
+            .where(ExecutionRunRecord.execution_run_id == execution_run_id)
+            .where(
+                ExecutionRunRecord.status == ExecutionRunStatus.EVIDENCE_ADMITTING
+            )
+            .where(ExecutionRunRecord.finalizer_owner_id == finalizer_owner_id)
+            .where(ExecutionRunRecord.finalization_fencing_epoch == finalization_fencing_epoch)
+            .where(ExecutionRunRecord.attempt_version == attempt_version)
+            .where(ExecutionRunRecord.finalization_expires_at > self._now())
             .values(
-                status=final_status,
+                status=target_status,
+                recovery_status=recovery_status,
                 attempt_version=ExecutionRunRecord.attempt_version + 1,
                 finalization_expires_at=None,
             )
             .execution_options(synchronize_session=False)
         )
         return updated.rowcount == 1
-
-    def stage_consume_inbox(self, inbox_id: UUID) -> bool:
-        updated = self._session.execute(
-            update(ExecutionInboxRecord)
-            .where(ExecutionInboxRecord.inbox_id == inbox_id)
-            .where(ExecutionInboxRecord.status == "pending")
-            .values(status="processed", processed_at=self._now())
-        )
-        return updated.rowcount == 1
-
-    def stage_fail_finalization(
-        self,
-        *,
-        execution_run_id: UUID,
-        hypothesis_id: UUID,
-        finalizer_owner_id: str,
-        finalization_fencing_epoch: int,
-        attempt_version: int,
-    ) -> bool:
-        """Atomically end a failed attempt and return its contract to approved."""
-        if not self.stage_complete_finalization(
-            execution_run_id=execution_run_id,
-            finalizer_owner_id=finalizer_owner_id,
-            finalization_fencing_epoch=finalization_fencing_epoch,
-            attempt_version=attempt_version,
-            final_status=ExecutionRunStatus.EXECUTION_FAILED,
-        ):
-            return False
-        restored = self._session.execute(
-            update(HypothesisRecord)
-            .where(HypothesisRecord.hypothesis_id == hypothesis_id)
-            .where(HypothesisRecord.status == "testing")
-            .values(status="approved")
-            .execution_options(synchronize_session=False)
-        )
-        return restored.rowcount == 1
 
     def fail_dispatch(self, execution_run_id: UUID, attempt_version: int, reason: str) -> bool:
         return self._terminal_with_outbox(
@@ -473,9 +637,9 @@ class ExecutionAttemptTransitionService:
             .where(
                 ExecutionRunRecord.status.notin_(
                     [
-                        ExecutionRunStatus.COMPLETED,
+                        ExecutionRunStatus.EVIDENCE_ADMITTED,
                         ExecutionRunStatus.CANCELLED,
-                        ExecutionRunStatus.FINALIZING,
+                        ExecutionRunStatus.EVIDENCE_ADMITTING,
                     ]
                 )
             )
@@ -497,6 +661,10 @@ class ExecutionAttemptTransitionService:
         return True
 
     def cancel_attempt(self, execution_run_id: UUID, expected_attempt_version: int) -> bool:
+        source = self._session.get(ExecutionRunRecord, execution_run_id)
+        if source is None or source.attempt_version != expected_attempt_version:
+            return False
+        source_status = ExecutionRunStatus(source.status)
         updated = self._session.execute(
             update(ExecutionRunRecord)
             .where(ExecutionRunRecord.execution_run_id == execution_run_id)
@@ -520,12 +688,32 @@ class ExecutionAttemptTransitionService:
         if updated.rowcount != 1:
             self._session.rollback()
             return False
-        self._session.execute(
+        outbox_updated = self._session.execute(
             update(ExecutionOutboxRecord)
             .where(ExecutionOutboxRecord.execution_run_id == execution_run_id)
             .where(ExecutionOutboxRecord.status.in_(["pending", "dispatching"]))
             .values(status="cancelled")
         )
+        inbox_updated = self._session.execute(
+            update(ExecutionInboxRecord)
+            .where(ExecutionInboxRecord.execution_run_id == execution_run_id)
+            .where(ExecutionInboxRecord.status == "pending")
+            .values(status="cancelled", processed_at=self._now())
+        )
+        if (
+            source_status
+            in {
+                ExecutionRunStatus.ADMITTED,
+                ExecutionRunStatus.DISPATCH_CLAIMED,
+                ExecutionRunStatus.RUNNING,
+            }
+            and outbox_updated.rowcount != 1
+        ) or (
+            source_status == ExecutionRunStatus.RESULT_RECEIVED
+            and inbox_updated.rowcount != 1
+        ):
+            self._session.rollback()
+            return False
         self._session.commit()
         return True
 
@@ -559,12 +747,15 @@ class ExecutionAttemptTransitionService:
         if updated.rowcount != 1:
             self._session.rollback()
             return False
-        self._session.execute(
+        outbox_updated = self._session.execute(
             update(ExecutionOutboxRecord)
             .where(ExecutionOutboxRecord.execution_run_id == execution_run_id)
             .where(ExecutionOutboxRecord.status == "dispatching")
             .values(status="pending")
         )
+        if outbox_updated.rowcount != 1:
+            self._session.rollback()
+            return False
         self._session.commit()
         return True
 
@@ -575,9 +766,23 @@ class ExecutionAttemptTransitionService:
         if old_run is None or old_run.status not in {
             ExecutionRunStatus.EXECUTION_FAILED,
             ExecutionRunStatus.DISPATCH_FAILED,
-            ExecutionRunStatus.ABANDONED,
-            ExecutionRunStatus.CANCELLED,
         }:
+            return None
+
+        # Check Task and Hypothesis eligibility
+        old_task = self._session.get(TaskRecord, old_run.task_id) if old_run.task_id else None
+        old_hypothesis = (
+            self._session.get(HypothesisRecord, old_run.hypothesis_id)
+            if old_run.hypothesis_id
+            else None
+        )
+        if (
+            old_task is None
+            or old_task.lifecycle_state != TaskLifecycleState.ACTIVE
+            or old_hypothesis is None
+            or old_hypothesis.status != HypothesisStatus.TESTING
+            or old_run.task_id != old_hypothesis.task_id
+        ):
             return None
 
         # A predecessor may have only one direct successor. Further technical
@@ -588,20 +793,42 @@ class ExecutionAttemptTransitionService:
             .order_by(text("created_at"), text("execution_run_id"))
         ).first()
         if existing_successor is not None:
-            return existing_successor
+            return (
+                existing_successor
+                if self._retry_successor_matches_predecessor(existing_successor, old_run)
+                else None
+            )
 
         old_outbox = self._session.exec(
             select(ExecutionOutboxRecord).where(
                 ExecutionOutboxRecord.execution_run_id == old_execution_run_id
             )
         ).first()
-        old_hypothesis = self._session.get(HypothesisRecord, old_run.hypothesis_id)
+        if old_outbox is None:
+            return None
         if (
-            old_outbox is None
-            or old_hypothesis is None
-            or old_run.task_id != old_hypothesis.task_id
+            old_outbox.dispatch_idempotency_key != old_run.dispatch_idempotency_key
+            or old_outbox.executor_type != old_run.executor_type
+            or old_outbox.method_id != old_run.method_id
+            or old_outbox.parameter_hash != old_run.parameter_hash
         ):
             return None
+
+        from application.orchestrator.execution_contracts import PreparedExecution
+        from application.orchestrator.execution_identity import method_parameter_hash
+
+        try:
+            prepared = PreparedExecution.model_validate(old_outbox.prepared_payload)
+        except ValueError:
+            return None
+        if (
+            prepared.specification.executor_id != old_run.executor_type
+            or prepared.specification.validation_method != old_run.method_id
+            or method_parameter_hash(prepared.specification.method_parameters)
+            != old_run.parameter_hash
+        ):
+            return None
+
         new_run_id, dispatch_key = uuid4(), str(uuid4())
         try:
             run = self.stage_admit_attempt(
@@ -624,11 +851,51 @@ class ExecutionAttemptTransitionService:
             # The unique predecessor constraint is the concurrency authority.
             # A competing transaction may have won after our read above.
             self._session.rollback()
-            return self._session.exec(
+            successor = self._session.exec(
                 select(ExecutionRunRecord)
                 .where(ExecutionRunRecord.previous_attempt_id == old_execution_run_id)
                 .order_by(text("created_at"), text("execution_run_id"))
             ).first()
+            if successor is None:
+                return None
+            return (
+                successor
+                if self._retry_successor_matches_predecessor(successor, old_run)
+                else None
+            )
+
+    def _retry_successor_matches_predecessor(
+        self,
+        successor: ExecutionRunRecord,
+        predecessor: ExecutionRunRecord,
+    ) -> bool:
+        if (
+            successor.previous_attempt_id != predecessor.execution_run_id
+            or successor.task_id != predecessor.task_id
+            or successor.hypothesis_id != predecessor.hypothesis_id
+            or successor.executor_type != predecessor.executor_type
+            or successor.method_id != predecessor.method_id
+            or successor.parameter_hash != predecessor.parameter_hash
+        ):
+            return False
+        predecessor_outbox = self._session.exec(
+            select(ExecutionOutboxRecord).where(
+                ExecutionOutboxRecord.execution_run_id == predecessor.execution_run_id
+            )
+        ).first()
+        successor_outbox = self._session.exec(
+            select(ExecutionOutboxRecord).where(
+                ExecutionOutboxRecord.execution_run_id == successor.execution_run_id
+            )
+        ).first()
+        return (
+            predecessor_outbox is not None
+            and successor_outbox is not None
+            and successor_outbox.executor_type == predecessor_outbox.executor_type
+            and successor_outbox.method_id == predecessor_outbox.method_id
+            and successor_outbox.parameter_hash == predecessor_outbox.parameter_hash
+            and successor_outbox.prepared_payload == predecessor_outbox.prepared_payload
+        )
 
     def mark_recovery_error(
         self, execution_run_id: UUID, expected_attempt_version: int, error_msg: str
@@ -639,7 +906,7 @@ class ExecutionAttemptTransitionService:
             .where(ExecutionRunRecord.attempt_version == expected_attempt_version)
             .where(
                 ExecutionRunRecord.status.notin_(
-                    [ExecutionRunStatus.COMPLETED, ExecutionRunStatus.CANCELLED]
+                    [ExecutionRunStatus.EVIDENCE_ADMITTED, ExecutionRunStatus.CANCELLED]
                 )
             )
             .values(

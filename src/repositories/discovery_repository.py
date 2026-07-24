@@ -9,7 +9,6 @@ from sqlmodel import Session, desc, select
 
 from db.models import DiscoveryRecord, EvidenceRecord, HypothesisRecord
 from repositories.common import (
-    filter_records_by_related_id,
     record_to_schema,
     schema_to_record_payload,
 )
@@ -24,6 +23,7 @@ DISCOVERY_JSON_FIELDS = {
     "evidence_ids",
     "claim",
     "validity_basis",
+    "limitations",
     "review_reasons",
     "flagged_by_evidence_ids",
 }
@@ -45,15 +45,13 @@ class DiscoveryRepository:
         return self._session is session
 
     def create(self, discovery: Discovery) -> Discovery:
-        """Persist and return a new Discovery."""
+        """Reject the removed generic Discovery writer."""
 
-        record = self.stage_create(discovery)
-        self._session.commit()
-        self._session.refresh(record)
-        return record_to_schema(Discovery, record)
+        del discovery
+        raise RuntimeError("Discovery creation is owned by AtomicDiscoveryAdmissionService.")
 
-    def stage_create(self, discovery: Discovery) -> DiscoveryRecord:
-        """Validate and add a Discovery without committing the shared session."""
+    def _stage_create_from_atomic_admission(self, discovery: Discovery) -> DiscoveryRecord:
+        """Validate and stage a Discovery for the sole application-owned writer."""
 
         self._validate_discovery_admission(discovery)
         record = DiscoveryRecord(
@@ -126,56 +124,12 @@ class DiscoveryRepository:
         change_type: EvidenceLifecycleState,
         replacement_evidence_id: UUID | None = None,
     ) -> builtins.list[Discovery]:
-        """Flag Discoveries affected by Evidence lifecycle changes for review."""
+        """Reject post-commit Discovery flagging outside validity propagation."""
 
-        if change_type not in {
-            EvidenceLifecycleState.SUPERSEDED,
-            EvidenceLifecycleState.INVALIDATED,
-        }:
-            raise ValueError("Discovery review flags require superseded or invalidated Evidence.")
-        if not reason.strip():
-            raise ValueError("Discovery review flags require a non-empty reason.")
-
-        records = self._session.exec(
-            select(DiscoveryRecord).order_by(desc(DiscoveryRecord.created_at))
-        ).all()
-        matching_records = filter_records_by_related_id(
-            records,
-            field_name="evidence_ids",
-            related_id=evidence_id,
+        del evidence_id, reason, change_type, replacement_evidence_id
+        raise RuntimeError(
+            "Evidence-driven Discovery review requires AtomicValidityPropagationService."
         )
-        review_reason = self._format_evidence_review_reason(
-            evidence_id,
-            reason,
-            change_type=change_type,
-            replacement_evidence_id=replacement_evidence_id,
-        )
-        evidence_ref = str(evidence_id)
-        affected_records: builtins.list[DiscoveryRecord] = []
-        for record in matching_records:
-            if record.lifecycle_state in _DISCOVERY_REVIEW_TERMINAL_STATES:
-                continue
-
-            review_reasons = list(record.review_reasons)
-            if review_reason not in review_reasons:
-                review_reasons.append(review_reason)
-
-            flagged_by_evidence_ids = list(record.flagged_by_evidence_ids)
-            if evidence_ref not in flagged_by_evidence_ids:
-                flagged_by_evidence_ids.append(evidence_ref)
-
-            record.lifecycle_state = DiscoveryLifecycleState.FLAGGED
-            record.review_reasons = review_reasons
-            record.flagged_by_evidence_ids = flagged_by_evidence_ids
-            self._session.add(record)
-            affected_records.append(record)
-
-        if affected_records:
-            self._session.commit()
-            for record in affected_records:
-                self._session.refresh(record)
-
-        return [record_to_schema(Discovery, record) for record in affected_records]
 
     def mark_historically_scoped_by_data_profile(
         self,
@@ -183,41 +137,12 @@ class DiscoveryRepository:
         replacement_data_profile_id: UUID | None = None,
         reason: str | None = None,
     ) -> builtins.list[Discovery]:
-        """Flag Discoveries whose validity envelope is scoped to an old DataProfile."""
+        """Reject post-commit DataProfile review outside validity propagation."""
 
-        records = self._session.exec(
-            select(DiscoveryRecord).order_by(desc(DiscoveryRecord.created_at))
-        ).all()
-        review_reason = self._format_data_profile_review_reason(
-            old_data_profile_id,
-            replacement_data_profile_id=replacement_data_profile_id,
-            reason=reason,
+        del old_data_profile_id, replacement_data_profile_id, reason
+        raise RuntimeError(
+            "DataProfile-driven Discovery review requires AtomicValidityPropagationService."
         )
-        affected_records: builtins.list[DiscoveryRecord] = []
-        for record in records:
-            if record.lifecycle_state in _DISCOVERY_REVIEW_TERMINAL_STATES:
-                continue
-            if not self._validity_basis_matches_data_profile(
-                record,
-                data_profile_id=old_data_profile_id,
-            ):
-                continue
-
-            review_reasons = list(record.review_reasons)
-            if review_reason not in review_reasons:
-                review_reasons.append(review_reason)
-
-            record.lifecycle_state = DiscoveryLifecycleState.FLAGGED
-            record.review_reasons = review_reasons
-            self._session.add(record)
-            affected_records.append(record)
-
-        if affected_records:
-            self._session.commit()
-            for record in affected_records:
-                self._session.refresh(record)
-
-        return [record_to_schema(Discovery, record) for record in affected_records]
 
     @staticmethod
     def _validity_basis_matches_data_profile(

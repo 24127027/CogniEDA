@@ -10,8 +10,8 @@ from typing import Any
 from sqlmodel import Session
 
 from application.orchestrator.execution_contracts import PreparedExecution
+from application.orchestrator.execution_identity import method_parameter_hash
 from application.orchestrator.receiver import submit_execution_result
-from application.orchestrator.scientific_processing import _method_parameter_hash
 from application.orchestrator.transition_service import ExecutionAttemptTransitionService
 from db.models import (
     DataProfileRecord,
@@ -20,6 +20,10 @@ from db.models import (
     HypothesisRecord,
 )
 from repositories.execution_outbox_repository import ExecutionOutboxRepository
+from schemas.data_explorer_contracts import (
+    DataExplorerFailureReason,
+    DataExplorerFailureResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,13 +67,29 @@ async def dispatch_pending_attempts(
                 run.execution_run_id, worker_id, run.lease_epoch
             ):
                 continue
+            current_run = session.get(ExecutionRunRecord, run.execution_run_id)
+            if current_run is None:
+                raise ValueError("Claimed ExecutionRun disappeared before executor dispatch.")
+
             context = context_factory() if context_factory is not None else ExecutorContext()
-            result = await executor_dispatcher.dispatch(prepared, context)
-            executor_status = result.status
-            error_message = result.error_message
+            raw_result = await executor_dispatcher.dispatch(prepared, context)
+            if raw_result.status == "success":
+                executor_status = "completed"
+                error_message = None
+                result = raw_result
+            else:
+                executor_status = "failed"
+                error_message = raw_result.message
+                result = raw_result
         except Exception as exc:
-            result = None
+            executor_status = "failed"
             error_message = str(exc)
+            result = DataExplorerFailureResult(
+                failure_reason=DataExplorerFailureReason.METHOD_EXECUTION_FAILURE,
+                message="Data Explorer dispatch failed before a valid observation was returned.",
+                diagnostics=(),
+                technical_limitations=(f"{type(exc).__name__}: {exc}",),
+            )
 
         envelope = submit_execution_result(
             session,
@@ -109,7 +129,7 @@ def _reconstruct_prepared_execution(
         or prepared.hypothesis.evidence_expectation != hypothesis.evidence_expectation
     ):
         raise ValueError("Prepared execution does not match its durable Hypothesis.")
-    parameter_hash = _method_parameter_hash(prepared.specification.method_parameters)
+    parameter_hash = method_parameter_hash(prepared.specification.method_parameters)
     if (
         record.execution_run_id != run.execution_run_id
         or record.dispatch_idempotency_key != run.dispatch_idempotency_key

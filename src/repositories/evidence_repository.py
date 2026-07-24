@@ -67,15 +67,13 @@ class EvidenceRepository:
         return self._session is session
 
     def create(self, evidence: Evidence) -> Evidence:
-        """Persist and return a new Evidence record."""
+        """Reject the removed generic Evidence writer."""
 
-        record = self.stage_create(evidence)
-        self._session.commit()
-        self._session.refresh(record)
-        return record_to_schema(Evidence, record)
+        del evidence
+        raise RuntimeError("Evidence creation is owned by the Evidence admission transaction.")
 
-    def stage_create(self, evidence: Evidence) -> EvidenceRecord:
-        """Validate and add Evidence without committing the shared session."""
+    def _stage_create_from_evidence_admission(self, evidence: Evidence) -> EvidenceRecord:
+        """Validate and stage Evidence for the sole application-owned writer."""
 
         self._validate_evidence_admission(evidence)
         if self._strict_provenance_validation:
@@ -198,30 +196,13 @@ class EvidenceRepository:
         reason: str | None = None,
         discovery_repository: DiscoveryRepository | None = None,
     ) -> Evidence | None:
-        """Mark Evidence superseded without editing the observed result payload."""
+        """Reject the removed split-transaction Evidence supersession path."""
 
-        self._validate_discovery_repository_session(discovery_repository)
-        record = self._session.get(EvidenceRecord, evidence_id)
-        if record is None:
-            return None
-        if self._session.get(EvidenceRecord, superseded_by_evidence_id) is None:
-            raise ValueError("Superseding Evidence requires an existing replacement Evidence.")
-        record.lifecycle_state = EvidenceLifecycleState.SUPERSEDED
-        record.superseded_by_evidence_id = superseded_by_evidence_id
-        record.lifecycle_reason = reason
-        self._session.add(record)
-        self._session.commit()
-        self._session.refresh(record)
-        superseded = record_to_schema(Evidence, record)
-        if discovery_repository is not None:
-            # Future orchestration may own broader propagation; this is a narrow review signal.
-            discovery_repository.flag_by_evidence_change(
-                evidence_id,
-                reason or "Evidence was superseded without a lifecycle reason.",
-                change_type=EvidenceLifecycleState.SUPERSEDED,
-                replacement_evidence_id=superseded_by_evidence_id,
-            )
-        return superseded
+        del evidence_id, superseded_by_evidence_id, reason, discovery_repository
+        raise RuntimeError(
+            "Evidence supersession requires AtomicValidityPropagationService "
+            "with independently persisted authority."
+        )
 
     def invalidate(
         self,
@@ -229,26 +210,13 @@ class EvidenceRepository:
         reason: str | None = None,
         discovery_repository: DiscoveryRepository | None = None,
     ) -> Evidence | None:
-        """Mark Evidence invalidated without editing the observed result payload."""
+        """Reject the removed split-transaction Evidence invalidation path."""
 
-        self._validate_discovery_repository_session(discovery_repository)
-        record = self._session.get(EvidenceRecord, evidence_id)
-        if record is None:
-            return None
-        record.lifecycle_state = EvidenceLifecycleState.INVALIDATED
-        record.lifecycle_reason = reason
-        self._session.add(record)
-        self._session.commit()
-        self._session.refresh(record)
-        invalidated = record_to_schema(Evidence, record)
-        if discovery_repository is not None:
-            # Future orchestration may own broader propagation; this is a narrow review signal.
-            discovery_repository.flag_by_evidence_change(
-                evidence_id,
-                reason or "Evidence was invalidated without a lifecycle reason.",
-                change_type=EvidenceLifecycleState.INVALIDATED,
-            )
-        return invalidated
+        del evidence_id, reason, discovery_repository
+        raise RuntimeError(
+            "Evidence invalidation requires AtomicValidityPropagationService "
+            "with independently persisted authority."
+        )
 
     def mark_historically_scoped_by_data_profile(
         self,
@@ -256,34 +224,10 @@ class EvidenceRepository:
         replacement_data_profile_id: UUID | None = None,
         reason: str | None = None,
     ) -> builtins.list[Evidence]:
-        """Mark Evidence as historical for a superseded DataProfile scope."""
+        """Reject the removed split-transaction DataProfile propagation path."""
 
-        records = self._session.exec(
-            select(EvidenceRecord)
-            .where(EvidenceRecord.profile_id == old_data_profile_id)
-            .order_by(desc(EvidenceRecord.created_at))
-        ).all()
-        historical_reason = self._format_data_profile_historical_reason(
-            old_data_profile_id,
-            replacement_data_profile_id=replacement_data_profile_id,
-            reason=reason,
-        )
-        affected_records: builtins.list[EvidenceRecord] = []
-        for record in records:
-            if record.lifecycle_state in _EVIDENCE_HISTORICAL_SCOPE_TERMINAL_STATES:
-                continue
-
-            record.lifecycle_state = EvidenceLifecycleState.HISTORICALLY_SCOPED
-            record.lifecycle_reason = historical_reason
-            self._session.add(record)
-            affected_records.append(record)
-
-        if affected_records:
-            self._session.commit()
-            for record in affected_records:
-                self._session.refresh(record)
-
-        return [record_to_schema(Evidence, record) for record in affected_records]
+        del old_data_profile_id, replacement_data_profile_id, reason
+        raise RuntimeError("DataProfile validity changes require AtomicValidityPropagationService.")
 
     def _validate_discovery_repository_session(
         self,

@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from application.orchestrator.execution_contracts import ExecutorResult, PreparedExecution
+from pydantic import TypeAdapter
 
+from application.orchestrator.execution_contracts import PreparedExecution
+from schemas.data_explorer_contracts import DataExplorerResult
+
+from .capabilities import Capability
 from .registry import ExecutorRegistry
 from .types import ExecutorContext, ExecutorInput
 
@@ -14,13 +18,20 @@ class ExecutorDispatcher:
 
     async def dispatch(
         self, prepared: PreparedExecution, context: ExecutorContext
-    ) -> ExecutorResult:
+    ) -> DataExplorerResult:
         if prepared.execution_run_id is None:
             raise ValueError("Durable executor dispatch requires an ExecutionRun identity.")
         if prepared.dispatch_idempotency_key is None or prepared.lease_epoch is None:
             raise ValueError("Durable executor dispatch requires attempt fencing identity.")
         if prepared.hypothesis_ref is None:
             raise ValueError("Durable executor dispatch requires a Hypothesis identity.")
+        if prepared.specification.executor_id in {
+            Capability.GRAPH_MINING.id,
+            Capability.HYPOTHESIS_TESTING.id,
+        }:
+            raise ValueError(
+                "The Data Explorer dispatcher cannot invoke Graph Miner or Hypothesis Analyst."
+            )
 
         executor = self._registry.get(prepared.specification.executor_id)
 
@@ -35,10 +46,11 @@ class ExecutorDispatcher:
             deterministic_seed=prepared.deterministic_seed,
         )
 
-        return await executor.run(
+        raw_result = await executor.run(
             input=input_data,
             context=context,
         )
+        return TypeAdapter(DataExplorerResult).validate_python(raw_result)
 
 
 def _durable_id(value: str, label: str) -> UUID:

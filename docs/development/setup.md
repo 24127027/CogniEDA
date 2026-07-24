@@ -39,15 +39,10 @@ Agent LLM behavior:
 
 ## Commands
 
-Current package script:
+Product Surface:
 
-```powershell
-uv run cognieda
-```
-
-Current result: the script runs `main.py`, which prints a placeholder message.
-
-This verifies packaging only. It does not start the planner, database, worker, API, or UI.
+CogniEDA exposes no supported CLI product surface at Gate 0.
+The codebase is structured as an in-process library and runtime composition root (`src/application/runtime.py`).
 
 Verification commands:
 
@@ -65,4 +60,4 @@ No docs build or docs link-check command was found in the current repo.
 
 ## Current verification note
 
-At the 2026-07-16 source snapshot, full pytest passed (210 tests), while Ruff reported 12 findings and strict mypy reported 132 errors. Those historical results should be refreshed after changes; configured planner model access also requires valid external model credentials and service availability.
+At the Gate 0 integration baseline, full pytest passes (564 passed), Ruff passes, and strict mypy reports 358 errors as explicit baseline technical debt.

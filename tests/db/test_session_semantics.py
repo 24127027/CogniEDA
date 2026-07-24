@@ -14,7 +14,7 @@ def test_evidence_repository_rejects_orphan_before_foreign_key_flush(db_session)
     repository = EvidenceRepository(db_session)
 
     with pytest.raises(ValueError, match="existing Hypothesis"):
-        repository.create(
+        repository._stage_create_from_evidence_admission(
             Evidence(
                 hypothesis_id=uuid4(),
                 profile_id=uuid4(),

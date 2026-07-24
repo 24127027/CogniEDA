@@ -16,6 +16,7 @@ The current implementation is a Python backend prototype managed with `uv`. It c
 - thin repositories in `src/repositories/`
 - baseline profiling utilities and a DVC adapter boundary in `src/data/`
 - `SessionFrameBuilder` and `SessionContextBuilder` in `src/memory/session_frame.py`
+- bounded SQL-backed Discovery retrieval in `src/memory/retrieval_engine.py`
 - a narrow approval-gated planner admission path in `src/agents/planner/`
 - a durable attempt worker/finalization protocol in `src/application/orchestrator/`
 - executor capability registration/dispatch plumbing, while concrete executor graphs remain stubs
@@ -31,13 +32,18 @@ The current implementation is a Python backend prototype managed with `uv`. It c
 | Data profiling | Partially implemented | Baseline dataframe profiling exists and produces immutable DataProfiles with optional DVC identity. Executable DVC integration is missing. |
 | Planner workflow | Partially implemented | Explicit commands and execution approval/admission work; answer/suggest/plan and general non-execution approval remain incomplete. Durable PlannerOperation persistence exists. |
 | Executor workflow | Partially implemented | Capability catalog/registry/dispatcher exist, but concrete executor graphs and structured result drafts are stubs. Durable worker execution is a separate application-layer path. |
-| Context type safety | Partially implemented | A pure retrieval policy plus `SessionContextBuilder` projections enforce local type/lifecycle filtering; no graph/vector retrieval engine exists. |
+| Context type safety | Partially implemented | A pure policy, bounded SQL-backed Discovery retrieval/ranking, and `SessionContextBuilder` projections enforce local type/lifecycle filtering; no graph/vector retrieval or mandatory protected specialist prompt boundary exists. |
 | Validity basis | Implemented locally | `Discovery.validity_basis` records dependency and invalidation metadata. Full provenance records remain incomplete. |
 | AnalysisFrame provenance | Partially implemented | Evidence requires `analysis_frame_ref`; a minimal `AnalysisFrame` table exists, but no full analytical-view provenance exists. |
 | Evidence cache | Not implemented | No evidence-cache service exists. |
 
 ## Known Deviation
 
-The local SQLModel schema has converged to the target FCO set and now includes targeted migrations plus minimal provenance/workflow records. It still lacks a general migration framework, runnable default executors, planner capabilities beyond configured request understanding and Task-operation approval, production retrieval/cache, and a CLI/service/worker bootstrap.
+The local SQLModel schema has converged to the target FCO set and now includes targeted migrations
+plus minimal provenance/workflow records. It still lacks a general migration framework, runnable
+default executors, several Planner branches, graph/vector retrieval, cache, and a CLI/service/worker
+bootstrap. Checked-in agent tool configuration also references undefined MCP servers, and current
+scientific responsibility is split incorrectly between Planner, generic executors, and application
+finalization.
 
 See [Implementation Gap Analysis](implementation-gap-analysis.md).

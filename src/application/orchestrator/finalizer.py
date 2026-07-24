@@ -1,4 +1,4 @@
-"""Restart-safe scientific finalization from durable attempt state only."""
+"""Restart-safe Evidence admission from durable attempt state only."""
 
 from __future__ import annotations
 
@@ -7,18 +7,30 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+from pydantic import TypeAdapter
 from sqlmodel import Session, select
 
-from application.orchestrator.execution_contracts import ExecutorResult, PreparedExecution
-from application.orchestrator.planner_commit import commit_planner_operations
+from application.orchestrator.evidence_admission import (
+    EvidenceAdmissionConflictError,
+    execute_evidence_admission_plan,
+    validate_and_build_evidence_admission_plan,
+)
+from application.orchestrator.execution_contracts import ExecutionReceiptEnvelope, PreparedExecution
 from application.orchestrator.transition_service import (
     AlreadyCompletedError,
     AlreadyFinalizingError,
     ClaimLostError,
     ExecutionAttemptTransitionService,
 )
-from db.models import ExecutionInboxRecord, ExecutionOutboxRecord, ExecutionRunRecord
-from schemas.enums import ExecutionRunStatus, PlannerOperationType
+from db.models import (
+    DataProfileRecord,
+    ExecutionInboxRecord,
+    ExecutionOutboxRecord,
+    ExecutionRunRecord,
+    HypothesisRecord,
+    TaskRecord,
+)
+from schemas.enums import ExecutionRunStatus
 
 
 def finalize_attempt(
@@ -29,12 +41,15 @@ def finalize_attempt(
     claim_duration: timedelta = timedelta(minutes=5),
     test_hook: Callable[[str, Session], None] | None = None,
 ) -> bool:
-    """Atomically synthesize scientific state from the authoritative inbox row."""
+    """Atomically admit AnalysisFrame and Evidence from the authoritative inbox row."""
 
     run = session.get(ExecutionRunRecord, execution_run_id)
     if run is None:
         return False
-    if run.status in {ExecutionRunStatus.COMPLETED, ExecutionRunStatus.EXECUTION_FAILED}:
+    if run.status in {
+        ExecutionRunStatus.EVIDENCE_ADMITTED,
+        ExecutionRunStatus.EXECUTION_FAILED,
+    }:
         return True
 
     if test_hook:
@@ -45,7 +60,7 @@ def finalize_attempt(
     expected_attempt_version = run.attempt_version
     expires_at = datetime.now(UTC) + claim_duration
 
-    if not transition_service.claim_finalization(
+    if not transition_service.claim_evidence_admission(
         execution_run_id=execution_run_id,
         finalizer_owner_id=finalizer_owner_id,
         expected_attempt_version=expected_attempt_version,
@@ -54,9 +69,11 @@ def finalize_attempt(
         session.rollback()
         run_refreshed = session.get(ExecutionRunRecord, execution_run_id)
         if run_refreshed:
-            if run_refreshed.status == ExecutionRunStatus.COMPLETED:
+            if run_refreshed.status in {
+                ExecutionRunStatus.EVIDENCE_ADMITTED,
+            }:
                 raise AlreadyCompletedError("already_completed")
-            elif run_refreshed.status == ExecutionRunStatus.FINALIZING:
+            elif run_refreshed.status == ExecutionRunStatus.EVIDENCE_ADMITTING:
                 raise AlreadyFinalizingError("already_finalizing")
             elif run_refreshed.status == ExecutionRunStatus.CANCELLED:
                 raise ClaimLostError("claim_lost")
@@ -78,7 +95,9 @@ def finalize_attempt(
         or inbox.dispatch_idempotency_key != run.dispatch_idempotency_key
         or inbox.lease_epoch != run.lease_epoch
     ):
+        session.rollback()
         return False
+
     outbox = session.exec(
         select(ExecutionOutboxRecord).where(
             ExecutionOutboxRecord.execution_run_id == execution_run_id,
@@ -86,83 +105,61 @@ def finalize_attempt(
         )
     ).first()
     if outbox is None:
+        session.rollback()
         return False
 
     if inbox.executor_status == "failed":
         return _finalize_execution_failure(session, run, inbox, transition_service)
-    try:
-        from application.orchestrator.scientific_processing import process_scientific_result
 
-        result = ExecutorResult.model_validate(inbox.serialized_observations)
+    try:
+        result = TypeAdapter(ExecutionReceiptEnvelope).validate_python(
+            inbox.serialized_observations
+        )
+        hypothesis = session.get(HypothesisRecord, run.hypothesis_id) if run.hypothesis_id else None
+        task = session.get(TaskRecord, run.task_id) if run.task_id else None
+        if hypothesis is None or task is None:
+            return _finalize_execution_failure(session, run, inbox, transition_service)
+
+        profile = session.get(DataProfileRecord, hypothesis.profile_id)
+        if profile is None:
+            return _finalize_execution_failure(session, run, inbox, transition_service)
+
         prepared = PreparedExecution.model_validate(outbox.prepared_payload).model_copy(
             update={
-                "hypothesis_ref": "hypothesis:durable",
-                "execution_run_ref": "execution_run:durable",
+                "hypothesis_ref": str(hypothesis.hypothesis_id),
+                "task_ref": str(task.task_id),
+                "data_profile_ref": str(profile.profile_id),
+                "execution_run_ref": str(run.execution_run_id),
                 "execution_run_id": run.execution_run_id,
                 "dispatch_idempotency_key": run.dispatch_idempotency_key,
                 "lease_epoch": run.lease_epoch,
             }
         )
 
-        profile_id = _profile_id_for_run(session, run)
-
-        success, operations = process_scientific_result(
-            session=session,
-            session_id="durable-finalizer",
-            prepared=prepared,
-            result=result,
-            run=run,
-            profile_id=profile_id,
-            hypothesis_id=run.hypothesis_id,
-            task_id=run.task_id,
-        )
-
-        if not success:
+        try:
+            plan = validate_and_build_evidence_admission_plan(
+                prepared=prepared,
+                result=result,
+                run=run,
+                inbox=inbox,
+                profile=profile,
+                hypothesis=hypothesis,
+                task=task,
+                session_id="durable-finalizer",
+            )
+        except EvidenceAdmissionConflictError:
+            return _finalize_evidence_conflict(session, run, inbox, transition_service)
+        except ValueError:
             return _finalize_execution_failure(session, run, inbox, transition_service)
-
-        if run.finalization_fencing_epoch is None:
-            raise ValueError("Finalization claim did not allocate a fencing epoch.")
 
         if test_hook:
             test_hook("before_complete", session)
 
-        if not transition_service.stage_complete_finalization(
-            execution_run_id=execution_run_id,
-            finalizer_owner_id=finalizer_owner_id,
-            finalization_fencing_epoch=run.finalization_fencing_epoch,
-            attempt_version=run.attempt_version,
-        ) or not transition_service.stage_consume_inbox(inbox.inbox_id):
-            session.rollback()
-            return False
+        return execute_evidence_admission_plan(session, plan, test_hook=test_hook)
 
-        # Exclude UPDATE_EXECUTION_RUN since stage_complete_finalization handles the run status
-        operations = [
-            operation
-            for operation in operations
-            if operation.operation_type != PlannerOperationType.UPDATE_EXECUTION_RUN
-        ]
-        result_commit = commit_planner_operations(session, operations, commit=False)
-        if result_commit.failed_operation_ids:
-            session.rollback()
-            return False
-
-        if test_hook:
-            test_hook("before_commit", session)
-
-        session.commit()
-        return True
     except Exception:
         session.rollback()
         raise
-
-
-def _profile_id_for_run(session: Session, run: ExecutionRunRecord) -> UUID:
-    from db.models import HypothesisRecord
-
-    hypothesis = session.get(HypothesisRecord, run.hypothesis_id)
-    if hypothesis is None:
-        raise ValueError("ExecutionRun references a missing Hypothesis.")
-    return hypothesis.profile_id
 
 
 def _finalize_execution_failure(
@@ -174,15 +171,49 @@ def _finalize_execution_failure(
     """Durably classify a failed execution without manufacturing Evidence."""
 
     if run.finalization_fencing_epoch is None or run.hypothesis_id is None:
+        session.rollback()
         return False
-    if not transition_service.stage_fail_finalization(
+    if not transition_service.stage_fail_execution(
         execution_run_id=run.execution_run_id,
-        hypothesis_id=run.hypothesis_id,
         finalizer_owner_id=run.finalizer_owner_id or "",
         finalization_fencing_epoch=run.finalization_fencing_epoch,
         attempt_version=run.attempt_version,
-    ) or not transition_service.stage_consume_inbox(inbox.inbox_id):
+    ) or not transition_service.stage_consume_authoritative_inbox(
+        inbox_id=inbox.inbox_id,
+        execution_run_id=run.execution_run_id,
+        dispatch_idempotency_key=run.dispatch_idempotency_key or "",
+        result_digest=inbox.result_digest,
+    ):
         session.rollback()
         return False
     session.commit()
     return True
+
+
+def _finalize_evidence_conflict(
+    session: Session,
+    run: ExecutionRunRecord,
+    inbox: ExecutionInboxRecord,
+    transition_service: ExecutionAttemptTransitionService,
+) -> bool:
+    """Durably quarantine a conflicting authoritative payload without Evidence."""
+
+    if run.finalization_fencing_epoch is None:
+        session.rollback()
+        return False
+    if not transition_service.stage_quarantine_evidence_conflict(
+        execution_run_id=run.execution_run_id,
+        finalizer_owner_id=run.finalizer_owner_id or "",
+        finalization_fencing_epoch=run.finalization_fencing_epoch,
+        attempt_version=run.attempt_version,
+        reason="evidence_admission_inbox_conflict",
+    ) or not transition_service.stage_mark_authoritative_inbox_conflict(
+        inbox_id=inbox.inbox_id,
+        execution_run_id=run.execution_run_id,
+        dispatch_idempotency_key=run.dispatch_idempotency_key or "",
+        result_digest=inbox.result_digest,
+    ):
+        session.rollback()
+        return False
+    session.commit()
+    return False

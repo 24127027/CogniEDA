@@ -230,7 +230,3 @@ __marimo__/
 # OS metadata
 .DS_Store
 Thumbs.db
-
-
-docs/audits
-docs/implementation

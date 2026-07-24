@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from langgraph.runtime import Runtime
+from pydantic import TypeAdapter, ValidationError
 
 from agents.executor import ExecutorContext, ExecutorDispatcher, ExecutorInput, ExecutorRegistry
 from agents.executor.capabilities import CapabilitySpec
@@ -21,9 +22,6 @@ from agents.planner.types import (
     AnalysisFrameObservation,
     Context,
     EvidenceObservation,
-    ExecutionRunObservation,
-    ExecutorResult,
-    HypothesisEvaluationDraft,
     PlannerDecision,
     RequestUnderstanding,
     RequestUnderstandingModel,
@@ -33,10 +31,10 @@ from agents.planner.types import (
 from application.orchestrator import reconciler as reconciliation_module
 from application.orchestrator.cancellation import authorize_retry
 from application.orchestrator.dispatcher import dispatch_pending_attempts
+from application.orchestrator.execution_contracts import ExecutionReceiptEnvelope
 from application.orchestrator.finalizer import finalize_attempt
 from application.orchestrator.planner_commit import commit_planner_operations
 from application.orchestrator.receiver import submit_execution_result
-from application.orchestrator.scientific_processing import _method_parameter_hash
 from db.models import ExecutionOutboxRecord
 from db.session import get_session
 from repositories import (
@@ -68,10 +66,10 @@ from schemas.common import (
     MethodParameter,
     SchemaSummary,
 )
+from schemas.data_explorer_contracts import DataExplorerResult
 from schemas.enums import (
     DataProfileLifecycleState,
     DataProfileMethod,
-    DiscoveryEpistemicStatus,
     EvidenceType,
     ExecutionRunStatus,
     HypothesisEvidenceOutcome,
@@ -94,24 +92,18 @@ class FakeExecutor:
         *,
         fail: bool = False,
         outcome: HypothesisEvidenceOutcome = HypothesisEvidenceOutcome.SUPPORTS,
-        advisory_outcome: HypothesisEvidenceOutcome | None = None,
-        finalize: bool = True,
         raise_error: bool = False,
-        output_executor_type: str | None = None,
         output_method: str | None = None,
         output_parameters: list[MethodParameter] | None = None,
     ) -> None:
         self.fail = fail
         self.outcome = outcome
-        self.advisory_outcome = advisory_outcome
-        self.finalize = finalize
         self.raise_error = raise_error
-        self.output_executor_type = output_executor_type
         self.output_method = output_method
         self.output_parameters = output_parameters
         self.requests: list[ExecutorInput] = []
 
-    async def run(self, input: ExecutorInput, context: ExecutorContext) -> ExecutorResult:
+    async def run(self, input: ExecutorInput, context: ExecutorContext) -> DataExplorerResult:
         request = input
         self.requests.append(request)
         if self.raise_error:
@@ -120,23 +112,22 @@ class FakeExecutor:
             frame_hash="test-frame-v1",
             column_refs=request.specification.variable_bindings,
         )
-        execution_run = ExecutionRunObservation(
-            executor_type=self.output_executor_type or request.specification.executor_id,
-            method_id=self.output_method or request.specification.validation_method,
-            parameter_hash=_method_parameter_hash(request.specification.method_parameters),
-            status="failed" if self.fail else "completed",
-        )
         if self.fail:
-            return ExecutorResult(
-                status="failed",
-                analysis_frame=analysis_frame,
-                execution_run=execution_run,
-                error_message="Deterministic test executor failure.",
+            from schemas.specialist_contracts import (
+                DataExplorerFailureReason,
+                DataExplorerFailureResult,
             )
-        return ExecutorResult(
-            status="completed",
+
+            return DataExplorerFailureResult(
+                status="failed",
+                failure_reason=DataExplorerFailureReason.METHOD_EXECUTION_FAILURE,
+                message="Deterministic test executor failure.",
+            )
+        from schemas.specialist_contracts import DataExplorerSuccessResult
+
+        return DataExplorerSuccessResult(
+            status="success",
             analysis_frame=analysis_frame,
-            execution_run=execution_run,
             evidence_observation=EvidenceObservation(
                 evidence_type=EvidenceType.STATISTICAL_TEST,
                 method=self.output_method or request.specification.validation_method,
@@ -158,10 +149,6 @@ class FakeExecutor:
                     ),
                 ),
                 code_reference="tests/agents/planner/test_execution_spine.py",
-            ),
-            evaluation=HypothesisEvaluationDraft(
-                outcome=self.advisory_outcome or self.outcome,
-                finalize=self.finalize,
             ),
         )
 
@@ -583,22 +570,14 @@ def test_execute_graph_persists_one_authorized_chain_without_second_approval(
     runs = ExecutionRunRepository(db_session).list(hypothesis_id=hypothesis[0].hypothesis_id)
     evidence = EvidenceRepository(db_session).list_for_hypothesis(hypothesis[0].hypothesis_id)
     discoveries = DiscoveryRepository(db_session).list_for_hypothesis(hypothesis[0].hypothesis_id)
-    assert len(analysis_frames) == len(runs) == len(evidence) == len(discoveries) == 1
+    assert len(analysis_frames) == len(runs) == len(evidence) == 1
+    assert len(discoveries) == 0
     assert evidence[0].profile_id == hypothesis[0].profile_id
     assert evidence[0].hypothesis_id == hypothesis[0].hypothesis_id
-    assert discoveries[0].hypothesis_id == hypothesis[0].hypothesis_id
-    assert discoveries[0].evidence_ids == [evidence[0].evidence_id]
-    assert discoveries[0].validity_basis.assumptions_excluded_from_inference is True
-    assert hypothesis[0].status.value == "confirmed"
-    assert TaskRepository(db_session).get_by_id(task.task_id).lifecycle_state.value == "completed"
+    assert hypothesis[0].status.value == "ready_for_evaluation"
+    assert TaskRepository(db_session).get_by_id(task.task_id).lifecycle_state.value == "active"
     frames = SessionFrameRepository(db_session).list()
-    assert len(frames) == 1
-    frame = frames[0]
-    assert frame.active_data_profile_refs == [task.profile_id]
-    assert frame.relevant_discovery_refs == [discoveries[0].discovery_id]
-    assert frame.supporting_evidence_refs == [evidence[0].evidence_id]
-    assert str(discoveries[0].discovery_id) in frame.inclusion_reasons
-    assert frame.active_assumptions == []
+    assert len(frames) == 0
 
     repeated_state = State.model_validate(
         graph.invoke(
@@ -607,11 +586,11 @@ def test_execute_graph_persists_one_authorized_chain_without_second_approval(
         )
     )
     assert repeated_state.execution_preparation is not None
-    assert repeated_state.execution_preparation.error_code == "task_not_active"
+    assert repeated_state.execution_preparation.error_code == "hypothesis_not_retryable"
     assert len(executor.requests) == 1
     assert len(HypothesisRepository(db_session).list(task_id=task.task_id)) == 1
     assert (
-        len(DiscoveryRepository(db_session).list_for_hypothesis(hypothesis[0].hypothesis_id)) == 1
+        len(DiscoveryRepository(db_session).list_for_hypothesis(hypothesis[0].hypothesis_id)) == 0
     )
 
 
@@ -637,11 +616,20 @@ def test_execute_graph_failure_keeps_task_active_and_creates_no_evidence_or_disc
     _dispatch_and_finalize(db_session, executor, task)
     assert len(executor.requests) == len(hypothesis) == 1
     hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)
-    assert hypothesis[0].status.value == "approved"
+    assert hypothesis[0].status not in {
+        HypothesisStatus.EVALUATED,
+        HypothesisStatus.FAILED,
+        HypothesisStatus.CANCELLED,
+        HypothesisStatus.ARCHIVED,
+    }
     assert AnalysisFrameRepository(db_session).list(data_profile_id=task.profile_id) == []
     runs = ExecutionRunRepository(db_session).list(hypothesis_id=hypothesis[0].hypothesis_id)
     assert len(runs) == 1
     assert runs[0].status == "execution_failed"
+    inbox = ExecutionInboxRepository(db_session).list(execution_run_id=runs[0].execution_run_id)
+    assert len(inbox) == 1
+    assert inbox[0].status == "processed"
+    assert inbox[0].error_message is not None
     assert EvidenceRepository(db_session).list_for_hypothesis(hypothesis[0].hypothesis_id) == []
     assert DiscoveryRepository(db_session).list_for_hypothesis(hypothesis[0].hypothesis_id) == []
     assert TaskRepository(db_session).get_by_id(task.task_id).lifecycle_state.value == "active"
@@ -825,7 +813,8 @@ def test_public_planner_resumes_durable_approval_in_a_new_instance(db_session, m
     hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)
     assert len(hypothesis) == 1
     discoveries = DiscoveryRepository(db_session).list_for_hypothesis(hypothesis[0].hypothesis_id)
-    assert len(discoveries) == 1
+    assert len(discoveries) == 0
+    assert hypothesis[0].status.value == "ready_for_evaluation"
     assert len(reconcile_calls) == 2
 
 
@@ -896,7 +885,8 @@ def test_durable_topology_survives_planner_and_dispatcher_replacement(db_session
         finalizer_session.close()
     hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)[0]
     assert len(EvidenceRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)) == 1
-    assert len(DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)) == 1
+    assert len(DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)) == 0
+    assert hypothesis.status.value == "ready_for_evaluation"
 
 
 def test_malformed_durable_payload_fails_without_invoking_executor(db_session) -> None:
@@ -1029,6 +1019,15 @@ def test_retry_reuses_contract_and_canonical_adapter_with_new_attempt(db_session
     assert predecessor is not None
     assert predecessor.dispatch_idempotency_key is not None
     assert predecessor.method_id is not None
+    from schemas.data_explorer_contracts import (
+        DataExplorerFailureReason,
+        DataExplorerFailureResult,
+    )
+
+    late_failure = DataExplorerFailureResult(
+        failure_reason=DataExplorerFailureReason.METHOD_EXECUTION_FAILURE,
+        message="Deterministic test executor failure.",
+    )
     assert (
         submit_execution_result(
             db_session,
@@ -1038,10 +1037,10 @@ def test_retry_reuses_contract_and_canonical_adapter_with_new_attempt(db_session
             worker_id="test-worker",
             method_id=predecessor.method_id,
             executor_status="failed",
-            result=None,
+            result=late_failure,
             error_msg="late predecessor result",
         )
-        is None
+        is not None
     )
 
     successful_executor = FakeExecutor()
@@ -1060,7 +1059,7 @@ def test_retry_reuses_contract_and_canonical_adapter_with_new_attempt(db_session
     hypothesis = HypothesisRepository(db_session).get_by_id(retry_input.hypothesis_id)
     assert hypothesis is not None
     assert len(EvidenceRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)) == 1
-    assert len(DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)) == 1
+    assert len(DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)) == 0
 
 
 def test_public_planner_rejects_stale_durable_approval(db_session) -> None:
@@ -1123,64 +1122,22 @@ def test_changed_contract_cannot_reuse_execution_approval(db_session) -> None:
     assert state.execution_revalidation.error_code == "stale_execution_approval"
 
 
-def test_hypothesis_accumulates_evidence_until_explicit_finalization(db_session) -> None:
-    task = _persist_ready_task(db_session)
-    executor = FakeExecutor(finalize=False)
-    context = _context(db_session, FailIfCalledRequestModel())
-    first_state = State.model_validate(
-        build_graph().invoke(
-            State(
-                query=f"/execute {task.task_id}",
-                planner_decision={"action": "approve"},
-            ),
-            context=context,
-        )
-    )
-    hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)[0]
-    assert first_state.execution_admission is not None and first_state.execution_admission.admitted
-    _dispatch_and_finalize(db_session, executor, task)
-    hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)[0]
-    assert len(EvidenceRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)) == 1
-    assert DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id) == []
-    assert hypothesis.status.value == "awaiting_additional_evidence"
-
-    second_state = State.model_validate(
-        build_graph().invoke(
-            State(
-                query=f"/execute {task.task_id}",
-                planner_decision={"action": "approve"},
-            ),
-            context=_context(db_session, FailIfCalledRequestModel()),
-        )
-    )
-    discoveries = DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)
-    evidence = EvidenceRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)
-    assert (
-        second_state.execution_admission is not None and second_state.execution_admission.admitted
-    )
-    _dispatch_and_finalize(db_session, FakeExecutor(finalize=True), task)
-    discoveries = DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)
-    evidence = EvidenceRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)
-    assert len(evidence) == 2
-    assert len(discoveries) == 1
-    assert set(discoveries[0].evidence_ids) == {item.evidence_id for item in evidence}
-
-
 @pytest.mark.parametrize(
-    ("executor", "error_code"),
+    "executor",
     [
-        (FakeExecutor(output_method="unexpected_method"), "executor_method_mismatch"),
-        (FakeExecutor(output_executor_type="unexpected_executor"), "executor_type_mismatch"),
-        (
+        pytest.param(
+            FakeExecutor(output_method="unexpected_method"),
+            id="method-identity",
+        ),
+        pytest.param(
             FakeExecutor(output_parameters=[MethodParameter(name="alpha", value=0.01)]),
-            "executor_parameter_mismatch",
+            id="parameter-payload",
         ),
     ],
 )
-def test_review_rejects_executor_identity_drift(
+def test_scientific_result_identity_fields_are_rejected_independently(
     db_session,
     executor: FakeExecutor,
-    error_code: str,
 ) -> None:
     task = _persist_ready_task(db_session)
 
@@ -1203,29 +1160,33 @@ def test_review_rejects_executor_identity_drift(
     persisted_task = TaskRepository(db_session).get_by_id(task.task_id)
     assert persisted_task is not None
     assert persisted_task.lifecycle_state == TaskLifecycleState.ACTIVE
+    run = ExecutionRunRepository(db_session).list(task_id=task.task_id)[0]
+    assert run.status == ExecutionRunStatus.EXECUTION_FAILED
 
 
-def test_executor_result_rejects_status_or_failure_contract_drift() -> None:
+def test_execution_receipt_contract_rejects_status_or_failure_contract_drift() -> None:
     analysis_frame = AnalysisFrameObservation(frame_hash="test-frame")
 
-    with pytest.raises(ValueError, match="status must match"):
-        ExecutorResult(
-            status="completed",
-            analysis_frame=analysis_frame,
-            execution_run=ExecutionRunObservation(status="failed"),
-            evidence_observation=EvidenceObservation(
-                evidence_type=EvidenceType.STATISTICAL_TEST,
-                method="deterministic_test",
-                result_summary=EvidenceResultSummary(summary="Observed result."),
-            ),
-            evaluation=HypothesisEvaluationDraft(outcome=HypothesisEvidenceOutcome.SUPPORTS),
+    with pytest.raises(ValidationError):
+        TypeAdapter(DataExplorerResult).validate_python(
+            {
+                "status": "completed",
+                "analysis_frame": analysis_frame,
+                "evidence_observation": EvidenceObservation(
+                    evidence_type=EvidenceType.STATISTICAL_TEST,
+                    method="deterministic_test",
+                    result_summary=EvidenceResultSummary(summary="Observed result."),
+                ),
+            }
         )
 
-    with pytest.raises(ValueError, match="failure information"):
-        ExecutorResult(
-            status="failed",
-            analysis_frame=analysis_frame,
-            execution_run=ExecutionRunObservation(status="failed"),
+    with pytest.raises(ValidationError):
+        TypeAdapter(ExecutionReceiptEnvelope).validate_python(
+            {
+                "status": "failed",
+                "analysis_frame": analysis_frame,
+                "evidence_type": EvidenceType.STATISTICAL_TEST,
+            }
         )
 
 
@@ -1246,33 +1207,30 @@ def test_inconclusive_execution_does_not_overclaim_no_relationship(db_session) -
     _dispatch_and_finalize(db_session, executor, task)
 
     hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)[0]
-    discovery = DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)[0]
-    assert discovery.epistemic_status == DiscoveryEpistemicStatus.INSUFFICIENT_EVIDENCE
-    assert "insufficient" in discovery.claim.statement.lower()
-    assert "no relationship" not in discovery.claim.statement.lower()
+    evidence = EvidenceRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)
+    assert len(evidence) == 1
+    assert hypothesis.status.value == "ready_for_evaluation"
+    assert len(DiscoveryRepository(db_session).list_for_hypothesis(hypothesis.hypothesis_id)) == 0
 
 
-def test_executor_advisory_outcome_cannot_override_deterministic_evaluation(db_session) -> None:
-    task = _persist_ready_task(db_session)
-    executor = FakeExecutor(advisory_outcome=HypothesisEvidenceOutcome.CONTRADICTS)
+def test_executor_advisory_outcome_cannot_override_deterministic_evaluation() -> None:
+    from pydantic import TypeAdapter, ValidationError
 
-    final_state = State.model_validate(
-        build_graph().invoke(
-            State(
-                query=f"/execute {task.task_id}",
-                planner_decision={"action": "approve"},
-            ),
-            context=_context(db_session, FailIfCalledRequestModel()),
-        )
-    )
+    from schemas.specialist_contracts import DataExplorerResult
 
-    assert final_state.execution_admission is not None and final_state.execution_admission.admitted
-    _dispatch_and_finalize(db_session, executor, task)
-    hypothesis = HypothesisRepository(db_session).list(task_id=task.task_id)
-    assert len(hypothesis) == 1
-    assert hypothesis[0].status == HypothesisStatus.APPROVED
-    assert EvidenceRepository(db_session).list_for_hypothesis(hypothesis[0].hypothesis_id) == []
-    assert DiscoveryRepository(db_session).list_for_hypothesis(hypothesis[0].hypothesis_id) == []
+    payload = {
+        "status": "success",
+        "analysis_frame": {"frame_hash": "hash123"},
+        "evidence_observation": {
+            "evidence_type": "statistical_test",
+            "method": "pearson_correlation",
+            "result_summary": {"summary": "test", "metric_name": "p_value", "metric_value": 0.01},
+        },
+        "evaluation": {"outcome": "contradicts", "finalize": True},
+    }
+
+    with pytest.raises(ValidationError):
+        TypeAdapter(DataExplorerResult).validate_python(payload)
 
 
 def test_execution_bundle_rolls_back_target_records_when_one_operation_fails(
@@ -1352,12 +1310,22 @@ def test_evidence_repository_rejects_orphans_and_cross_profile_evidence(db_sessi
 
     repository = EvidenceRepository(db_session)
     with pytest.raises(ValueError, match="existing Hypothesis"):
-        repository.create(evidence(uuid4(), profile.profile_id))
+        repository._stage_create_from_evidence_admission(
+            evidence(uuid4(), profile.profile_id)
+        )
     with pytest.raises(ValueError, match="existing DataProfile"):
-        repository.create(evidence(hypothesis.hypothesis_id, uuid4()))
+        repository._stage_create_from_evidence_admission(
+            evidence(hypothesis.hypothesis_id, uuid4())
+        )
     with pytest.raises(ValueError, match="must match"):
-        repository.create(evidence(hypothesis.hypothesis_id, other_profile.profile_id))
+        repository._stage_create_from_evidence_admission(
+            evidence(hypothesis.hypothesis_id, other_profile.profile_id)
+        )
     assert repository.list() == []
 
-    accepted = repository.create(evidence(hypothesis.hypothesis_id, profile.profile_id))
+    accepted_seed = evidence(hypothesis.hypothesis_id, profile.profile_id)
+    repository._stage_create_from_evidence_admission(accepted_seed)
+    db_session.commit()
+    accepted = repository.get_by_id(accepted_seed.evidence_id)
+    assert accepted is not None
     assert accepted.hypothesis_id == hypothesis.hypothesis_id

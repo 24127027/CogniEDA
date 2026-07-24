@@ -1,10 +1,17 @@
 # User Research Workflow
 
+> **Classification:** user-facing elaboration, partially superseded by the
+> [Canonical Investigation Workflow](../architecture/canonical-investigation-workflow.md). Use the
+> canonical agent boundary document when this page assigns scientific responsibility.
+
 ## Implementation Status
 
 Partially implemented backend prototype.
 
-The repo has FCO/provenance persistence, profiling, session-frame projection, an approval-gated execution admission path, a durable worker protocol, and one deterministic scientific-finalization path. It still does not implement an end-to-end user product workflow because natural-language planning, default executors, cleaning, retrieval, UI/API and worker bootstrap are incomplete.
+The repo has FCO/provenance persistence, profiling, session-frame projection, approval-gated
+execution, atomic Evidence admission, protected evaluation, governed Discovery admission, active
+retrieval, and atomic validity propagation. It is not an end-user product because default
+executors, cleaning, UI/API, and a worker process are absent.
 
 ## Target Workflow
 
@@ -85,7 +92,9 @@ Current implementation:
 - `Assumption` stores source, testability, scope, scoped DataProfile ids, contradiction Discovery refs, and replacement refs.
 - Schema admission rejects claims marked as testable so they can be converted into Task/Hypothesis candidates instead of Assumptions.
 - `SessionContextBuilder` excludes assumptions from conclusion/discovery-synthesis context.
-- No planner warning flow or graph retrieval engine exists. A pure type/lifecycle retrieval policy does exist under `src/memory/retrieval_policy.py`.
+- No planner warning flow, graph-store traversal, or runnable Graph Miner exists. A pure
+  type/lifecycle policy and bounded SQL-backed Discovery retrieval/ranking path do exist under
+  `src/memory/retrieval_policy.py` and `src/memory/retrieval_engine.py`.
 
 Status: Partially implemented.
 
@@ -102,7 +111,9 @@ Current implementation:
 - `Task` schema/table/repository exist with proposed/active/paused/completed/failed/rejected/cancelled lifecycle.
 - Proposed Tasks can appear in planning SessionFrame context but cannot generate Hypotheses.
 - `HypothesisRepository.create()` rejects Hypothesis creation from non-active, non-analytical, parent, unaccepted-DataProfile, or duplicate Task sources.
-- `manage_tasks` can turn already-supplied typed drafts into PlannerOperations, but the public planner path does not yet produce those drafts or complete general Task approval.
+- `/manage_task` and `/decompose` use configured structured-output adapters to produce exact
+  durable PlannerOperation proposals and support approval of those batches. General natural-language
+  planning and all broader Task workflows are still incomplete.
 
 Status: Partially implemented.
 
@@ -127,12 +138,14 @@ Status: Partially implemented.
 
 Target design:
 
-- A terminal analytical Task compiles into exactly one `Hypothesis`.
-- Planner prepares execution and dispatches a specialist executor.
-- Executor creates or references AnalysisFrame provenance.
-- Executor produces immutable `Evidence`.
-- Executor authors a `Discovery` draft as an evidence-bound claim.
-- Commit persists approved executor outputs with execution provenance.
+- A terminal analytical Task maps to exactly one `Hypothesis`.
+- Hypothesis Analyst operationalizes the Task into the testable Hypothesis and decision contract.
+- Planner coordinates approval and dispatch without making scientific judgments.
+- Data Explorer executes the approved contract and proposes AnalysisFrame/ExecutionRun provenance
+  plus Evidence observations; it does not interpret them.
+- Hypothesis Analyst evaluates admitted Evidence in protected context and proposes the evidence-bound
+  Discovery claim.
+- The application commit boundary validates and atomically persists approved outputs and provenance.
 
 Current implementation:
 
@@ -140,8 +153,13 @@ Current implementation:
 - Evidence requires `DataProfile`, `AnalysisFrame`, and `ExecutionRun` references.
 - Discovery requires Evidence and `validity_basis`.
 - Repository guards enforce one Task to one Hypothesis and one Hypothesis to one Discovery for fresh local stores.
-- Approved execution admission persists Hypothesis/ExecutionRun/outbox state. An independent worker persists an inbox result and a fenced finalizer can create AnalysisFrame/Evidence/Discovery/lifecycle/SessionFrame operations for one deterministic method.
-- The durable worker now validates persisted attempt identity and reaches the capability registry through one `ExecutorInput` adapter. The canonical `ExecutorResult` observation schema exists, but default executor graph builders remain explicit stubs.
+- Approved execution admission persists Hypothesis/ExecutionRun/outbox state. An independent worker
+  persists canonical observations; fenced Evidence admission creates AnalysisFrame/Evidence only.
+- The durable worker validates persisted attempt identity and receives observation-only
+  `DataExplorerResult` through the real dispatcher seam. Hypothesis Analyst evaluates only the
+  protected bundle; durable governance and atomic admission persist the exact proposal.
+- The Planner still authors the operational contract. Concrete deployment auth/model/Data Explorer
+  adapters are absent and must be supplied to the fail-closed composition root.
 
 Status: Partially implemented.
 

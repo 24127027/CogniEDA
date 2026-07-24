@@ -9,7 +9,6 @@ from sqlmodel import Session, asc, select
 
 from application.orchestrator.transition_service import ExecutionAttemptTransitionService
 from db.models import (
-    AnalysisFrameRecord,
     AssumptionRecord,
     DataProfileRecord,
     DiscoveryRecord,
@@ -19,11 +18,9 @@ from db.models import (
     SessionFrameRecord,
     TaskRecord,
 )
-from repositories.analysis_frame_repository import AnalysisFrameRepository
 from repositories.assumption_repository import ASSUMPTION_JSON_FIELDS, AssumptionUpdate
 from repositories.common import apply_update, record_to_schema, schema_to_record_payload
 from repositories.discovery_repository import DiscoveryRepository
-from repositories.evidence_repository import EvidenceRepository
 from repositories.hypothesis_repository import HypothesisRepository, HypothesisUpdate
 from repositories.objective_repository import (
     ObjectiveMutationContext,
@@ -34,8 +31,6 @@ from repositories.session_frame_repository import SESSION_FRAME_JSON_FIELDS
 from repositories.task_repository import TASK_JSON_FIELDS, TaskUpdate
 from schemas.artifacts import (
     Assumption,
-    Discovery,
-    Evidence,
     Hypothesis,
     Objective,
     SessionFrame,
@@ -46,6 +41,7 @@ from schemas.enums import (
     DataProfileLifecycleState,
     DiscoveryLifecycleState,
     ExecutionRunStatus,
+    HypothesisStatus,
     PlannerOperationApprovalState,
     PlannerOperationType,
     TaskKind,
@@ -57,7 +53,7 @@ from schemas.planner_operations import (
     PlannerCommitResult,
     PlannerOperation,
 )
-from schemas.provenance import AnalysisFrame, ExecutionOutbox, ExecutionRun
+from schemas.provenance import ExecutionOutbox, ExecutionRun
 
 _COMMITTABLE_STATES = {
     PlannerOperationApprovalState.APPROVED,
@@ -276,6 +272,13 @@ def _validate_execution_bundle(operations: list[PlannerOperation]) -> None:
         return
     if len(run_operations) != 1 or len(outbox_operations) != 1:
         raise ValueError("Execution admission requires exactly one ExecutionRun and one outbox.")
+    if any(
+        operation.operation_type == PlannerOperationType.CHANGE_HYPOTHESIS_STATE
+        for operation in operations
+    ):
+        raise ValueError(
+            "Execution admission lifecycle is owned by ExecutionAttemptTransitionService."
+        )
 
     run = ExecutionRun(**run_operations[0].payload)
     outbox = ExecutionOutbox(**outbox_operations[0].payload)
@@ -328,7 +331,10 @@ def _stage_execution_admission(session: Session, operations: list[PlannerOperati
         or dispatch_idempotency_key is None
     ):
         raise ValueError("Execution admission requires complete immutable attempt identity.")
-    ExecutionAttemptTransitionService(session).stage_admit_attempt(
+    transition_service = ExecutionAttemptTransitionService(session)
+    if not transition_service.stage_hypothesis_testing_for_execution(hypothesis.hypothesis_id):
+        raise ValueError("Hypothesis is not eligible for execution admission.")
+    transition_service.stage_admit_attempt(
         execution_run_id=run.execution_run_id,
         task_id=run.task_id,
         hypothesis_id=run.hypothesis_id,
@@ -496,8 +502,7 @@ def _require_current_retrieval_motivations(
                 discovery_record.lifecycle_state,
             )
             raise ValueError(
-                "Selected Discovery is no longer active: "
-                f"{discovery_id} ({lifecycle_value})."
+                f"Selected Discovery is no longer active: {discovery_id} ({lifecycle_value})."
             )
         discovery = DiscoveryRepository(session).get_by_id(discovery_id)
         if discovery is None:
@@ -578,9 +583,18 @@ def _apply_change_task_state(session: Session, operation: PlannerOperation) -> N
     task_record = _require_record(session, TaskRecord, task_id, "Task")
     if "lifecycle_state" not in operation.payload:
         raise ValueError("change_task_state requires lifecycle_state in payload.")
+    target_state = TaskLifecycleState(operation.payload["lifecycle_state"])
+    if (
+        task_record.task_kind == TaskKind.ANALYTICAL
+        and target_state == TaskLifecycleState.COMPLETED
+    ):
+        raise ValueError(
+            "Terminal analytical Task completion is owned by Discovery Admission cutover; "
+            "generic PlannerOperation cannot set COMPLETED state."
+        )
     apply_update(
         task_record,
-        TaskUpdate(lifecycle_state=TaskLifecycleState(operation.payload["lifecycle_state"])),
+        TaskUpdate(lifecycle_state=target_state),
         json_fields=TASK_JSON_FIELDS,
     )
     session.add(task_record)
@@ -607,15 +621,22 @@ def _apply_change_hypothesis_state(session: Session, operation: PlannerOperation
     record = _require_record(session, HypothesisRecord, hypothesis_id, "Hypothesis")
     if "status" not in operation.payload:
         raise ValueError("change_hypothesis_state requires status in payload.")
-    apply_update(record, HypothesisUpdate(status=operation.payload["status"]))
+    target_status = operation.payload["status"]
+    if str(target_status).lower() in {"evaluated", HypothesisStatus.EVALUATED.value}:
+        raise ValueError(
+            "Hypothesis transition to EVALUATED is owned by Discovery Admission cutover; "
+            "generic PlannerOperation cannot set EVALUATED state."
+        )
+    apply_update(record, HypothesisUpdate(status=target_status))
     session.add(record)
 
 
 def _apply_create_analysis_frame(session: Session, operation: PlannerOperation) -> None:
-    analysis_frame = AnalysisFrame(**operation.payload)
-    if session.get(AnalysisFrameRecord, analysis_frame.analysis_frame_id) is not None:
-        raise ValueError(f"AnalysisFrame already exists: {analysis_frame.analysis_frame_id}")
-    AnalysisFrameRepository(session).stage_create(analysis_frame)
+    del session, operation
+    raise ValueError(
+        "AnalysisFrame creation is owned by the Evidence admission transaction; "
+        "PlannerOperation CREATE_ANALYSIS_FRAME is not a production mutation path."
+    )
 
 
 def _apply_create_execution_run(session: Session, operation: PlannerOperation) -> None:
@@ -647,13 +668,18 @@ def _apply_create_execution_inbox(session: Session, operation: PlannerOperation)
 
 
 def _apply_create_evidence(session: Session, operation: PlannerOperation) -> None:
-    evidence = Evidence(**operation.payload)
-    EvidenceRepository(session, strict_provenance_validation=True).stage_create(evidence)
+    del session, operation
+    raise ValueError(
+        "Evidence creation is owned by the Evidence admission transaction; "
+        "PlannerOperation CREATE_EVIDENCE is not a production mutation path."
+    )
 
 
 def _apply_create_discovery(session: Session, operation: PlannerOperation) -> None:
-    discovery = Discovery(**operation.payload)
-    DiscoveryRepository(session).stage_create(discovery)
+    raise ValueError(
+        "Discovery creation is owned by AtomicDiscoveryAdmissionService; "
+        "PlannerOperation CREATE_DISCOVERY is not a valid un-governed mutation path."
+    )
 
 
 def _apply_update_assumption_state(session: Session, operation: PlannerOperation) -> None:
@@ -714,9 +740,7 @@ def _require_objective_user_approval(
         raise ValueError("Objective lifecycle operations require explicit user approval.")
     record = session.get(PlannerOperationRecord, operation.operation_id)
     if record is None or record.approval_state != PlannerOperationApprovalState.APPROVED:
-        raise ValueError(
-            "Objective lifecycle operation must be the persisted approved proposal."
-        )
+        raise ValueError("Objective lifecycle operation must be the persisted approved proposal.")
 
 
 def _apply_update_session_frame(session: Session, operation: PlannerOperation) -> None:
@@ -724,6 +748,10 @@ def _apply_update_session_frame(session: Session, operation: PlannerOperation) -
     # Later work can decide whether this operation means append, replace, or
     # user-governed frame mutation.
     frame = SessionFrame(**operation.payload)
+    if frame.frame_outcome is not None and frame.relevant_discovery_refs:
+        raise ValueError(
+            "Conclusion SessionFrame creation is owned by AtomicDiscoveryAdmissionService."
+        )
     if session.get(SessionFrameRecord, frame.session_frame_id) is not None:
         raise ValueError(f"SessionFrame already exists: {frame.session_frame_id}")
     session.add(

@@ -135,6 +135,14 @@ class HypothesisRepository:
         record = self._session.get(HypothesisRecord, hypothesis_id)
         if record is None:
             return None
+        if (
+            "status" in update.model_fields_set
+            and update.status == HypothesisStatus.EVALUATED
+            and record.status != HypothesisStatus.EVALUATED
+        ):
+            raise RuntimeError(
+                "Hypothesis EVALUATED transition is owned by AtomicDiscoveryAdmissionService."
+            )
         apply_update(record, update, json_fields=HYPOTHESIS_JSON_FIELDS)
         self._session.add(record)
         self._session.commit()

@@ -1,12 +1,12 @@
-from langgraph.graph.state import CompiledStateGraph
+from typing import Any
 
-from application.orchestrator.execution_contracts import ExecutorResult
+from langgraph.graph.state import CompiledStateGraph
 
 from ..types import ExecutorContext, ExecutorInput
 from .state import State
 
 
-def build_graph() -> CompiledStateGraph[State, ExecutorContext, ExecutorInput, ExecutorResult]:
+def build_graph() -> CompiledStateGraph[State, ExecutorContext, ExecutorInput, Any]:
     """Build the GraphMiner graph."""
 
     raise NotImplementedError("GraphMiner graph is not implemented yet.")

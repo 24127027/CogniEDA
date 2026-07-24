@@ -13,19 +13,34 @@ Implemented or partially implemented today:
 - Baseline dataframe profiling under `src/data/`, producing immutable `DataProfile` records with dataset path and optional DVC identity.
 - A DVC adapter interface that makes executable DVC integration explicit but not yet implemented.
 - `SessionFrameBuilder` and `SessionContextBuilder` under `src/memory/session_frame.py`, including planning vs conclusion context projection.
+- Bounded SQL-backed Discovery retrieval with lifecycle/profile filtering, structural and lexical
+  relevance, deterministic ranking, and inclusion/exclusion reasons.
 - A configured natural-language request-understanding adapter plus public `/manage_task`, `/decompose`, and `/objective` typed proposal paths. Proposed operations remain uncommitted until the caller approves the exact persisted ordered batch.
 - A user-governed one-active-Objective lifecycle with explicit transitions, optimistic locking, immutable non-FCO revision provenance, and atomic successor SessionFrame updates.
 - A narrow approval-gated planner execution admission path that atomically persists `Hypothesis`, `ExecutionRun`, and execution outbox state.
-- A durable local worker protocol with lease/fencing transitions, result inbox, reconciliation helpers, and transactional scientific finalization.
-- A durable-worker-to-domain adapter and capability registry/dispatcher under `src/agents/executor/`; the concrete GraphMiner and HypothesisAnalyst graphs remain stubs.
+- A durable local worker protocol with lease/fencing transitions, an observation-only result inbox,
+  reconciliation helpers, and atomic AnalysisFrame/Evidence admission.
+- A durable-worker-to-domain adapter and capability registry/dispatcher under
+  `src/agents/executor/`. Its only durable output is the canonical observation-only
+  `DataExplorerResult`. The Hypothesis Analyst has an isolated PydanticAI protected-evaluation
+  boundary and durable fenced proposal/failure control. Exact proposal governance, atomic
+  Discovery admission, active retrieval exclusion, and atomic validity propagation are
+  implemented for the local SQLite boundary.
+- A fail-closed composition root under `src/application/runtime.py` that loads
+  an explicit `COGNIEDA_RUNTIME_FACTORY=module:factory` deployment hook.
 
 Not implemented yet:
 
 - Executable DVC integration.
-- Runnable default executor graphs and an end-to-end analytical product loop.
-- Graph/vector retrieval and production prompt assembly; current type safety is a pure policy plus local `SessionFrame` projection.
+- A concrete Data Explorer adapter, production worker process, and general end-to-end product loop.
+- Graph/vector retrieval and general production context assembly; protected Hypothesis evaluation
+  now uses a canonical repository-built bundle, while broader context support remains a pure
+  policy, local `SessionFrame` projection, and bounded SQL-backed Discovery retrieval.
 - Evidence-cache persistence and reuse.
-- A production CLI, service API, or worker bootstrap.
+- A deployment-supplied authentication resolver, Analyst model provider, Data Explorer factory,
+  service API, worker process, or product CLI. CogniEDA exposes no supported CLI product surface at Gate 0.
+- A working checked-in MCP/tool configuration for model-backed agents; the current agent config
+  names MCP servers that are not defined in `config/mcp.toml`.
 
 
 ## Target Architecture Summary
@@ -82,7 +97,7 @@ uv run mypy src
 ```text
 src/
   agents/        LangGraph agent scaffolds and planner/executor contracts
-  application/   durable execution-attempt orchestration and scientific finalization
+  application/   composition root, execution orchestration, and governed admissions
   data/          Dataset loaders, DVC boundary, validation, and baseline profiling
   db/            SQLModel tables, engine setup, and init helper
   memory/        SessionFrame and context builders
@@ -104,6 +119,9 @@ Start here:
 - [Architecture Overview](docs/architecture/overview.md)
 - [First-Class Objects](docs/architecture/first-class-objects.md)
 - [Implementation Gap Analysis](docs/architecture/implementation-gap-analysis.md)
+- [Agent Responsibility Boundaries](docs/architecture/agent-responsibility-boundaries.md)
+- [Canonical Investigation Workflow](docs/architecture/canonical-investigation-workflow.md)
+- [Scientific Specialist Contracts](docs/architecture/scientific-specialist-contracts.md)
 - [User Research Workflow](docs/workflows/user-research-workflow.md)
 - [Development Setup](docs/development/setup.md)
 - [Testing](docs/development/testing.md)

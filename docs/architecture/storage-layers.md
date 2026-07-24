@@ -20,7 +20,8 @@ The current implementation uses:
 - a local SQLModel store, defaulting to `.local/cognieda_graph.sqlite3`
 - Git-tracked DataProfile mirror templates under `artifacts/data_profiles/`
 - no graph database implementation
-- two targeted SQLite migrations for the execution-attempt protocol and Task motivation; no general migration framework
+- targeted, idempotent SQLite upgrades for pre-repair execution-attempt state, Objective lifecycle,
+  Task motivation, and Task review; no general migration framework
 - typed provenance/workflow records for `UserDecision`, `AnalysisFrame`, `ExecutionRun`, execution outbox/inbox/approval, and `PlannerOperation`
 - no target evidence cache
 
