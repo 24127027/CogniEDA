@@ -19,7 +19,8 @@ from schemas.common import (
     ScalarParameterValue,
     ValidityBasis,
 )
-from schemas.data_explorer_contracts import (
+from schemas.enums import AnalysisIntent, DatasetSourceType, DiscoveryEpistemicStatus, EvidenceType
+from schemas.execution.data_explorer import (
     DataExplorerFailureReason,
     DataExplorerFailureResult,
     DataExplorerResult,
@@ -28,7 +29,6 @@ from schemas.data_explorer_contracts import (
     TechnicalDiagnostic,
     TechnicalRetryDisposition,
 )
-from schemas.enums import AnalysisIntent, DatasetSourceType, DiscoveryEpistemicStatus, EvidenceType
 
 __all__ = [
     "ActiveStateProof",

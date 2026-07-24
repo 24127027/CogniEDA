@@ -29,15 +29,15 @@ ExecutionOutbox(pending)
 
 | Contract/component | Owner | Role |
 | --- | --- | --- |
-| `PreparedExecution` plus run/outbox records | `application.orchestrator` | Durable transport and immutable attempt identity |
+| `PreparedExecution` plus run/outbox records | `application.execution` / `schemas.execution` | Durable transport and immutable attempt identity |
 | `DataExplorerInput` | `agents.executor` | Non-persisted scientific request with Task, Hypothesis, DataProfile and ExecutionRun UUIDs |
 | `DataExplorerExecutionContext` | Worker process | Non-persisted operational dependency seam; currently empty |
 | `DataExplorerAdapterProtocol` | `agents.executor` | Narrow role-specific invocation surface returning `DataExplorerResult` |
 | `DataExplorerRegistry` | `agents.executor` | One explicit executor id/factory per runtime; exact lookup, lazy construction and adapter validation only |
 | `DataExplorerAdapter` | `agents.executor` | Data Explorer-specific LangGraph validation adapter |
 | `DataExplorerDispatcher` | `agents.executor` | Translate a validated prepared contract, invoke one Data Explorer adapter, and validate its actual return value as `DataExplorerResult` |
-| `DataExplorerResult` | `schemas.data_explorer_contracts` | Canonical observation-only executor and durable receipt type |
-| `finalize_attempt()` | `application.orchestrator.finalizer` | Historical function name for restart-safe, fenced Evidence admission only |
+| `DataExplorerResult` | `schemas.execution.data_explorer` | Canonical observation-only executor and durable receipt type |
+| `finalize_attempt()` | `application.execution.recovery` | Restart-safe, fenced Evidence admission recovery coordinator |
 
 `DataExplorerInput` contains the application-bound `execution_run_id`, `task_id`, `hypothesis_id`, and
 `data_profile_id`, plus the dataset path, admitted hypothesis and execution specification, and

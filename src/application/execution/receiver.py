@@ -8,9 +8,9 @@ from uuid import UUID
 from pydantic import TypeAdapter
 from sqlmodel import Session
 
-from application.orchestrator.execution_contracts import ExecutionReceiptEnvelope
-from application.orchestrator.execution_identity import result_payload_digest
+from application.evidence.identity import result_payload_digest
 from db.models import ExecutionInboxRecord
+from schemas.execution.contracts import ExecutionReceiptEnvelope
 
 
 def submit_execution_result(
@@ -35,7 +35,7 @@ def submit_execution_result(
     payload = _canonical_result_payload(result, executor_status=executor_status)
     digest = result_payload_digest(payload)
 
-    from application.orchestrator.transition_service import ExecutionAttemptTransitionService
+    from application.execution.transition_service import ExecutionAttemptTransitionService
 
     transition_service = ExecutionAttemptTransitionService(session)
 

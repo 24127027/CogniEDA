@@ -8,8 +8,8 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlmodel import Session
 
-from application.orchestrator.finalizer import finalize_attempt
-from application.orchestrator.transition_service import (
+from application.execution.recovery.evidence_admission_recovery import finalize_attempt
+from application.execution.transition_service import (
     AlreadyFinalizingError,
     ClaimLostError,
     ExecutionAttemptTransitionService,

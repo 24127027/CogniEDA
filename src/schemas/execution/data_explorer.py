@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 from pydantic import Field, NonNegativeInt
 
 from schemas.common import CogniEDABaseModel, ImmutableCogniEDABaseModel, NonEmptyStr
-from schemas.execution_observations import AnalysisFrameObservation, EvidenceObservation
+from schemas.execution.observations import AnalysisFrameObservation, EvidenceObservation
 
 
 class TechnicalDiagnostic(ImmutableCogniEDABaseModel):

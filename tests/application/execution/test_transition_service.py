@@ -7,17 +7,17 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from application.orchestrator.execution_identity import result_payload_digest
-from application.orchestrator.transition_service import ExecutionAttemptTransitionService
+from application.evidence.identity import result_payload_digest
+from application.execution.transition_service import ExecutionAttemptTransitionService
 from db.models import (
     ExecutionInboxRecord,
     ExecutionOutboxRecord,
     ExecutionRunRecord,
 )
 from schemas.common import EvidenceResultSummary
-from schemas.data_explorer_contracts import DataExplorerSuccessResult
 from schemas.enums import EvidenceType, ExecutionRunStatus
-from schemas.execution_observations import AnalysisFrameObservation, EvidenceObservation
+from schemas.execution.data_explorer import DataExplorerSuccessResult
+from schemas.execution.observations import AnalysisFrameObservation, EvidenceObservation
 
 
 @pytest.fixture
@@ -446,8 +446,8 @@ def test_authorize_new_attempt_reuses_hypothesis_and_idempotent(memory_session: 
     )
     memory_session.commit()
 
-    from application.orchestrator.execution_contracts import PreparedExecution
-    from application.orchestrator.execution_identity import method_parameter_hash
+    from application.evidence.identity import method_parameter_hash
+    from schemas.execution.contracts import PreparedExecution
 
     prepared_payload = PreparedExecution(
         task_ref=str(hyp.task_id),

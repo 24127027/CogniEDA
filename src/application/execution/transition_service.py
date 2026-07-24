@@ -11,7 +11,7 @@ from sqlalchemy import func, or_, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from application.orchestrator.execution_identity import result_payload_digest
+from application.evidence.identity import result_payload_digest
 from db.models import (
     ExecutionInboxRecord,
     ExecutionOutboxRecord,
@@ -19,13 +19,13 @@ from db.models import (
     HypothesisRecord,
     TaskRecord,
 )
-from schemas.data_explorer_contracts import DataExplorerResult
 from schemas.enums import (
     ExecutionRunStatus,
     HypothesisStatus,
     TaskLifecycleState,
     ValiditySourceState,
 )
+from schemas.execution.data_explorer import DataExplorerResult
 
 
 class ExecutionTransitionError(ValueError):
@@ -814,8 +814,8 @@ class ExecutionAttemptTransitionService:
         ):
             return None
 
-        from application.orchestrator.execution_contracts import PreparedExecution
-        from application.orchestrator.execution_identity import method_parameter_hash
+        from application.evidence.identity import method_parameter_hash
+        from schemas.execution.contracts import PreparedExecution
 
         try:
             prepared = PreparedExecution.model_validate(old_outbox.prepared_payload)

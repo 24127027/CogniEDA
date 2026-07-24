@@ -17,15 +17,14 @@ from agents.planner.types import (
     EvidenceObservation,
     PreparedExecution,
 )
-from application.orchestrator.cancellation import cancel_execution_attempt
-from application.orchestrator.execution_contracts import ExecutionReceiptEnvelope
-from application.orchestrator.execution_identity import (
+from application.evidence.identity import (
     method_parameter_hash,
     result_payload_digest,
 )
-from application.orchestrator.finalizer import finalize_attempt
-from application.orchestrator.receiver import submit_execution_result
-from application.orchestrator.transition_service import (
+from application.execution.cancellation import cancel_execution_attempt
+from application.execution.receiver import submit_execution_result
+from application.execution.recovery import finalize_attempt
+from application.execution.transition_service import (
     AlreadyCompletedError,
     AlreadyFinalizingError,
     ClaimLostError,
@@ -56,6 +55,7 @@ from schemas.enums import (
     TaskKind,
     TaskLifecycleState,
 )
+from schemas.execution.contracts import ExecutionReceiptEnvelope
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,7 @@ def _setup_attempt_for_finalization(
         contract_fingerprint="fingerprint-123",
     )
 
-    from schemas.data_explorer_contracts import DataExplorerSuccessResult
+    from schemas.execution.data_explorer import DataExplorerSuccessResult
 
     dx_result = DataExplorerSuccessResult(
         status="success",

@@ -8,7 +8,7 @@ from uuid import UUID
 
 from sqlmodel import Session
 
-from application.orchestrator.transition_service import (
+from application.execution.transition_service import (
     AlreadyCompletedError,
     AlreadyFinalizingError,
     ExecutionAttemptTransitionService,

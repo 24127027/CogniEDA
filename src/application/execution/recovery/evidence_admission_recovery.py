@@ -1,4 +1,4 @@
-"""Restart-safe Evidence admission from durable attempt state only."""
+"""Restart-safe Evidence admission recovery coordinator from durable attempt state only."""
 
 from __future__ import annotations
 
@@ -10,13 +10,12 @@ from uuid import UUID
 from pydantic import TypeAdapter
 from sqlmodel import Session, select
 
-from application.orchestrator.evidence_admission import (
+from application.evidence.admission_plan import (
     EvidenceAdmissionConflictError,
-    execute_evidence_admission_plan,
     validate_and_build_evidence_admission_plan,
 )
-from application.orchestrator.execution_contracts import ExecutionReceiptEnvelope, PreparedExecution
-from application.orchestrator.transition_service import (
+from application.evidence.admission_service import execute_evidence_admission_plan
+from application.execution.transition_service import (
     AlreadyCompletedError,
     AlreadyFinalizingError,
     ClaimLostError,
@@ -31,6 +30,7 @@ from db.models import (
     TaskRecord,
 )
 from schemas.enums import ExecutionRunStatus
+from schemas.execution.contracts import ExecutionReceiptEnvelope, PreparedExecution
 
 
 def finalize_attempt(

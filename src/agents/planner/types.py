@@ -12,7 +12,6 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_ai.messages import ModelMessage
 
-from application.orchestrator import execution_contracts
 from schemas.artifacts import AnalyticalSpecification, Assumption
 from schemas.common import EvaluationThresholds, MethodParameter
 from schemas.enums import (
@@ -24,10 +23,11 @@ from schemas.enums import (
     TaskKind,
     TaskLifecycleState,
 )
-from schemas.execution_observations import (
+from schemas.execution import contracts as execution_contracts
+from schemas.execution.observations import (
     AnalysisFrameObservation as AnalysisFrameObservation,
 )
-from schemas.execution_observations import (
+from schemas.execution.observations import (
     EvidenceObservation as EvidenceObservation,
 )
 from schemas.planner_operations import (

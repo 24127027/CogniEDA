@@ -10,10 +10,9 @@ from typing import Protocol
 from sqlmodel import Session
 
 from agents.executor.types import DataExplorerExecutionContext
-from application.orchestrator.execution_contracts import PreparedExecution
-from application.orchestrator.execution_identity import method_parameter_hash
-from application.orchestrator.receiver import submit_execution_result
-from application.orchestrator.transition_service import ExecutionAttemptTransitionService
+from application.evidence.identity import method_parameter_hash
+from application.execution.receiver import submit_execution_result
+from application.execution.transition_service import ExecutionAttemptTransitionService
 from db.models import (
     DataProfileRecord,
     ExecutionOutboxRecord,
@@ -21,7 +20,8 @@ from db.models import (
     HypothesisRecord,
 )
 from repositories.execution_outbox_repository import ExecutionOutboxRepository
-from schemas.data_explorer_contracts import (
+from schemas.execution.contracts import PreparedExecution
+from schemas.execution.data_explorer import (
     DataExplorerFailureReason,
     DataExplorerFailureResult,
     DataExplorerResult,

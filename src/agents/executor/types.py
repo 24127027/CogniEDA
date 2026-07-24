@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from application.orchestrator.execution_contracts import ExecutionSpecification, HypothesisDraft
+from schemas.execution.contracts import ExecutionSpecification, HypothesisDraft
 
 
 class DataExplorerInput(BaseModel):

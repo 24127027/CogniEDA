@@ -32,13 +32,12 @@ from agents.planner.types import (
     State,
     TaskCreateDraft,
 )
-from application.orchestrator import reconciler as reconciliation_module
-from application.orchestrator.cancellation import authorize_retry
-from application.orchestrator.dispatcher import dispatch_pending_attempts
-from application.orchestrator.execution_contracts import ExecutionReceiptEnvelope
-from application.orchestrator.finalizer import finalize_attempt
+from application.execution import recovery as reconciliation_module
+from application.execution.cancellation import authorize_retry
+from application.execution.dispatch import dispatch_pending_attempts
+from application.execution.receiver import submit_execution_result
+from application.execution.recovery import finalize_attempt
 from application.orchestrator.planner_commit import commit_planner_operations
-from application.orchestrator.receiver import submit_execution_result
 from db.models import ExecutionOutboxRecord
 from db.session import get_session
 from repositories import (
@@ -70,7 +69,6 @@ from schemas.common import (
     MethodParameter,
     SchemaSummary,
 )
-from schemas.data_explorer_contracts import DataExplorerResult
 from schemas.enums import (
     DataProfileLifecycleState,
     DataProfileMethod,
@@ -84,6 +82,8 @@ from schemas.enums import (
     TaskKind,
     TaskLifecycleState,
 )
+from schemas.execution.contracts import ExecutionReceiptEnvelope
+from schemas.execution.data_explorer import DataExplorerResult
 from schemas.planner_operations import PlannerOperation
 from schemas.provenance import AnalysisFrame
 
@@ -1025,7 +1025,7 @@ def test_retry_reuses_contract_and_canonical_adapter_with_new_attempt(db_session
     assert predecessor is not None
     assert predecessor.dispatch_idempotency_key is not None
     assert predecessor.method_id is not None
-    from schemas.data_explorer_contracts import (
+    from schemas.execution.data_explorer import (
         DataExplorerFailureReason,
         DataExplorerFailureResult,
     )

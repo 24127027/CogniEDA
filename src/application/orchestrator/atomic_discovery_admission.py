@@ -12,6 +12,9 @@ from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
+from application.execution.transition_service import (
+    ExecutionAttemptTransitionService,
+)
 from application.orchestrator.discovery_admission_governance import (
     DiscoveryAdmissionGovernanceService,
     compute_decision_fingerprint,
@@ -22,9 +25,6 @@ from application.orchestrator.synthesis_bundle import (
     build_synthesis_bundle,
     compute_evaluation_key,
     compute_evidence_set_digest,
-)
-from application.orchestrator.transition_service import (
-    ExecutionAttemptTransitionService,
 )
 from db.models import (
     AnalysisFrameRecord,

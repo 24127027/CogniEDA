@@ -7,15 +7,15 @@ from uuid import uuid4
 
 from sqlalchemy import inspect, text
 
-from application.orchestrator.execution_identity import result_payload_digest
-from application.orchestrator.transition_service import ExecutionAttemptTransitionService
+from application.evidence.identity import result_payload_digest
+from application.execution.transition_service import ExecutionAttemptTransitionService
 from db.init_db import init_db
 from db.models import DataProfileRecord, ExecutionRunRecord, HypothesisRecord, TaskRecord
 from db.session import create_db_engine, get_session
 from schemas.common import EvidenceResultSummary
-from schemas.data_explorer_contracts import DataExplorerSuccessResult
 from schemas.enums import EvidenceType, ExecutionRunStatus
-from schemas.execution_observations import AnalysisFrameObservation, EvidenceObservation
+from schemas.execution.data_explorer import DataExplorerSuccessResult
+from schemas.execution.observations import AnalysisFrameObservation, EvidenceObservation
 
 
 def _observation_payload() -> dict:
@@ -34,7 +34,7 @@ def test_lease_claim_and_renewal_fence_stale_owners(db_session) -> None:
 
     from uuid import uuid4
 
-    from application.orchestrator.transition_service import ExecutionAttemptTransitionService
+    from application.execution.transition_service import ExecutionAttemptTransitionService
 
     first_svc = ExecutionAttemptTransitionService(db_session)
     run_id = uuid4()

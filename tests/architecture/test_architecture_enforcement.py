@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 SOURCE_ROOT = Path("src")
-TRANSITION_OWNER = "src/application/orchestrator/transition_service.py"
+TRANSITION_OWNER = "src/application/execution/transition_service.py"
 VALIDITY_OWNER = "src/application/orchestrator/validity_propagation_service.py"
 MODEL_DEFINITION = "src/db/models.py"
 EXECUTION_RECORDS = {
@@ -62,7 +62,11 @@ MIGRATION_OWNER = "src/db/legacy_migration.py"
 
 def _violations(source: str, path: str) -> list[str]:
     """Return forbidden execution-record writes outside the transition owner."""
-    if path in {TRANSITION_OWNER, VALIDITY_OWNER, MODEL_DEFINITION, MIGRATION_OWNER}:
+    allowed = {
+        Path(p).as_posix()
+        for p in (TRANSITION_OWNER, VALIDITY_OWNER, MODEL_DEFINITION, MIGRATION_OWNER)
+    }
+    if Path(path).as_posix() in allowed:
         return []
 
     tree = ast.parse(source)
@@ -365,3 +369,95 @@ def test_package_s1a_specialists_have_no_compatibility_executor_surface() -> Non
     package_source = Path("src/agents/executor/__init__.py").read_text(encoding="utf-8")
     assert "graph_miner" not in package_source
     assert "hypothesis_analyst" not in package_source
+
+
+def test_package_s1b_execution_and_evidence_modules_moved_out_of_orchestrator() -> None:
+    """Old execution/Evidence files must not exist in application.orchestrator."""
+
+    forbidden_old_files = [
+        "src/application/orchestrator/cancellation.py",
+        "src/application/orchestrator/dispatcher.py",
+        "src/application/orchestrator/execution_admission.py",
+        "src/application/orchestrator/execution_contracts.py",
+        "src/application/orchestrator/execution_identity.py",
+        "src/application/orchestrator/finalizer.py",
+        "src/application/orchestrator/receiver.py",
+        "src/application/orchestrator/reconciler.py",
+        "src/application/orchestrator/transition_service.py",
+        "src/application/orchestrator/evidence_admission.py",
+        "src/schemas/execution_observations.py",
+        "src/schemas/data_explorer_contracts.py",
+    ]
+    present = [path for path in forbidden_old_files if Path(path).exists()]
+    assert not present, f"Moved S1-B modules still exist in old paths: {present}"
+
+
+def test_package_s1b_schemas_do_not_import_application() -> None:
+    """Schemas must be self-contained value objects and not depend on application layer."""
+
+    schemas_dir = Path("src/schemas")
+    violations: list[str] = []
+    for path in schemas_dir.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module
+                and node.module.startswith("application")
+            ):
+                violations.append(f"{path.as_posix()}: imports from {node.module}")
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.startswith("application"):
+                        violations.append(f"{path.as_posix()}: imports {alias.name}")
+
+    assert not violations, f"Schemas import application layer: {violations}"
+
+
+def test_package_s1b_repositories_do_not_import_application() -> None:
+    """Repositories must not import application layer logic or services."""
+
+    repos_dir = Path("src/repositories")
+    violations: list[str] = []
+    for path in repos_dir.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module
+                and node.module.startswith("application")
+            ):
+                violations.append(f"{path.as_posix()}: imports from {node.module}")
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.startswith("application"):
+                        violations.append(f"{path.as_posix()}: imports {alias.name}")
+
+    assert not violations, f"Repositories import application layer: {violations}"
+
+
+def test_package_s1b_no_old_orchestrator_import_paths_remain() -> None:
+    """Active production code and tests must not import deleted old orchestrator paths."""
+
+    forbidden_imports = [
+        "application.orchestrator.cancellation",
+        "application.orchestrator.dispatcher",
+        "application.orchestrator.execution_admission",
+        "application.orchestrator.execution_contracts",
+        "application.orchestrator.execution_identity",
+        "application.orchestrator.finalizer",
+        "application.orchestrator.receiver",
+        "application.orchestrator.reconciler",
+        "application.orchestrator.transition_service",
+        "application.orchestrator.evidence_admission",
+        "schemas.execution_observations",
+        "schemas.data_explorer_contracts",
+    ]
+    violations: list[str] = []
+    for path in Path("src").rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        for forbidden in forbidden_imports:
+            if f"import {forbidden}" in source or f"from {forbidden}" in source:
+                violations.append(f"{path.as_posix()}: {forbidden}")
+
+    assert not violations, f"Old import paths found in src: {violations}"

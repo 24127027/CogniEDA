@@ -6,8 +6,7 @@ from uuid import UUID
 
 from sqlmodel import Session, select
 
-from application.orchestrator.execution_contracts import PreparedExecution
-from application.orchestrator.execution_identity import method_parameter_hash
+from application.evidence.identity import method_parameter_hash
 from db.models import DiscoveryRecord
 from repositories.analysis_frame_repository import AnalysisFrameRepository
 from repositories.data_profile_repository import DataProfileRepository
@@ -27,6 +26,7 @@ from schemas.enums import (
     TaskLifecycleState,
     ValiditySourceState,
 )
+from schemas.execution.contracts import PreparedExecution
 from schemas.specialist_contracts import (
     SUPPORTED_EVALUATION_CONTRACT_VERSION,
     ActiveStateProof,
@@ -380,7 +380,7 @@ def _build_evidence_lineage(
 
 
 def _execution_specification(specification: AnalyticalSpecification) -> object:
-    from application.orchestrator.execution_contracts import ExecutionSpecification
+    from schemas.execution.contracts import ExecutionSpecification
 
     return ExecutionSpecification(
         claim_type=specification.claim_type,

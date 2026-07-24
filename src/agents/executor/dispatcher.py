@@ -4,8 +4,8 @@ from uuid import UUID
 
 from pydantic import TypeAdapter
 
-from application.orchestrator.execution_contracts import PreparedExecution
-from schemas.data_explorer_contracts import DataExplorerResult
+from schemas.execution.contracts import PreparedExecution
+from schemas.execution.data_explorer import DataExplorerResult
 
 from .registry import DataExplorerRegistry
 from .types import DataExplorerExecutionContext, DataExplorerInput

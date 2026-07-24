@@ -4,14 +4,14 @@ import threading
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from application.orchestrator.execution_identity import result_payload_digest
-from application.orchestrator.transition_service import ExecutionAttemptTransitionService
+from application.evidence.identity import result_payload_digest
+from application.execution.transition_service import ExecutionAttemptTransitionService
 from db.models import DataProfileRecord, ExecutionRunRecord, HypothesisRecord, TaskRecord
 from db.session import get_session
 from schemas.common import EvidenceResultSummary
-from schemas.data_explorer_contracts import DataExplorerSuccessResult
 from schemas.enums import EvidenceType
-from schemas.execution_observations import AnalysisFrameObservation, EvidenceObservation
+from schemas.execution.data_explorer import DataExplorerSuccessResult
+from schemas.execution.observations import AnalysisFrameObservation, EvidenceObservation
 
 
 def _observation_payload() -> dict:

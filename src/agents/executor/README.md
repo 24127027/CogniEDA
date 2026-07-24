@@ -23,7 +23,7 @@ context = DataExplorerExecutionContext()
 result = await DataExplorerDispatcher(data_explorer_registry).dispatch(prepared, context)
 ```
 
-`prepared` must already contain canonical Task/Hypothesis/DataProfile UUID strings, an `execution_run_id`, dispatch key and lease epoch. `application.orchestrator.dispatcher` reconstructs those values from the persisted run/outbox/FCO records. Calling the adapter with transient Planner handles fails before registry resolution.
+`prepared` must already contain canonical Task/Hypothesis/DataProfile UUID strings, an `execution_run_id`, dispatch key and lease epoch. `application.execution.dispatch` reconstructs those values from the persisted run/outbox/FCO records. Calling the adapter with transient Planner handles fails before registry resolution.
 
 ## Registration is not runnability
 
@@ -40,7 +40,7 @@ Miner and Hypothesis Analyst have no registry entry or package-level executor al
 
 ## Boundary rules
 
-- Durable transport and attempt fencing stay in `application.orchestrator`.
+- Durable transport and attempt fencing stay in `application.execution`.
 - The registry never changes run/outbox/inbox state.
 - The dispatcher performs one durable-to-domain conversion.
 - Domain input excludes Assumptions, Task motivation, retrieval data, SessionFrame, raw chat, Planner state, repositories and SQL sessions.
@@ -57,7 +57,7 @@ replaced by role-specific `DataExplorer*` symbols. `DataExplorerExecutor`,
 registration, cross-specialist capability-selection helpers, `ExecutionRequest`, `ExecutorOutput`,
 the duplicate capability-layer `ExecutionResult`, legacy `ExecutorResult`, and compatibility
 bridges were removed. The canonical output type is
-`schemas.data_explorer_contracts.DataExplorerResult`.
+`schemas.execution.data_explorer.DataExplorerResult`.
 
 ## Not yet implemented
 

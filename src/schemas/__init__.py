@@ -60,7 +60,16 @@ _EXPORT_MODULES = {
             "TechnicalDiagnostic",
             "TechnicalRetryDisposition",
         ),
-        "schemas.data_explorer_contracts",
+        "schemas.execution.data_explorer",
+    ),
+    **dict.fromkeys(
+        (
+            "ExecutionReceiptEnvelope",
+            "ExecutionSpecification",
+            "HypothesisDraft",
+            "PreparedExecution",
+        ),
+        "schemas.execution.contracts",
     ),
     **dict.fromkeys(
         (
@@ -114,7 +123,7 @@ _EXPORT_MODULES = {
     ),
     **dict.fromkeys(
         ("AnalysisFrameObservation", "EvidenceObservation"),
-        "schemas.execution_observations",
+        "schemas.execution.observations",
     ),
     **dict.fromkeys(
         ("PlannerCommitResult", "PlannerOperation"),

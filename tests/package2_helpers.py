@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 
 from sqlmodel import Session
 
+from application.evidence.identity import method_parameter_hash
 from application.orchestrator.discovery_admission_governance import (
     ALLOWED_TRUSTED_OPERATION_TYPES,
     ALLOWED_TRUSTED_PURPOSES,
@@ -15,12 +16,6 @@ from application.orchestrator.discovery_admission_governance import (
     USER_GOVERNED_PURPOSE,
     compute_governance_authority_fingerprint,
 )
-from application.orchestrator.execution_contracts import (
-    ExecutionSpecification,
-    HypothesisDraft,
-    PreparedExecution,
-)
-from application.orchestrator.execution_identity import method_parameter_hash
 from application.orchestrator.validity_propagation_service import (
     AtomicValidityPropagationService,
     validity_authority_scope,
@@ -61,6 +56,11 @@ from schemas.enums import (
     TaskLifecycleState,
     ValidityEventType,
     ValiditySourceType,
+)
+from schemas.execution.contracts import (
+    ExecutionSpecification,
+    HypothesisDraft,
+    PreparedExecution,
 )
 from schemas.provenance import AnalysisFrame
 from schemas.specialist_contracts import DiscoveryProposal, DiscoverySynthesisBundle

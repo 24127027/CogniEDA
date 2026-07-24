@@ -17,12 +17,12 @@ from agents.executor import (
 from agents.executor.graph_miner.agent import GraphMiner
 from agents.executor.hypothesis_analyst.agent import HypothesisAnalyst
 from agents.planner.types import PlannerOutput
-from application.orchestrator.execution_contracts import (
+from schemas.common import EvaluationThresholds
+from schemas.execution.contracts import (
     ExecutionSpecification,
     HypothesisDraft,
     PreparedExecution,
 )
-from schemas.common import EvaluationThresholds
 from schemas.specialist_contracts import (
     DataExplorerFailureReason,
     DataExplorerFailureResult,

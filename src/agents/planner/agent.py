@@ -38,7 +38,7 @@ class Planner:
 
         context = self.prepare_context(session_frame)
         if context.database_url:
-            from application.orchestrator.reconciler import reconcile_execution_attempts
+            from application.execution.recovery import reconcile_execution_attempts
             from db.session import get_session
 
             session = get_session(context.database_url)

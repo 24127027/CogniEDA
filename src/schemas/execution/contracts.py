@@ -9,11 +9,11 @@ from uuid import UUID
 from pydantic import Field
 
 from schemas.common import CogniEDABaseModel, EvaluationThresholds, MethodParameter
-from schemas.data_explorer_contracts import DataExplorerResult
-from schemas.execution_observations import (
+from schemas.execution.data_explorer import DataExplorerResult
+from schemas.execution.observations import (
     AnalysisFrameObservation as AnalysisFrameObservation,
 )
-from schemas.execution_observations import (
+from schemas.execution.observations import (
     EvidenceObservation as EvidenceObservation,
 )
 

@@ -7,7 +7,7 @@ from uuid import UUID
 
 from sqlmodel import Session, asc, select
 
-from application.orchestrator.transition_service import ExecutionAttemptTransitionService
+from application.execution.transition_service import ExecutionAttemptTransitionService
 from db.models import (
     AssumptionRecord,
     DataProfileRecord,

@@ -4,7 +4,7 @@ from typing import Any, Protocol, runtime_checkable
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import TypeAdapter
 
-from schemas.data_explorer_contracts import DataExplorerResult
+from schemas.execution.data_explorer import DataExplorerResult
 
 from .types import DataExplorerExecutionContext, DataExplorerInput
 

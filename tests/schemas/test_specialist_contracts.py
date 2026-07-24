@@ -5,12 +5,6 @@ from uuid import uuid4
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from application.orchestrator.execution_contracts import (
-    AnalysisFrameObservation as ReceiptAnalysisFrameObservation,
-)
-from application.orchestrator.execution_contracts import (
-    EvidenceObservation as ReceiptEvidenceObservation,
-)
 from schemas.common import (
     DiscoveryClaim,
     EvaluationThresholds,
@@ -24,7 +18,13 @@ from schemas.enums import (
     DiscoveryEpistemicStatus,
     EvidenceType,
 )
-from schemas.execution_observations import AnalysisFrameObservation, EvidenceObservation
+from schemas.execution.contracts import (
+    AnalysisFrameObservation as ReceiptAnalysisFrameObservation,
+)
+from schemas.execution.contracts import (
+    EvidenceObservation as ReceiptEvidenceObservation,
+)
+from schemas.execution.observations import AnalysisFrameObservation, EvidenceObservation
 from schemas.specialist_contracts import (
     AdmittedEvidenceSnapshot,
     AnalysisFrameEvaluationSnapshot,
@@ -493,8 +493,8 @@ class TestHypothesisAnalystResults:
 
 class TestDependencyAndOwnershipBoundaries:
     def test_observations_have_one_schema_owner_and_legacy_import_is_a_reexport(self) -> None:
-        assert AnalysisFrameObservation.__module__ == "schemas.execution_observations"
-        assert EvidenceObservation.__module__ == "schemas.execution_observations"
+        assert AnalysisFrameObservation.__module__ == "schemas.execution.observations"
+        assert EvidenceObservation.__module__ == "schemas.execution.observations"
         assert ReceiptAnalysisFrameObservation is AnalysisFrameObservation
         assert ReceiptEvidenceObservation is EvidenceObservation
 
@@ -533,7 +533,7 @@ class TestDependencyAndOwnershipBoundaries:
 
 class TestObservationReceiptEnvelope:
     def test_success_result_maps_to_observation_receipt_envelope(self) -> None:
-        from application.orchestrator.execution_contracts import (
+        from schemas.execution.contracts import (
             ExecutionReceiptEnvelope,
         )
         from schemas.specialist_contracts import DataExplorerSuccessResult

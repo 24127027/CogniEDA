@@ -16,6 +16,8 @@ from agents.executor.hypothesis_analyst.nodes import build_hypothesis_analyst_ag
 from agents.executor.registry import DataExplorerFactory, DataExplorerRegistry
 from agents.executor.types import DataExplorerExecutionContext
 from agents.planner.agent import Planner
+from application.execution.dispatch import dispatch_pending_attempts
+from application.execution.recovery import reconcile_execution_attempts
 from application.orchestrator.discovery_admission_coordinator import (
     DiscoveryAdmissionCoordinator,
 )
@@ -24,12 +26,10 @@ from application.orchestrator.discovery_admission_governance import (
     DiscoveryAdmissionGovernanceService,
     GovernanceAuthorityIssuer,
 )
-from application.orchestrator.dispatcher import dispatch_pending_attempts
 from application.orchestrator.evaluator_runner import (
     enqueue_ready_evaluations,
     run_evaluation_attempt,
 )
-from application.orchestrator.reconciler import reconcile_execution_attempts
 from application.orchestrator.validity_propagation_service import (
     AtomicValidityPropagationService,
 )

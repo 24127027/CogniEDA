@@ -11,7 +11,7 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 from sqlmodel import select
 
-from application.orchestrator.evidence_admission import (
+from application.evidence import (
     ANALYSIS_FRAME_ORDINAL,
     CONTRACT_VERSION,
     EVIDENCE_ADMISSION_NAMESPACE,
@@ -20,24 +20,16 @@ from application.orchestrator.evidence_admission import (
     RESOLVED_POST_ADMISSION_STATUS,
     EvidenceAdmissionPlan,
     EvidenceAdmissionReplayDisposition,
+    canonical_sha256,
     classify_evidence_admission_replay,
     compute_analysis_frame_fingerprint,
     compute_evidence_fingerprint,
     execute_evidence_admission_plan,
     generate_deterministic_analysis_frame_id,
     generate_deterministic_evidence_id,
-    validate_and_build_evidence_admission_plan,
-)
-from application.orchestrator.execution_contracts import (
-    ExecutionReceiptEnvelope,
-    ExecutionSpecification,
-    HypothesisDraft,
-    PreparedExecution,
-)
-from application.orchestrator.execution_identity import (
-    canonical_sha256,
     method_parameter_hash,
     result_payload_digest,
+    validate_and_build_evidence_admission_plan,
 )
 from db.models import (
     AnalysisFrameRecord,
@@ -52,17 +44,23 @@ from db.models import (
     TaskRecord,
 )
 from schemas.common import EvaluationThresholds, EvidenceResultSummary, MethodParameter
-from schemas.data_explorer_contracts import (
-    DataExplorerFailureReason,
-    DataExplorerFailureResult,
-    DataExplorerSuccessResult,
-)
 from schemas.enums import (
     EvidenceType,
     ExecutionRunStatus,
     HypothesisStatus,
 )
-from schemas.execution_observations import AnalysisFrameObservation, EvidenceObservation
+from schemas.execution.contracts import (
+    ExecutionReceiptEnvelope,
+    ExecutionSpecification,
+    HypothesisDraft,
+    PreparedExecution,
+)
+from schemas.execution.data_explorer import (
+    DataExplorerFailureReason,
+    DataExplorerFailureResult,
+    DataExplorerSuccessResult,
+)
+from schemas.execution.observations import AnalysisFrameObservation, EvidenceObservation
 
 
 def _make_prepared_and_run(
@@ -756,10 +754,11 @@ def test_active_execution_to_evidence_modules_import_no_scientific_authority() -
     source_paths = (
         root / "src" / "agents" / "executor" / "dispatcher.py",
         root / "src" / "agents" / "executor" / "executor.py",
-        root / "src" / "application" / "orchestrator" / "evidence_admission.py",
-        root / "src" / "application" / "orchestrator" / "execution_contracts.py",
-        root / "src" / "application" / "orchestrator" / "execution_identity.py",
-        root / "src" / "application" / "orchestrator" / "finalizer.py",
+        root / "src" / "application" / "evidence" / "admission_plan.py",
+        root / "src" / "application" / "evidence" / "admission_service.py",
+        root / "src" / "schemas" / "execution" / "contracts.py",
+        root / "src" / "application" / "evidence" / "identity.py",
+        root / "src" / "application" / "execution" / "recovery" / "evidence_admission_recovery.py",
     )
     forbidden_symbols = {
         "Discovery",
@@ -799,7 +798,7 @@ def test_production_finalizer_is_sole_call_site_invoking_evidence_admission() ->
     root = Path(__file__).parents[3] / "src"
     call_sites: list[Path] = []
     for path in root.rglob("*.py"):
-        if path.name == "evidence_admission.py":
+        if path.parent.name == "evidence" or path.name == "evidence_admission.py":
             continue
         text = path.read_text(encoding="utf-8")
         if (
@@ -808,7 +807,7 @@ def test_production_finalizer_is_sole_call_site_invoking_evidence_admission() ->
         ):
             call_sites.append(path)
     assert len(call_sites) == 1
-    assert call_sites[0].name == "finalizer.py"
+    assert call_sites[0].name == "evidence_admission_recovery.py"
     finalizer_text = call_sites[0].read_text(encoding="utf-8")
     assert "process_scientific_result" not in finalizer_text
     assert "DiscoveryRecord" not in finalizer_text
@@ -819,9 +818,9 @@ def test_full_path_repeated_technical_failures_succeed_and_leave_hypothesis_test
 ) -> None:
     """Verify repeated technical failure path through receipt and finalization."""
 
-    from application.orchestrator.cancellation import authorize_retry
-    from application.orchestrator.finalizer import finalize_attempt
-    from application.orchestrator.transition_service import ExecutionAttemptTransitionService
+    from application.execution.cancellation import authorize_retry
+    from application.execution.recovery import finalize_attempt
+    from application.execution.transition_service import ExecutionAttemptTransitionService
 
     prepared, run, profile_id, hypothesis_id, task_id = _make_prepared_and_run(finalizing=False)
     db_session.add(
