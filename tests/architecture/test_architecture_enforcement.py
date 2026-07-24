@@ -285,3 +285,14 @@ def test_production_has_no_test_model_or_graph_miner_registration() -> None:
         ):
             violations.append(f"{path.as_posix()}: Graph Miner registration")
     assert not violations, f"Production bootstrap bypasses: {violations}"
+
+
+def test_supported_package_has_no_cli_surface() -> None:
+    """Gate 0 must not package a command, placeholder entry point, or CLI module."""
+
+    project = Path("pyproject.toml").read_text(encoding="utf-8")
+    assert "[project.scripts]" not in project
+    assert "console_scripts" not in project
+    assert 'py-modules = ["main"]' not in project
+    assert not Path("main.py").exists()
+    assert not Path("src/cli").exists()

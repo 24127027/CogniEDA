@@ -24,9 +24,10 @@ Persistence is implemented by `SessionFrameRepository`. Construction is implemen
 
 `SessionContextBuilder` can derive non-persistent `planning`, `answer`, `conclusion`, and
 `discovery_synthesis` context bundles from repository-backed state or a persisted `SessionFrame`.
-The scientific finalizer also appends a minimal governed SessionFrame snapshot after successful
-Evidence/Discovery creation. These are guards/snapshots, separate from the bounded SQL-backed
-`DiscoveryRetrievalEngine`; neither is a new durable object type.
+Atomic Discovery admission also appends a deterministic conclusion `SessionFrame` in the same
+transaction as the Discovery and terminal lifecycle transitions. These are guards/snapshots,
+separate from the bounded SQL-backed `DiscoveryRetrievalEngine`; neither is a new durable object
+type.
 
 ## Implementation Status
 
@@ -39,7 +40,7 @@ Implemented:
 - compact frame construction from target FCOs and user-decision provenance
 - planning/answer/protected-synthesis projection with type and lifecycle filtering
 - a pure retrieval admission policy for context roles
-- minimal scientific-finalization SessionFrame append
+- atomic conclusion SessionFrame append during Discovery admission
 - stale-context, dead-end, cached-tool-result, and invalidation metadata
 - tests for repository round trips and builder behavior
 

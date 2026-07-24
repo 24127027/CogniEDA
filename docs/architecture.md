@@ -12,8 +12,15 @@ Use these pages for implementation-oriented architecture:
 
 ## Current Status
 
-The current implementation is a backend prototype with target FCO persistence, provenance/workflow records, profiling utilities, `SessionFrame` projections, approval-gated execution admission, and a durable local worker/finalization protocol. Answer/planning branches and concrete executor graphs remain scaffold-level.
+The current implementation is a backend prototype with target FCO persistence,
+provenance/workflow records, profiling utilities, `SessionFrame` projections, approval-gated
+execution admission, and a durable local SQLite path through Evidence admission, protected
+evaluation, governed Discovery admission, validity propagation, and active retrieval exclusion.
+Answer/planning branches, a concrete Data Explorer, and Graph Miner remain incomplete.
 
 The architecture defines exactly these FCOs: `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, and `SessionFrame`.
 
-The largest remaining gaps are planner capabilities beyond configured request understanding and Task-operation approval, runnable executors, full reproducibility provenance, executable DVC/cleaning, graph retrieval, cache, static-quality compliance, and production service/worker bootstrap.
+The largest remaining gaps are planner capabilities beyond configured request understanding and
+Task-operation approval, concrete Data Explorer and Graph Miner implementations, full
+reproducibility provenance, executable DVC/cleaning, graph retrieval, cache, static-quality
+compliance, and production service/worker bootstrap.

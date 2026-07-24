@@ -115,12 +115,13 @@ Scientifically required lineage IDs appear only in protected input snapshots, ad
 or `ValidityBasis`; they are not returned as a second authority by Data Explorer or Hypothesis
 Analyst.
 
-## Current Mixed `ExecutorResult` Classification
+## Removed Legacy Mixed `ExecutorResult`
 
-The mixed contract remains an application-private receiver/finalizer compatibility payload and is
-not the executor-facing runtime contract or target architecture.
+The former mixed contract is absent from active source. The table records the historical field
+split that produced the current separate specialist and application contracts; it is not a
+supported compatibility surface.
 
-| Current field | Classification | Target disposition |
+| Historical field | Classification | Current disposition |
 | --- | --- | --- |
 | `status` | Application diagnostic plus obsolete mixed discriminator | Application attempt state and separate specialist discriminators |
 | `analysis_frame` | Data Explorer observation | Canonical `AnalysisFrameObservation` reused by `DataExplorerSuccessResult` |
@@ -131,8 +132,7 @@ not the executor-facing runtime contract or target architecture.
 | `evaluation.finalize` | Obsolete scientific authority | Removed; deterministic application workflow governs admission/commit |
 | `error_message` | Application diagnostic | Typed Data Explorer failure plus application attempt diagnostics |
 
-This classification does not imply that the mixed contract should remain. No compatibility adapter
-or runtime consumer of the new contracts is added in Wave 1.1A.
+No compatibility adapter or runtime consumer retains the mixed contract.
 
 ## Current Implementation Status
 

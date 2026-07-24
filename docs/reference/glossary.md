@@ -14,7 +14,7 @@
 | `SessionFrame` | FCO for active user-governed context. | Partially implemented as append-only compact snapshots. |
 | `Workspace` | Filesystem/runtime boundary containing files and one independent graph database. | No Workspace FCO exists. |
 | `Question` | User interface input that becomes or modifies a Task. | No Question FCO exists. |
-| `AnalysisFrame` | Provenance/data-view record for exact dataframe view used in Evidence. | Minimal durable record exists and is materialized by the scientific finalizer; full reproducibility detail remains incomplete. |
+| `AnalysisFrame` | Provenance/data-view record for exact dataframe view used in Evidence. | Minimal durable record exists and is materialized by atomic Evidence admission; full reproducibility detail remains incomplete. |
 | `GeneratedView` | Runtime/provenance output such as answer or synthesis. Not Discovery. | Not a durable FCO. |
 | `PlannerOperation` | Pending mutation produced by planner nodes before commit. | Durable envelope/table/repository and local atomic commit/rollback boundary exist; handler/reachability gaps remain. |
 | `ExecutionRun` | Provenance/workflow record for one execution attempt. | Durable attempt record exists with outbox/inbox/approval, lease, fencing and recovery metadata; full reproducibility detail remains incomplete. |

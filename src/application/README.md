@@ -20,9 +20,9 @@ factory; it does not synthesize defaults.
 - atomically propagate validity events and exclude invalid state from active retrieval;
 - reconcile pending inbox items and expired leases.
 
-The checked-in CLI is limited to Discovery admission and requires an explicit deployment factory.
-There is no default authentication implementation, concrete Data Explorer, service API, event bus,
-or worker daemon. `bootstrap/` and `events/` remain target-design READMEs.
+There is no supported package CLI or checked-in admission command. There is also no default
+authentication implementation, concrete Data Explorer, service API, event bus, or worker daemon.
+`bootstrap/` and `events/` remain target-design READMEs.
 
 ## Ownership boundary
 

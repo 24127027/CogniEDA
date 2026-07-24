@@ -1,9 +1,8 @@
 # Implementation Gap Analysis
 
-> **Current implementation snapshot:** working tree reviewed 2026-07-24; repository-wide audit
-> baseline revision `ced5575`.
-> Code is the source of truth for current behavior. Detailed evidence and severity are in the
-> [Codebase Alignment Audit](../audits/codebase-alignment-audit.md).
+> **Current implementation snapshot:** Gate 0 candidate reviewed 2026-07-24.
+> Code is the source of truth for current behavior. Local verification audits under
+> `.local/audits/` are ignored working records, not clean-clone documentation authority.
 
 ## Current Implementation Versus Target
 
@@ -12,7 +11,7 @@
 | FCO ontology | Exactly Objective, DataProfile, Assumption, Task, Hypothesis, Evidence, Discovery, SessionFrame | Pydantic schemas, SQLModel tables and repositories use this set | Implemented locally; no production graph abstraction |
 | Planner governance | Understand, route, manage Tasks/Objectives/Assumptions/approvals, coordinate specialists, emit operations | Request classification and narrow Task/decomposition/Objective/execution approvals exist | Partial; answer/suggest/review/pause and several approval workflows are placeholders |
 | Hypothesis Analyst | Operationalize Task and evaluate Evidence in protected context without raw-data access | A no-tool PydanticAI evaluation mode consumes only a canonical repository-built bundle and durably publishes a fenced proposal/failure; Planner still authors the operational contract | Evidence evaluation implemented; operationalization ownership remains misaligned |
-| Data Explorer | Execute approved contract, produce provenance and Evidence proposal | Capability label only; no registered implementation | Absent |
+| Data Explorer | Execute approved contract and return observation-only provenance/Evidence inputs | Contract, dispatcher, and per-runtime factory registration exist; no concrete implementation is checked in | Partial boundary; concrete adapter absent |
 | Graph Miner | Typed graph retrieval, lineage/staleness/conflict/coverage analysis | Stub wrapper plus separate bounded SQL-backed Discovery retrieval | Partial and misassigned |
 | PydanticAI boundary | Canonical LLM construction, deps, tools, typed output, validation and retry | Used by selected Planner adapters; default checked-in tool config fails assembly | Partial / configuration-blocked |
 | LangGraph boundary | Deterministic routing, interruption, checkpoint and workflow state only | Planner topology uses it; Hypothesis Analyst evaluation uses PydanticAI directly, while Graph Miner remains a stub and `DataExplorerExecutor` owns observation output | Retain narrowly; Graph Miner and concrete Data Explorer remain absent |
@@ -29,8 +28,8 @@
 | Dataset versioning/cleaning | DVC/physical versions and approved cleaning produce new DataProfile | CSV/Parquet profiler plus DVC interface | Partial; DVC and cleaning execution absent |
 | Retrieval/graph | Durable FCO relations and governed Graph Miner traversal | SQLModel/JSON relations and bounded Discovery retrieval | Partial; no graph-store abstraction or Graph Miner workflow |
 | Evidence cache | Validity-keyed reuse that cannot author Discovery | No table/service | Absent |
-| Product surface | Supported CLI/service/worker loop | Package 6 provides a fail-closed composition root and admission CLI loaded through an explicit deployment factory | Partial; no concrete deployment adapters, API, or worker process |
-| Quality gates | Reproducible pytest, lint, format, type, import/startup, migration checks in CI | Extensive local tests; no tracked CI and static debt remains | Partial; see verification record in the audit |
+| Product surface | Supported CLI/service/worker loop | Package 6 provides a fail-closed in-process composition root and pure environment loader; no supported CLI, API, or worker process exists | Partial; concrete deployment adapters and product surfaces are absent |
+| Quality gates | Reproducible pytest, lint, format, type, import/startup, migration checks in CI | Extensive local tests and documented repository commands exist; no tracked CI and strict mypy debt remains | Partial |
 
 ## Protected Invariants Already Present
 
@@ -85,7 +84,7 @@ and retrieval exclusion.
 
 ## Dependency Order
 
-1. Lock the responsibility and framework contracts (completed by audit documents).
+1. Lock the responsibility and framework contracts (completed by canonical architecture documents).
 2. Add authorization/context boundary tests and versioned specialist proposal contracts
    (completed through the Package 5 authority boundary; product authentication-adapter integration
    remains).
@@ -96,8 +95,8 @@ and retrieval exclusion.
    SQLite persistence boundary).
 7. Complete Planner branches, bootstrap, DVC/cleaning, then cache.
 
-See [Remediation Backlog](../audits/remediation-backlog.md) for exact modules, prerequisites,
-migration impact, tests and completion criteria.
+Package-level remediation details remain in ignored local audit notes and are not part of the
+clean-clone authority chain.
 
 ## Owner Decisions Required
 

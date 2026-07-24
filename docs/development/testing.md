@@ -20,7 +20,7 @@ uv run mypy src
 
 ## Covered behavior
 
-The 20 test files cover:
+The repository test suite covers:
 
 - canonical FCO admission and architecture ownership boundaries;
 - repository CRUD/query, append-only surfaces, immutability and lifecycle guards;
@@ -35,7 +35,7 @@ The 20 test files cover:
 - PlannerOperation persistence/commit behavior for covered cases;
 - executor capability registry/dispatcher plumbing;
 - attempt transition, lease, fencing, race and recovery cases;
-- scientific processing and overlapping scientific-finalization races;
+- atomic Evidence/Discovery admission and overlapping execution/admission races;
 - tool-manager configuration loading.
 
 No test is marked skipped or xfailed in the audited snapshot. Concurrency tests use file-backed SQLite where independent connections matter; external analytical work is represented by fake executors.
@@ -50,7 +50,7 @@ Passing tests do not cover:
 - runnable GraphMiner/HypothesisAnalyst graphs;
 - DVC execution or cleaning/version creation;
 - natural-language end-to-end planning, retrieval or prompt construction;
-- production CLI/API/worker bootstrap;
+- production API/worker bootstrap (Gate 0 intentionally has no supported CLI);
 - process crash or multi-host worker behavior;
 - external executor side-effect idempotency;
 - cache validity/reuse;

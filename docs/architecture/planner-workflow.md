@@ -67,8 +67,10 @@ Planner nodes should produce typed operations rather than mutating durable state
 - durable `PlannerOperation` envelopes and repository;
 - approved/not-required filtering;
 - rollback on apply/flush errors;
-- a special atomic execution/scientific bundle;
-- handlers for Task, Assumption, Hypothesis, AnalysisFrame, Evidence, Discovery, Objective, SessionFrame and conflict flags.
+- a special atomic execution-admission bundle;
+- handlers for governed Task, Assumption, Hypothesis, Objective, SessionFrame, and conflict
+  operations; PlannerOperation Evidence/Discovery writes fail closed because their atomic
+  admission services are the sole writers.
 
 Known gaps:
 

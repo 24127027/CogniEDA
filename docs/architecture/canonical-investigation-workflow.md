@@ -34,9 +34,10 @@ operationalization must label Assumptions as planning-only.
 Discovery Synthesis Context contains only the approved Hypothesis, accepted DataProfile,
 AnalysisFrame and ExecutionRun provenance, admitted Evidence, method/parameters, decision rule,
 uncertainty, and validity metadata. It excludes Assumptions, existing Discoveries, Tasks, raw chat,
-failed reasoning, caches, and unverified generated views. Current local projection implements much
-of this exclusion (`src/memory/session_frame.py:196-251`), but no specialist consumes that bundle in
-the production path.
+failed reasoning, caches, and unverified generated views. The local protected-evaluation path builds
+the closed `DiscoverySynthesisBundle` from repositories and passes only that bundle to the
+Hypothesis Analyst (`src/application/orchestrator/synthesis_bundle.py`,
+`src/application/orchestrator/evaluator_runner.py`).
 
 ## Approval And Persistence Sequence
 
@@ -84,6 +85,7 @@ persisted approval record, so commit is not a universal authorization boundary.
 
 ## Runtime Entry-Point Reality
 
-The package entry point runs the Discovery-admission CLI. It loads only an explicit
+There is no supported package CLI, admission command, service API, or worker daemon.
+`load_runtime_from_environment()` is a pure composition helper: it loads only an explicit
 `COGNIEDA_RUNTIME_FACTORY=module:factory` hook and fails closed without deployment-provided
-authentication, model, and Data Explorer adapters. There is no service API or worker daemon.
+authentication, model, and Data Explorer adapters.

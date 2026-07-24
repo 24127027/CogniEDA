@@ -40,7 +40,9 @@ Current implementation:
 - `Task.can_generate_hypothesis()` rejects proposed, rejected, paused, failed, cancelled, non-analytical, unscoped, and under-specified Tasks.
 - `HypothesisRepository.create()` rejects Hypotheses unless the source Task exists, is active, analytical, has no child Tasks, uses an active accepted DataProfile, matches the Hypothesis profile, and has no existing Hypothesis.
 - The database schema adds a unique constraint for one Task to one Hypothesis in fresh databases.
-- `DiscoveryRepository.create()` rejects Discoveries unless the Hypothesis exists, all Evidence exists, all Evidence is active, all Evidence belongs to the same Hypothesis, and the Hypothesis has no existing Discovery.
+- Public `DiscoveryRepository.create()` fails closed. Only `AtomicDiscoveryAdmissionService` may
+  stage a Discovery, after revalidating the exact proposal, decision, Hypothesis, active Evidence,
+  and one-Hypothesis/one-Discovery cardinality.
 - The database schema adds a unique constraint for one Hypothesis to one Discovery in fresh databases.
 - `GeneratedView` does not exist.
 - `Evidence` exists as an immutable schema/table/repository and requires `analysis_frame_ref` and `execution_run_ref`.
@@ -60,12 +62,12 @@ Current `Task`, `Hypothesis`, `Evidence`, and `Discovery` repositories support:
 - proposed/active/paused/completed/failed/rejected/cancelled Task lifecycle persistence
 - terminal analytical Task admission checks before Hypothesis creation
 - one Task to one Hypothesis guard at repository and fresh-database schema level
-- hypothesis creation and lifecycle/status updates
+- hypothesis creation and non-terminal lifecycle/status updates
 - hypothesis listing by task/profile/status
-- evidence creation and retrieval by hypothesis/profile
+- Evidence retrieval by hypothesis/profile; generic creation is sealed behind atomic Evidence admission
 - evidence supersession/invalidation helpers with optional same-session dependent-Discovery review flagging
-- typed evidence-to-hypothesis evaluation outcomes
-- Discovery creation and retrieval by Hypothesis/status/review state
+- protected Hypothesis Analyst evaluation proposals and typed technical/domain failures
+- governed atomic Discovery admission and retrieval by Hypothesis/status/review state
 - repository-level Discovery review flagging after referenced Evidence changes
 - one Hypothesis to one Discovery guard at repository and fresh-database schema level
 
@@ -79,6 +81,6 @@ The main remaining lifecycle risk is not local repository admission; it is orche
 authority consistency. Retry reuses the existing Hypothesis for the Task, but changed-contract rerun
 semantics are unspecified. Approval is durable for the public Task/decomposition/Objective and
 execution paths, while the general commit boundary can still trust caller-authored in-memory
-approval states. DataProfile/Evidence lifecycle propagation is also not atomic across dependent
-records. Planner still authors the operational contract, while concrete Data Explorer and
-deployment adapters remain absent.
+approval states. Local SQLite validity propagation is atomic, but production authority issuance and
+distributed transaction support are absent. Planner still authors the operational contract, while
+concrete Data Explorer and deployment adapters remain absent.
