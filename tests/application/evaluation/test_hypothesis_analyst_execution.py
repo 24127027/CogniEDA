@@ -11,13 +11,13 @@ from pydantic_ai.models.test import TestModel
 from sqlmodel import select
 
 from agents.executor.hypothesis_analyst.nodes import build_hypothesis_analyst_agent
-from application.orchestrator.evaluation_transition_service import (
+from application.evaluation import (
     EvaluationConflictError,
     EvaluationTransitionService,
     StaleEvaluationOwnerError,
+    build_synthesis_bundle,
+    run_evaluation_attempt,
 )
-from application.orchestrator.evaluator_runner import run_evaluation_attempt
-from application.orchestrator.synthesis_bundle import build_synthesis_bundle
 from db.models import DiscoveryRecord, HypothesisRecord, TaskRecord
 from db.session import get_session
 from package2_helpers import (
@@ -34,7 +34,7 @@ from schemas.enums import (
     ValidityEventType,
     ValiditySourceType,
 )
-from schemas.specialist_contracts import (
+from schemas.evaluation import (
     DiscoveryProposal,
     EvaluationFailure,
     EvaluationFailureReason,

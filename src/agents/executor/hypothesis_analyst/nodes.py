@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models import Model
 
-from schemas.specialist_contracts import (
+from schemas.evaluation import (
     DiscoveryProposal,
     DiscoverySynthesisBundle,
     HypothesisAnalystResult,

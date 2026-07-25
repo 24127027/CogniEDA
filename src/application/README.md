@@ -8,11 +8,13 @@ identifier/context factory. The identifier must exactly match durable admitted w
 analytical contracts use `deterministic`. Missing adapters fail closed. `runtime_loader.py` loads an explicit deployment
 factory; it does not synthesize defaults.
 
-Following **Package S1-B**, application responsibilities are structured into focused bounded contexts:
+Following **Package S2-A**, application responsibilities are structured into focused bounded contexts:
 
 - `application/execution/`: Owns execution attempt admission, contract/receipt identity hashing, transition service, dispatching, receipt ingestion, cancellation, and recovery.
 - `application/evidence/`: Owns pure Evidence admission plan validation and the atomic AnalysisFrame + Evidence write transaction.
-- `application/orchestrator/`: Temporarily retains protected evaluation execution, governance decision binding, atomic Discovery admission, and validity propagation.
+- `application/evaluation/`: Owns protected synthesis bundle construction, evaluation transition state machine, CAS fencing, and evaluator runner invocation.
+- `application/governance/`: Owns authenticated principal resolution, governance authority issuance, durable proposal decision recording, and deterministic governance fingerprints.
+- `application/orchestrator/`: Temporarily retains atomic Discovery admission and validity propagation.
 
 There is no supported package CLI or checked-in admission command. There is also no default
 authentication implementation, concrete Data Explorer, service API, event bus, or worker daemon.
@@ -31,8 +33,9 @@ The current worker path is independent of the compiled planner graph:
 planner approval/commit  -> ExecutionRun + outbox (application.execution)
 external worker loop      -> Data Explorer -> observation-only inbox (application.execution)
 Evidence admission        -> AnalysisFrame + Evidence (application.evidence)
-Hypothesis Analyst        -> protected proposal (application.orchestrator)
-governance + admission    -> Discovery + lifecycle + conclusion frame (application.orchestrator)
+Hypothesis Analyst        -> protected proposal (application.evaluation)
+governance decision       -> durable proposal decision (application.governance)
+atomic admission          -> Discovery + lifecycle + conclusion frame (application.orchestrator)
 validity propagation      -> dependent invalidation/review + retrieval exclusion (application.orchestrator)
 ```
 
@@ -41,4 +44,4 @@ validity propagation      -> dependent invalidation/review + retrieval exclusion
 A future deployment shell may validate external requests, run worker loops, publish events and
 construct responses. The composition contract exists; concrete deployment adapters do not.
 
-See [execution/README.md](execution/README.md), [evidence/README.md](evidence/README.md), and [orchestrator/README.md](orchestrator/README.md).
+See [execution/README.md](execution/README.md), [evidence/README.md](evidence/README.md), [evaluation/README.md](evaluation/README.md), [governance/README.md](governance/README.md), and [orchestrator/README.md](orchestrator/README.md).

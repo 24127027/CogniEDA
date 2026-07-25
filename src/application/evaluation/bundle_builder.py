@@ -26,8 +26,7 @@ from schemas.enums import (
     TaskLifecycleState,
     ValiditySourceState,
 )
-from schemas.execution.contracts import PreparedExecution
-from schemas.specialist_contracts import (
+from schemas.evaluation import (
     SUPPORTED_EVALUATION_CONTRACT_VERSION,
     ActiveStateProof,
     AdmittedEvidenceSnapshot,
@@ -45,6 +44,7 @@ from schemas.specialist_contracts import (
     ProvenanceManifestEntry,
     RepositorySource,
 )
+from schemas.execution.contracts import PreparedExecution
 
 REQUIRED_INVALIDATORS = (
     "DataProfile identity or accepted-ground-truth state changes.",

@@ -12,12 +12,12 @@ from sqlalchemy import delete, inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, create_engine
 
-from application.orchestrator.discovery_admission_governance import (
-    DiscoveryAdmissionGovernanceService,
-)
-from application.orchestrator.evaluation_transition_service import (
+from application.evaluation import (
     EvaluationTransitionService,
     StaleEvaluationOwnerError,
+)
+from application.governance import (
+    DiscoveryAdmissionGovernanceService,
 )
 from application.orchestrator.validity_propagation_service import (
     AtomicValidityPropagationService,

@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from sqlmodel import Session, select
 
-from application.orchestrator.discovery_admission_governance import (
+from application.evaluation import EvaluationTransitionService, build_synthesis_bundle
+from application.governance import (
     DiscoveryAdmissionGovernanceService,
 )
-from application.orchestrator.evaluation_transition_service import EvaluationTransitionService
-from application.orchestrator.synthesis_bundle import build_synthesis_bundle
 from db.models import (
     DiscoveryRecord,
     EvaluationControlRecord,

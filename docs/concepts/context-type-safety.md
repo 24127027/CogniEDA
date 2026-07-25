@@ -58,7 +58,7 @@ Current code provides:
 - Discovery Synthesis Context excludes assumptions, tasks, existing Discoveries, user decisions, pending tasks, open questions, stale context, dead ends, and cached tool-result summaries.
 - Discovery Synthesis Context filters by safe memory status and active profile/evidence lifecycle.
 - `src/memory/retrieval_policy.py` defines a pure type/lifecycle admission policy for planning, answer, conclusion, and discovery-synthesis roles.
-- `src/schemas/specialist_contracts.py` defines an immutable, versioned
+- `src/schemas/evaluation/bundle.py` defines an immutable, versioned
   `DiscoverySynthesisBundle` from evaluation-specific Hypothesis, DataProfile, and AnalysisFrame
   snapshots plus active Evidence. Its schema cannot carry planning/context roles or generic bags.
 - a bounded SQL-backed `DiscoveryRetrievalEngine` provides structural task-motivation matching,

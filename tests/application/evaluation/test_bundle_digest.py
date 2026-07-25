@@ -7,7 +7,7 @@ from datetime import timedelta
 import pytest
 from pydantic import ValidationError
 
-from application.orchestrator.synthesis_bundle import (
+from application.evaluation import (
     build_synthesis_bundle,
     compute_bundle_digest,
 )

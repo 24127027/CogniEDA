@@ -8,13 +8,12 @@ import pytest
 from pydantic import ValidationError
 from sqlmodel import Session
 
-from application.orchestrator.discovery_admission_governance import (
+from application.evaluation import EvaluationTransitionService, build_synthesis_bundle
+from application.governance import (
     DiscoveryAdmissionGovernanceService,
     compute_admission_fingerprint,
     generate_deterministic_discovery_id,
 )
-from application.orchestrator.evaluation_transition_service import EvaluationTransitionService
-from application.orchestrator.synthesis_bundle import build_synthesis_bundle
 from db.models import EvaluationControlRecord
 from package2_helpers import (
     persist_governance_authority,

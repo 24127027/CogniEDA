@@ -13,10 +13,10 @@ from agents.executor.hypothesis_analyst.nodes import (
     HypothesisAnalystDependencies,
     evaluate_synthesis_bundle,
 )
-from application.orchestrator.evaluation_transition_service import EvaluationTransitionService
+from application.evaluation.transition_service import EvaluationTransitionService
 from db.models import EvaluationControlRecord, HypothesisRecord
 from schemas.enums import HypothesisStatus
-from schemas.specialist_contracts import (
+from schemas.evaluation import (
     DiscoveryProposal,
     EvaluationFailure,
     EvaluationFailureReason,

@@ -14,20 +14,19 @@ from sqlalchemy import text, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
+from application.evaluation import EvaluationTransitionService, build_synthesis_bundle
+from application.governance import (
+    DiscoveryAdmissionGovernanceService,
+    GovernanceAuthorityIssuer,
+    ProposalAuthorizationError,
+    ProposalDecisionConflictError,
+)
 from application.orchestrator.atomic_discovery_admission import (
     AtomicDiscoveryAdmissionConflictError,
     AtomicDiscoveryAdmissionError,
     AtomicDiscoveryAdmissionService,
 )
 from application.orchestrator.discovery_admission_coordinator import DiscoveryAdmissionCoordinator
-from application.orchestrator.discovery_admission_governance import (
-    DiscoveryAdmissionGovernanceService,
-    GovernanceAuthorityIssuer,
-    ProposalAuthorizationError,
-    ProposalDecisionConflictError,
-)
-from application.orchestrator.evaluation_transition_service import EvaluationTransitionService
-from application.orchestrator.synthesis_bundle import build_synthesis_bundle
 from db.init_db import init_db
 from db.models import (
     DiscoveryAdmissionClaimRecord,
@@ -51,7 +50,6 @@ from repositories.evidence_repository import EvidenceRepository
 from repositories.objective_repository import ObjectiveRepository
 from repositories.task_repository import TaskRepository
 from schemas.artifacts import Objective, Task
-from schemas.discovery_admission_contracts import AuthenticatedPrincipal
 from schemas.enums import (
     AuthorizationClass,
     DiscoveryAdmissionClaimState,
@@ -66,7 +64,8 @@ from schemas.enums import (
     ValidityEventType,
     ValiditySourceType,
 )
-from schemas.specialist_contracts import DiscoveryProposal
+from schemas.evaluation import DiscoveryProposal
+from schemas.governance import AuthenticatedPrincipal
 
 
 class _StaticPrincipalResolver:

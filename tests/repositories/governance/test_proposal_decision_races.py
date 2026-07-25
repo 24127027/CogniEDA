@@ -12,13 +12,12 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select, update
 
-from application.orchestrator.discovery_admission_governance import (
+from application.evaluation import EvaluationTransitionService, build_synthesis_bundle
+from application.governance import (
     DiscoveryAdmissionGovernanceService,
     ProposalAuthorizationError,
     ProposalDecisionConflictError,
 )
-from application.orchestrator.evaluation_transition_service import EvaluationTransitionService
-from application.orchestrator.synthesis_bundle import build_synthesis_bundle
 from db.migrations import upgrade_proposal_decision_schema
 from db.models import (
     DiscoveryRecord,

@@ -9,7 +9,7 @@ from uuid import UUID, uuid5
 from sqlalchemy import update
 from sqlmodel import Session
 
-from application.orchestrator.discovery_admission_governance import (
+from application.governance import (
     compute_governance_authority_fingerprint,
 )
 from db.models import (

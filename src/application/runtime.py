@@ -16,19 +16,19 @@ from agents.executor.hypothesis_analyst.nodes import build_hypothesis_analyst_ag
 from agents.executor.registry import DataExplorerFactory, DataExplorerRegistry
 from agents.executor.types import DataExplorerExecutionContext
 from agents.planner.agent import Planner
+from application.evaluation import (
+    enqueue_ready_evaluations,
+    run_evaluation_attempt,
+)
 from application.execution.dispatch import dispatch_pending_attempts
 from application.execution.recovery import reconcile_execution_attempts
-from application.orchestrator.discovery_admission_coordinator import (
-    DiscoveryAdmissionCoordinator,
-)
-from application.orchestrator.discovery_admission_governance import (
+from application.governance import (
     AuthenticatedPrincipalResolver,
     DiscoveryAdmissionGovernanceService,
     GovernanceAuthorityIssuer,
 )
-from application.orchestrator.evaluator_runner import (
-    enqueue_ready_evaluations,
-    run_evaluation_attempt,
+from application.orchestrator.discovery_admission_coordinator import (
+    DiscoveryAdmissionCoordinator,
 )
 from application.orchestrator.validity_propagation_service import (
     AtomicValidityPropagationService,
@@ -36,8 +36,8 @@ from application.orchestrator.validity_propagation_service import (
 from db.init_db import init_db
 from db.models import GovernanceAuthorityRecord, ProposalDecisionRecord
 from db.session import get_session
-from schemas.discovery_admission_contracts import AuthenticatedPrincipal
 from schemas.enums import GovernanceDecisionOutcome
+from schemas.governance import AuthenticatedPrincipal
 from schemas.validity_propagation_contracts import (
     ValidityPropagationCommand,
     ValidityPropagationResult,

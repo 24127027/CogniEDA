@@ -12,19 +12,19 @@ from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from application.execution.transition_service import (
-    ExecutionAttemptTransitionService,
-)
-from application.orchestrator.discovery_admission_governance import (
-    DiscoveryAdmissionGovernanceService,
-    compute_decision_fingerprint,
-    compute_governance_authority_fingerprint,
-)
-from application.orchestrator.synthesis_bundle import (
+from application.evaluation import (
     SynthesisBundleError,
     build_synthesis_bundle,
     compute_evaluation_key,
     compute_evidence_set_digest,
+)
+from application.execution.transition_service import (
+    ExecutionAttemptTransitionService,
+)
+from application.governance import (
+    DiscoveryAdmissionGovernanceService,
+    compute_decision_fingerprint,
+    compute_governance_authority_fingerprint,
 )
 from db.models import (
     AnalysisFrameRecord,
@@ -67,7 +67,7 @@ from schemas.enums import (
     TaskLifecycleState,
     ValiditySourceState,
 )
-from schemas.specialist_contracts import (
+from schemas.evaluation import (
     DiscoveryProposal,
     DiscoverySynthesisBundle,
     compute_proposal_digest,

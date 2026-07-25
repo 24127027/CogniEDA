@@ -26,9 +26,9 @@ do not contain PydanticAI, LangGraph, SQLModel, repository, or application-servi
 `src/schemas/execution/observations.py` owns `AnalysisFrameObservation` and
 `EvidenceObservation`. `src/schemas/execution/data_explorer.py` owns the Data Explorer result
 models, and `src/schemas/execution/contracts.py` owns the prepared/receipt transport contracts.
-Neither `schemas.specialist_contracts` nor Planner types re-export these execution schemas.
+Neither `schemas.evaluation` nor Planner types re-export these execution schemas.
 
-`src/schemas/specialist_contracts.py` owns all lifecycle-distinct specialist models. Its evaluation
+`src/schemas/evaluation/` owns all lifecycle-distinct evaluation specialist models. Its evaluation
 snapshots intentionally omit mutable persistence state that is not scientific input:
 
 - `HypothesisEvaluationSnapshot` omits Task identity, Hypothesis lifecycle status and timestamps,

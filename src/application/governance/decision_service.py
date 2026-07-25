@@ -1,36 +1,42 @@
-"""Durable authorization and read-only planning for future Discovery admission."""
+"""Durable proposal governance decision recording and admission-plan construction."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from typing import Protocol
-from uuid import UUID, uuid4, uuid5
+from uuid import UUID, uuid4
 
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from application.orchestrator.synthesis_bundle import (
+from application.evaluation.bundle_builder import (
     SynthesisBundleError,
     build_synthesis_bundle,
     compute_evaluation_key,
     compute_evidence_set_digest,
 )
+from application.governance.authority import (
+    USER_GOVERNED_OPERATION_TYPE,
+    USER_GOVERNED_PURPOSE,
+    ProposalAuthorizationError,
+)
+from application.governance.fingerprints import (
+    _datetime_is_expired,
+    compute_admission_fingerprint,
+    compute_decision_fingerprint,
+    compute_governance_authority_fingerprint,
+    generate_deterministic_discovery_id,
+)
 from db.models import (
     DiscoveryRecord,
     EvaluationControlRecord,
-    GovernanceAuthorityRecord,
     ProposalDecisionRecord,
     utc_now,
 )
 from repositories.discovery_admission_claim_repository import DiscoveryAdmissionClaimRepository
-from repositories.proposal_decision_repository import ProposalDecisionRepository
+from repositories.governance import ProposalDecisionRepository
 from schemas.canonical import canonical_sha256
 from schemas.discovery_admission_contracts import (
-    AuthenticatedPrincipal,
     DiscoveryAdmissionPlan,
     DiscoveryClaimSnapshot,
-    GovernanceAuthority,
-    ProposalAuthority,
     ValidityBasisSnapshot,
 )
 from schemas.enums import (
@@ -39,7 +45,7 @@ from schemas.enums import (
     EvaluationControlState,
     GovernanceDecisionOutcome,
 )
-from schemas.specialist_contracts import (
+from schemas.evaluation import (
     BundleProvenanceManifest,
     DecisionRuleSnapshot,
     DiscoveryProposal,
@@ -48,13 +54,8 @@ from schemas.specialist_contracts import (
     compute_proposal_digest,
     validate_proposal_against_bundle,
 )
+from schemas.governance import GovernanceAuthority, ProposalAuthority
 
-DISCOVERY_ADMISSION_NAMESPACE = UUID("2b8f42e2-65a8-4f10-9831-d85c4908079f")
-DISCOVERY_ADMISSION_CONTRACT_VERSION = "discovery-admission/v1"
-
-USER_GOVERNED_PURPOSE = "governed_discovery_admission"
-USER_GOVERNED_OPERATION_TYPE = "authorize_proposal"
-GOVERNANCE_AUTHORITY_ISSUER_ID = "service:governance_authority_issuer"
 ALLOWED_TRUSTED_PRODUCERS = frozenset(
     {"system:evaluator", "system:internal_batch", "system:trusted_service"}
 )
@@ -62,205 +63,8 @@ ALLOWED_TRUSTED_PURPOSES = frozenset({"governed_discovery_admission", "automated
 ALLOWED_TRUSTED_OPERATION_TYPES = frozenset({"authorize_proposal"})
 
 
-class ProposalAuthorizationError(ValueError):
-    """Raised when proposal authority or authorization verification fails."""
-
-
 class ProposalDecisionConflictError(ValueError):
     """Raised when conflicting decision submissions or replay conflicts occur."""
-
-
-class AuthenticatedPrincipalResolver(Protocol):
-    """Trusted authentication adapter supplied by the production composition root."""
-
-    def resolve_authenticated_principal(
-        self,
-        authentication_context_id: str,
-    ) -> AuthenticatedPrincipal:
-        """Resolve one server-authenticated principal; never accept caller identity fields."""
-
-
-def generate_deterministic_discovery_id(
-    hypothesis_id: UUID,
-    proposal_digest: str,
-    *,
-    contract_version: str = DISCOVERY_ADMISSION_CONTRACT_VERSION,
-) -> UUID:
-    """Derive a deterministic Discovery ID from authoritative identity."""
-
-    seed = f"{contract_version}:{hypothesis_id}:{proposal_digest}"
-    return uuid5(DISCOVERY_ADMISSION_NAMESPACE, seed)
-
-
-def compute_governance_authority_fingerprint(
-    *,
-    authority_id: UUID,
-    actor_identity: str,
-    authority_class: AuthorizationClass,
-    workspace_id: str,
-    session_id: str | None,
-    purpose: str,
-    operation_type: str,
-    issued_by: str,
-    issued_at: datetime,
-    expires_at: datetime | None,
-) -> str:
-    """Fingerprint one independently issued durable actor-authority grant."""
-
-    return canonical_sha256(
-        {
-            "actor_identity": actor_identity,
-            "authority_class": authority_class.value,
-            "authority_id": authority_id,
-            "expires_at": _canonical_datetime(expires_at),
-            "issued_at": _canonical_datetime(issued_at),
-            "issued_by": issued_by,
-            "operation_type": operation_type,
-            "purpose": purpose,
-            "session_id": session_id,
-            "workspace_id": workspace_id,
-        }
-    )
-
-
-def compute_decision_fingerprint(
-    *,
-    decision_id: UUID,
-    authority_id: UUID,
-    evaluation_id: UUID,
-    evaluation_key: str,
-    hypothesis_id: UUID,
-    task_id: UUID,
-    proposal_digest: str,
-    bundle_digest: str,
-    evidence_set_digest: str,
-    decision: GovernanceDecisionOutcome,
-    actor: str,
-    actor_authority_type: AuthorizationClass,
-    workspace_id: str,
-    session_id: str | None,
-    purpose: str,
-    operation_type: str,
-    decision_timestamp: datetime,
-    reason: str | None,
-) -> str:
-    """Fingerprint every immutable field of one durable governance decision."""
-
-    return canonical_sha256(
-        {
-            "actor": actor,
-            "actor_authority_type": actor_authority_type.value,
-            "authority_id": authority_id,
-            "bundle_digest": bundle_digest,
-            "decision": decision.value,
-            "decision_id": decision_id,
-            "decision_timestamp": _canonical_datetime(decision_timestamp),
-            "evaluation_id": evaluation_id,
-            "evaluation_key": evaluation_key,
-            "evidence_set_digest": evidence_set_digest,
-            "hypothesis_id": hypothesis_id,
-            "operation_type": operation_type,
-            "proposal_digest": proposal_digest,
-            "purpose": purpose,
-            "reason": reason,
-            "session_id": session_id,
-            "task_id": task_id,
-            "workspace_id": workspace_id,
-        }
-    )
-
-
-def compute_admission_fingerprint(plan: DiscoveryAdmissionPlan) -> str:
-    """Fingerprint every plan field other than the fingerprint itself."""
-
-    return canonical_sha256(plan.model_dump(mode="python", exclude={"admission_fingerprint"}))
-
-
-class GovernanceAuthorityIssuer:
-    """Production authority issuer boundary for user-governed decision authority."""
-
-    def __init__(
-        self,
-        session: Session,
-        *,
-        principal_resolver: AuthenticatedPrincipalResolver,
-        workspace_id: str,
-        session_id: str | None = None,
-    ) -> None:
-        if not workspace_id.strip():
-            raise ValueError("Governance authority issuer requires a non-empty workspace identity.")
-        if session_id is not None and not session_id.strip():
-            raise ValueError("Session identity must be non-empty when supplied.")
-        self._session = session
-        self._principal_resolver = principal_resolver
-        self._workspace_id = workspace_id
-        self._session_id = session_id
-
-    def issue_user_authority(
-        self,
-        *,
-        authentication_context_id: str,
-        expires_at: datetime | None = None,
-    ) -> GovernanceAuthorityRecord:
-        """Resolve authenticated identity and durably issue one fixed-purpose grant."""
-
-        if self._session.new or self._session.dirty or self._session.deleted:
-            raise ProposalAuthorizationError("Authority issuer requires a clean unit of work.")
-
-        if not authentication_context_id.strip():
-            raise ProposalAuthorizationError("Authentication context identity cannot be empty.")
-        principal = self._principal_resolver.resolve_authenticated_principal(
-            authentication_context_id
-        )
-        if principal.authentication_context_id != authentication_context_id:
-            raise ProposalAuthorizationError("Authentication context identity mismatch.")
-        if principal.workspace_id != self._workspace_id:
-            raise ProposalAuthorizationError("Authenticated principal workspace mismatch.")
-        if self._session_id is None or principal.session_id != self._session_id:
-            raise ProposalAuthorizationError("Authenticated principal session mismatch.")
-
-        now = utc_now()
-        authenticated_at = principal.authenticated_at
-        if authenticated_at.tzinfo is None:
-            authenticated_at = authenticated_at.replace(tzinfo=UTC)
-        if authenticated_at > now:
-            raise ProposalAuthorizationError("Authenticated principal timestamp is in the future.")
-        if _datetime_is_expired(expires_at, now):
-            raise ProposalAuthorizationError("Cannot issue an already-expired authority grant.")
-
-        authority_id = uuid4()
-        fingerprint = compute_governance_authority_fingerprint(
-            authority_id=authority_id,
-            actor_identity=principal.principal_id,
-            authority_class=AuthorizationClass.USER_GOVERNED,
-            workspace_id=self._workspace_id,
-            session_id=self._session_id,
-            purpose=USER_GOVERNED_PURPOSE,
-            operation_type=USER_GOVERNED_OPERATION_TYPE,
-            issued_by=GOVERNANCE_AUTHORITY_ISSUER_ID,
-            issued_at=now,
-            expires_at=expires_at,
-        )
-
-        record = GovernanceAuthorityRecord(
-            authority_id=authority_id,
-            actor_identity=principal.principal_id,
-            authority_class=AuthorizationClass.USER_GOVERNED,
-            workspace_id=self._workspace_id,
-            session_id=self._session_id,
-            purpose=USER_GOVERNED_PURPOSE,
-            operation_type=USER_GOVERNED_OPERATION_TYPE,
-            issued_by=GOVERNANCE_AUTHORITY_ISSUER_ID,
-            issued_at=now,
-            expires_at=expires_at,
-            active=True,
-            authority_fingerprint=fingerprint,
-        )
-
-        self._session.add(record)
-        self._session.commit()
-        self._session.refresh(record)
-        return record
 
 
 class DiscoveryAdmissionGovernanceService:
@@ -771,21 +575,3 @@ class DiscoveryAdmissionGovernanceService:
             raise ProposalAuthorizationError(
                 "Discovery governance requires a clean session and will not flush caller changes."
             )
-
-
-def _canonical_datetime(value: datetime | None) -> str | None:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=UTC)
-    return value.astimezone(UTC).isoformat()
-
-
-def _datetime_is_expired(expiry: datetime | None, now: datetime) -> bool:
-    if expiry is None:
-        return False
-    if expiry.tzinfo is None:
-        expiry = expiry.replace(tzinfo=UTC)
-    if now.tzinfo is None:
-        now = now.replace(tzinfo=UTC)
-    return expiry <= now

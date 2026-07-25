@@ -451,9 +451,16 @@ def test_package_s1b_no_old_orchestrator_import_paths_remain() -> None:
         "application.orchestrator.reconciler",
         "application.orchestrator.transition_service",
         "application.orchestrator.evidence_admission",
+        "application.orchestrator.evaluation_transition_service",
+        "application.orchestrator.evaluator_runner",
+        "application.orchestrator.synthesis_bundle",
+        "application.orchestrator.discovery_admission_governance",
         "application.evidence.identity",
         "schemas.execution_observations",
         "schemas.data_explorer_contracts",
+        "schemas.specialist_contracts",
+        "repositories.evaluation_control_repository",
+        "repositories.proposal_decision_repository",
     ]
     violations: list[str] = []
     for root in (Path("src"), Path("tests")):
@@ -491,14 +498,6 @@ def test_package_s1b_execution_schema_compatibility_exports_are_removed() -> Non
     }
     violations: list[str] = []
 
-    specialist_path = Path("src/schemas/specialist_contracts.py")
-    specialist_tree = ast.parse(specialist_path.read_text(encoding="utf-8"))
-    for node in ast.walk(specialist_tree):
-        if isinstance(node, ast.ImportFrom) and node.module == "schemas.execution.data_explorer":
-            imported = sorted(alias.name for alias in node.names if alias.name in forbidden_exports)
-            if imported:
-                violations.append(f"{specialist_path.as_posix()}: re-exports {imported}")
-
     contracts_path = Path("src/schemas/execution/contracts.py")
     contracts_tree = ast.parse(contracts_path.read_text(encoding="utf-8"))
     for node in ast.walk(contracts_tree):
@@ -529,8 +528,6 @@ def test_package_s1b_execution_schema_compatibility_exports_are_removed() -> Non
 
     for root in (Path("src"), Path("tests")):
         for path in root.rglob("*.py"):
-            if path == specialist_path:
-                continue
             tree = ast.parse(path.read_text(encoding="utf-8"))
             for node in ast.walk(tree):
                 if not (
@@ -592,3 +589,66 @@ def test_package_s1b_application_dependency_directions_are_enforced() -> None:
                 violations.append(f"{path.as_posix()}: imports {node.module}")
 
     assert not violations, f"S1-B dependency-direction violations: {violations}"
+
+
+def test_package_s2a_dependency_directions_are_enforced() -> None:
+    """Package S2-A architecture and dependency direction invariants must hold."""
+
+    violations: list[str] = []
+
+    # 1. Schemas import no application or repository code
+    for path in Path("src/schemas").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                if node.module.startswith(("application", "repositories")):
+                    violations.append(f"{path.as_posix()}: schema imports {node.module}")
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.startswith(("application", "repositories")):
+                        violations.append(f"{path.as_posix()}: schema imports {alias.name}")
+
+    # 2. Repositories import no application code
+    for path in Path("src/repositories").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                if node.module.startswith("application"):
+                    violations.append(f"{path.as_posix()}: repository imports {node.module}")
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.startswith("application"):
+                        violations.append(f"{path.as_posix()}: repository imports {alias.name}")
+
+    # 3. Analyst imports no governance or Discovery admission code
+    for path in Path("src/agents/executor/hypothesis_analyst").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                if node.module.startswith(
+                    (
+                        "application.governance",
+                        "schemas.governance",
+                        "repositories.governance",
+                        "application.orchestrator.atomic_discovery_admission",
+                    )
+                ):
+                    violations.append(f"{path.as_posix()}: Analyst imports {node.module}")
+
+    # 4. application.evaluation does not import governance decision services
+    for path in Path("src/application/evaluation").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                if node.module.startswith("application.governance"):
+                    violations.append(f"{path.as_posix()}: evaluation imports {node.module}")
+
+    # 5. application.governance does not invoke Hypothesis Analyst
+    for path in Path("src/application/governance").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                if node.module.startswith("agents.executor.hypothesis_analyst"):
+                    violations.append(f"{path.as_posix()}: governance imports {node.module}")
+
+    assert not violations, f"S2-A dependency-direction violations: {violations}"

@@ -36,8 +36,8 @@ AnalysisFrame and ExecutionRun provenance, admitted Evidence, method/parameters,
 uncertainty, and validity metadata. It excludes Assumptions, existing Discoveries, Tasks, raw chat,
 failed reasoning, caches, and unverified generated views. The local protected-evaluation path builds
 the closed `DiscoverySynthesisBundle` from repositories and passes only that bundle to the
-Hypothesis Analyst (`src/application/orchestrator/synthesis_bundle.py`,
-`src/application/orchestrator/evaluator_runner.py`).
+Hypothesis Analyst (`src/application/evaluation/bundle_builder.py`,
+`src/application/evaluation/runner.py`).
 
 ## Approval And Persistence Sequence
 

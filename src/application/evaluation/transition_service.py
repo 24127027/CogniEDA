@@ -9,19 +9,19 @@ from sqlalchemy import or_, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
-from application.orchestrator.synthesis_bundle import (
+from application.evaluation.bundle_builder import (
     SynthesisBundleError,
     build_synthesis_bundle,
     compute_evaluation_key,
     compute_evidence_set_digest,
 )
 from db.models import EvaluationControlRecord, utc_now
-from repositories.evaluation_control_repository import (
+from repositories.evaluation import (
     ACTIVE_EVALUATION_STATES,
     EvaluationControlRepository,
 )
 from schemas.enums import EvaluationControlState
-from schemas.specialist_contracts import (
+from schemas.evaluation import (
     BundleProvenanceManifest,
     DiscoveryProposal,
     DiscoverySynthesisBundle,

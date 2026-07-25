@@ -8,7 +8,7 @@ import pytest
 from pydantic import ValidationError
 from sqlmodel import select
 
-from application.orchestrator.synthesis_bundle import (
+from application.evaluation import (
     SynthesisBundleError,
     build_synthesis_bundle,
     compute_bundle_digest,
@@ -27,7 +27,7 @@ from schemas.enums import (
     ExecutionRunStatus,
     HypothesisStatus,
 )
-from schemas.specialist_contracts import (
+from schemas.evaluation import (
     AdmittedEvidenceSnapshot,
     AnalysisFrameEvaluationSnapshot,
     DataProfileEvaluationSnapshot,

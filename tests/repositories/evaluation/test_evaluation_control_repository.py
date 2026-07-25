@@ -8,13 +8,13 @@ from threading import Barrier
 
 import pytest
 
-from application.orchestrator.evaluation_transition_service import (
+from application.evaluation import (
     EvaluationConflictError,
     EvaluationTransitionError,
     EvaluationTransitionService,
     StaleEvaluationOwnerError,
+    build_synthesis_bundle,
 )
-from application.orchestrator.synthesis_bundle import build_synthesis_bundle
 from db.models import EvaluationControlRecord, HypothesisRecord, utc_now
 from db.session import get_session
 from package2_helpers import (
@@ -22,14 +22,14 @@ from package2_helpers import (
     propagate_validity_for_test,
     proposal_for_bundle,
 )
-from repositories.evaluation_control_repository import EvaluationControlRepository
+from repositories.evaluation import EvaluationControlRepository
 from schemas.enums import (
     EvaluationControlState,
     HypothesisStatus,
     ValidityEventType,
     ValiditySourceType,
 )
-from schemas.specialist_contracts import EvaluationFailure, EvaluationFailureReason
+from schemas.evaluation import EvaluationFailure, EvaluationFailureReason
 
 
 def test_enqueue_is_identity_bound_and_exact_replay_is_idempotent(db_session) -> None:

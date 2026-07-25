@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 from sqlmodel import Session
 
 from application.execution.identity import method_parameter_hash
-from application.orchestrator.discovery_admission_governance import (
+from application.governance import (
     ALLOWED_TRUSTED_OPERATION_TYPES,
     ALLOWED_TRUSTED_PURPOSES,
     USER_GOVERNED_OPERATION_TYPE,
@@ -57,13 +57,13 @@ from schemas.enums import (
     ValidityEventType,
     ValiditySourceType,
 )
+from schemas.evaluation import DiscoveryProposal, DiscoverySynthesisBundle
 from schemas.execution.contracts import (
     ExecutionSpecification,
     HypothesisDraft,
     PreparedExecution,
 )
 from schemas.provenance import AnalysisFrame
-from schemas.specialist_contracts import DiscoveryProposal, DiscoverySynthesisBundle
 from schemas.validity_propagation_contracts import ValidityPropagationCommand
 
 

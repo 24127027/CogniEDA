@@ -778,7 +778,7 @@ def test_active_execution_to_evidence_modules_import_no_scientific_authority() -
     forbidden_modules = {
         "application.orchestrator.scientific_processing",
         "application.orchestrator.finalizer",
-        "schemas.specialist_contracts",
+        "schemas.evaluation",
     }
 
     for path in source_paths:

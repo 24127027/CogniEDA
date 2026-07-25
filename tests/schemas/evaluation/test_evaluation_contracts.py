@@ -18,16 +18,7 @@ from schemas.enums import (
     DiscoveryEpistemicStatus,
     EvidenceType,
 )
-from schemas.execution.data_explorer import (
-    DataExplorerFailureReason,
-    DataExplorerResult,
-    DataExplorerSuccessResult,
-    ExecutionDetails,
-    TechnicalDiagnostic,
-    TechnicalRetryDisposition,
-)
-from schemas.execution.observations import AnalysisFrameObservation, EvidenceObservation
-from schemas.specialist_contracts import (
+from schemas.evaluation import (
     AdmittedEvidenceSnapshot,
     AnalysisFrameEvaluationSnapshot,
     DataProfileEvaluationSnapshot,
@@ -42,6 +33,15 @@ from schemas.specialist_contracts import (
     HypothesisEvaluationSnapshot,
     MethodParameterSnapshot,
 )
+from schemas.execution.data_explorer import (
+    DataExplorerFailureReason,
+    DataExplorerResult,
+    DataExplorerSuccessResult,
+    ExecutionDetails,
+    TechnicalDiagnostic,
+    TechnicalRetryDisposition,
+)
+from schemas.execution.observations import AnalysisFrameObservation, EvidenceObservation
 
 
 def _analysis_frame_observation() -> AnalysisFrameObservation:
@@ -520,9 +520,9 @@ class TestDependencyAndOwnershipBoundaries:
                     raise AssertionError(f"Module {module_name} imports legacy ExecutorResult")
 
     def test_schemas_do_not_import_application_compatibility(self) -> None:
-        import schemas.specialist_contracts
+        import schemas.evaluation
 
-        assert not hasattr(schemas.specialist_contracts, "legacy_scientific_result_bridge")
+        assert not hasattr(schemas.evaluation, "legacy_scientific_result_bridge")
 
 
 class TestObservationReceiptEnvelope:

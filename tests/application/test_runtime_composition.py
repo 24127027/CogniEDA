@@ -22,13 +22,13 @@ from application.runtime import (
 from application.runtime_loader import load_runtime_from_environment
 from db.models import EvidenceRecord, ValidityEventRecord
 from package2_helpers import persist_governance_authority, persist_package2_lineage
-from schemas.discovery_admission_contracts import AuthenticatedPrincipal
 from schemas.enums import (
     AuthorizationClass,
     EvidenceLifecycleState,
     ValidityEventType,
     ValiditySourceType,
 )
+from schemas.governance import AuthenticatedPrincipal
 from schemas.validity_propagation_contracts import ValidityPropagationCommand
 
 

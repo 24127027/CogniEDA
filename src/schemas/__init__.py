@@ -146,7 +146,7 @@ _EXPORT_MODULES = {
             "compute_proposal_digest",
             "validate_proposal_against_bundle",
         ),
-        "schemas.specialist_contracts",
+        "schemas.evaluation",
     ),
 }
 
