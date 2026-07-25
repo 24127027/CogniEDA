@@ -57,6 +57,27 @@ EXPECTED_TABLES = [
             "db.models.execution",
             "db.models",
         ),
+        (
+            "db.models.evaluation",
+            "db.models.governance",
+            "db.models.discovery",
+            "db.models.validity",
+            "db.models",
+        ),
+        (
+            "db.models.validity",
+            "db.models.discovery",
+            "db.models.governance",
+            "db.models.evaluation",
+            "db.models",
+        ),
+        (
+            "db.models.governance",
+            "db.models.evaluation",
+            "db.models.validity",
+            "db.models.discovery",
+            "db.models",
+        ),
     ],
 )
 def test_fresh_process_import_orders_register_the_exact_table_set(
