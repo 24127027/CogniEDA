@@ -2,13 +2,31 @@
 
 from __future__ import annotations
 
+import hashlib
+import inspect
+import json
 from datetime import UTC, datetime
+from enum import Enum
 from uuid import UUID
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
-from schemas import enums
+from schemas import (
+    discovery as discovery_pkg,
+)
+from schemas import (
+    enums,
+)
+from schemas import (
+    evaluation as evaluation_pkg,
+)
+from schemas import (
+    governance as governance_pkg,
+)
+from schemas import (
+    validity as validity_pkg,
+)
 from schemas.governance import (
     AuthenticatedPrincipal,
     GovernanceAuthority,
@@ -18,44 +36,100 @@ from schemas.validity import (
     ValidityPropagationCommand,
 )
 
+S3A_SCHEMA_SNAPSHOT_SHA256 = (
+    "0408a3ceb27a6cbc86c2cdfe96fc531cf25ec42ed45c4e5f05d10d7a3ec7e404"
+)
+
 
 def test_bounded_packages_reuse_single_canonical_enum_definitions() -> None:
     """Evaluation, governance, discovery, and validity must reuse canonical enum class objects."""
 
-    import schemas.discovery as discovery_pkg
-    import schemas.evaluation as evaluation_pkg
-    import schemas.governance as governance_pkg
-    import schemas.validity as validity_pkg
+    import schemas.discovery.admission as discovery_admission
+    import schemas.discovery.claim as discovery_claim
+    import schemas.evaluation.results as evaluation_results
+    import schemas.evaluation.snapshots as evaluation_snapshots
+    import schemas.governance.authority as governance_authority
+    import schemas.governance.decision as governance_decision
+    import schemas.governance.user_decision as governance_user_decision
+    import schemas.validity.propagation as validity_propagation
 
-    evaluation_enums = {"EvaluationControlState"}
-    governance_enums = {
-        "AuthorizationClass",
-        "GovernanceDecisionOutcome",
-        "UserDecisionStatus",
-        "UserDecisionType",
+    expected_identities = {
+        evaluation_snapshots: ("AnalysisIntent", "DatasetSourceType", "EvidenceType"),
+        evaluation_results: ("DiscoveryEpistemicStatus",),
+        governance_authority: ("AuthorizationClass",),
+        governance_decision: ("AuthorizationClass", "GovernanceDecisionOutcome"),
+        governance_user_decision: ("UserDecisionStatus", "UserDecisionType"),
+        discovery_claim: (
+            "AnalysisIntent",
+            "DiscoveryEpistemicStatus",
+            "DiscoveryLifecycleState",
+        ),
+        discovery_admission: (
+            "AuthorizationClass",
+            "DiscoveryAdmissionReplayDisposition",
+            "DiscoveryEpistemicStatus",
+            "EvaluationControlState",
+            "HypothesisStatus",
+            "TaskLifecycleState",
+        ),
+        validity_propagation: (
+            "AuthorizationClass",
+            "ValidityEventType",
+            "ValiditySourceType",
+        ),
     }
-    discovery_enums = {
-        "AnalysisIntent",
-        "DiscoveryEpistemicStatus",
-        "DiscoveryLifecycleState",
-        "DiscoveryAdmissionClaimState",
-        "DiscoveryAdmissionReplayDisposition",
-    }
-    validity_enums = {
-        "ValiditySourceType",
-        "ValiditySourceState",
-        "ValidityEventType",
-    }
-
-    for pkg, enum_names in (
-        (evaluation_pkg, evaluation_enums),
-        (governance_pkg, governance_enums),
-        (discovery_pkg, discovery_enums),
-        (validity_pkg, validity_enums),
-    ):
+    for module, enum_names in expected_identities.items():
         for name in enum_names:
-            if hasattr(pkg, name):
-                assert getattr(pkg, name) is getattr(enums, name)
+            assert getattr(module, name) is getattr(enums, name)
+
+    exported_enum_owners = {
+        value: value.__module__
+        for package in (
+            evaluation_pkg,
+            governance_pkg,
+            discovery_pkg,
+            validity_pkg,
+        )
+        for name in package.__all__
+        if inspect.isclass(value := getattr(package, name))
+        and issubclass(value, Enum)
+    }
+    assert exported_enum_owners == {
+        evaluation_pkg.ActiveStateProof: "schemas.evaluation.bundle",
+        evaluation_pkg.EvaluationFailureReason: "schemas.evaluation.results",
+        evaluation_pkg.InclusionRole: "schemas.evaluation.bundle",
+        evaluation_pkg.ManifestObjectType: "schemas.evaluation.bundle",
+        evaluation_pkg.RepositorySource: "schemas.evaluation.bundle",
+    }
+
+
+def test_all_exported_s3b_model_schemas_and_configs_match_s3a() -> None:
+    """Hash every exported Pydantic schema/config/field order against S3-A."""
+
+    snapshot = {}
+    for package in (
+        evaluation_pkg,
+        governance_pkg,
+        discovery_pkg,
+        validity_pkg,
+    ):
+        package_snapshot = {}
+        for name in package.__all__:
+            value = getattr(package, name)
+            if inspect.isclass(value) and issubclass(value, BaseModel):
+                package_snapshot[name] = {
+                    "schema": value.model_json_schema(),
+                    "config": dict(value.model_config),
+                    "fields": list(value.model_fields),
+                }
+        snapshot[package.__name__] = package_snapshot
+    encoded = json.dumps(
+        snapshot,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode()
+    assert hashlib.sha256(encoded).hexdigest() == S3A_SCHEMA_SNAPSHOT_SHA256
 
 
 def test_s3b_models_model_dump_json_is_baseline_compatible() -> None:

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+
 from sqlalchemy import inspect, text
 from sqlmodel import SQLModel
 
@@ -32,6 +35,16 @@ EXPECTED_TABLES = sorted([
     "user_decisions",
     "validity_events",
 ])
+S3A_SQLITE_MASTER_OBJECT_COUNT = 214
+S3A_SQLITE_MASTER_SHA256 = (
+    "265178b8fd1b9fdf1c84ec25e27019a84d66221e1b9c0d9ef99761d4e183c6ed"
+)
+
+
+def _normalize_sql(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return " ".join(value.split())
 
 
 def test_sqlite_schema_and_trigger_equivalence(tmp_path) -> None:
@@ -49,12 +62,40 @@ def test_sqlite_schema_and_trigger_equivalence(tmp_path) -> None:
     assert set(EXPECTED_TABLES) <= set(table_names)
     assert len(EXPECTED_TABLES) == 21
 
-    # Check triggers
+    # Compare the complete non-internal sqlite_master representation with the
+    # independently captured S3-A baseline. SQLite-owned autoindexes are
+    # excluded because their names begin with sqlite_ and are not user DDL.
     with engine.connect() as conn:
-        triggers = conn.execute(
-            text("SELECT name FROM sqlite_master WHERE type = 'trigger'")
-        ).fetchall()
-        trigger_names = {row[0] for row in triggers}
+        objects = [
+            {
+                "type": row[0],
+                "name": row[1],
+                "table": row[2],
+                "sql": _normalize_sql(row[3]),
+            }
+            for row in conn.execute(
+                text(
+                    """
+                    SELECT type, name, tbl_name, sql
+                    FROM sqlite_master
+                    WHERE name NOT LIKE 'sqlite_%'
+                    ORDER BY type, name, tbl_name
+                    """
+                )
+            )
+        ]
+    encoded = json.dumps(
+        objects,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    assert len(objects) == S3A_SQLITE_MASTER_OBJECT_COUNT
+    assert hashlib.sha256(encoded).hexdigest() == S3A_SQLITE_MASTER_SHA256
+    trigger_names = {
+        item["name"]
+        for item in objects
+        if item["type"] == "trigger"
+    }
 
     expected_triggers = {
         "legacy_scientific_quarantine_immutable_update",
@@ -68,7 +109,7 @@ def test_sqlite_schema_and_trigger_equivalence(tmp_path) -> None:
         "discovery_admission_claims_terminal",
         "proposal_decisions_exact_consumption",
     }
-    assert expected_triggers <= trigger_names
+    assert trigger_names == expected_triggers
 
 
 def test_facade_table_count() -> None:

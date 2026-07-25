@@ -15,10 +15,28 @@ import pytest
     [
         ("application.evidence", "application.execution"),
         ("application.execution", "application.evidence"),
+        (
+            "application.evaluation",
+            "application.governance",
+            "application.discovery",
+            "application.validity",
+        ),
+        (
+            "application.validity",
+            "application.discovery",
+            "application.evaluation",
+            "application.governance",
+        ),
+        (
+            "application.governance",
+            "application.discovery",
+            "application.validity",
+            "application.evaluation",
+        ),
     ],
 )
-def test_execution_and_evidence_packages_are_import_order_independent(
-    module_order: tuple[str, str],
+def test_adjacent_application_packages_are_import_order_independent(
+    module_order: tuple[str, ...],
 ) -> None:
     """Package exports must not re-enter a partially initialized neighbor."""
 

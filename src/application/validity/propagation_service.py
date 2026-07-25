@@ -56,6 +56,8 @@ from schemas.validity import (
 )
 
 _VALIDITY_EVENT_NAMESPACE = UUID("2aa2d86d-197b-5a73-b938-f2ac79e11057")
+
+
 class StaleValidityPropagationError(RuntimeError):
     """Raised when a source or dependent loses an expected-state fence."""
 
@@ -124,7 +126,14 @@ class AtomicValidityPropagationService:
         if existing is not None:
             return self._replay_existing(existing, request_fingerprint)
 
-        plan, dependencies = self._build_plan(command, authority)
+        try:
+            plan, dependencies = self._build_plan(command, authority)
+        except StaleValidityPropagationError:
+            self.session.rollback()
+            winner = self.repo.get_by_idempotency_key(command.idempotency_key)
+            if winner is not None:
+                return self._replay_existing(winner, request_fingerprint)
+            raise
         try:
             self._apply_plan(plan, command, dependencies)
             event = ValidityEventRecord(
