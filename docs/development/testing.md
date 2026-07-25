@@ -5,59 +5,52 @@
 ```powershell
 uv run pytest
 uv run ruff check .
+uv run python -m compileall -q src
 uv run mypy src
 ```
 
-`pyproject.toml` configures pytest for `tests/` plus README doctests, Ruff for all rules with a small ignore set, and mypy strict mode for `src`.
+`pyproject.toml` configures pytest for `tests/` plus README doctests, Ruff for all
+rules with a small ignore set, and strict mypy for `src`.
 
-## Verified snapshot — Gate 0 Baseline (2026-07-24)
+Counts are checkout-specific and must not be copied forward as current facts.
+The S4 audit records the exact reviewed commands and results. Strict mypy has
+known baseline debt and is not currently a clean gate.
 
-| Check | Result |
-| --- | --- |
-| Full pytest on `tests` + `README.md` | **564 passed** |
-| Ruff on `src` + `tests` | **Passed clean** |
-| Strict mypy on `src` | **Failed: 358 errors in 24 files** (baseline technical debt) |
+## Covered boundaries
 
-## Covered behavior
+The suite includes:
 
-The repository test suite covers:
+- FCO classification, schema/model ownership, and import safety;
+- Task-Hypothesis-Discovery cardinality and terminal-writer guards;
+- Planner proposal/approval and fail-closed scientific operation handling;
+- execution outbox/inbox, lease, fencing, retry, race, and recovery behavior;
+- atomic Evidence and Discovery admission with rollback/replay/concurrency;
+- protected synthesis-bundle exclusion and Analyst typed outputs;
+- governance authority, exact proposal decision, and consumption fencing;
+- validity authority, full dependent effects, replay, races, and retrieval
+  exclusion;
+- SessionFrame projection and bounded Discovery retrieval;
+- SQLite migrations, legacy quarantine, 21-table facade, and trigger equivalence;
+- canonical documentation inventory, links, anchors, and forbidden phantom
+  source claims.
 
-- canonical FCO admission and architecture ownership boundaries;
-- repository CRUD/query, append-only surfaces, immutability and lifecycle guards;
-- one Task–one Hypothesis and one Hypothesis–one Discovery constraints;
-- Evidence/Discovery/DataProfile supersession/historical review semantics;
-- Task motivation provenance;
-- SQLite foreign keys, URL isolation and targeted migration boundaries;
-- deterministic DataProfile semantics;
-- RetrievalPolicy and SessionFrame planning/answer/synthesis projections;
-- planner request parsing with injected fake classification models;
-- planner graph topology and approval-gated execution admission;
-- PlannerOperation persistence/commit behavior for covered cases;
-- executor capability registry/dispatcher plumbing;
-- attempt transition, lease, fencing, race and recovery cases;
-- atomic Evidence/Discovery admission and overlapping execution/admission races;
-- tool-manager configuration loading.
+Concurrency tests use file-backed SQLite where independent connections matter.
+External analytical/model work uses injected fakes; passing tests do not prove a
+live provider, worker, or production adapter.
 
-No test is marked skipped or xfailed in the audited snapshot. Concurrency tests use file-backed SQLite where independent connections matter; external analytical work is represented by fake executors.
+## Important limitations
 
-## Important gaps
+Tests do not make the absent product surfaces real. Notably absent or partial:
 
-Passing tests do not cover:
+- a supported CLI/API/worker bootstrap and deployment authentication adapter;
+- a concrete production Data Explorer adapter and live Analyst model;
+- executable DVC/cleaning/version workflows;
+- complete answer/suggest/plan Planner branches and a Planner application
+  facade;
+- Graph Miner traversal, persistent semantic index, and Evidence cache;
+- multi-host crash semantics and external side-effect idempotency;
+- a clean strict-mypy baseline.
 
-- default `_ConfiguredRequestUnderstandingModel` construction (it currently raises `TypeError`);
-- technical retry reuses its existing Hypothesis and creates a distinct successor attempt;
-- rejection of an outbox-only execution bundle without marking an operation committed;
-- runnable GraphMiner/HypothesisAnalyst graphs;
-- DVC execution or cleaning/version creation;
-- natural-language end-to-end planning, retrieval or prompt construction;
-- production API/worker bootstrap (Gate 0 intentionally has no supported CLI);
-- process crash or multi-host worker behavior;
-- external executor side-effect idempotency;
-- cache validity/reuse;
-- Ruff/mypy compliance.
-
-## Test credibility boundary
-
-Use a passing test count only to claim that covered local contracts pass. Do not use it to claim that CogniEDA is product-ready, that a live configured model service is reachable, or that static quality gates are green.
-
-When adding behavior, protect invariants first: immutable knowledge, context-role exclusion, admission/cardinality, transition ownership/fencing, operation atomicity, and evidence-bound Discovery creation.
+When adding behavior, protect immutable knowledge, context-role exclusion,
+admission/cardinality, transaction ownership, fencing/idempotency, and
+evidence-bound Discovery creation first.

@@ -101,5 +101,5 @@ The local runtime and validity facade are SQLite-only, expose no supported CLI, 
 worker or service loop. Package S1-B moved execution coordination to `application.execution`,
 Evidence admission to `application.evidence`, and canonical execution contracts to
 `schemas.execution`. Packages S2-A and S2-B moved evaluation, governance, Discovery admission,
-and validity propagation to their canonical application bounded contexts. Broader S3
-normalization remains deferred.
+and validity propagation to their canonical application bounded contexts. S3 normalized
+the persistence models behind the explicit `db.models` facade.

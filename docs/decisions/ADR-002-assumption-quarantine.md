@@ -1,8 +1,31 @@
 # ADR-002: Assumption Quarantine in Synthesis Contexts
 
-- **Status**: Accepted `[Implemented]`
-- **Context**: Analytical assumptions and user heuristics are often used to guide planning. If assumptions leak into hypothesis synthesis, unverified beliefs are treated as empirical facts.
-- **Decision**: `Assumption` objects are strictly quarantined and excluded from Conclusion Contexts and Hypothesis Analyst evaluation inputs.
-- **Consequences**: Hypotheses can only be evaluated against empirical `Evidence` and verified `DataProfile` records. Contradiction flagging occurs post-admission and does not alter claim validity.
-- **Rejected Alternatives**: Including assumptions as soft context prompts, merging assumptions into discovery claim text.
-- **Verification**: `test_package_s2a_dependency_directions_are_enforced` and Analyst context builder tests.
+**Status:** Accepted; structurally enforced for protected evaluation.
+
+## Context
+
+Assumptions may guide planning, but using them as empirical premises would turn
+unverified beliefs into scientific claims.
+
+## Decision
+
+Conclusion/Discovery synthesis excludes `Assumption`, existing `Discovery`,
+`SessionFrame`, raw chat, and caller-supplied generic context. The Hypothesis
+Analyst receives only the closed `DiscoverySynthesisBundle`.
+
+## Consequences
+
+Assumptions can be compared with a Discovery only after admission to raise a
+review signal; the comparison does not rewrite either object.
+
+## Rejected alternatives
+
+Soft-prompt assumption context and embedding assumptions into proposed claim
+text.
+
+## Enforcement
+
+`src/schemas/evaluation/bundle.py` has no unsafe context channel and
+`src/application/evaluation/bundle_builder.py` reconstructs the bundle from
+repositories. `tests/application/evaluation/test_synthesis_bundle.py` and
+`tests/application/evaluation/test_bundle_digest.py` verify the exclusion.

@@ -1,30 +1,39 @@
-# Retrieval Engine & SessionFrame Active Context
+# Retrieval and SessionFrame
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** bounded Discovery retrieval and typed projections `[Implemented]`;
+> general session-resume product workflow `[Partially Implemented]`.
 
-CogniEDA implements active retrieval context filtering anchored to user-governed `SessionFrame` state.
+## Current SessionFrame behavior
 
----
+`SessionFrame` is a persisted context snapshot. `SessionFrameRepository` can append, read, list,
+and select the latest active/checkpoint/handoff frame. Planner approval paths can append successor
+frames; atomic Discovery admission creates a deterministic conclusion frame; validity propagation
+marks affected frames `SUPERSEDED` and appends a stale marker.
 
-## 1. `SessionFrame` Role
+Frames are not updated in place during ordinary “resume.” There is no supported workspace-open UI,
+automatic timestamp refresh, or general item-governance service.
 
-`SessionFrame` (`src/schemas/research/session_frame.py`) tracks active user context:
-- `active_objective_id`: Current active research objective.
-- `focal_task_id`: Currently selected focus task.
-- `active_data_profile_id`: Ground-truth dataset profile in scope.
-- `working_hypotheses`: Currently active hypotheses under evaluation.
+## Context projections
 
----
+`SessionContextBuilder` builds planning, answer, conclusion, and discovery-synthesis views.
+Assumptions are planning-only. Existing Discoveries are allowed for answer/planning under policy
+but excluded from conclusion/discovery synthesis. Rejected Tasks, completed Hypotheses, invalid
+Evidence, stale caches, and superseded frames are excluded as defined by `retrieval_policy.py`.
 
-## 2. Retrieval Filtering Rules
+The protected Hypothesis Analyst path does not consume SessionFrame projections; it uses the
+closed repository-built bundle described in [Context Type Safety](context-type-safety.md).
 
-1. **Active Context Exclusion**: Invalidated `Discovery`, `Evidence`, or `Hypothesis` objects are strictly excluded from active retrieval.
-2. **Assumption Isolation**: `Assumption` objects are returned during Planning retrieval, but excluded from Conclusion retrieval.
-3. **Completed Hypothesis Bounding**: Completed hypotheses without valid claims are excluded from future planning synthesis.
+## Discovery retrieval
 
----
+`DiscoveryRetrievalEngine` performs a bounded relational candidate query with structural and
+lexical scoring. It filters lifecycle state, DataProfile scope, pins, exclusions, and Task
+motivation eligibility. It is currently used by Planner decomposition.
 
-## 3. Graph Miner & Future Retrieval Extensions
+Invalidated/deprecated Discoveries remain available through explicit repository historical reads
+but are excluded from active retrieval. A superseded SessionFrame is not returned by
+`get_latest_active`.
 
-> [!NOTE]
-> Advanced vector retrieval, semantic graph indexing, and Graph Miner capabilities are **deferred** until future product packages. Active retrieval currently operates via direct relational queries over SQLite.
+## Deferred work
+
+`[Deferred]` Graph Miner traversal, persistent semantic/vector indexes, a general historical query
+mode, session scoping/cardinality policy, and a user-facing resume interface.

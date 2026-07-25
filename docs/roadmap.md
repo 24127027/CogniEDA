@@ -1,77 +1,55 @@
-# CogniEDA Master Development Roadmap
+# CogniEDA Development Roadmap
 
-> **Status**: `[Implemented]` (Structural Foundation S1–S4) / `[Design Target]` (Package 7 Product Slice)
+> **Implementation status:** Packages S1-S3 are present in the reviewed source.
+> Package S4 is the current documentation/structural-exit checkpoint. Package 7
+> is a future product slice and has not started.
 
-This document is the **single canonical roadmap** for CogniEDA. It records completed structural packages and outlines future product vertical slices.
+This roadmap distinguishes reviewed implementation from target work. Commit
+history names are useful provenance, but source and tests determine current
+behavior.
 
----
+## Structural foundation
 
-## 1. Completed Structural Foundation (S1 – S4)
+| Package | Reviewed outcome |
+| --- | --- |
+| Gate 0 | Core FCO schemas, SQLite initialization, and scientific-safety baseline. The `wave-1-sqlite-integration` tag points to `9b46c204eb4eed85c39b726bdce105ac5eac74a7`. |
+| S1-A | Private Data Explorer registry/dispatcher boundary and fail-closed runtime composition. |
+| S1-B | Execution transitions, recovery, and atomic Evidence admission separated into application contexts. The canonical class is `ExecutionAttemptTransitionService`. |
+| S2-A | Protected evaluation and governance separated; the Analyst authors proposals but cannot authorize or persist Discoveries. |
+| S2-B | Atomic Discovery admission and atomic validity propagation established as sole supported transaction owners. |
+| S3-A/S3-B | Canonical persistence model modules normalized behind the explicit 21-table `db.models` facade; SQLite migration/trigger tests cover the supported boundary. |
+| S4 | Canonical documentation reconstructed and adversarially reconciled with source, tests, migrations, and Git history. Final limitations are recorded in the structural-exit report. |
 
-The structural foundation established the governed bounded contexts, specialist authority boundaries, transaction integrity, and SQLite persistence layer.
+## Package 7 readiness
 
-### Gate 0 — Scientific Safety & Baseline Infrastructure `[Implemented]`
-- Established core FCO schemas and initial SQLite database initialization.
-- Wave 1 Integration tag: `wave-1-sqlite-integration` (`9b46c204eb4eed85c39b726bdce105ac5eac74a7`).
+The S4 verdict is **READY WITH EXPLICIT LIMITATIONS**, not a claim that a product
+surface already exists. Package 7 may build a narrow end-to-end product slice
+provided it preserves these boundaries:
 
-### Package S1-A — Data Explorer Boundary & Runtime Facade `[Implemented]`
-- Isolated Data Explorer execution capabilities.
-- Removed generic executor aliases and unified runtime interfaces.
+- Data Explorer remains observation-only.
+- Hypothesis Analyst receives only `DiscoverySynthesisBundle` and returns a
+  typed proposal/failure.
+- user authority and exact proposal decisions precede Discovery admission;
+- only the existing atomic services materialize Evidence, Discovery, and
+  validity effects;
+- Assumptions remain excluded from conclusion synthesis;
+- proposed/non-terminal Tasks cannot execute or produce scientific claims.
 
-### Package S1-B — Execution & Evidence Bounded-Context Decomposition `[Implemented]`
-- Decomposed `application.execution` and `application.evidence`.
-- Extracted `ExecutionTransitionService` and strict Evidence admission.
+Likely product work includes an authenticated CLI/API bootstrap, a production
+Data Explorer adapter and worker loop, the governed dataset/profile workflow,
+and completion of Planner branches. The Planner's direct SQLModel/repository
+knowledge is documented non-blocking debt; introducing an application facade is
+preferred when that surface is touched.
 
-### Package S2-A — Evaluation & Governance Bounded-Context Decomposition `[Implemented]`
-- Decomposed `application.evaluation` and `application.governance`.
-- Isolated `HypothesisAnalyst` proposal authoring from governance decision recording.
+## Deferred work
 
-### Package S2-B — Discovery & Validity Bounded-Context Decomposition `[Implemented]`
-- Decomposed `application.discovery` and `application.validity`.
-- Established `AtomicDiscoveryAdmissionService` and `AtomicValidityPropagationService`.
+- executable DVC/artifact integration and governed cleaning;
+- Graph Miner traversal plus persistent semantic/vector indexing;
+- validity-keyed Evidence cache;
+- multi-tenant service/worker deployment and production model/auth adapters;
+- broader reproducibility envelope, CI policy, and strict-mypy remediation.
 
-### Package S3-A — Research, Execution & Evidence Persistence Normalization `[Implemented]`
-- Normalized SQLModel table models, repository boundaries, and private staging hooks for research, execution, and evidence contexts.
-
-### Package S3-B — Evaluation, Governance, Discovery & Validity Persistence Normalization `[Implemented]`
-- Normalized persistence models and trigger guards across evaluation, governance, discovery, and validity contexts.
-- Verified 21 SQLModel tables, 214 `sqlite_master` objects, and 10 SQLite triggers.
-
-### Package S4 — Canonical Documentation Reconstruction & Structural Exit Checkpoint `[Implemented]`
-- Reconstructed canonical documentation hierarchy (`docs/index.md`, `project-purpose.md`, `roadmap.md`, `architecture/*`, `workflows/*`, `decisions/*`).
-- Verified complete S1–S3 bounded-context structure.
-- Classified Planner persistence access and verified Package 7 readiness exit criteria.
-
----
-
-## 2. Next Supported Product Vertical Slice (Package 7)
-
-Package 7 will deliver the first end-to-end user-facing analytical product slice over the verified structural foundation.
-
-### Package 7A — Interactive Task & Hypothesis Guidance `[Design Target]`
-- **Purpose**: Interactive UI/CLI workflow for research objective formulation, task decomposition, and hypothesis binding.
-- **Prerequisites**: Package S4 completion.
-- **Exclusions**: Unsafe auto-execution without user governance.
-
-### Package 7B — Governed Analytical Execution Engine `[Design Target]`
-- **Purpose**: Production executor dispatch, deterministic sandbox execution, and structured observation parsing.
-- **Prerequisites**: Package 7A.
-- **Exclusions**: Arbitrary unconstrained code execution.
-
-### Package 7C — Synthesis & Discovery Materialization `[Design Target]`
-- **Purpose**: Hypothesis evaluation bundling, proposal authoring by Hypothesis Analyst, user decision workflow, and atomic discovery materialization.
-- **Prerequisites**: Package 7B.
-- **Exclusions**: Automatic discovery creation bypassing user governance.
-
-### Package 7D — Active Session Resume & Graph Visualization `[Design Target]`
-- **Purpose**: Multi-session workspace resumption, interactive lineage visualization, and active retrieval context management.
-- **Prerequisites**: Package 7C.
-- **Exclusions**: Unchecked long-memory chat summaries.
-
----
-
-## 3. Future Research & Product Packages `[Deferred]`
-
-- **Graph Miner Context Retrieval**: Advanced graph store indexing for discovery lineage `[Deferred]`.
-- **DVC / Artifact Storage Integration**: External large-scale binary dataset versioning `[Deferred]`.
-- **Multi-Tenant HTTP Service & Worker Daemon**: Production HTTP/gRPC server and async worker pool `[Deferred]`.
+See [Implementation Gap Analysis](architecture/implementation-gap-analysis.md)
+for the current gap inventory and
+[Structural Exit Status](architecture/structural-exit-status.md) for the S4
+verdict.

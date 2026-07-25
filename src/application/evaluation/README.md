@@ -1,26 +1,16 @@
-# Evaluation Application Package (`src/application/evaluation/`)
+# Evaluation Application Package
 
-> Canonical Documentation: [ADR-003: Specialist Scientific Authority](../../docs/decisions/ADR-003-specialist-scientific-authority.md) | [Evidence to Discovery Workflow](../../docs/workflows/evidence-to-discovery.md)
+Canonical references: [Scientific Specialist Contracts](../../../docs/architecture/scientific-specialist-contracts.md)
+and [Evidence to Discovery](../../../docs/workflows/evidence-to-discovery.md).
 
-## Purpose
-Owns evaluation control state management and protected Hypothesis Analyst execution orchestration.
+`EvaluationTransitionService` owns durable `EvaluationControl` enqueue, claim,
+proposal/failure publication, retry, cancellation, invalidation, and conflict
+transitions. `build_synthesis_bundle` reconstructs a closed
+`DiscoverySynthesisBundle` from repositories; the protected Analyst runner
+receives only that bundle and publishes a typed proposal or failure.
 
-## Owned Responsibilities
-- `EvaluationControlService` (`control_service.py`).
-- Assembling protected Conclusion Context for Hypothesis Analyst.
-- Managing `EvaluationControlRecord` state transitions (`PENDING` $\rightarrow$ `CLAIMED` $\rightarrow$ `PROPOSAL_READY`).
+This package does not record user decisions, materialize Discoveries, or admit
+Assumptions/generic context into synthesis.
 
-## Forbidden Responsibilities
-- Direct governance decision recording (owned by `application.governance`).
-- Discovery materialization (owned by `application.discovery`).
-- Injecting `Assumption` objects into evaluation inputs.
-
-## Canonical Inputs / Outputs
-- Input: `Evidence`-ready `Hypothesis`, evaluation key.
-- Output: `DiscoverySynthesisBundle`, `DiscoveryProposal`.
-
-## Transaction Authority
-Sole transaction owner for `EvaluationControlRecord` lifecycle transitions.
-
-## Tests
-- `tests/application/evaluation/test_control_service.py`
+Primary verification: `tests/application/evaluation/test_synthesis_bundle.py`,
+`test_bundle_digest.py`, and `test_hypothesis_analyst_execution.py`.

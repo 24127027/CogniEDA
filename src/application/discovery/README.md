@@ -1,27 +1,18 @@
-# Discovery Application Package (`src/application/discovery/`)
+# Discovery Application Package
 
-> Canonical Documentation: [ADR-004: Atomic Discovery Admission](../../docs/decisions/ADR-004-atomic-discovery-admission.md) | [Evidence to Discovery Workflow](../../docs/workflows/evidence-to-discovery.md)
+Canonical references: [ADR-004](../../../docs/decisions/ADR-004-atomic-discovery-admission.md)
+and [Evidence to Discovery](../../../docs/workflows/evidence-to-discovery.md).
 
-## Purpose
-Owns atomic materialization and fenced claim validation for `Discovery` objects.
+This package owns deterministic admission-plan construction, claim/replay
+fencing, the supported coordinator, and the sole atomic Discovery transaction.
+`AtomicDiscoveryAdmissionService` verifies authority under the SQLite writer
+lock and commits the exact proposal-copy `Discovery`, conclusion
+`SessionFrame`, terminal Task/Hypothesis transitions, committed evaluation and
+claim state, and decision consumption.
 
-## Owned Responsibilities
-- `AtomicDiscoveryAdmissionService` (`admission_service.py`).
-- Atomic transaction materializing `DiscoveryRecord` from an authorized `DiscoveryProposal`.
-- Verifying exact proposal copy rule and fencing claim consumption.
-- Transitioning `EvaluationControlRecord` to `COMMITTED` and `ProposalDecisionRecord` to `consumed=1`.
+It does not author proposals or make governance decisions. Public
+`DiscoveryRepository.create()` is sealed.
 
-## Forbidden Responsibilities
-- Authoring scientific proposals (owned by Hypothesis Analyst).
-- Making user governance decisions (owned by `application.governance`).
-- Public `DiscoveryRepository.create()` calls.
-
-## Canonical Inputs / Outputs
-- Input: `DiscoveryAdmissionRequestPayload` (containing decision ID, evaluation ID, proposal digest, claim token).
-- Output: `AtomicDiscoveryAdmissionResult` (containing committed `Discovery`, `DiscoveryAdmissionClaimRecord`).
-
-## Transaction Authority
-Sole transaction owner for `Discovery` creation and `EvaluationControlRecord.COMMITTED` state transitions.
-
-## Tests
-- `tests/application/discovery/test_atomic_discovery_admission.py`
+Primary verification:
+`tests/application/discovery/test_discovery_admission_plan.py` and
+`tests/application/discovery/test_atomic_discovery_admission.py`.

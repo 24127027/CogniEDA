@@ -1,31 +1,43 @@
-# Task to Hypothesis Workflow
+# Task-to-Hypothesis Workflow
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** Partial planner workflow, verified at the library
+> and SQLite integration levels. Natural-language planning branches remain
+> scaffold-level.
 
-This guide documents planning decomposition, task creation, and 1:1 hypothesis binding.
-
----
-
-## 1. Workflow Summary
+## Implemented path
 
 ```text
-Objective
-└──> Planner Node (expand_plan)
-     └──> Task Creation (TaskRecord)
-          └──> Analytical Focus Check
-               └──> 1:1 Hypothesis Binding (HypothesisRecord)
+approved PlannerOperation
+  -> Task committed by commit_planner_operations
+  -> prepare_execution validates active analytical terminal Task + active accepted DataProfile
+  -> user approves exact execution contract
+  -> commit_execution_contract
+  -> Hypothesis(TESTING) + admitted ExecutionRun/outbox
 ```
 
----
+Planner nodes stage durable `PlannerOperation` and `ExecutionApproval` workflow
+records. Approved ordinary research-state operations are committed through
+`src/application/orchestrator/planner_commit.py`. Execution approval is
+revalidated against current Task and DataProfile state before
+`commit_execution_contract` creates or transitions the single Hypothesis and
+stages execution admission.
 
-## 2. Step-by-Step Specification
+## Protected invariants
 
-1. **Preconditions**: Active `Objective` and valid `DataProfile` bound in `SessionFrame`.
-2. **Inputs**: Research question or natural language planning prompt.
-3. **Responsible Components**: Planner Nodes (`src/agents/planner/nodes.py`), Task Commit Service (`src/repositories/research/task.py`).
-4. **Durable Writes**: Staged `PlannerOperationRecord`s committed atomically into `tasks` and `hypotheses` tables.
-5. **Invariants**:
-   - Only **terminal analytical tasks** generate `Hypothesis` objects.
-   - One terminal analytical task generates **exactly one** `Hypothesis`.
-   - Parent tasks do not generate hypotheses.
-6. **Resulting State**: `TaskRecord` (`status='READY'`) and `HypothesisRecord` (`status='PROPOSED'`).
+- Only an active terminal analytical `Task` with an analytical specification can
+  enter execution preparation.
+- The bound `DataProfile` must be active, accepted as ground truth, and match the
+  Task.
+- One terminal analytical Task has exactly one Hypothesis.
+- Parent/organizing Tasks do not create Hypotheses or execute.
+- A proposed Task cannot execute.
+- Execution admission places the Hypothesis in `TESTING`; evidence admission
+  later transitions it to `READY_FOR_EVALUATION`.
+
+## Boundaries and limitations
+
+`expand_plan` does not directly create a Hypothesis. The binding occurs only
+after exact execution-contract approval. Planner nodes still open SQLModel
+sessions and know repository/record types; this is documented non-blocking
+application-boundary debt. The supported Planner commit path rejects generic
+creation of `AnalysisFrame`, `Evidence`, and `Discovery`.

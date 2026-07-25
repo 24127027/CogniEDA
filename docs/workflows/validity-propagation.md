@@ -1,30 +1,38 @@
 # Validity Propagation Workflow
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** Implemented and verified on SQLite for the supported
+> source/event matrix, exact replay, conflict fencing, and dependent-state
+> propagation.
 
-This guide documents validity event creation, propagation through dependent research state, and active retrieval exclusion.
-
----
-
-## 1. Workflow Summary
+## Atomic path
 
 ```text
-Invalidation Command / Trigger Event
-└──> AtomicValidityPropagationService
-     ├──> Authority & Fingerprint Verification
-     ├──> ValidityEventRecord Creation (Immutable)
-     ├──> Dependent Target State Mutation (INVALIDATED)
-     └──> Retrieval Index Exclusion Notification
+authorized validity command
+  -> AtomicValidityPropagationService
+  -> validate authority, source type/state/fingerprint, event type, replacement
+  -> derive versioned ValidityPropagationPlan
+  -> acquire SQLite writer lock and revalidate
+  -> commit source/dependent transitions + immutable ValidityEvent
 ```
 
----
+`src/application/validity/propagation_service.py` owns this path. Supported
+events cover invalidation/supersession of `DataProfile`, `Evidence`,
+`AnalysisFrame`, and `ExecutionRun`. The plan records stable fingerprints and
+the full intended effect set.
 
-## 2. Step-by-Step Specification
+Depending on the source and event, one transaction can update the source plus
+affected Evidence, EvaluationControls, active admission claims, Discoveries,
+Hypotheses, Tasks needing review, and SessionFrames that become superseded. It
+then inserts the immutable `ValidityEvent`.
 
-1. **Preconditions**: Invalidation request issued with valid authority token and target fingerprint.
-2. **Inputs**: Source fingerprint, target ID, invalidation reason.
-3. **Responsible Components**: `AtomicValidityPropagationService` (`src/application/validity/propagation_service.py`).
-4. **Durable Writes**:
-   - `ValidityEventRecord` (immutable audit record).
-   - Target entity `validity_state` updated to `INVALIDATED` (`AnalysisFrameRecord`, `HypothesisRecord`, `DiscoveryAdmissionClaimRecord`).
-5. **Retrieval Impact**: Invalidated entities remain in the SQLite database for historical traceability but are immediately excluded from active retrieval and conclusion contexts.
+## Replay and failure semantics
+
+- Exact replay succeeds only when all persisted effects still match.
+- The same idempotency key with changed content conflicts.
+- Concurrent exact commands produce one commit and one recognized replay.
+- Concurrent incompatible commands produce one winner.
+- Missing, stale, wrong-principal, or wrong-action authority fails closed.
+
+There is no retrieval-index notification. Invalidated/deprecated Discoveries are
+excluded by persisted lifecycle/validity state and query policy; they remain in
+SQLite for provenance and audit.

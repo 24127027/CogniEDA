@@ -27,7 +27,10 @@ COGNIEDA_DB_ECHO=false
 
 Database behavior:
 
-- If `COGNIEDA_DB_URL` is empty, the default SQLite URL points to `.local/cognieda_graph.sqlite3`.
+- Repository session helpers fall back to `.local/cognieda_graph.sqlite3` when
+  `COGNIEDA_DB_URL` is empty.
+- `CogniEDARuntime` itself requires a non-empty explicit database URL in
+  `RuntimeConfiguration`; it does not silently select that fallback.
 - SQLite foreign keys are enabled on connect.
 - `init_db()` creates all SQLModel tables.
 
@@ -52,7 +55,9 @@ uv run ruff check .
 uv run mypy src
 ```
 
-No docs build or docs link-check command was found in the current repo.
+Markdown structure, canonical index coverage, relative links, and local heading
+anchors are checked by
+`tests/architecture/test_documentation_integrity.py`.
 
 ## Tool And MCP Config
 
@@ -60,4 +65,7 @@ No docs build or docs link-check command was found in the current repo.
 
 ## Current verification note
 
-At the Gate 0 integration baseline, full pytest passes (564 passed), Ruff passes, and strict mypy reports 358 errors as explicit baseline technical debt.
+Verification counts are checkout-specific. The current S4 command evidence and
+known strict-mypy debt are recorded in the ignored local audit referenced by the
+[Structural Exit Status](../architecture/structural-exit-status.md); rerun the
+commands before making a release claim.

@@ -13,7 +13,8 @@ The `application` layer coordinates domain transactions, execution transitions, 
 - Atomic discovery materialization (`application.discovery`).
 - Atomic validity propagation (`application.validity`).
 - Planner operation commit orchestration (`application.orchestrator`).
-- Application runtime composition root (`application.bootstrap`).
+- In-process composition root (`application.runtime`) and external factory loader
+  (`application.runtime_loader`).
 
 ## Forbidden Responsibilities
 - Direct SQLModel table manipulation outside owned transaction boundaries.
@@ -30,3 +31,6 @@ The `application` layer coordinates domain transactions, execution transitions, 
 - [governance](governance/README.md)
 - [orchestrator](orchestrator/README.md)
 - [validity](validity/README.md)
+
+`bootstrap/` and `events/` are documentation-only target packages. They contain
+no Python implementation and are not the current composition root.

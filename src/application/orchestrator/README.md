@@ -1,25 +1,17 @@
-# Orchestrator Application Package (`src/application/orchestrator/`)
+# Orchestrator Application Package
 
-> Canonical Documentation: [Bounded Contexts](../../docs/architecture/bounded-contexts.md) | [Task to Hypothesis Workflow](../../docs/workflows/task-to-hypothesis.md)
+Canonical references:
+[Bounded Contexts](../../../docs/architecture/bounded-contexts.md) and
+[Task to Hypothesis](../../../docs/workflows/task-to-hypothesis.md).
 
-## Purpose
-Owns planner commit transaction coordination and approval-gated task/hypothesis persistence.
+`commit_planner_operations` commits approved Planner operations for Objective,
+Task, Assumption, Hypothesis, and ordinary SessionFrame state. Execution
+admission is delegated to `ExecutionAttemptTransitionService`.
 
-## Owned Responsibilities
-- `commit_planner_operations` service.
-- Atomically persisting approved `PlannerOperation` batches into `tasks`, `hypotheses`, and `objectives`.
+The generic commit path rejects AnalysisFrame, Evidence, and Discovery creation
+and cannot write terminal Task/Hypothesis scientific states. Planner nodes still
+know SQLModel sessions and repositories; a narrower application facade is
+documented non-blocking debt.
 
-## Forbidden Responsibilities
-- Direct execution run management (owned by `application.execution`).
-- Direct evidence admission (owned by `application.evidence`).
-- Direct discovery admission (owned by `application.discovery`).
-
-## Canonical Inputs / Outputs
-- Input: Approved `PlannerOperation` list, session ID.
-- Output: `CommitPlannerOperationsResult`.
-
-## Transaction Authority
-Transaction owner for committing staged planner operations.
-
-## Tests
-- `tests/agents/planner/test_planner_operations.py`
+Primary verification: Planner tests under `tests/agents/planner` and
+`tests/application/orchestrator`.

@@ -1,30 +1,41 @@
-# Governance & Admission Workflow
+# Governance and Admission Workflow
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** Implemented and verified on SQLite for Discovery
+> proposal decisions and admission authority.
 
-This guide documents user authority token issuance, proposal decision recording, and fenced claim verification.
+## Authority and decision
 
----
+`GovernanceAuthorityIssuer` in `src/application/governance/authority.py`
+persists an expiring authority bound to the authenticated principal, action,
+resource, and proposal digest. It does not create a Discovery.
 
-## 1. Workflow Summary
+`DiscoveryAdmissionGovernanceService` in
+`src/application/governance/decision_service.py` validates that authority and
+records one durable `ProposalDecision`. Supported outcomes are `APPROVED`,
+`REJECTED`, and `CANCELLED`; there is no `MODIFY` outcome. A changed proposal
+requires a new evaluated proposal and corresponding authority/decision.
 
 ```text
-DiscoveryProposal
-└──> Governance Authority Generation (GovernanceAuthorityRecord)
-     └──> User Decision (ACCEPT / REJECT / MODIFY)
-          └──> ProposalDecisionRecord (consumed=0)
-               └──> Fenced Admission Verification
-                    └──> ProposalDecisionRecord (consumed=1)
+authenticated principal
+  -> exact proposal-ready EvaluationControl
+  -> authority issuance
+  -> approved/rejected/cancelled ProposalDecision
+  -> approved decision eligible for atomic Discovery admission
 ```
 
----
+## Consumption boundary
 
-## 2. Step-by-Step Specification
+Recording an approval does not materialize scientific truth. Only
+`AtomicDiscoveryAdmissionService`, normally entered through
+`DiscoveryAdmissionCoordinator`, may consume the exact approved decision while
+committing the full Discovery chain.
 
-1. **Preconditions**: Evaluation control reaches `PROPOSAL_READY` state with a valid `DiscoveryProposal`.
-2. **Inputs**: Proposal digest (`proposal_digest`), workspace ID, actor identity, user action.
-3. **Responsible Components**: `ProposalDecisionService` (`src/application/governance/decision_service.py`), SQLite trigger guards.
-4. **Durable Writes**:
-   - `GovernanceAuthorityRecord` (immutable authority token).
-   - `ProposalDecisionRecord` (immutable core decision details).
-5. **Consumption Fencing**: SQLite trigger `proposal_decisions_exact_consumption` prevents `consumed` from mutating to `1` unless backed by an exact committed discovery admission claim chain in `discovery_admission_claims`.
+SQLite triggers and service validation prevent:
+
+- decision consumption without the matching committed admission claim;
+- reuse across a different principal, action, resource, or proposal digest;
+- silent mutation of immutable decision fields;
+- split commits of Discovery, lifecycle changes, and decision consumption.
+
+Rejected and cancelled decisions remain durable governance history and cannot be
+used for admission.

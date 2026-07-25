@@ -1,61 +1,57 @@
-# Persistence & Transaction Boundaries
+# Persistence and Transactions
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** normalized ownership `[Implemented]`; transaction and trigger
+> guarantees `[Verified on SQLite]`.
 
-CogniEDA enforces explicit, isolated write sets and single-owner transactions for all database operations.
+## Layer separation
 
----
+```text
+domain schema != repository adapter != SQLModel table != migration asset
+```
 
-## 1. Canonical Storage Architecture
+`schemas` owns typed values. `repositories` owns lookup/conversion and narrowly named staging
+hooks. `db.models` owns 21 table definitions and is the stable facade. `db.migrations` and
+`db.legacy_migration` own SQLite upgrade and quarantine assets. Repositories do not generally own
+multi-record commits; explicit legacy/bootstrap create methods are documented exceptions.
 
-- **Engine**: SQLite with WAL (Write-Ahead Logging) and immediate transaction locking.
-- **ORM / DDL Layer**: SQLModel over SQLAlchemy core.
-- **Facade Import Boundary**: `src/db/models/__init__.py` acts as the sole public persistence model facade.
+## Table ownership
 
----
+| Persistence module | Tables |
+| --- | --- |
+| `db.models.research` | objectives, objective_revisions, data_profiles, assumptions, tasks, hypotheses, session_frames |
+| `db.models.workflow` | planner_operations |
+| `db.models.execution` | execution_runs, execution_outbox, execution_inbox, execution_approvals |
+| `db.models.evidence` | analysis_frames, evidence |
+| `db.models.evaluation` | evaluation_controls |
+| `db.models.governance` | user_decisions, governance_authorities, proposal_decisions |
+| `db.models.discovery` | discoveries, discovery_admission_claims |
+| `db.models.validity` | validity_events |
 
-## 2. Table Set & Transaction Owners
+## Transaction write sets
 
-| Table Name | Entity Description | Sole Transaction Owner | Write Boundary / Mutability |
-| :--- | :--- | :--- | :--- |
-| `objectives` | Research objectives | Objective Commit Service | Mutable via `objective_revisions` |
-| `objective_revisions` | Revision audit log | Objective Commit Service | Append-only |
-| `data_profiles` | Dataset fingerprints | Data Profiler Service | **Immutable** |
-| `assumptions` | Research premises | Planner Commit Service | Mutable lifecycle state |
-| `tasks` | Analytical work items | Task Commit / Transition Service | State machine updates |
-| `hypotheses` | Testable hypotheses | Task Commit / Transition Service | State machine updates |
-| `execution_runs` | Execution attempt record | `ExecutionTransitionService` | Fenced lease & state updates |
-| `execution_inbox` | Dispatch queue | `ExecutionTransitionService` | Monotonic status updates |
-| `execution_outbox` | Completion queue | `ExecutionTransitionService` | Monotonic status updates |
-| `execution_approvals` | Sandbox approval tokens | `ExecutionTransitionService` | Fenced consumption |
-| `analysis_frames` | Provenance records | `EvidenceAdmissionService` | **Immutable** |
-| `evidence` | Observed empirical results | `EvidenceAdmissionService` | **Immutable** |
-| `evaluation_controls` | Synthesis control records | `EvaluationControlService` | State machine updates |
-| `governance_authorities` | User authority tokens | `ProposalDecisionService` | **Immutable** (Trigger guarded) |
-| `proposal_decisions` | Recorded user decisions | `ProposalDecisionService` | Monotonic consumption (Trigger guarded) |
-| `discovery_admission_claims` | Fenced materialization claims | `AtomicDiscoveryAdmissionService` | Terminal state updates (Trigger guarded) |
-| `discoveries` | Materialized claims | `AtomicDiscoveryAdmissionService` | **Immutable** |
-| `session_frames` | Active focal windows | Session Service | Mutable focal context |
-| `planner_operations` | Staged operations | Planner Commit Service | Pending operations queue |
-| `user_decisions` | Direct decision log | Governance Service | Append-only |
-| `validity_events` | Invalidation audit trail | `AtomicValidityPropagationService` | **Immutable** (Trigger guarded) |
+| Operation | Commit owner | Principal write set |
+| --- | --- | --- |
+| approved Planner batch | `commit_planner_operations` | planner operation state plus Task, Objective/revision, Assumption, Hypothesis, or successor SessionFrame as requested |
+| execution admission | `commit_planner_operations` delegating staging to `ExecutionAttemptTransitionService` | Hypothesis state, ExecutionRun, outbox, consumed approval, operation state |
+| execution transitions | `ExecutionAttemptTransitionService` public methods and application execution coordinators | run, outbox, inbox, approval state as applicable |
+| Evidence admission | `execute_evidence_admission_plan` | AnalysisFrame, Evidence, ExecutionRun, Hypothesis, authoritative inbox |
+| evaluation lifecycle | `EvaluationTransitionService` | EvaluationControl |
+| authority issuance | `GovernanceAuthorityIssuer` | GovernanceAuthority |
+| proposal decision | `DiscoveryAdmissionGovernanceService` via its repository commit hook | ProposalDecision |
+| Discovery admission | `AtomicDiscoveryAdmissionService` | Discovery, conclusion SessionFrame, Hypothesis, Task, EvaluationControl, admission claim, ProposalDecision |
+| validity propagation | `AtomicValidityPropagationService` | source state, dependent Evidence/evaluation/claim/Discovery/Hypothesis/Task/SessionFrame state, ValidityEvent |
 
----
+The phrase “sole writer” applies to a specific guarded transition, not every row of a table.
+Atomic Discovery admission legitimately writes terminal EvaluationControl, Task, Hypothesis,
+SessionFrame, claim, and decision fields. Atomic validity propagation legitimately writes validity
+or review state across other contexts.
 
-## 3. Atomic Transaction Write Sets
+## Concurrency, replay, and limitations
 
-### Execution Transition Write Set
-- Owner: `ExecutionTransitionService`
-- Write Set: `ExecutionRunRecord`, `ExecutionInboxRecord`, `ExecutionOutboxRecord`, `ExecutionApprovalRecord`.
+Execution and scientific terminal paths use CAS conditions, lease/fencing epochs, deterministic
+identities, exact fingerprints, or unique constraints. Evidence admission and Discovery admission
+recognize exact committed replay; validity exact replay verifies the persisted complete effect
+plan. Changed payloads/commands conflict. Failures roll back each owned transaction.
 
-### Evidence Admission Write Set
-- Owner: `EvidenceAdmissionService`
-- Write Set: `AnalysisFrameRecord`, `EvidenceRecord`, `TaskRecord` (status update).
-
-### Discovery Admission Write Set
-- Owner: `AtomicDiscoveryAdmissionService`
-- Write Set: `DiscoveryRecord`, `DiscoveryAdmissionClaimRecord`, `EvaluationControlRecord` (`COMMITTED`), `ProposalDecisionRecord` (`consumed=1`).
-
-### Validity Propagation Write Set
-- Owner: `AtomicValidityPropagationService`
-- Write Set: `ValidityEventRecord`, `HypothesisRecord` (`INVALIDATED`), `DiscoveryAdmissionClaimRecord` (`INVALIDATED`), `AnalysisFrameRecord` (`INVALIDATED`).
+`[Known Deviation]` External Data Explorer side effects are at-least-once. Cross-service workflow
+steps are not one distributed transaction. All concurrency and trigger claims are SQLite-only.

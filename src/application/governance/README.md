@@ -1,25 +1,17 @@
-# Governance Application Package (`src/application/governance/`)
+# Governance Application Package
 
-> Canonical Documentation: [Governance and Admission Workflow](../../docs/workflows/governance-and-admission.md) | [Scientific Specialist Contracts](../../docs/architecture/scientific-specialist-contracts.md)
+Canonical reference:
+[Governance and Admission](../../../docs/workflows/governance-and-admission.md).
 
-## Purpose
-Owns user authority token generation and immutable proposal decision recording.
+`GovernanceAuthorityIssuer` persists expiring authority bound to the resolved
+principal, action, resource, workspace/session, and proposal identity.
+`DiscoveryAdmissionGovernanceService` verifies that authority and records an
+exact `APPROVED`, `REJECTED`, or `CANCELLED` proposal decision.
 
-## Owned Responsibilities
-- `ProposalDecisionService` (`decision_service.py`).
-- Generating `GovernanceAuthorityRecord` tokens.
-- Persisting `ProposalDecisionRecord` entries (user ACCEPT / REJECT decisions).
+Governance neither authors the proposal nor materializes a Discovery. Decision
+consumption belongs to the atomic Discovery transaction.
 
-## Forbidden Responsibilities
-- Authoring scientific proposals (owned by Analyst).
-- Materializing `Discovery` objects (owned by `application.discovery`).
-
-## Canonical Inputs / Outputs
-- Input: `DiscoveryProposal`, user action token, actor identity.
-- Output: `ProposalDecisionRecord`, `GovernanceAuthorityRecord`.
-
-## Transaction Authority
-Sole transaction owner for `GovernanceAuthorityRecord` and `ProposalDecisionRecord` creation.
-
-## Tests
-- `tests/application/governance/test_decision_service.py`
+Primary verification:
+`tests/application/governance/test_proposal_authorization.py` and governance
+cases in
+`tests/application/discovery/test_atomic_discovery_admission.py`.

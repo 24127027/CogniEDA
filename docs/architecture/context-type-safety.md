@@ -1,27 +1,46 @@
-# Context Type Safety & Assumption Quarantine
+# Context Type Safety
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** protected Hypothesis evaluation `[Implemented]`; generic
+> SessionFrame projections `[Partially Implemented]`; broader product context assembly `[Deferred]`.
 
-CogniEDA enforces context type safety across all planning, execution, synthesis, and retrieval contexts to prevent epistemic pollution.
+## Structurally enforced protected evaluation
 
----
+`DiscoverySynthesisBundle` is a frozen, closed schema. It admits Hypothesis, accepted DataProfile
+metadata, AnalysisFrame/ExecutionRun provenance, active Evidence, method metadata, decision rule,
+limitations, invalidators, and digests. `build_synthesis_bundle` reconstructs those values from
+repositories and checks active lifecycle and exact lineage. The Hypothesis Analyst has no tools,
+message history, repository, SQL session, or generic context field.
 
-## 1. Defined Context Types
+Therefore the supported protected evaluation path structurally excludes:
 
-| Context Type | Purpose | Allowed Objects | Forbidden Objects |
-| :--- | :--- | :--- | :--- |
-| **Planning Context** | Decomposing research goals into task plans | `Objective`, `DataProfile`, `Assumption`, active `Task` tree, `SessionFrame` | Unverified executions, rejected tasks |
-| **Execution Context** | Sandboxed execution of analytical code | `Task`, `DataProfile`, execution parameters, seed | `Assumption`, raw chat history, prior discoveries |
-| **Conclusion Context** | Scientific synthesis & discovery evaluation | `Hypothesis`, `DataProfile`, `AnalysisFrame`, backing `Evidence` | **`Assumption`**, prior `Discovery` objects, chat history, retrieval scores |
-| **Governance Context** | User review & decision recording | `DiscoveryProposal`, `EvaluationControl`, `GovernanceAuthority` | Unverified proposals, direct FCO mutators |
-| **Retrieval Context** | Workspace context resolution | Active `SessionFrame`, non-invalidated `Discovery` objects | Invalidated objects, stale session frames, rejected tasks |
+- Assumptions;
+- existing Discoveries;
+- Tasks as inference premises;
+- SessionFrames and raw chat history;
+- rejected/completed workflow state;
+- GeneratedViews, cache entries, retrieval scores, and arbitrary prompt bags.
 
----
+## SessionFrame projections
 
-## 2. Assumption Quarantine Mechanism
+`SessionContextBuilder` provides planning, answer, conclusion, and discovery-synthesis projections.
+Planning may include active Assumptions and Tasks. Answer may include active Discoveries.
+Conclusion/discovery-synthesis projections exclude Assumptions, Tasks, existing Discoveries, user
+decisions, dead ends, stale context, and caches.
 
-The core invariant of context type safety is the **Assumption Quarantine**:
-- `Assumption` objects represent user premises, heuristics, or unverified domain beliefs.
-- While `Assumption`s are accessible during **Planning Context** to help structure tasks, they are **strictly excluded** from **Conclusion Context**.
-- Scientific evaluation of a `Hypothesis` relies solely on empirical `Evidence` and verified `DataProfile` attributes.
-- After a `Discovery` is materialized, it may be compared against active `Assumption`s to flag contradictions, but the `Assumption` cannot serve as an inference premise.
+These projections are policy helpers, not the protected evaluator's authority. The protected
+evaluator uses the repository-built bundle directly.
+
+## Active retrieval
+
+`DiscoveryRetrievalEngine` performs bounded SQL-backed Discovery retrieval for planning. It excludes
+invalidated and deprecated Discoveries even when pinned; flagged or cross-profile results cannot
+motivate a Task. `AtomicValidityPropagationService` invalidates dependent state and marks affected
+SessionFrames superseded. `SessionFrameRepository.get_latest_active` excludes superseded frames.
+
+## Known limitations
+
+`[Known Deviation]` The general retrieval policy accepts some provenance references by string type
+and has no explicit historical/audit context mode.
+
+`[Partially Implemented]` SessionFrames are stored snapshots; there is no supported session-resume
+UI, item-level governance workflow, or general automatic context refresh.

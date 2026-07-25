@@ -1,43 +1,48 @@
-# Database Migrations & Schema Evolution
+# Migrations and Schema Evolution
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** current upgrade chain `[Implemented]` and `[Verified on SQLite]`.
 
-CogniEDA uses an idempotent, targeted database migration framework designed for workspace-local SQLite databases.
+## Initialization order
 
----
+`src/db/init_db.py:init_db` is the checked-in entry point. It creates an engine and calls:
 
-## 1. Migration Entry Point & Functions
+1. `upgrade_pre_repair_database`;
+2. `upgrade_objective_lifecycle_schema`;
+3. `upgrade_task_motivation_schema`;
+4. `upgrade_task_review_schema`;
+5. `upgrade_evaluation_control_schema`;
+6. `upgrade_proposal_decision_schema`;
+7. `upgrade_validity_events_schema`;
+8. `SQLModel.metadata.create_all`;
+9. `upgrade_discovery_admission_claim_schema`;
+10. `upgrade_legacy_payloads_schema`.
 
-Migration functions are located in `src/db/migrations.py`:
-- `init_db(database_url)` (`src/db/init_db.py`): Initializes a fresh database and applies all schema DDL and trigger definitions.
-- `upgrade_database(engine)` (`src/db/migrations.py`): Runs targeted idempotent upgrade functions in strict sequential order.
+There is no generic `upgrade_database` function. Discovery-chain triggers are installed after all
+referenced tables exist. The legacy payload step invokes the deterministic
+`LegacyPayloadMigrator` and installs its marker/quarantine assets.
 
-Targeted Upgrade Chain:
-1. `upgrade_pre_repair_database(engine)`: Fenced execution run columns and indexes.
-2. `upgrade_objective_lifecycle_schema(engine)`: Objective revisions table and active objective constraint.
-3. `upgrade_task_motivation_schema(engine)`: Task discovery motivation links.
-4. `upgrade_task_review_schema(engine)`: Planning review reason fields.
-5. `upgrade_evaluation_control_schema(engine)`: Evaluation control digest and status columns.
-6. `upgrade_proposal_decision_schema(engine)`: Governance authority tables and immutability triggers.
-7. `upgrade_validity_events_schema(engine)`: Validity metadata and quarantine tables.
-8. `upgrade_discovery_admission_claim_schema(engine)`: Fenced discovery admission claim triggers.
-9. `upgrade_legacy_payloads_schema(engine)`: Legacy payload migration helper.
+## Trigger set
 
----
+Fresh S3-B-equivalent SQLite metadata contains exactly these ten triggers:
 
-## 2. Trigger Guards & Immutability Enforcement
+- governance authority immutable core;
+- proposal decision immutable core;
+- proposal decision monotonic consumption;
+- validity event immutable update and no-delete;
+- Discovery admission claim immutable identity and terminal-state guard;
+- exact proposal-decision consumption;
+- legacy quarantine immutable update and no-delete.
 
-SQLite triggers enforce strict immutability at the database level:
-- `governance_authorities_immutable_core`: Prevents modification of core authority fields.
-- `proposal_decisions_immutable_core`: Prevents modification of decision fields.
-- `proposal_decisions_monotonic_consumption`: Enforces one-way consumption (`consumed 0 -> 1`).
-- `validity_events_immutable` / `validity_events_no_delete`: Prevents updates or deletions of validity events.
-- `discovery_admission_claims_immutable_identity`: Prevents claim identity mutation.
-- `discovery_admission_claims_terminal`: Prevents state updates once a claim reaches a terminal state (`COMMITTED`, `CONFLICT`, `CANCELLED`, `INVALIDATED`).
-- `proposal_decisions_exact_consumption`: Rejects consumption unless backed by an exact committed discovery admission claim chain.
+Exact names and DDL are enforced by `tests/db/test_s3b_sqlite_schema_equivalence.py` and
+`tests/db/test_legacy_migration.py`.
 
----
+## Guarantees and limits
 
-## 3. Historical Migration Assets Policy
+Focused tests cover fresh initialization, targeted legacy upgrades, idempotent rerun, deterministic
+quarantine, interrupted migration rollback/retry, model import order, and SQLite trigger behavior.
+One historical task-motivation downgrade helper exists; the project does not claim a general
+rollback framework.
 
-Existing migration functions and historical schema repairs in `src/db/migrations.py` are **immutable historical assets**. They must not be reorganized or refactored in documentation or exit packages.
+`[Known Deviation]` These are targeted in-code SQLite upgrade assets, not Alembic revisions.
+Historical migration functions must not be reordered or rewritten merely to improve documentation.
+No non-SQLite guarantee is claimed.

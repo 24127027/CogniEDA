@@ -1,25 +1,17 @@
-# Evidence Application Package (`src/application/evidence/`)
+# Evidence Application Package
 
-> Canonical Documentation: [Execution to Evidence Workflow](../../docs/workflows/execution-to-evidence.md) | [Research State Model](../../docs/architecture/research-state-model.md)
+Canonical reference:
+[Execution to Evidence](../../../docs/workflows/execution-to-evidence.md).
 
-## Purpose
-Owns formal admission of observed empirical results into immutable `AnalysisFrame` and `Evidence` records.
+This package validates observation-only results, builds deterministic frozen
+`EvidenceAdmissionPlan` values, and executes the sole supported AnalysisFrame
+and Evidence admission transaction through `execute_evidence_admission_plan`.
+The transaction also moves the fenced ExecutionRun to `EVIDENCE_ADMITTED`, the
+Hypothesis to `READY_FOR_EVALUATION`, and consumes the authoritative inbox.
 
-## Owned Responsibilities
-- `EvidenceAdmissionService` (`admission_service.py`).
-- Creating immutable `AnalysisFrameRecord` and `EvidenceRecord` from Data Explorer observations.
-- Updating target `TaskRecord` to `COMPLETED`.
+Evidence admission does not complete the Task, evaluate the Evidence, or create
+a Discovery. Execution lease/queue transitions remain owned by
+`ExecutionAttemptTransitionService`.
 
-## Forbidden Responsibilities
-- Modifying `ExecutionRunRecord` leases (owned by `application.execution`).
-- Evaluating scientific hypotheses (owned by Hypothesis Analyst).
-
-## Canonical Inputs / Outputs
-- Input: `DataExplorerResult` / `EvidenceObservation`, run ID, task ID.
-- Output: `EvidenceAdmissionResult` (created `AnalysisFrame`, `Evidence`).
-
-## Transaction Authority
-Sole transaction owner for `AnalysisFrameRecord` and `EvidenceRecord` creation.
-
-## Tests
-- `tests/application/evidence/test_admission_service.py`
+Primary verification:
+`tests/application/evidence/test_evidence_admission.py`.

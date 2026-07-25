@@ -2,7 +2,10 @@
 
 ## Current implementation
 
-This directory contains no Python bootstrap implementation. There is no `dependency_container.py`, root application factory, worker bootstrap or startup lifecycle in current source.
+This directory contains no Python bootstrap implementation. The current
+in-process composition root is `src/application/runtime.py`, with external
+factory loading in `src/application/runtime_loader.py`. There is no
+`dependency_container.py`, worker bootstrap, or startup lifecycle here.
 
 ## Target design
 

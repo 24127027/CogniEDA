@@ -1,62 +1,61 @@
-# Scientific Specialist Contracts & Authority Boundaries
+# Scientific Specialist Contracts
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** protected specialist boundaries `[Implemented]`; concrete production
+> adapters `[Deferred]`.
 
-This document defines the authority boundaries, input/output contracts, and responsibility matrix for CogniEDA's specialist roles.
+## Authority matrix
 
----
+| Component | Observe | Evaluate Evidence | Author proposal wording | Decide | Persist |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Data Explorer adapter | yes | no | no | no | no |
+| Hypothesis Analyst | no | yes | yes | no | no |
+| Governance services | no | no | no | record exact authority/decision | authority and decision records only |
+| Discovery admission | no | no | no | verify approved decision | exact authorized Discovery chain |
+| Planner | no | no | no | stage approved workflow operations | no Evidence/Discovery writer |
 
-## 1. Scientific Responsibility Matrix
+## Data Explorer
 
-| Role / Component | Observation Authority | Evaluation Authority | Proposal Authority | Decision Authority | Persistence Authority | Invalidation Authority |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Data Explorer** | **YES** | NO | NO | NO | NO | NO |
-| **Hypothesis Analyst** | NO | **YES** | **YES** | NO | NO | NO |
-| **Application Services** | NO | NO | NO | NO | **YES** | **YES** |
-| **User Governance** | NO | NO | NO | **YES** | NO | NO |
+`DataExplorerDispatcher` invokes one explicitly registered
+`DataExplorerAdapterProtocol`. The adapter receives a `DataExplorerInput` containing durable
+Task, Hypothesis, DataProfile, and ExecutionRun identities plus the admitted contract. It returns
+`DataExplorerSuccessResult` or `DataExplorerFailureResult`.
 
----
+Success output contains `AnalysisFrameObservation` and `EvidenceObservation`. It contains no
+scientific evaluation or Discovery wording. The adapter has no repository, SQL session, governance,
+or transaction authority. No concrete production adapter is checked in.
 
-## 2. Data Explorer Boundary
+## Hypothesis Analyst
 
-**Authority**:
-- Executes sandboxed code against `DataProfile`.
-- Emits `AnalysisFrameObservation` and `EvidenceObservation`.
-- Emits technical failure results and diagnostics.
+`application.evaluation.bundle_builder.build_synthesis_bundle` reconstructs a closed,
+repository-authoritative `DiscoverySynthesisBundle`. The bundle contains only:
 
-**Explicit Exclusions**:
-- Must **not** evaluate a `Hypothesis`.
-- Must **not** create a `DiscoveryProposal`.
-- Must **not** record governance decisions.
-- Must **not** mutate database models.
+- Hypothesis contract;
+- safe accepted DataProfile metadata;
+- AnalysisFrame and ExecutionRun provenance;
+- active admitted Evidence;
+- method parameters, decision rule, limitations, invalidators, and digests.
 
----
+The no-tool PydanticAI agent receives that bundle as its only dependency, with no message history.
+The schema has no generic context field, so Assumptions, prior Discoveries, SessionFrames, chat,
+retrieval scores, raw data, and files cannot be injected through the supported runner.
+Hypothesis Analyst returns a typed `DiscoveryProposal` or `EvaluationFailure`.
 
-## 3. Hypothesis Analyst Boundary
+## Evaluation, governance, and admission
 
-**Authority**:
-- Evaluates backing `Evidence` against a `Hypothesis` decision rule.
-- Author of scientific claim proposals: produces `DiscoverySynthesisBundle` $\rightarrow$ `DiscoveryProposal | EvaluationFailure`.
+`EvaluationTransitionService` owns evaluation-control enqueue/claim/retry/proposal publication.
+`GovernanceAuthorityIssuer` independently issues expiring principal-bound authority.
+`DiscoveryAdmissionGovernanceService` records and verifies the exact decision; it does not author
+or materialize the claim.
 
-**Protected Context Inclusions**:
-- Target `Hypothesis`.
-- Active `DataProfile`.
-- `AnalysisFrame` provenance.
-- Backing `Evidence` records.
-- Method parameters and decision rules.
+`AtomicDiscoveryAdmissionService` rebuilds the current bundle and proposal authority under the
+SQLite writer lock. It copies the authorized proposal exactly into `Discovery`, creates the
+conclusion SessionFrame, transitions Hypothesis/Task/evaluation/claim state, and consumes the
+decision in one commit.
 
-**Protected Context Exclusions**:
-- **Assumptions** (Strictly Quarantined).
-- Prior `Discovery` objects.
-- `SessionFrame` context.
-- Conversation history / chat prose.
-- Retrieval scores / arbitrary context bags.
+## Explicitly rejected claims
 
----
-
-## 4. Governed Proposal-Copy Rule
-
-When the Hypothesis Analyst generates a `DiscoveryProposal`, application services enforce the **Exact Proposal-Copy Rule**:
-- The proposal digest (`proposal_digest`) is calculated via SHA-256 over the claim payload.
-- Governance records a `UserDecision` linked to this exact proposal digest.
-- `AtomicDiscoveryAdmissionService` verifies that the materializing `Discovery` is an exact structural copy of the authorized proposal before committing.
+- Data Explorer does not evaluate.
+- The application layer does not rewrite Discovery wording.
+- Governance and Planner do not create Discovery.
+- Assumptions do not enter protected conclusion synthesis.
+- Repositories do not own these multi-record transactions.

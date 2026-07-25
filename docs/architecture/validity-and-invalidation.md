@@ -1,36 +1,50 @@
-# Validity Engine & Invalidation Propagation
+# Validity and Invalidation
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** supported propagation commands `[Implemented]` and
+> `[Verified on SQLite]`; production authority workflows `[Partially Implemented]`.
 
-CogniEDA enforces scientific validity through deterministic source fingerprinting, immutable validity events, and atomic dependent-state invalidation.
+## Command and authority
 
----
+`ValidityPropagationCommand` is a versioned, frozen request binding:
 
-## 1. Source Fingerprints & Invalidation Triggers
+- source type/id and expected state;
+- server-computed source fingerprint;
+- event type and reason;
+- durable authority ID plus workspace/session scope;
+- idempotency key;
+- optional replacement identity/fingerprint.
 
-Invalidation occurs when an upstream premise or computation becomes invalid or superseded:
+`AtomicValidityPropagationService` reloads and fingerprints the source, verifies the immutable
+`GovernanceAuthorityRecord`, checks event/source allowlists and principal or trusted-producer
+scope, discovers dependents, derives a deterministic plan, and executes it atomically.
 
-| Source Type | Cause for Invalidation | Invalidation Effect |
-| :--- | :--- | :--- |
-| **DataProfile** | Data cleaning, filtering, re-ingestion | Invalidation of all dependent `AnalysisFrame`, `Evidence`, `Hypothesis`, and `Discovery` records |
-| **Execution Method** | Parameter change, code bug, algorithm revision | Invalidation of dependent `ExecutionRun`, `Evidence`, and downstream claims |
-| **User Invalidation** | Explicit rejection of an analytical step | Invalidation of target `Hypothesis` and dependent discoveries |
+## Supported sources and effects
 
----
+Supported events cover DataProfile invalidation/supersession, Evidence
+invalidation/supersession/conflict, AnalysisFrame invalidity, ExecutionRun conflict, and
+AnalysisFrame/ExecutionRun provenance corruption.
 
-## 2. Invalidation vs. Flagging
+The write set may transition the source plus dependent Evidence, EvaluationControl, active
+DiscoveryAdmissionClaim, Discovery, Hypothesis, Task review metadata, and SessionFrame. Tasks are
+kept in their lifecycle state but gain review reasons. Pre-Discovery source loss moves a ready
+Hypothesis to `AWAITING_ADDITIONAL_EVIDENCE`; post-Discovery dependencies are invalidated.
+Affected SessionFrames become `SUPERSEDED`.
 
-- **Invalidation**: An immutable event (`ValidityEventRecord`) issued by `AtomicValidityPropagationService`. It changes target validity state to `INVALIDATED` and excludes the target from active retrieval and conclusion contexts.
-- **Flagging**: A review signal created when a new `Discovery` contradicts an active `Assumption`. Flagging does **not** mutate truth or invalidate objects; it notifies the user for review.
-- **Assumption Replacement**: Updating an `Assumption` does **not** invalidate prior `Discovery` objects, because discoveries depend on empirical `Evidence`, not assumptions.
+## Replay and concurrency
 
----
+The immutable ValidityEvent records the request fingerprint, plan fingerprint, complete transition
+manifest, authority, and committed state. Exact replay verifies the complete persisted effects and
+returns the original event. A changed command under the same idempotency key conflicts.
+Concurrent exact commands produce one commit and one verified replay; incompatible commands have
+one winner. Failure at any staged transition rolls back the source and event.
 
-## 3. Atomic Propagation Semantics
+## Retrieval and history
 
-- **Owner**: `AtomicValidityPropagationService` (`src/application/validity/propagation_service.py`).
-- **Atomic Transaction**:
-  1. Verifies authority token and source fingerprint.
-  2. Persists immutable `ValidityEventRecord`.
-  3. Updates dependent target states (`INVALIDATED`).
-  4. Triggers retrieval index exclusion so invalidated objects are hidden from active contexts while remaining accessible in historical audit queries.
+Invalidated scientific records remain durable for historical trace. Active retrieval excludes
+invalidated Discoveries and superseded frames. No event bus or persistent retrieval index is
+notified; exclusion is enforced by persisted state and query policy.
+
+## Limitations
+
+`[Known Deviation]` The runtime can execute a supplied authority but no general production validity
+authority issuer/workflow is checked in. All transaction and trigger guarantees are SQLite-only.

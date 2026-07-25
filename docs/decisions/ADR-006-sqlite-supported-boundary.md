@@ -1,8 +1,30 @@
 # ADR-006: SQLite as Sole Supported Persistence Boundary
 
-- **Status**: Accepted `[Implemented]`
-- **Context**: Supporting multiple database engines before stabilizing scientific transaction semantics leads to dialect fragmentation and unverified DDL triggers.
-- **Decision**: SQLite with WAL mode, foreign key enforcement, and immediate transaction locking is the **sole supported persistence boundary** for CogniEDA structural foundation releases.
-- **Consequences**: All database models, DDL migrations, and DDL triggers are written and tested exclusively against SQLite. PostgreSQL or distributed database support is out of current scope.
-- **Rejected Alternatives**: Multi-dialect ORM abstraction layer without triggers, raw file-system JSON stores.
-- **Verification**: `tests/db/test_s3b_sqlite_schema_equivalence.py`.
+**Status:** Accepted; implemented and verified for SQLite only.
+
+## Context
+
+Scientific transaction semantics depend on concrete lock, trigger, and migration
+behavior. Multi-dialect claims without equivalent tests would be unsafe.
+
+## Decision
+
+SQLite is the sole supported persistence runtime for the current foundation.
+Initialization enables foreign keys and applies ordered, targeted in-code schema
+repairs, table creation, triggers, and legacy quarantine.
+
+## Consequences
+
+PostgreSQL and distributed-database behavior is not claimed. There is no Alembic
+or general downgrade framework.
+
+## Rejected alternatives
+
+An unverified multi-dialect abstraction and filesystem JSON as the authority
+store.
+
+## Enforcement
+
+`tests/db/test_s3b_sqlite_schema_equivalence.py` verifies the explicit 21-table
+facade and SQLite schema/trigger equivalence. Migration tests under `tests/db`
+exercise upgrades and trigger guards.

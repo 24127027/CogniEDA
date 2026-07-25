@@ -1,26 +1,18 @@
-# Validity Application Package (`src/application/validity/`)
+# Validity Application Package
 
-> Canonical Documentation: [ADR-005: Atomic Validity Propagation](../../docs/decisions/ADR-005-atomic-validity-propagation.md) | [Validity Propagation Workflow](../../docs/workflows/validity-propagation.md)
+Canonical references:
+[ADR-005](../../../docs/decisions/ADR-005-atomic-validity-propagation.md) and
+[Validity Propagation](../../../docs/workflows/validity-propagation.md).
 
-## Purpose
-Owns invalidation event issuance and atomic state propagation across dependent research state objects.
+`AtomicValidityPropagationService` verifies durable authority and source
+fingerprints, derives a versioned plan, revalidates under the SQLite writer lock,
+and atomically commits source/dependent state transitions plus one immutable
+ValidityEvent.
 
-## Owned Responsibilities
-- `AtomicValidityPropagationService` (`propagation_service.py`).
-- Atomic transaction persisting `ValidityEventRecord`.
-- Updating dependent target entities (`AnalysisFrameRecord`, `HypothesisRecord`, `DiscoveryAdmissionClaimRecord`) to `INVALIDATED`.
-- Triggering retrieval index exclusion for invalidated entities.
+The effect set can cover Evidence, EvaluationControl, admission claims,
+Discovery, Hypothesis, Task review state, and SessionFrame supersession. No
+retrieval-index notification exists; active retrieval excludes invalid state by
+query policy.
 
-## Forbidden Responsibilities
-- Direct FCO deletion.
-- Mutating historical evidence content.
-
-## Canonical Inputs / Outputs
-- Input: `ValidityPropagationRequest` (source fingerprint, target ID, authority token, reason).
-- Output: `ValidityPropagationResult` (persisted event ID, list of affected target IDs).
-
-## Transaction Authority
-Sole transaction owner for `ValidityEventRecord` insertion and `INVALIDATED` validity state updates.
-
-## Tests
-- `tests/application/validity/test_validity_propagation.py`
+Primary verification:
+`tests/application/validity/test_validity_propagation.py`.

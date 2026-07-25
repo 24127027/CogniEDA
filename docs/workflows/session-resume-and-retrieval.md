@@ -1,28 +1,37 @@
-# Session Resume & Retrieval Workflow
+# Session Resume and Retrieval Workflow
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** Implemented as library-level append/read/projection
+> and bounded SQL retrieval. No production workspace-open or UI resume bootstrap
+> exists.
 
-This guide documents workspace session initialization, active context building, and state reconstruction.
+## SessionFrame snapshots
 
----
+`SessionFrameRepository` provides append, read, list, latest, and latest-active
+operations. A frame is an immutable-style context snapshot: ordinary progress
+appends a successor rather than updating a timestamp or focal handles in place.
+Atomic Discovery admission appends the conclusion frame. Validity propagation
+can mark affected frames `SUPERSEDED` with a stale marker.
 
-## 1. Workflow Summary
+`SessionContextBuilder` in `src/memory/session_frame.py` builds bounded planner
+projections from a selected frame. These projections may include Assumptions for
+planning. They are not the protected conclusion context used by the Hypothesis
+Analyst.
 
-```text
-Workspace Open / Session Resume
-└──> SessionFrame Initialization (SessionFrameRecord)
-     └──> Context Building (SessionContextBuilder)
-          ├──> Filter Invalidated Objects
-          ├──> Enforce Assumption Quarantine
-          └──> Assemble Active Focal Window
-```
+## Discovery retrieval
 
----
+`DiscoveryRetrievalEngine` in `src/memory/retrieval_engine.py` performs bounded
+SQLite structural filtering followed by deterministic lexical scoring. Filters
+cover lifecycle/validity state, profile scope, pinning, exclusions, and
+motivation eligibility.
 
-## 2. Step-by-Step Specification
+- Invalidated or deprecated Discoveries are excluded even when pinned.
+- Flagged or cross-profile Discoveries are not eligible to motivate new work.
+- Retrieval does not mutate research state.
+- Graph Miner and a persistent semantic/vector index are deferred.
 
-1. **Preconditions**: SQLite database initialized; existing workspace session ID provided.
-2. **Inputs**: Workspace URI, session ID.
-3. **Responsible Components**: `SessionContextBuilder` (`src/memory/session_frame.py`), `SessionFrameRepository` (`src/repositories/research/session_frame.py`).
-4. **Durable Writes**: Updated `SessionFrameRecord` timestamp and active focal handles.
-5. **Resulting State**: Active context window loaded into memory for planner and execution operations.
+## Resume boundary
+
+A caller can reconstruct an active projection by loading the latest active frame
+for a session and invoking the context builder. The repository does not yet ship
+a CLI, API, or process bootstrap that maps a filesystem workspace open into this
+sequence automatically.

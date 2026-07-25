@@ -1,45 +1,53 @@
-# Research-State Model & First-Class Objects (FCOs)
+# Research-State Model
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** target ontology `[Implemented]`; several lifecycle and product
+> governance surfaces remain `[Partially Implemented]`.
 
-This document defines the canonical **First-Class Objects (FCOs)**, provenance entities, and runtime structures in CogniEDA.
+## Target First-Class Objects
 
----
+Exactly these eight objects are FCOs:
 
-## 1. Target First-Class Objects (FCOs)
+| FCO | Current durable representation | Current lifecycle authority |
+| --- | --- | --- |
+| `Objective` | schema, table, repository, revision provenance | approved Planner commit |
+| `DataProfile` | frozen schema, table, repository | profiler/import bootstrap; validity service for invalidation/supersession |
+| `Assumption` | schema, table, repository | Planner commit; planning-only premise |
+| `Task` | schema, table, repository | Planner commit; execution/Discovery terminal transitions |
+| `Hypothesis` | schema, table, repository | execution admission; Evidence/Discovery/validity transitions |
+| `Evidence` | frozen schema, table, repository | atomic Evidence admission; validity service changes lifecycle metadata |
+| `Discovery` | frozen schema, table, repository | atomic Discovery admission; validity service changes lifecycle metadata |
+| `SessionFrame` | schema, append-oriented table/repository | bootstrap/Planner successor snapshots, Discovery conclusion frame, validity supersession |
 
-Only the following 8 entities are target First-Class Objects in CogniEDA:
+## Non-FCO boundaries
 
-| FCO | Epistemic Role | Lifecycle / Mutability | Sole Write Authority | Read / Retrieval Policy |
-| :--- | :--- | :--- | :--- | :--- |
-| **Objective** | High-level research motivation & scientific goal | Mutable via versioned revisions (`ObjectiveRevision`) | `ObjectiveRepository` / Commit Service | Unrestricted |
-| **DataProfile** | Formal specification & statistical fingerprint of a dataset version | Immutable | Data Profiler / Dataset Import | Active ground-truth profile included in planning |
-| **Assumption** | Stated analytical premise or user heuristic | Mutable (Active, Superseded, Flagged) | Planner Commit / User Action | **Quarantined** from Conclusion/Synthesis context |
-| **Task** | Analytical work item decomposing an Objective | State machine (`DRAFT`, `PENDING_APPROVAL`, `READY`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`) | Task Repository / Execution Transition | Planning and context resolution |
-| **Hypothesis** | Testable mathematical/statistical assertion bound 1:1 to a terminal Task | State machine (`PROPOSED`, `EVALUATED`, `INVALIDATED`) | Task Commit / Admission Service | Conclusion Synthesis Context |
-| **Evidence** | Observed empirical result from audited execution | **Immutable** | `EvidenceAdmissionService` | Conclusion Synthesis Context |
-| **Discovery** | Evidence-bound scientific claim | **Immutable** | `AtomicDiscoveryAdmissionService` | Default active retrieval (if valid) |
-| **SessionFrame** | Active user context & focal window | Updated on user interaction | `SessionFrameRepository` | Active retrieval boundary |
+- `Workspace`: filesystem and runtime boundary.
+- `Question`: user input that may become a `Task`.
+- `AnalysisFrame` and `ExecutionRun`: provenance.
+- `PlannerOperation`: durable pending workflow mutation.
+- `GeneratedView`: runtime/provenance output.
+- `EvidenceCacheEntry`: cache design target; no persistence exists.
+- `ObjectiveRevision`, approvals, inbox/outbox, evaluation controls, governance records,
+  admission claims, user decisions, and validity events: workflow, authority, or provenance.
 
----
+## Implemented invariants
 
-## 2. Non-FCO Boundaries
+- `DataProfile` and `Evidence` schema payloads are frozen; lifecycle changes are separate guarded
+  metadata transitions.
+- one `Task` has at most one `Hypothesis`, enforced by a unique constraint;
+- one `Hypothesis` has at most one `Discovery`, enforced by a unique constraint;
+- protected evaluation requires an active accepted DataProfile and active Evidence;
+- Discovery admission requires same-Hypothesis active Evidence and structured claim, scope, and
+  validity basis;
+- parent Tasks cannot enter the execution/evaluation/admission terminal path;
+- Assumptions and existing Discoveries cannot enter the protected evaluation bundle.
 
-The following entities are explicitly **not** First-Class Objects:
-- **`Workspace`**: Filesystem & runtime boundary.
-- **`Question`**: User UI input that decomposes into a `Task`.
-- **`AnalysisFrame`**: Provenance & dataset view metadata record.
-- **`ExecutionRun`**: Provenance & execution attempt record.
-- **`GeneratedView`**: Runtime visualization output.
-- **`PlannerOperation`**: Pending state mutation proposal.
-- **`EvidenceCacheEntry`**: Transient performance cache.
+## Known deviations and partial areas
 
----
+`[Known Deviation]` The Planner currently authors the operational analytical contract; target
+design assigns operationalization to Hypothesis Analyst.
 
-## 3. Structural Invariants & Lifecycles
+`[Partially Implemented]` SessionFrame is append-oriented and has deterministic projections, but
+general user item governance, workspace/session cardinality, and refresh/resume UI are absent.
 
-1. **`DataProfile` Immutability**: Cleaning or transforming data creates a *new dataset version* and a *new `DataProfile`*. Existing profiles are never mutated.
-2. **`Evidence` Immutability**: Analytical results cannot be updated. Overwritten or superseded results create new `Evidence` records and trigger invalidation events.
-3. **One-to-One Task & Hypothesis Binding**: One terminal analytical `Task` produces exactly one `Hypothesis`. Parent tasks do not produce hypotheses or discoveries.
-4. **`Discovery` Materialization Requirement**: A `Discovery` cannot exist without backing `Evidence`. It must contain structured `claim`, `scope`, and `validity_basis`.
-5. **Assumption Quarantine**: `Assumption` objects may guide planning but are strictly excluded from Conclusion and Discovery Synthesis contexts.
+`[Partially Implemented]` Repository methods still provide some bootstrap CRUD surfaces. Exact
+scientific writers are sealed, but the project does not claim a general graph-domain abstraction.

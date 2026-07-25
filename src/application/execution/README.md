@@ -1,25 +1,18 @@
-# Execution Application Package (`src/application/execution/`)
+# Execution Application Package
 
-> Canonical Documentation: [Execution to Evidence Workflow](../../docs/workflows/execution-to-evidence.md) | [Persistence and Transactions](../../docs/architecture/persistence-and-transactions.md)
+Canonical references:
+[Execution to Evidence](../../../docs/workflows/execution-to-evidence.md) and
+[Persistence and Transactions](../../../docs/architecture/persistence-and-transactions.md).
 
-## Purpose
-Owns execution run dispatch, lease fencing, status transitions, and retry/recovery logic.
+`ExecutionAttemptTransitionService` owns durable run-attempt, dispatch outbox,
+result inbox, lease/fencing, failure, retry, cancellation, and evidence-admission
+transition stages. Dispatch/recovery coordinators call this service; external
+effects remain at-least-once and are protected by identity, digest, owner,
+epoch, and attempt-version checks.
 
-## Owned Responsibilities
-- `ExecutionTransitionService` (`transition_service.py`).
-- Managing `ExecutionRunRecord`, `ExecutionInboxRecord`, `ExecutionOutboxRecord`, and `ExecutionApprovalRecord`.
-- Fenced lease acquisition, worker heartbeat, and attempt version incrementing.
+This package does not author scientific claims and does not directly insert
+AnalysisFrame, Evidence, or Discovery records.
 
-## Forbidden Responsibilities
-- Admitting `AnalysisFrame` or `Evidence` records (owned by `application.evidence`).
-- Mutating scientific hypothesis claims.
-
-## Canonical Inputs / Outputs
-- Input: `PreparedExecution`, execution request token.
-- Output: `ExecutionTransitionResult`, `ExecutionRunRecord`.
-
-## Transaction Authority
-Sole transaction owner for execution attempt records and inbox/outbox queues.
-
-## Tests
-- `tests/application/execution/test_transition_service.py`
+Primary verification:
+`tests/application/execution/test_transition_service.py` and
+`tests/repositories/test_execution_recovery_boundaries.py`.

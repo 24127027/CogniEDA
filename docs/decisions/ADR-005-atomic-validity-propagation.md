@@ -1,8 +1,32 @@
 # ADR-005: Atomic Validity Propagation Transaction Ownership
 
-- **Status**: Accepted `[Implemented]`
-- **Context**: Partial or un-coordinated invalidation of upstream data or hypotheses leaves orphaned, invalid scientific claims active in retrieval contexts.
-- **Decision**: `AtomicValidityPropagationService` (`src/application/validity/propagation_service.py`) is the **sole supported transaction owner** for issuing validity events and updating dependent target states.
-- **Consequences**: Validity events are immutable and append-only. Dependent target entities (`AnalysisFrame`, `Hypothesis`, `DiscoveryAdmissionClaim`) are atomically updated to `INVALIDATED`.
-- **Rejected Alternatives**: In-place deletion of invalid objects, un-monitored cascading updates.
-- **Verification**: `test_package_s2b_dependency_directions_are_enforced` and validity propagation tests.
+**Status:** Accepted; implemented and verified on SQLite for the supported event
+matrix.
+
+## Context
+
+Partial invalidation can leave dependent scientific state active after its
+authority is lost.
+
+## Decision
+
+`AtomicValidityPropagationService` is the sole supported transaction owner for
+validity source transitions, dependent effects, and immutable event insertion.
+
+## Consequences
+
+Authority and source fingerprints are revalidated under the writer lock. Exact
+replay requires the complete persisted effect set; incompatible commands
+conflict.
+
+## Rejected alternatives
+
+Deletion, repository-by-repository cascades, and asynchronous best-effort
+retrieval notifications.
+
+## Enforcement
+
+`tests/application/validity/test_validity_propagation.py` covers atomic rollback,
+authority, all supported source types, replay, races, and retrieval exclusion.
+Dependency direction is checked by
+`tests/architecture/test_architecture_enforcement.py`.

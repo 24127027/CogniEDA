@@ -1,30 +1,47 @@
-# Workspace & DataProfile Workflow
+# Workspace and DataProfile Workflow
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** Partial. Dataset loading and profiling plus immutable
+> `DataProfile` persistence are implemented library surfaces. A governed
+> workspace-import/acceptance workflow, executable DVC integration, and automatic
+> `SessionFrame` binding are not implemented.
 
-This guide documents the lifecycle, preconditions, responsible components, and failure modes for workspace initialization and immutable dataset profiling.
-
----
-
-## 1. Workflow Summary
+## Implemented path
 
 ```text
-Dataset File / Raw Source
-└──> Data Profiler
-     └──> Statistical Fingerprinting & Validation
-          └──> DataProfile Record (Immutable)
-               └──> Active SessionFrame Binding
+CSV or Parquet path / pandas DataFrame
+  -> data.profiling.profile_path or profile_dataframe
+  -> DataProfile value
+  -> DataProfileRepository.create
+  -> immutable data_profiles row
 ```
 
----
+- `src/data/loaders.py` loads CSV and Parquet inputs.
+- `src/data/profiling.py` derives schema, baseline statistics, quality flags,
+  preprocessing history, and source/version identifiers.
+- `src/repositories/research/data_profile.py` persists and reads immutable
+  `DataProfile` FCOs.
+- `DataProfileRepository.supersede` deliberately rejects split-transaction
+  supersession. Supersession and dependent invalidation must go through
+  `AtomicValidityPropagationService`.
 
-## 2. Step-by-Step Specification
+Creating a profile does not imply that a user accepted it as ground truth. The
+caller must supply the lifecycle and acceptance state represented by the schema.
+No current service combines file registration, review, acceptance, persistence,
+and frame creation into one governed product workflow.
 
-1. **Preconditions**: Raw CSV/Parquet dataset present in workspace `data/raw/` directory.
-2. **Inputs**: File path, workspace ID, dataset name.
-3. **Responsible Components**: Data Profiler Service (`src/schemas/research/data_profile.py`, `src/repositories/research/data_profile.py`).
-4. **Durable Writes**: `DataProfileRecord` created in SQLite `data_profiles` table (`accepted_as_ground_truth=1`).
-5. **Failure / Retry / Replay**: If profiling fails due to corrupted data or invalid schema, no `DataProfileRecord` is written. Retry requires providing a corrected data file.
-6. **User Governance Points**: User accepts `DataProfile` as ground truth.
-7. **Resulting State**: Immutable `DataProfile` available for planning and execution contexts.
-8. **Immutability Enforcement**: Any subsequent data cleaning or transformation generates a **new dataset version** and a **new `DataProfile`**. Existing profiles are never updated in place.
+## Invariants and failure behavior
+
+- Cleaning or transforming data creates a new dataset version and a new
+  `DataProfile`; an existing profile is not rewritten.
+- Profiling failures occur before repository persistence.
+- Repository writes are ordinary single-record commits, not a cross-object
+  workspace transaction.
+- `src/data/dvc.py` is an explicit adapter stub and raises
+  `DvcIntegrationNotImplementedError`.
+
+## Not yet implemented
+
+- a production CLI/API flow for import, review, acceptance, and cleaning;
+- executable DVC commands or automatic dataset-version registration;
+- automatic creation or replacement of a `SessionFrame` when a profile is
+  accepted.

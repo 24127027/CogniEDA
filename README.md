@@ -4,21 +4,23 @@ CogniEDA is a governed research-state system for analytical investigation. Its g
 
 ## Current Implementation Status
 
-Implemented or verified in the structural foundation (Gate 0 through Package S4):
+Implemented or verified in the current in-process/SQLite foundation:
 
 - **First-Class Objects (FCOs)**: Pydantic schemas and SQLModel tables for `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, and `SessionFrame`.
-- **Bounded Context Architecture**: Decomposed, single-owner bounded contexts across `application`, `schemas`, `repositories`, and `db.models`.
+- **Bounded Context Architecture**: Canonical schemas and persistence models are separated across research, workflow, execution, evidence, evaluation, governance, discovery, and validity contexts.
 - **Specialist Scientific Boundaries**: Observation-only Data Explorer, PydanticAI protected-evaluation Hypothesis Analyst, and user-governed proposal authorization.
 - **Atomic Admission Services**: `AtomicDiscoveryAdmissionService` (sole Discovery materialization transaction owner) and `AtomicValidityPropagationService` (sole validity propagation transaction owner).
 - **SQLite Persistence & Triggers**: Fenced execution lease tracking, immutable governance authority tables, and DDL triggers enforcing exact claim consumption.
-- **Canonical Documentation & Structural Exit**: Reconstructed canonical documentation (`docs/index.md`) and verified Package 7 readiness (`docs/architecture/structural-exit-status.md`).
+- **Canonical Documentation & Structural Exit**: Source-backed current/target documentation and an adversarial S4 exit assessment are linked from `docs/index.md`.
 
-Not implemented yet (Scheduled for Package 7+):
+Partially implemented or absent:
 
 - Supported CLI binary, HTTP REST/gRPC service, or worker daemon process.
 - Executable DVC integration.
 - Production Data Explorer sandbox runner and production model adapters.
 - Graph Miner semantic vector index persistence.
+- Complete answer/suggest/plan Planner branches and a Planner application facade.
+- A governed import/clean/accept/resume product workflow and persistent cache.
 
 ## Target Architecture Summary
 
@@ -57,7 +59,7 @@ uv sync
 copy .env.example .env
 ```
 
-The default database URL resolves to `.local/cognieda_graph.sqlite3` unless `COGNIEDA_DB_URL` is set. Each filesystem workspace should use its own graph database file.
+The in-process runtime does not choose a default database. Its caller supplies an explicit SQLite URL, or an external runtime factory can be selected through `COGNIEDA_RUNTIME_FACTORY`.
 
 ## Verification
 
@@ -69,6 +71,8 @@ uv run ruff check .
 uv run python -m compileall -q src
 uv run mypy src
 ```
+
+`mypy` is a declared diagnostic command, but the current checkout retains known strict-typing debt. Consult the structural-exit report for the reviewed result; do not infer a clean type gate from the command being listed.
 
 ## Repository Structure
 

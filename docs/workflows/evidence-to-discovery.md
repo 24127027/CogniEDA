@@ -1,35 +1,53 @@
-# Evidence to Discovery Workflow
+# Evidence-to-Discovery Workflow
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** Implemented and verified on SQLite for protected
+> evaluation, governance, replay fencing, and atomic admission.
 
-This guide documents protected hypothesis evaluation, scientific proposal authoring, governance decision, and atomic discovery materialization.
-
----
-
-## 1. Workflow Summary
+## Protected evaluation
 
 ```text
-Evidence-Ready Hypothesis
-└──> EvaluationControlService
-     └──> Protected Hypothesis Analyst Evaluation
-          └──> DiscoverySynthesisBundle -> DiscoveryProposal
-               └──> User Governance Decision (ProposalDecisionRecord)
-                    └──> AtomicDiscoveryAdmissionService
-                         ├──> DiscoveryRecord (Immutable)
-                         ├──> DiscoveryAdmissionClaimRecord (COMMITTED)
-                         └──> EvaluationControlRecord (COMMITTED)
+Hypothesis(READY_FOR_EVALUATION) + active admitted Evidence
+  -> EvaluationTransitionService claim
+  -> build_synthesis_bundle reconstructs authority from repositories
+  -> tool-free Hypothesis Analyst
+  -> DiscoveryProposal or EvaluationFailure
+  -> EvaluationControl(PROPOSAL_READY)
 ```
 
----
+`DiscoverySynthesisBundle` is a frozen, closed schema. It contains the
+Hypothesis, safe DataProfile metadata, AnalysisFrame/ExecutionRun provenance,
+active Evidence, invalidators, method metadata, and a digest. It has no generic
+context field and structurally excludes Assumptions, prior Discoveries,
+SessionFrames, raw chat, raw data, files, and retrieval scores.
 
-## 2. Step-by-Step Specification
+`EvaluationTransitionService` owns the durable evaluation-control lifecycle.
+`src/agents/executor/hypothesis_analyst/agent.py` receives only the typed bundle,
+has no tools, and returns a typed `DiscoveryProposal` or `EvaluationFailure`.
 
-1. **Preconditions**: `Evidence` admitted for target `Hypothesis`.
-2. **Inputs**: Protected Conclusion Context (Hypothesis, DataProfile, Evidence, parameters, decision rules; **Assumptions Quarantined**).
-3. **Responsible Components**: Hypothesis Analyst Agent (`src/agents/executor/hypothesis_analyst/agent.py`), `EvaluationControlService` (`src/application/evaluation/control_service.py`), `ProposalDecisionService` (`src/application/governance/decision_service.py`), `AtomicDiscoveryAdmissionService` (`src/application/discovery/admission_service.py`).
-4. **Durable Writes**:
-   - `EvaluationControlRecord` state transitions (`PROPOSAL_READY` $\rightarrow$ `COMMITTED`).
-   - `ProposalDecisionRecord` monotonic consumption (`consumed=1`).
-   - `DiscoveryAdmissionClaimRecord` (`state='COMMITTED'`).
-   - `DiscoveryRecord` (Immutable scientific claim).
-5. **Exact Proposal-Copy Rule**: `AtomicDiscoveryAdmissionService` asserts that the materializing `Discovery` is an exact structural copy of the authorized `DiscoveryProposal`.
+## Governance and atomic admission
+
+```text
+DiscoveryProposal
+  -> GovernanceAuthorityIssuer issues expiring principal-bound authority
+  -> DiscoveryAdmissionGovernanceService records exact proposal decision
+  -> DiscoveryAdmissionCoordinator
+  -> AtomicDiscoveryAdmissionService commits one transaction
+       exact proposal-copy Discovery
+       conclusion SessionFrame snapshot
+       Hypothesis(EVALUATED)
+       Task(COMPLETED)
+       EvaluationControl(COMMITTED)
+       DiscoveryAdmissionClaim(COMMITTED)
+       ProposalDecision(consumed)
+```
+
+The admission service rebuilds and verifies authority under the SQLite writer
+lock. The materialized `Discovery` must be an exact structural copy of the
+authorized proposal. Exact replay is idempotent; a changed replay conflicts.
+
+## Scientific meaning
+
+`Evidence` is an immutable observation. `Discovery` is the authorized,
+evidence-bound claim. Inconclusive and fail-to-reject results may still produce
+knowledge, but must retain the method, scope, uncertainty, decision rule, and
+validity basis that justify the limited claim.

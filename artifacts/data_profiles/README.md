@@ -4,7 +4,9 @@ This directory is a reviewable mirror/template surface for `DataProfile` records
 
 Runtime truth is the workspace-local graph database. Files here should not be treated as a second source of truth unless an explicit import/export workflow is added.
 
-Each mirror should align with `schemas.artifacts.DataProfile` and store dataset-version identity directly:
+Each mirror should align with
+`src/schemas/research/data_profile.py::DataProfile` and store dataset-version
+identity directly:
 
 - `dataset_path`
 - optional `dvc_hash`

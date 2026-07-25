@@ -1,6 +1,8 @@
 # CogniEDA Canonical Documentation Index
 
-Welcome to the canonical architecture, workflow, decision, and structural exit documentation for **CogniEDA**.
+This is the navigation authority for current architecture, target constraints,
+workflows, decisions, and structural-exit documentation. Source code remains the
+authority for current implementation.
 
 > [!IMPORTANT]
 > **Core Thesis**: CogniEDA is a *validity-preserving research-state infrastructure* for governed analytical investigation.
@@ -11,8 +13,8 @@ Welcome to the canonical architecture, workflow, decision, and structural exit d
 ## 1. Primary Entry Points
 
 * [Project Purpose](project-purpose.md): Research intent vs. analytical infrastructure, core thesis, and design principles.
-* [Roadmap](roadmap.md): Completed structural foundation (Gate 0 through S4) and future product vertical slices (Package 7).
-* [Structural Exit Status](architecture/structural-exit-status.md): Official Package S4 structural readiness assessment and Package 7 exit verdict.
+* [Roadmap](roadmap.md): Reviewed structural foundation, S4 checkpoint, and future Package 7 scope.
+* [Structural Exit Status](architecture/structural-exit-status.md): Adversarial Package S4 assessment and qualified Package 7 verdict.
 
 ---
 
@@ -35,13 +37,13 @@ Welcome to the canonical architecture, workflow, decision, and structural exit d
 
 ## 3. Workflows
 
-* [Workspace and Data Profile Workflow](workflows/workspace-and-data-profile.md): Immutable dataset versioning and profiling.
+* [Workspace and Data Profile Workflow](workflows/workspace-and-data-profile.md): Implemented profiling/persistence and the absent governed product workflow.
 * [Task to Hypothesis Workflow](workflows/task-to-hypothesis.md): Planning, task formulation, and one-to-one hypothesis binding.
 * [Execution to Evidence Workflow](workflows/execution-to-evidence.md): Analytical task dispatch, Data Explorer execution, and evidence admission.
 * [Evidence to Discovery Workflow](workflows/evidence-to-discovery.md): Protected hypothesis evaluation, proposal synthesis, and atomic discovery materialization.
 * [Governance and Admission Workflow](workflows/governance-and-admission.md): User decision recording, proposal authorization, and fenced claim validation.
-* [Validity Propagation Workflow](workflows/validity-propagation.md): Source invalidation triggering, graph propagation, and retrieval exclusion.
-* [Session Resume and Retrieval Workflow](workflows/session-resume-and-retrieval.md): Session frame initialization, active context building, and state reconstruction.
+* [Validity Propagation Workflow](workflows/validity-propagation.md): Authorized atomic dependent-state propagation and query-policy exclusion.
+* [Session Resume and Retrieval Workflow](workflows/session-resume-and-retrieval.md): Append-only frame projections, retrieval, and the absent product bootstrap.
 
 ---
 
@@ -67,13 +69,9 @@ Welcome to the canonical architecture, workflow, decision, and structural exit d
 
 ---
 
-## 6. Current Implementation vs. Target Design Status
+## 6. Status language
 
-All canonical documentation uses standard status markers:
-* `[Implemented]`: Fully realized in active source code and covered by automated tests.
-* `[Verified on SQLite]`: Persistence and transaction semantics verified against SQLite.
-* `[Partially Implemented]`: Scaffold or incomplete implementation exists in source.
-* `[Design Target]`: Target architectural design for future packages.
-* `[Deferred]`: Intentionally postponed out of current scope.
-* `[Known Deviation]`: Identified discrepancy between target architecture and current code.
-* `[Unsupported]`: Features or entry points explicitly disallowed in current release.
+Canonical pages label current implementation, target design, limitations, and
+unsupported/deferred surfaces in prose. “Implemented” applies only to the
+specific named boundary; it does not imply a CLI, service, worker, or production
+adapter.

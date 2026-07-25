@@ -1,6 +1,6 @@
 # CogniEDA Project Purpose and Epistemic Core
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** The research-state core, protected scientific admission paths, and their SQLite transaction semantics are implemented. Product bootstrap, concrete executor/model adapters, DVC, cache, and several Planner branches remain partial or absent.
 
 CogniEDA is a **governed research-state system for analytical investigation**. It bridges the critical gap between ungrounded natural-language reasoning and rigorous data analysis by providing validity-preserving research-state infrastructure.
 
@@ -35,9 +35,9 @@ CogniEDA strictly separates objects by their structural and epistemic roles:
 | :--- | :--- | :--- |
 | **First-Class Objects (FCOs)** | Core domain entities possessing durable identity, lifecycle, and strict governance | `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, `SessionFrame` |
 | **Provenance Records** | Audit trails of analytical computation and workflow execution | `AnalysisFrame`, `ExecutionRun`, `ExecutionApproval`, `ExecutionInbox`, `ExecutionOutbox` |
-| **Workflow State** | Transient planning and interaction entities | `PlannerOperation`, `TaskProposal`, `UserDecision` |
+| **Workflow State** | Durable or transient coordination state that is not scientific knowledge | `PlannerOperation`, `TaskProposal`, `UserDecision`, `EvaluationControl` |
 | **Generated Views** | Derived visual or analytical output representations | Plots, summary tables, dynamic UI artifacts |
-| **Cache & Indexes** | Transient query/retrieval acceleration structures | Active retrieval indexes |
+| **Cache & Indexes** | Query/retrieval acceleration structures, not scientific writers | Target cache/index surfaces; no persistent cache or semantic index is implemented |
 
 ---
 
@@ -55,6 +55,6 @@ To preserve architectural integrity, CogniEDA is explicitly **not**:
 ## 5. Architectural Entry Points
 
 * Architecture Overview: [overview.md](architecture/overview.md)
-* Scientific Authority: [scientific-authority.md](architecture/scientific-specialist-contracts.md)
+* Scientific Authority: [scientific-specialist-contracts.md](architecture/scientific-specialist-contracts.md)
 * Research State Model: [research-state-model.md](architecture/research-state-model.md)
 * Structural Exit Status: [structural-exit-status.md](architecture/structural-exit-status.md)

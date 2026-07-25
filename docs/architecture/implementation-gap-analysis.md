@@ -1,6 +1,6 @@
 # Implementation Gap Analysis
 
-> **Current implementation snapshot:** Package S3-B completed, 2026-07-25.
+> **Current implementation snapshot:** Package S4 adversarial review, 2026-07-26.
 > Code is the source of truth for current behavior. Local verification audits under
 > `.local/audits/` are ignored working records, not clean-clone documentation authority.
 
@@ -9,7 +9,7 @@
 | Area | Target | Current implementation | Status / principal gap |
 | --- | --- | --- | --- |
 | FCO ontology | Exactly Objective, DataProfile, Assumption, Task, Hypothesis, Evidence, Discovery, SessionFrame | Pydantic schemas, SQLModel tables and repositories use this set | Implemented locally; no production graph abstraction |
-| Planner governance | Understand, route, manage Tasks/Objectives/Assumptions/approvals, coordinate specialists, emit operations | Request classification and narrow Task/decomposition/Objective/execution approvals exist | Partial; answer/suggest/review/pause and several approval workflows are placeholders |
+| Planner governance | Understand, route, manage Tasks/Objectives/Assumptions/approvals, coordinate specialists, emit operations | Request classification and narrow Task/decomposition/Objective/execution approvals exist; nodes open SQLModel sessions and know repositories/records | Partial; answer/suggest/review/pause branches remain incomplete and a Planner application facade is absent. Supported generic commit paths fail closed for AnalysisFrame/Evidence/Discovery, so this is non-blocking documented debt for S4 |
 | Hypothesis Analyst | Operationalize Task and evaluate Evidence in protected context without raw-data access | A no-tool PydanticAI evaluation mode consumes only a canonical repository-built bundle and durably publishes a fenced proposal/failure; Planner still authors the operational contract | Evidence evaluation implemented; operationalization ownership remains misaligned |
 | Data Explorer | Execute approved contract and return observation-only provenance/Evidence inputs | Contract, dispatcher, and per-runtime factory registration exist; no concrete implementation is checked in | Partial boundary; concrete adapter absent |
 | Graph Miner | Typed graph retrieval, lineage/staleness/conflict/coverage analysis | Stub wrapper plus separate bounded SQL-backed Discovery retrieval | Partial and misassigned |
@@ -23,8 +23,8 @@
 | Schema/repository/persistence ownership | Research, execution, Evidence, governance, workflow, Discovery, evaluation, and validity records have explicit owners without duplicate definitions or alternate scientific writers | Canonical schemas, repositories, and persistence models across all 8 bounded contexts (`research`, `execution`, `evidence`, `evaluation`, `governance`, `discovery`, `validity`, `workflow`) have single canonical owners, single enum identities, strict Pydantic configs, and register through the explicit 21-table `db.models` facade | Implemented locally through reviewed S3-A and S3-B |
 | Context type safety | Assumptions only in planning; protected Discovery synthesis | Package 2 builds immutable repository-authoritative evaluation snapshots, a closed provenance manifest, and a complete digest; the Analyst receives only that bundle | Implemented for Hypothesis evaluation; broader Graph Miner and generated-view context remain absent |
 | Discovery admission governance | Exact persisted proposal and independently authorized decision produce one atomic Discovery chain | Package 5 resolves authenticated principal context through an injected adapter; S2-A binds decision recording to that exact principal and an explicit expiring immutable authority grant, then persists the decision before separate atomic admission | Implemented locally for SQLite; the product composition root still needs a real authentication adapter |
-| Validity propagation | One authorized source event atomically invalidates every applicable dependent and current retrieval path | Package 4 supports eight typed DataProfile, AnalysisFrame, Evidence, ExecutionRun, conflict, supersession, invalidation, and provenance-corruption events through one fenced transaction and immutable event record | Implemented locally; no production authority issuer, only explicit SQLite upgrade/trigger support |
-| SessionFrame | User-governed current context with auditable item inclusion | Append snapshots, narrow successor updates and deterministic atomic conclusion frames exist | Partial; no item governance, session scoping/cardinality or general refresh |
+| Validity propagation | One authorized source event atomically invalidates every applicable dependent and current retrieval path | Eight typed DataProfile, AnalysisFrame, Evidence, and ExecutionRun events propagate through one fenced transaction and immutable event; runtime exposes authority issuance | Implemented locally on SQLite; production authentication/authorization adapters are absent |
+| SessionFrame | User-governed current context with auditable item inclusion | Append snapshots, latest-active lookup, bounded projections, conclusion frames, and validity supersession exist | Partial; no product resume bootstrap, item-governance workflow, or general refresh service |
 | Provenance | Reproducible data view, method, code, environment, seed, artifacts | Minimal AnalysisFrame/ExecutionRun and Evidence refs | Partial; insufficient for general reproducibility/invalidation |
 | Dataset versioning/cleaning | DVC/physical versions and approved cleaning produce new DataProfile | CSV/Parquet profiler plus DVC interface | Partial; DVC and cleaning execution absent |
 | Retrieval/graph | Durable FCO relations and governed Graph Miner traversal | SQLModel/JSON relations and bounded Discovery retrieval | Partial; no graph-store abstraction or Graph Miner workflow |
@@ -60,9 +60,10 @@
    authentication implementation is checked in.
 4. Validity propagation has no production authority-issuance workflow and its explicit upgrade
    path/immutability triggers support SQLite only.
-5. Package 1 now keeps a technically failed Hypothesis in `testing`, admits an exact-contract retry,
-   and durably consumes repeated-failure inboxes. Changed-contract successor creation remains
-   intentionally outside Package 1.
+5. Strict `mypy src` retains substantial pre-existing debt and is not a clean
+   release gate; the S4 audit records the before/after diagnostic count.
+6. Changed-contract successor creation remains intentionally outside the
+   current execution-retry path.
 
 Wave 0.1 removes the raw-dataset builtin from the Hypothesis Analyst scaffold. Wave 1.1A adds Data
 Explorer output, protected synthesis input, and Hypothesis Analyst result contracts. Wave 1.1B-1
@@ -99,8 +100,9 @@ and retrieval exclusion.
    SQLite persistence boundary).
 7. Complete Planner branches, bootstrap, DVC/cleaning, then cache.
 
-Package-level remediation details remain in ignored local audit notes and are not part of the
-clean-clone authority chain.
+Package S4 reconciles these boundaries with the canonical documentation. Its
+detailed command evidence remains in an ignored local audit and is not
+clean-clone documentation authority.
 
 ## Owner Decisions Required
 

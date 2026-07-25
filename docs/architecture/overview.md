@@ -1,58 +1,54 @@
 # System Architecture Overview
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** `[Partially Implemented]`; persistence and guarded transactions are `[Verified on SQLite]`.
 
-CogniEDA is structured around a multi-tier, governed architecture designed to guarantee conclusion validity, context type safety, and multi-session continuity.
+CogniEDA is validity-preserving research-state infrastructure for governed analytical
+investigation. Its priority order is:
 
----
+1. conclusion validity and traceability;
+2. context type safety;
+3. multi-session continuity.
 
-## 1. High-Level Architectural Tiers
+## Current implementation
+
+The checked-in system is an in-process Python runtime, not a product service:
 
 ```text
-┌───────────────────────────────────────────────────────────┐
-│                      User Interface / CLI                 │
-│         (Target Package 7 Product Slice - Unsupported)     │
-└─────────────────────────────┬─────────────────────────────┘
-                              │
-┌─────────────────────────────▼─────────────────────────────┐
-│                    Application Layer                      │
-│   (execution, evidence, evaluation, governance,           │
-│    discovery, validity, orchestrator, events)             │
-└──────┬──────────────────────┬──────────────────────┬──────┘
-       │                      │                      │
-┌──────▼──────┐        ┌──────▼──────┐        ┌──────▼──────┐
-│  Specialist │        │    Schemas  │        │Repositories │
-│    Agents   │        │   Bounded   │        │   Bounded   │
-│ (Explorer / │        │   Context   │        │   Context   │
-│  Analyst)   │        │   Models    │        │   Adapters  │
-└─────────────┘        └──────┬──────┘        └──────┬──────┘
-                              │                      │
-                       ┌──────▼──────────────────────▼──────┐
-                       │          Database Models           │
-                       │     (db.models canonical facade)   │
-                       └──────────────────┬─────────────────┘
-                                          │
-                       ┌──────────────────▼─────────────────┐
-                       │         SQLite Database Engine     │
-                       │ (immediate locking & DDL triggers) │
-                       └────────────────────────────────────┘
+Planner and deployment adapters
+        |
+        v
+application transaction and coordination services
+        |
+        +--> observation-only Data Explorer adapter boundary
+        +--> protected Hypothesis Analyst boundary
+        |
+        v
+schemas -> repositories -> db.models facade -> workspace-local SQLite
 ```
 
----
+Implemented paths include approval-gated Planner operations, fenced execution attempts,
+AnalysisFrame/Evidence admission, protected evaluation, durable governance decisions, atomic
+Discovery admission, validity propagation, bounded Discovery retrieval, and SessionFrame
+snapshots.
 
-## 2. Core Architectural Invariants
+## Target design and unsupported surfaces
 
-1. **Strict Context Isolation**: Specialized agent roles operate only within their assigned contexts. Data Explorer performs code execution and technical observations. Hypothesis Analyst evaluates evidence and proposes claims.
-2. **Single Transaction Owners**: Atomic operations (Discovery materialization, validity propagation, execution transitions) have exactly one owning application service. Direct database mutations by unauthorized components are strictly forbidden.
-3. **Immutable Epistemic Records**: `DataProfile`, `Evidence`, `Discovery`, `ValidityEvent`, `GovernanceAuthority`, and `ProposalDecision` objects are immutable once written.
-4. **Governed Materialization**: A `Discovery` cannot be created directly by an LLM agent or planner node. It requires a protected synthesis bundle, formal proposal, user decision, and fenced atomic admission.
+`[Design Target]` The broader product workflow adds interactive entry points, concrete production
+adapters, executable dataset versioning, and more complete retrieval.
 
----
+`[Unsupported]` No checked-in CLI, HTTP/gRPC service, worker daemon, production Data Explorer,
+production authentication resolver, or default Hypothesis Analyst model provider exists.
+Graph Miner and the event/bootstrap package directories are scaffold or documentation-only.
 
-## 3. Key Subsystems
+## Load-bearing boundaries
 
-- **Research State Management**: [research-state-model.md](research-state-model.md)
-- **Scientific Specialist Boundaries**: [scientific-specialist-contracts.md](scientific-specialist-contracts.md)
-- **Bounded Contexts**: [bounded-contexts.md](bounded-contexts.md)
-- **Persistence & Transactions**: [persistence-and-transactions.md](persistence-and-transactions.md)
-- **Validity & Invalidation Engine**: [validity-and-invalidation.md](validity-and-invalidation.md)
+- Data Explorer returns observations; it does not evaluate or persist.
+- Hypothesis Analyst alone authors `DiscoveryProposal` scientific wording from a closed bundle.
+- Application services own durable transitions; repositories are persistence adapters.
+- `AtomicDiscoveryAdmissionService` is the only supported Discovery materializer.
+- `AtomicValidityPropagationService` is the only supported validity-event transaction owner.
+- SQLite is the only verified database boundary.
+
+See [Scientific Specialist Contracts](scientific-specialist-contracts.md),
+[Persistence and Transactions](persistence-and-transactions.md), and
+[Structural Exit Status](structural-exit-status.md).

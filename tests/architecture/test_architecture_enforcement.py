@@ -276,6 +276,33 @@ def test_evidence_writer_and_terminal_lifecycle_writers_are_sealed() -> None:
     assert "Analytical Task COMPLETED transition is owned by" in task_source
 
 
+def test_planner_scientific_writers_and_terminal_transitions_fail_closed() -> None:
+    """Planner debt cannot become an alternate Evidence/Discovery or terminal writer."""
+
+    tree = ast.parse(
+        Path("src/application/orchestrator/planner_commit.py").read_text(encoding="utf-8")
+    )
+    fail_closed_handlers = {
+        "_apply_create_analysis_frame",
+        "_apply_create_evidence",
+        "_apply_create_discovery",
+    }
+    functions = {
+        node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)
+    }
+    assert fail_closed_handlers <= functions.keys()
+    for name in fail_closed_handlers:
+        assert any(isinstance(node, ast.Raise) for node in ast.walk(functions[name])), (
+            f"{name} must fail closed"
+        )
+
+    source = Path("src/application/orchestrator/planner_commit.py").read_text(
+        encoding="utf-8"
+    )
+    assert "generic PlannerOperation cannot set COMPLETED state" in source
+    assert "generic PlannerOperation cannot set EVALUATED state" in source
+
+
 def test_production_has_no_test_model_or_graph_miner_registration() -> None:
     """Deployment composition must supply real adapters and register Data Explorer only."""
 

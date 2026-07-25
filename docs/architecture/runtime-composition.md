@@ -1,37 +1,40 @@
-# Runtime Composition & In-Process Architecture
+# Runtime Composition
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** in-process composition `[Implemented]`; production bootstrap
+> `[Unsupported]`; database semantics `[Verified on SQLite]`.
 
-This document describes the in-process execution environment, runtime composition, and current entry point limitations of CogniEDA.
+## Current implementation
 
----
+`CogniEDARuntime` is defined in `src/application/runtime.py`. Construction:
 
-## 1. `CogniEDARuntime` Composition
+1. requires an explicit SQLite database URL;
+2. calls `init_db`;
+3. requires an `AuthenticatedPrincipalResolver`;
+4. requires a Hypothesis Analyst model;
+5. creates a private `DataExplorerRegistry` and registers exactly one supplied adapter factory;
+6. creates a no-tool Hypothesis Analyst agent and one database-bound Planner.
 
-The application is assembled in-process via `CogniEDARuntime` (`src/application/bootstrap/runtime.py`):
+The runtime exposes:
 
-```python
-class CogniEDARuntime:
-    """In-process composition facade for CogniEDA application services."""
-```
+- Planner access;
+- Data Explorer dispatch and execution reconciliation;
+- protected evaluation enqueue/run;
+- authenticated authority issuance and proposal decision recording;
+- authenticated Discovery admission coordination;
+- validity propagation.
 
-Component Wiring:
-- **Database Connection**: Configures SQLite database engine with WAL mode and immediate locking.
-- **Registry Services**: Manages Data Explorer capability registration.
-- **Service Layer Wiring**: Instantiates `ExecutionTransitionService`, `EvidenceAdmissionService`, `EvaluationControlService`, `ProposalDecisionService`, `AtomicDiscoveryAdmissionService`, and `AtomicValidityPropagationService`.
+Each method opens a fresh session from the one configured database URL. Durable outbox/inbox,
+evaluation control, admission claims, and validity events allow services to reconstruct work after
+process restart. There is no automatic background loop.
 
----
+## Deployment boundary
 
-## 2. In-Process Runtime Guarantees
+`runtime_loader.load_runtime_from_environment` requires
+`COGNIEDA_RUNTIME_FACTORY=module:factory`; it does not supply default production adapters.
+The `src/application/bootstrap/` directory contains no Python implementation.
 
-1. **Deterministic Execution**: All execution runs record parameters, random seeds, and method IDs.
-2. **Atomic State Transitions**: Mutating state transitions run within guarded database transaction blocks.
-3. **Restart Reconstruction**: Workspaces can be reloaded directly from SQLite database state without losing lineage or validity history.
+## Unsupported surfaces
 
----
-
-## 3. Product & Entry Point Limitations
-
-> [!WARNING]
-> **No Supported CLI or HTTP Service Currently Exists**:
-> CogniEDA is currently an **in-process Python library**. There is **no production CLI binary**, HTTP REST API, gRPC service, or async background worker daemon. Production entry points will be introduced in Package 7. Internal test runners must not be used as product interfaces.
+`[Unsupported]` The repository has no packaged CLI, HTTP/gRPC API, daemon, worker process,
+authentication implementation, production Data Explorer, or default production model provider.
+Tests and direct Python calls are not product entry points.

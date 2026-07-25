@@ -1,64 +1,38 @@
-# Bounded Contexts & Package Architecture
+# Bounded Contexts
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** package ownership `[Implemented]`; runtime deployment surfaces
+> `[Partially Implemented]`; persistence guarantees `[Verified on SQLite]`.
 
-CogniEDA is structured into explicit bounded contexts across application services, schemas, repositories, and persistence models.
+## Current package map
 
----
+| Context | Schemas | Repositories | Tables | Application owner / entry |
+| --- | --- | --- | --- | --- |
+| research | `schemas.research` | `repositories.research` | objectives, revisions, profiles, assumptions, tasks, hypotheses, session frames | `application.orchestrator.planner_commit`; Planner nodes |
+| workflow | `schemas.planner_operations` | `repositories.planner_operation_repository` | planner operations | Planner proposal/decision nodes and `commit_planner_operations` |
+| execution | `schemas.execution` | `repositories.execution` | runs, approvals, outbox, inbox | `application.execution` |
+| evidence | `schemas.evidence` | `repositories.evidence` | analysis frames, evidence | `application.evidence` plus execution finalizer |
+| evaluation | `schemas.evaluation` | `repositories.evaluation` | evaluation controls | `application.evaluation` |
+| governance | `schemas.governance` | `repositories.governance` | user decisions, authorities, proposal decisions | `application.governance` |
+| discovery | `schemas.discovery` | `repositories.discovery` | discoveries, admission claims | `application.discovery` |
+| validity | `schemas.validity` | `repositories.validity` | validity events | `application.validity` |
+| runtime | typed configuration in `application.runtime` | none | none | `CogniEDARuntime`, `runtime_loader` |
+| retrieval | `schemas.retrieval` and context summaries | research/discovery repositories | no index table | `memory.retrieval_engine`, `retrieval_policy`, `session_frame` |
 
-## 1. Canonical Bounded-Context Map
+`db.models` is the stable 21-table facade. Its eight implementation modules are persistence
+ownership modules, not domain schemas or repositories.
 
-```text
-src/
-├── application/
-│   ├── research/       (Objective, Task, Hypothesis lifecycle)
-│   ├── execution/      (ExecutionTransitionService, sandbox dispatch)
-│   ├── evidence/       (EvidenceAdmissionService)
-│   ├── evaluation/     (EvaluationControlService, Hypothesis Analyst runner)
-│   ├── governance/     (ProposalDecisionService, UserDecision)
-│   ├── discovery/      (AtomicDiscoveryAdmissionService)
-│   ├── validity/       (AtomicValidityPropagationService)
-│   ├── orchestrator/   (Planner commit & transaction orchestration)
-│   ├── events/         (Domain event pub/sub dispatcher)
-│   └── bootstrap/      (Runtime composition & factory registry)
-│
-├── schemas/
-│   ├── research/       (Objective, Task, Hypothesis value objects)
-│   ├── execution/      (ExecutionDetails, PreparedExecution, observations)
-│   ├── evidence/       (Evidence value objects & admission contracts)
-│   ├── evaluation/     (EvaluationControl, synthesis bundle schemas)
-│   ├── governance/     (GovernanceAuthority, ProposalDecision schemas)
-│   ├── discovery/      (Discovery, claim, & admission contracts)
-│   └── validity/       (ValidityEvent & propagation contracts)
-│
-├── repositories/
-│   ├── research/       (Objective, Task, Hypothesis, Assumption repos)
-│   ├── execution/      (ExecutionRun, Inbox, Outbox repos)
-│   ├── evidence/       (AnalysisFrame, Evidence repos)
-│   ├── evaluation/     (EvaluationControl repo)
-│   ├── governance/     (GovernanceAuthority, ProposalDecision repos)
-│   ├── discovery/      (Discovery, AdmissionClaim repos)
-│   └── validity/       (ValidityEvent repo)
-│
-└── db/
-    └── models/         (Stable SQLModel database facade)
-        ├── research.py
-        ├── execution.py
-        ├── evidence.py
-        ├── workflow.py
-        ├── evaluation.py
-        ├── governance.py
-        ├── discovery.py
-        ├── validity.py
-        └── common.py
-```
+## Dependency rules
 
----
+- schemas import no application or repository modules;
+- repositories may import schemas and `db.models`, but no application services;
+- application services coordinate repositories and own commits;
+- specialist packages import no persistence/application mutation services;
+- adjacent application packages use explicit coordination rather than re-export aliases;
+- direct imports of table classes use the `db.models` facade outside the model implementation.
 
-## 2. Dependency Direction Invariants
+## Scaffold-only directories
 
-1. **Schemas**: Dependency-inert value objects. Import no application or repository code.
-2. **Repositories**: Persistence adapters. Import schemas and `db.models`. Import no application code.
-3. **Application Services**: Core domain logic and transactions. Import schemas and repositories.
-4. **Specialists (Data Explorer / Analyst)**: Pure computational agents. Do not import database models, repositories, or application transaction services.
-5. **Facade Protection**: All database operations use `db.models` facade exports. Direct imports from submodules or schema compatibility aliases are forbidden.
+`src/application/bootstrap/` and `src/application/events/` contain READMEs only. They are not active
+Python bounded contexts. Graph Miner has stub code but no runtime registration.
+
+See [Module Responsibilities](module-responsibilities.md) for write ownership and dependencies.

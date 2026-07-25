@@ -1,35 +1,51 @@
-# Execution to Evidence Workflow
+# Execution-to-Evidence Workflow
 
-> **Status**: `[Implemented]` / `[Verified on SQLite]`
+> **Implementation status:** Implemented and verified on SQLite for the
+> library/runtime path. No production worker or concrete Data Explorer adapter is
+> shipped.
 
-This guide documents execution attempt dispatch, Data Explorer observation, and atomic evidence admission.
-
----
-
-## 1. Workflow Summary
+## Transaction sequence
 
 ```text
-Analytical Task (READY)
-└──> ExecutionTransitionService (dispatch)
-     └──> Fenced ExecutionRunRecord (RUNNING)
-          └──> Data Explorer Execution
-               └──> AnalysisFrameObservation + EvidenceObservation
-                    └──> EvidenceAdmissionService
-                         ├──> AnalysisFrameRecord (Immutable)
-                         ├──> EvidenceRecord (Immutable)
-                         └──> TaskRecord (COMPLETED)
+approved execution contract
+  -> ExecutionAttemptTransitionService admits ExecutionRun + dispatch outbox
+  -> dispatcher claims outbox with owner/epoch fencing
+  -> configured DataExplorerAdapterProtocol implementation returns typed observations
+  -> receiver persists authoritative inbox/result digest
+  -> recovery finalizer builds EvidenceAdmissionPlan
+  -> execute_evidence_admission_plan commits atomically
+       AnalysisFrame
+       Evidence
+       ExecutionRun(EVIDENCE_ADMITTED)
+       Hypothesis(READY_FOR_EVALUATION)
+       inbox consumption
 ```
 
----
+`ExecutionAttemptTransitionService` in
+`src/application/execution/transition_service.py` owns run, outbox, inbox,
+lease, fencing, and retry transitions. Dispatch uses the private
+`DataExplorerRegistry`/dispatcher boundary; the adapter observes and returns
+typed results but does not write research state or evaluate a hypothesis.
 
-## 2. Step-by-Step Specification
+`execute_evidence_admission_plan` in
+`src/application/evidence/admission_service.py` is the sole supported atomic
+AnalysisFrame/Evidence admission path. Exact concurrent replays recognize the
+committed winner; incompatible artifact identities are quarantined as conflicts.
 
-1. **Preconditions**: Terminal analytical task in `READY` state with bound `Hypothesis` and execution contract.
-2. **Inputs**: Execution contract, task parameters, random seed.
-3. **Responsible Components**: `ExecutionTransitionService` (`src/application/execution/transition_service.py`), Data Explorer Agent (`src/agents/executor/data_explorer/agent.py`), `EvidenceAdmissionService` (`src/application/evidence/admission_service.py`).
-4. **Durable Writes**:
-   - `ExecutionRunRecord` lease acquisition and completion status.
-   - `AnalysisFrameRecord` (provenance).
-   - `EvidenceRecord` (observed result digest).
-   - `TaskRecord` updated to `COMPLETED`.
-5. **Failure / Retry**: If execution fails technically, `ExecutionTransitionService` handles retries or marks the run `FAILED`. If evidence admission fails validation, changes are rolled back atomically.
+## State and failure rules
+
+- An outbox row is dispatch intent; an inbox row is received executor output.
+- Technical failure is represented on `ExecutionRun`; it does not manufacture
+  Evidence.
+- Lease owner, fencing epoch, attempt version, dispatch idempotency key, and
+  result digest are revalidated before admission.
+- Evidence admission does **not** complete the Task. The Task remains active
+  until authorized Discovery admission commits the scientific chain.
+- `AnalysisFrame` is provenance, and `ExecutionRun` is workflow provenance;
+  neither is an FCO.
+
+## Not yet implemented
+
+The runtime requires one injected Data Explorer adapter factory and context
+factory. The repository contains no production adapter, process worker, daemon,
+or service bootstrap.
