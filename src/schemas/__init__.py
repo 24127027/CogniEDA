@@ -10,15 +10,37 @@ _EXPORT_MODULES = {
         (
             "Assumption",
             "DataProfile",
-            "Discovery",
-            "Evidence",
             "Hypothesis",
             "Objective",
+            "ObjectiveRevision",
             "SessionFrame",
             "Task",
-            "UserDecision",
         ),
-        "schemas.artifacts",
+        "schemas.research",
+    ),
+    **dict.fromkeys(
+        (
+            "AnalysisFrame",
+            "Evidence",
+        ),
+        "schemas.evidence",
+    ),
+    **dict.fromkeys(
+        (
+            "ExecutionApproval",
+            "ExecutionInbox",
+            "ExecutionOutbox",
+            "ExecutionRun",
+        ),
+        "schemas.execution",
+    ),
+    **dict.fromkeys(
+        ("Discovery",),
+        "schemas.discovery",
+    ),
+    **dict.fromkeys(
+        ("UserDecision",),
+        "schemas.governance",
     ),
     **dict.fromkeys(
         (
@@ -139,10 +161,6 @@ _EXPORT_MODULES = {
     **dict.fromkeys(
         ("PlannerCommitResult", "PlannerOperation"),
         "schemas.planner_operations",
-    ),
-    **dict.fromkeys(
-        ("AnalysisFrame", "ExecutionRun", "ObjectiveRevision"),
-        "schemas.provenance",
     ),
     **dict.fromkeys(
         (

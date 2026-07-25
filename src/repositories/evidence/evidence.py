@@ -9,11 +9,11 @@ from uuid import UUID
 from sqlmodel import Session, desc, select
 
 from db.models import DataProfileRecord, EvidenceRecord, HypothesisRecord
-from repositories.analysis_frame_repository import AnalysisFrameRepository
 from repositories.common import record_to_schema, schema_to_record_payload
-from repositories.execution_run_repository import ExecutionRunRepository
-from schemas.artifacts import Evidence
+from repositories.evidence.analysis_frame import AnalysisFrameRepository
+from repositories.execution.run import ExecutionRunRepository
 from schemas.enums import EvidenceLifecycleState
+from schemas.evidence import Evidence
 
 if TYPE_CHECKING:
     from repositories.discovery import DiscoveryRepository

@@ -16,17 +16,16 @@ from application.orchestrator.planner_commit import commit_planner_operations
 from db.init_db import init_db
 from db.session import create_db_engine, get_session
 from memory.retrieval_policy import is_allowed_in_context
-from repositories.objective_repository import (
+from repositories.planner_operation_repository import PlannerOperationRepository
+from repositories.research import (
     ObjectiveMutationContext,
     ObjectiveRepository,
+    ObjectiveRevisionRepository,
     ObjectiveUpdate,
+    SessionFrameRepository,
+    TaskRepository,
+    UserDecisionRepository,
 )
-from repositories.objective_revision_repository import ObjectiveRevisionRepository
-from repositories.planner_operation_repository import PlannerOperationRepository
-from repositories.session_frame_repository import SessionFrameRepository
-from repositories.task_repository import TaskRepository
-from repositories.user_decision_repository import UserDecisionRepository
-from schemas.artifacts import Objective, SessionFrame, Task, UserDecision
 from schemas.enums import (
     ContextMode,
     FirstClassObjectType,
@@ -37,7 +36,9 @@ from schemas.enums import (
     TaskLifecycleState,
     UserDecisionType,
 )
+from schemas.governance import UserDecision
 from schemas.planner_operations import PlannerOperation
+from schemas.research import Objective, SessionFrame, Task
 
 
 def _bootstrap_objective(

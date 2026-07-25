@@ -8,14 +8,9 @@ from sqlmodel import Session, select
 
 from application.execution.identity import method_parameter_hash
 from db.models import DiscoveryRecord
-from repositories.analysis_frame_repository import AnalysisFrameRepository
-from repositories.data_profile_repository import DataProfileRepository
-from repositories.evidence_repository import EvidenceRepository
-from repositories.execution_outbox_repository import ExecutionOutboxRepository
-from repositories.execution_run_repository import ExecutionRunRepository
-from repositories.hypothesis_repository import HypothesisRepository
-from repositories.task_repository import TaskRepository
-from schemas.artifacts import AnalyticalSpecification, Evidence, Hypothesis, Task
+from repositories.evidence import AnalysisFrameRepository, EvidenceRepository
+from repositories.execution import ExecutionOutboxRepository, ExecutionRunRepository
+from repositories.research import DataProfileRepository, HypothesisRepository, TaskRepository
 from schemas.canonical import canonical_sha256
 from schemas.enums import (
     DataProfileLifecycleState,
@@ -44,7 +39,9 @@ from schemas.evaluation import (
     ProvenanceManifestEntry,
     RepositorySource,
 )
+from schemas.evidence import Evidence
 from schemas.execution.contracts import PreparedExecution
+from schemas.research import AnalyticalSpecification, Hypothesis, Task
 
 REQUIRED_INVALIDATORS = (
     "DataProfile identity or accepted-ground-truth state changes.",

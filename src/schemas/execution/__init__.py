@@ -15,9 +15,19 @@ from schemas.execution.data_explorer import (
     TechnicalDiagnostic,
     TechnicalRetryDisposition,
 )
+from schemas.execution.lifecycle import (
+    ExecutionApprovalStatus,
+    ExecutionRunStatus,
+)
 from schemas.execution.observations import (
     AnalysisFrameObservation,
     EvidenceObservation,
+)
+from schemas.execution.provenance import (
+    ExecutionApproval,
+    ExecutionInbox,
+    ExecutionOutbox,
+    ExecutionRun,
 )
 
 __all__ = [
@@ -27,8 +37,14 @@ __all__ = [
     "DataExplorerResult",
     "DataExplorerSuccessResult",
     "EvidenceObservation",
+    "ExecutionApproval",
+    "ExecutionApprovalStatus",
     "ExecutionDetails",
+    "ExecutionInbox",
+    "ExecutionOutbox",
     "ExecutionReceiptEnvelope",
+    "ExecutionRun",
+    "ExecutionRunStatus",
     "ExecutionSpecification",
     "HypothesisDraft",
     "PreparedExecution",

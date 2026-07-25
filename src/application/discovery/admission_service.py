@@ -45,12 +45,12 @@ from repositories.discovery import (
     DiscoveryAdmissionClaimRepository,
     DiscoveryRepository,
 )
-from repositories.session_frame_repository import SESSION_FRAME_JSON_FIELDS
-from schemas.artifacts import DataProfile, Discovery, Evidence, Objective, SessionFrame
+from repositories.research.session_frame import SESSION_FRAME_JSON_FIELDS
 from schemas.canonical import canonical_sha256
 from schemas.common import ImmutableCogniEDABaseModel, NonEmptyStr
 from schemas.discovery import (
     AtomicDiscoveryAdmissionResult,
+    Discovery,
     DiscoveryAdmissionLease,
     DiscoveryAdmissionPlan,
 )
@@ -73,6 +73,8 @@ from schemas.evaluation import (
     compute_proposal_digest,
     validate_proposal_against_bundle,
 )
+from schemas.evidence import Evidence
+from schemas.research import DataProfile, Objective, SessionFrame
 
 _CONCLUSION_FRAME_NAMESPACE = UUID("373fed23-80ef-43cc-9e5e-2c379dcfa8c8")
 

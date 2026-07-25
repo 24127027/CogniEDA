@@ -15,10 +15,12 @@ from agents.planner.types import (
     ObjectiveUpdateDraft,
     PlannerDecision,
 )
-from repositories.objective_repository import ObjectiveRepository
-from repositories.objective_revision_repository import ObjectiveRevisionRepository
 from repositories.planner_operation_repository import PlannerOperationRepository
-from repositories.session_frame_repository import SessionFrameRepository
+from repositories.research import (
+    ObjectiveRepository,
+    ObjectiveRevisionRepository,
+    SessionFrameRepository,
+)
 from schemas.enums import ObjectiveStatus, PlannerOperationApprovalState
 
 

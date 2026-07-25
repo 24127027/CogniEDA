@@ -10,12 +10,12 @@ from sqlmodel import Session, desc, select
 
 from db.models import DataProfileRecord
 from repositories.common import record_to_schema, schema_to_record_payload
-from schemas.artifacts import DataProfile
 from schemas.enums import DataProfileLifecycleState, DataProfileMethod
+from schemas.research import DataProfile
 
 if TYPE_CHECKING:
     from repositories.discovery import DiscoveryRepository
-    from repositories.evidence_repository import EvidenceRepository
+    from repositories.evidence import EvidenceRepository
 
 DATA_PROFILE_JSON_FIELDS = {
     "schema_summary",

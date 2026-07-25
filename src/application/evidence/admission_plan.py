@@ -18,7 +18,6 @@ from db.models import (
     HypothesisRecord,
     TaskRecord,
 )
-from schemas.artifacts import Evidence
 from schemas.canonical import canonical_sha256
 from schemas.common import EvidenceProvenance
 from schemas.enums import (
@@ -31,9 +30,9 @@ from schemas.enums import (
     TaskKind,
     TaskLifecycleState,
 )
+from schemas.evidence import AnalysisFrame, Evidence
 from schemas.execution.observations import AnalysisFrameObservation, EvidenceObservation
 from schemas.planner_operations import PlannerOperation
-from schemas.provenance import AnalysisFrame
 
 if TYPE_CHECKING:
     from schemas.execution.contracts import (

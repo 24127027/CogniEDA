@@ -15,9 +15,7 @@ from application.evidence.admission_plan import (
     compute_analysis_frame_fingerprint,
     compute_evidence_fingerprint,
 )
-from db.models import ExecutionRunRecord
-from schemas.artifacts import Evidence
-from schemas.provenance import AnalysisFrame
+from schemas.evidence import AnalysisFrame, Evidence
 
 
 def execute_evidence_admission_plan(
@@ -32,9 +30,8 @@ def execute_evidence_admission_plan(
     the pending inbox in one transaction.
     """
     from application.execution.transition_service import ExecutionAttemptTransitionService
-    from db.models import AnalysisFrameRecord, EvidenceRecord
-    from repositories.analysis_frame_repository import AnalysisFrameRepository
-    from repositories.evidence_repository import EvidenceRepository
+    from db.models import AnalysisFrameRecord, EvidenceRecord, ExecutionRunRecord
+    from repositories.evidence import AnalysisFrameRepository, EvidenceRepository
 
     session.expire_all()
     run = session.get(ExecutionRunRecord, plan.execution_run_id)
@@ -179,6 +176,7 @@ def _committed_admission_matches(session: Any, plan: EvidenceAdmissionPlan) -> b
         AnalysisFrameRecord,
         EvidenceRecord,
         ExecutionInboxRecord,
+        ExecutionRunRecord,
         HypothesisRecord,
     )
     from schemas.enums import ExecutionRunStatus, HypothesisStatus

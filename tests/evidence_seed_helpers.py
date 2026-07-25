@@ -2,8 +2,8 @@
 
 from sqlmodel import Session
 
-from repositories.evidence_repository import EvidenceRepository
-from schemas.artifacts import Evidence
+from repositories.evidence import EvidenceRepository
+from schemas.evidence import Evidence
 
 
 def seed_evidence_for_test(

@@ -16,8 +16,8 @@ from repositories.common import (
     record_to_schema,
     schema_to_record_payload,
 )
-from schemas.artifacts import Assumption
 from schemas.enums import AssumptionStatus
+from schemas.research import Assumption
 
 ASSUMPTION_JSON_FIELDS = {
     "scoped_data_profile_ids",

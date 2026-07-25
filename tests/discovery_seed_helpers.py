@@ -12,7 +12,7 @@ from sqlmodel import Session
 from db.models import DiscoveryRecord
 from repositories.common import record_to_schema, schema_to_record_payload
 from repositories.discovery import DISCOVERY_JSON_FIELDS
-from schemas.artifacts import Discovery
+from schemas.discovery import Discovery
 
 
 def seed_historical_discovery(session: Session, discovery: Discovery) -> Discovery:

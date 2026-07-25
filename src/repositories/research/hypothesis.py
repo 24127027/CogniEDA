@@ -11,8 +11,8 @@ from sqlmodel import Session, desc, select
 
 from db.models import DataProfileRecord, HypothesisRecord, TaskRecord
 from repositories.common import apply_update, record_to_schema, schema_to_record_payload
-from schemas.artifacts import Hypothesis, Task
 from schemas.enums import DataProfileLifecycleState, HypothesisStatus
+from schemas.research import Hypothesis, Task
 
 HYPOTHESIS_JSON_FIELDS = {"variables"}
 

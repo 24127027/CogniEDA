@@ -26,12 +26,8 @@ from db.models import (
     GovernanceAuthorityRecord,
     utc_now,
 )
-from repositories.analysis_frame_repository import AnalysisFrameRepository
-from repositories.data_profile_repository import DataProfileRepository
-from repositories.evidence_repository import EvidenceRepository
-from repositories.hypothesis_repository import HypothesisRepository
-from repositories.task_repository import TaskRepository
-from schemas.artifacts import AnalyticalSpecification, DataProfile, Evidence, Hypothesis, Task
+from repositories.evidence import AnalysisFrameRepository, EvidenceRepository
+from repositories.research import DataProfileRepository, HypothesisRepository, TaskRepository
 from schemas.common import (
     BaselineSummary,
     DiscoveryClaim,
@@ -58,12 +54,13 @@ from schemas.enums import (
     ValiditySourceType,
 )
 from schemas.evaluation import DiscoveryProposal, DiscoverySynthesisBundle
+from schemas.evidence import AnalysisFrame, Evidence
 from schemas.execution.contracts import (
     ExecutionSpecification,
     HypothesisDraft,
     PreparedExecution,
 )
-from schemas.provenance import AnalysisFrame
+from schemas.research import AnalyticalSpecification, DataProfile, Hypothesis, Task
 from schemas.validity import ValidityPropagationCommand
 
 

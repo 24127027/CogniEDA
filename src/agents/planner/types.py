@@ -12,7 +12,6 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_ai.messages import ModelMessage
 
-from schemas.artifacts import AnalyticalSpecification, Assumption
 from schemas.common import EvaluationThresholds, MethodParameter
 from schemas.enums import (
     AnalysisIntent,
@@ -35,6 +34,7 @@ from schemas.planner_operations import (
     TaskStateChangeOperationPayload,
     TaskUpdateOperationPayload,
 )
+from schemas.research import AnalyticalSpecification, Assumption
 
 PlannerIntent = Literal[
     "answer",

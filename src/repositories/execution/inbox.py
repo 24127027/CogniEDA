@@ -8,7 +8,7 @@ from sqlmodel import Session, desc, select
 
 from db.models import ExecutionInboxRecord
 from repositories.common import record_to_schema
-from schemas.provenance import ExecutionInbox
+from schemas.execution import ExecutionInbox
 
 
 class ExecutionInboxRepository:

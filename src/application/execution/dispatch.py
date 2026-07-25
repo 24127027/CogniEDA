@@ -19,7 +19,7 @@ from db.models import (
     ExecutionRunRecord,
     HypothesisRecord,
 )
-from repositories.execution_outbox_repository import ExecutionOutboxRepository
+from repositories.execution import ExecutionOutboxRepository
 from schemas.execution.contracts import PreparedExecution
 from schemas.execution.data_explorer import (
     DataExplorerFailureReason,

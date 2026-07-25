@@ -12,7 +12,6 @@ from db.migrations import downgrade_task_motivation_schema, upgrade_task_motivat
 from db.models import DataProfileRecord, DiscoveryRecord, HypothesisRecord, TaskRecord
 from db.session import create_db_engine, get_session
 from repositories import PlannerOperationRepository, TaskRepository, TaskUpdate
-from schemas.artifacts import Hypothesis, Task
 from schemas.enums import (
     DataProfileMethod,
     DiscoveryEpistemicStatus,
@@ -24,6 +23,7 @@ from schemas.enums import (
     TaskLifecycleState,
 )
 from schemas.planner_operations import PlannerOperation, TaskUpdateOperationPayload
+from schemas.research import Hypothesis, Task
 
 
 def build_task_payload(task_id: UUID | None = None, **overrides: object) -> dict[str, object]:

@@ -17,7 +17,6 @@ from repositories import (
     SessionFrameRepository,
     TaskRepository,
 )
-from schemas.artifacts import Assumption, Objective, SessionFrame, Task
 from schemas.common import TaskContextSummary
 from schemas.enums import (
     AssumptionSource,
@@ -36,6 +35,7 @@ from schemas.planner_operations import (
     PlannerOperation,
     TaskUpdateOperationPayload,
 )
+from schemas.research import Assumption, Objective, SessionFrame, Task
 
 
 def build_task_payload(task_id: UUID | None = None, **overrides: object) -> dict[str, object]:

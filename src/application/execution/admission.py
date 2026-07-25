@@ -11,8 +11,8 @@ from schemas.enums import (
     PlannerOperationApprovalState,
     PlannerOperationType,
 )
+from schemas.execution import ExecutionOutbox, ExecutionRun
 from schemas.planner_operations import PlannerOperation
-from schemas.provenance import ExecutionOutbox, ExecutionRun
 
 
 def build_execution_admission_operations(

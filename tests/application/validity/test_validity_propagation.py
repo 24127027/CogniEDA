@@ -50,11 +50,9 @@ from package2_helpers import (
     persist_package2_lineage,
     proposal_for_bundle,
 )
-from repositories.data_profile_repository import DataProfileRepository
 from repositories.discovery import DiscoveryRepository
-from repositories.evidence_repository import EvidenceRepository
-from repositories.session_frame_repository import SessionFrameRepository
-from schemas.artifacts import DataProfile, Evidence
+from repositories.evidence import EvidenceRepository
+from repositories.research import DataProfileRepository, SessionFrameRepository
 from schemas.common import (
     BaselineSummary,
     SchemaSummary,
@@ -78,6 +76,8 @@ from schemas.enums import (
     ValiditySourceState,
     ValiditySourceType,
 )
+from schemas.evidence import Evidence
+from schemas.research import DataProfile
 from schemas.retrieval import RetrievalRequest
 from schemas.validity import ValidityPropagationCommand
 

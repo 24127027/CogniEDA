@@ -12,8 +12,8 @@ from sqlmodel import Session, desc, select
 
 from db.models import DiscoveryRecord, TaskRecord
 from repositories.common import apply_update, record_to_schema, schema_to_record_payload
-from schemas.artifacts import Task
 from schemas.enums import TaskDependencyType, TaskKind, TaskLifecycleState
+from schemas.research import Task
 
 TASK_JSON_FIELDS = {
     "variables",

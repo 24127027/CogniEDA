@@ -10,8 +10,8 @@ from sqlmodel import Session, desc, select
 
 from db.models import UserDecisionRecord
 from repositories.common import apply_update, record_to_schema, schema_to_record_payload
-from schemas.artifacts import UserDecision
 from schemas.enums import UserDecisionStatus, UserDecisionType
+from schemas.governance import UserDecision
 
 USER_DECISION_JSON_FIELDS = {
     "alternatives_considered",

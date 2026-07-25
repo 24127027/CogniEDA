@@ -46,10 +46,8 @@ from package2_helpers import (
     proposal_for_bundle,
 )
 from repositories.discovery import DiscoveryRepository
-from repositories.evidence_repository import EvidenceRepository
-from repositories.objective_repository import ObjectiveRepository
-from repositories.task_repository import TaskRepository
-from schemas.artifacts import Objective, Task
+from repositories.evidence import EvidenceRepository
+from repositories.research import ObjectiveRepository, TaskRepository
 from schemas.enums import (
     AuthorizationClass,
     DiscoveryAdmissionClaimState,
@@ -66,6 +64,7 @@ from schemas.enums import (
 )
 from schemas.evaluation import DiscoveryProposal
 from schemas.governance import AuthenticatedPrincipal
+from schemas.research import Objective, Task
 
 
 class _StaticPrincipalResolver:

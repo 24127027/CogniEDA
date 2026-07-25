@@ -9,7 +9,7 @@ from sqlmodel import Session, desc, select
 
 from db.models import DiscoveryRecord, EvidenceRecord, HypothesisRecord
 from repositories.common import record_to_schema, schema_to_record_payload
-from schemas.artifacts import Discovery
+from schemas.discovery import Discovery
 from schemas.enums import (
     DiscoveryEpistemicStatus,
     DiscoveryLifecycleState,

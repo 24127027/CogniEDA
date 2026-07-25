@@ -11,9 +11,10 @@ from sqlmodel import Session
 from memory.retrieval_policy import exclusion_reason
 from memory.semantic_scorer import LexicalScorer, SemanticScorer
 from repositories.discovery import DiscoveryRepository
-from repositories.task_repository import TaskRepository
-from schemas.artifacts import Discovery, SessionFrame, Task
+from repositories.research import TaskRepository
+from schemas.discovery import Discovery
 from schemas.enums import ContextMode, DiscoveryLifecycleState, FirstClassObjectType
+from schemas.research import SessionFrame, Task
 from schemas.retrieval import RetrievalRequest, RetrievalResult, RetrievalResultItem
 
 logger = logging.getLogger(__name__)

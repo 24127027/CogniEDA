@@ -25,8 +25,7 @@ from repositories import (
     SessionFrameRepository,
     TaskRepository,
 )
-from repositories.objective_repository import MultipleActiveObjectivesError, ObjectiveRepository
-from schemas.artifacts import Hypothesis, Objective, SessionFrame
+from repositories.research import MultipleActiveObjectivesError, ObjectiveRepository
 from schemas.common import TaskContextSummary
 from schemas.enums import (
     ContextMode,
@@ -40,13 +39,14 @@ from schemas.enums import (
     TaskKind,
     TaskLifecycleState,
 )
+from schemas.execution import ExecutionApproval
 from schemas.execution.contracts import (
     ExecutionSpecification,
     HypothesisDraft,
     PreparedExecution,
 )
 from schemas.planner_operations import PlannerOperation
-from schemas.provenance import ExecutionApproval
+from schemas.research import Hypothesis, Objective, SessionFrame
 from schemas.retrieval import RetrievalRequest
 
 from ..utilities.nodes_registry import NodeRegistry

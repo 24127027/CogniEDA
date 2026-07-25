@@ -8,7 +8,7 @@ from sqlmodel import Session, desc, select
 
 from db.models import ExecutionRunRecord
 from repositories.common import record_to_schema
-from schemas.provenance import ExecutionRun
+from schemas.execution import ExecutionRun
 
 
 class ExecutionRunRepository:

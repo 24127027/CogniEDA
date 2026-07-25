@@ -7,12 +7,13 @@ from db.models import TaskRecord
 from discovery_seed_helpers import seed_historical_discovery
 from memory.retrieval_engine import DiscoveryRetrievalEngine
 from memory.semantic_scorer import LexicalScorer
-from schemas.artifacts import Discovery, Objective, SessionFrame, Task
 from schemas.common import DiscoveryClaim, ValidityBasis
+from schemas.discovery import Discovery
 from schemas.enums import (
     DiscoveryEpistemicStatus,
     DiscoveryLifecycleState,
 )
+from schemas.research import Objective, SessionFrame, Task
 from schemas.retrieval import RetrievalRequest
 
 
@@ -120,7 +121,7 @@ def test_retrieval_separates_motivation_from_context(db_session: Session, create
         validity_basis=v2,
     )
 
-    from repositories.task_repository import TaskRepository
+    from repositories.research import TaskRepository
 
     seed_historical_discovery(db_session, direct_motivation)
     seed_historical_discovery(db_session, other_discovery)
@@ -190,7 +191,7 @@ def test_retrieval_ranks_by_structural_relations(db_session: Session, create_val
     ancestor_task.motivated_by_discovery_ids = [d_ancestor.discovery_id]
     parent_task.motivated_by_discovery_ids = [d_direct.discovery_id]
 
-    from repositories.task_repository import TaskRepository
+    from repositories.research import TaskRepository
 
     seed_historical_discovery(db_session, d_direct)
     seed_historical_discovery(db_session, d_ancestor)

@@ -1,25 +1,34 @@
 """Research-state and provenance persistence repositories."""
 
-from repositories.analysis_frame_repository import AnalysisFrameRepository
-from repositories.assumption_repository import AssumptionRepository, AssumptionUpdate
-from repositories.data_profile_repository import DataProfileRepository
 from repositories.discovery import DiscoveryRepository
-from repositories.evidence_repository import EvidenceRepository
-from repositories.execution_approval_repository import ExecutionApprovalRepository
-from repositories.execution_inbox_repository import ExecutionInboxRepository
-from repositories.execution_outbox_repository import ExecutionOutboxRepository
-from repositories.execution_run_repository import ExecutionRunRepository
-from repositories.hypothesis_repository import HypothesisRepository, HypothesisUpdate
-from repositories.objective_repository import (
+from repositories.evaluation import EvaluationControlRepository
+from repositories.evidence import AnalysisFrameRepository, EvidenceRepository
+from repositories.execution import (
+    ExecutionApprovalRepository,
+    ExecutionInboxRepository,
+    ExecutionOutboxRepository,
+    ExecutionRunRepository,
+)
+from repositories.governance import ProposalDecisionRepository
+from repositories.planner_operation_repository import PlannerOperationRepository
+from repositories.research import (
+    AssumptionRepository,
+    AssumptionUpdate,
+    DataProfileRepository,
+    HypothesisRepository,
+    HypothesisUpdate,
+    MultipleActiveObjectivesError,
     ObjectiveMutationContext,
     ObjectiveRepository,
+    ObjectiveRevisionRepository,
     ObjectiveUpdate,
+    SessionFrameRepository,
+    TaskRepository,
+    TaskUpdate,
+    UserDecisionRepository,
+    UserDecisionUpdate,
 )
-from repositories.objective_revision_repository import ObjectiveRevisionRepository
-from repositories.planner_operation_repository import PlannerOperationRepository
-from repositories.session_frame_repository import SessionFrameRepository
-from repositories.task_repository import TaskRepository, TaskUpdate
-from repositories.user_decision_repository import UserDecisionRepository, UserDecisionUpdate
+from repositories.validity import ValidityEventRepository
 
 __all__ = [
     "AnalysisFrameRepository",
@@ -27,6 +36,7 @@ __all__ = [
     "AssumptionUpdate",
     "DataProfileRepository",
     "DiscoveryRepository",
+    "EvaluationControlRepository",
     "EvidenceRepository",
     "ExecutionApprovalRepository",
     "ExecutionInboxRepository",
@@ -34,14 +44,17 @@ __all__ = [
     "ExecutionRunRepository",
     "HypothesisRepository",
     "HypothesisUpdate",
+    "MultipleActiveObjectivesError",
     "ObjectiveMutationContext",
     "ObjectiveRepository",
     "ObjectiveRevisionRepository",
     "ObjectiveUpdate",
     "PlannerOperationRepository",
+    "ProposalDecisionRepository",
     "SessionFrameRepository",
     "TaskRepository",
     "TaskUpdate",
     "UserDecisionRepository",
     "UserDecisionUpdate",
+    "ValidityEventRepository",
 ]

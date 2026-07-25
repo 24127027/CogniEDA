@@ -69,15 +69,6 @@ from repositories import (
     SessionFrameRepository,
     TaskRepository,
 )
-from schemas.artifacts import (
-    AnalyticalSpecification,
-    Assumption,
-    DataProfile,
-    Discovery,
-    Evidence,
-    Hypothesis,
-    Task,
-)
 from schemas.common import (
     BaselineSummary,
     DiscoveryClaim,
@@ -88,6 +79,7 @@ from schemas.common import (
     SchemaSummary,
     ValidityBasis,
 )
+from schemas.discovery import Discovery
 from schemas.enums import (
     DataProfileLifecycleState,
     DataProfileMethod,
@@ -102,11 +94,19 @@ from schemas.enums import (
     ValidityEventType,
     ValiditySourceType,
 )
+from schemas.evidence import Evidence
 from schemas.execution.contracts import ExecutionReceiptEnvelope
 from schemas.execution.data_explorer import DataExplorerResult
 from schemas.execution.observations import (
     AnalysisFrameObservation,
     EvidenceObservation,
+)
+from schemas.research import (
+    AnalyticalSpecification,
+    Assumption,
+    DataProfile,
+    Hypothesis,
+    Task,
 )
 from schemas.retrieval import RetrievalRequest
 

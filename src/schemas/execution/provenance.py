@@ -1,4 +1,4 @@
-"""Minimal non-FCO provenance records."""
+"""Execution attempt protocol and provenance schemas."""
 
 from __future__ import annotations
 
@@ -6,37 +6,11 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import Field, model_validator
+from pydantic import Field
 
 from schemas.common import CogniEDABaseModel, NonEmptyStr, utc_now
-from schemas.enums import (
-    ExecutionApprovalStatus,
-    ExecutionRunStatus,
-    ObjectiveStatus,
-    ValiditySourceState,
-)
-
-
-class AnalysisFrame(CogniEDABaseModel):
-    """Provenance pointer for the data view used by an analysis."""
-
-    analysis_frame_id: UUID = Field(default_factory=uuid4)
-    data_profile_id: UUID
-    frame_hash: NonEmptyStr | None = None
-    frame_ref: NonEmptyStr | None = None
-    column_refs: list[NonEmptyStr] = Field(default_factory=list)
-    row_filter_description: str | None = None
-    validity_state: ValiditySourceState = ValiditySourceState.ACTIVE
-    validity_reason: str | None = None
-    created_at: datetime = Field(default_factory=utc_now)
-
-    @model_validator(mode="after")
-    def _has_frame_identity(self) -> AnalysisFrame:
-        """Require at least one stable way to identify the analysis view."""
-
-        if self.frame_hash is None and self.frame_ref is None:
-            raise ValueError("AnalysisFrame requires frame_hash or frame_ref.")
-        return self
+from schemas.enums import ValiditySourceState
+from schemas.execution.lifecycle import ExecutionApprovalStatus, ExecutionRunStatus
 
 
 class ExecutionRun(CogniEDABaseModel):
@@ -121,22 +95,3 @@ class ExecutionApproval(CogniEDABaseModel):
     execution_run_id: UUID | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
-
-
-class ObjectiveRevision(CogniEDABaseModel):
-    """Immutable non-FCO provenance for one governed Objective mutation."""
-
-    objective_revision_id: UUID = Field(default_factory=uuid4)
-    objective_id: UUID
-    previous_title: NonEmptyStr
-    previous_statement: NonEmptyStr
-    previous_status: ObjectiveStatus
-    new_title: NonEmptyStr
-    new_statement: NonEmptyStr
-    new_status: ObjectiveStatus
-    changed_fields: list[NonEmptyStr]
-    reason: NonEmptyStr
-    planner_operation_id: UUID | None = None
-    user_decision_id: UUID | None = None
-    actor: NonEmptyStr
-    created_at: datetime = Field(default_factory=utc_now)

@@ -10,7 +10,7 @@ import pytest
 SOURCE_ROOT = Path("src")
 TRANSITION_OWNER = "src/application/execution/transition_service.py"
 VALIDITY_OWNER = "src/application/validity/propagation_service.py"
-MODEL_DEFINITION = "src/db/models.py"
+MODEL_DEFINITION = "src/db/models/__init__.py"
 EXECUTION_RECORDS = {
     "ExecutionRunRecord",
     "ExecutionInboxRecord",
@@ -35,9 +35,9 @@ AUTHORITATIVE_FIELDS = {
     "executor_type",
 }
 EXECUTION_REPOSITORIES = {
-    "src/repositories/execution_run_repository.py",
-    "src/repositories/execution_outbox_repository.py",
-    "src/repositories/execution_inbox_repository.py",
+    "src/repositories/execution/run.py",
+    "src/repositories/execution/outbox.py",
+    "src/repositories/execution/inbox.py",
 }
 
 
@@ -266,11 +266,11 @@ def test_package6_removed_compatibility_modules_are_absent_and_unreferenced() ->
 def test_evidence_writer_and_terminal_lifecycle_writers_are_sealed() -> None:
     """Generic repositories cannot bypass the atomic admission transactions."""
 
-    evidence_source = Path("src/repositories/evidence_repository.py").read_text(encoding="utf-8")
-    hypothesis_source = Path("src/repositories/hypothesis_repository.py").read_text(
+    evidence_source = Path("src/repositories/evidence/evidence.py").read_text(encoding="utf-8")
+    hypothesis_source = Path("src/repositories/research/hypothesis.py").read_text(
         encoding="utf-8"
     )
-    task_source = Path("src/repositories/task_repository.py").read_text(encoding="utf-8")
+    task_source = Path("src/repositories/research/task.py").read_text(encoding="utf-8")
     assert "Evidence creation is owned by the Evidence admission transaction." in (evidence_source)
     assert "Hypothesis EVALUATED transition is owned by" in hypothesis_source
     assert "Analytical Task COMPLETED transition is owned by" in task_source

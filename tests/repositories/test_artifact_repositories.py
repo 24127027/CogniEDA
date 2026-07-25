@@ -29,21 +29,10 @@ from repositories import (
     TaskUpdate,
     UserDecisionRepository,
 )
-from schemas.artifacts import (
-    Assumption,
-    DataProfile,
-    Discovery,
-    EvaluationThresholds,
-    Evidence,
-    Hypothesis,
-    Objective,
-    SessionFrame,
-    Task,
-    UserDecision,
-)
 from schemas.common import (
     BaselineSummary,
     DiscoveryClaim,
+    EvaluationThresholds,
     EvidenceProvenance,
     EvidenceResultSummary,
     MethodParameter,
@@ -51,6 +40,7 @@ from schemas.common import (
     SchemaSummary,
     ValidityBasis,
 )
+from schemas.discovery import Discovery
 from schemas.enums import (
     AssumptionSource,
     AssumptionStatus,
@@ -72,7 +62,16 @@ from schemas.enums import (
     TaskLifecycleState,
     UserDecisionType,
 )
-from schemas.provenance import AnalysisFrame
+from schemas.evidence import AnalysisFrame, Evidence
+from schemas.governance import UserDecision
+from schemas.research import (
+    Assumption,
+    DataProfile,
+    Hypothesis,
+    Objective,
+    SessionFrame,
+    Task,
+)
 
 
 def build_objective(**overrides: object) -> Objective:
@@ -321,7 +320,7 @@ def test_obsolete_domain_types_are_not_exported_or_fcos() -> None:
     assert "dataset_asset" not in fcos
     assert "decision_log" not in fcos
 
-    import schemas.artifacts as artifacts
+    import schemas as artifacts
 
     assert not hasattr(artifacts, "Project")
     assert not hasattr(artifacts, "DatasetAsset")

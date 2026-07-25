@@ -10,7 +10,7 @@ from sqlmodel import Session, desc, select
 from db.models import ExecutionApprovalRecord
 from repositories.common import record_to_schema, schema_to_record_payload
 from schemas.enums import ExecutionApprovalStatus
-from schemas.provenance import ExecutionApproval
+from schemas.execution import ExecutionApproval
 
 EXECUTION_APPROVAL_JSON_FIELDS = {"prepared_payload"}
 

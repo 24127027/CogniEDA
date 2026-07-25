@@ -16,7 +16,6 @@ from db.models import (
 )
 from package2_helpers import propagate_validity_for_test
 from repositories import DataProfileRepository, SessionFrameRepository, TaskRepository
-from schemas.artifacts import DataProfile, SessionFrame, Task
 from schemas.common import BaselineSummary, EvaluationThresholds, MethodParameter, SchemaSummary
 from schemas.enums import (
     DataProfileLifecycleState,
@@ -31,6 +30,7 @@ from schemas.enums import (
     ValiditySourceType,
 )
 from schemas.planner_operations import PlannerOperation
+from schemas.research import DataProfile, SessionFrame, Task
 
 
 class EmptyMotivationDecompositionModel:

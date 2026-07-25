@@ -15,8 +15,7 @@ from db.models import (
     UserDecisionRecord,
 )
 from repositories.common import apply_update, record_to_schema, schema_to_record_payload
-from repositories.objective_revision_repository import ObjectiveRevisionRepository
-from schemas.artifacts import Objective
+from repositories.research.objective_revision import ObjectiveRevisionRepository
 from schemas.enums import (
     ObjectiveStatus,
     PlannerOperationApprovalState,
@@ -25,7 +24,7 @@ from schemas.enums import (
     UserDecisionStatus,
     UserDecisionType,
 )
-from schemas.provenance import ObjectiveRevision
+from schemas.research import Objective, ObjectiveRevision
 
 OBJECTIVE_REVISION_FIELDS = ("title", "statement", "status")
 UNFINISHED_TASK_STATES = {

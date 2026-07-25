@@ -3,22 +3,12 @@ from __future__ import annotations
 from uuid import uuid4
 
 from memory import ContextBundle, ContextMode, SessionContextBuilder, SessionFrameBuilder
-from schemas.artifacts import (
-    Assumption,
-    DataProfile,
-    Discovery,
-    EvaluationThresholds,
-    Evidence,
-    Hypothesis,
-    Objective,
-    Task,
-    UserDecision,
-)
 from schemas.common import (
     BaselineSummary,
     DeadEndSummary,
     DiscoveryClaim,
     DiscoveryContextSummary,
+    EvaluationThresholds,
     EvidenceProvenance,
     EvidenceResultSummary,
     MethodParameter,
@@ -27,6 +17,7 @@ from schemas.common import (
     ToolResultCacheSummary,
     ValidityBasis,
 )
+from schemas.discovery import Discovery
 from schemas.enums import (
     AssumptionStatus,
     ConfidenceLevel,
@@ -45,6 +36,15 @@ from schemas.enums import (
     TaskLifecycleState,
     UserDecisionStatus,
     UserDecisionType,
+)
+from schemas.evidence import Evidence
+from schemas.governance import UserDecision
+from schemas.research import (
+    Assumption,
+    DataProfile,
+    Hypothesis,
+    Objective,
+    Task,
 )
 
 

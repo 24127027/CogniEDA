@@ -8,7 +8,7 @@ from sqlmodel import Session, asc, select
 
 from db.models import ObjectiveRevisionRecord
 from repositories.common import record_to_schema, schema_to_record_payload
-from schemas.provenance import ObjectiveRevision
+from schemas.research import ObjectiveRevision
 
 OBJECTIVE_REVISION_JSON_FIELDS = {"changed_fields"}
 

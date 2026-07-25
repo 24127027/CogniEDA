@@ -10,11 +10,14 @@ from schemas.discovery.admission import (
     FutureAtomicWriteSet,
     ValidityBasisSnapshot,
 )
+from schemas.discovery.claim import Discovery, DiscoveryClaim
 
 __all__ = [
     "AtomicDiscoveryAdmissionResult",
+    "Discovery",
     "DiscoveryAdmissionLease",
     "DiscoveryAdmissionPlan",
+    "DiscoveryClaim",
     "DiscoveryClaimSnapshot",
     "FutureAtomicWriteSet",
     "ValidityBasisSnapshot",

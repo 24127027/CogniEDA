@@ -18,24 +18,18 @@ from db.models import (
     SessionFrameRecord,
     TaskRecord,
 )
-from repositories.assumption_repository import ASSUMPTION_JSON_FIELDS, AssumptionUpdate
 from repositories.common import apply_update, record_to_schema, schema_to_record_payload
 from repositories.discovery import DiscoveryRepository
-from repositories.hypothesis_repository import HypothesisRepository, HypothesisUpdate
-from repositories.objective_repository import (
+from repositories.research import (
+    HypothesisRepository,
+    HypothesisUpdate,
     ObjectiveMutationContext,
     ObjectiveRepository,
     ObjectiveUpdate,
 )
-from repositories.session_frame_repository import SESSION_FRAME_JSON_FIELDS
-from repositories.task_repository import TASK_JSON_FIELDS, TaskUpdate
-from schemas.artifacts import (
-    Assumption,
-    Hypothesis,
-    Objective,
-    SessionFrame,
-    Task,
-)
+from repositories.research.assumption import ASSUMPTION_JSON_FIELDS, AssumptionUpdate
+from repositories.research.session_frame import SESSION_FRAME_JSON_FIELDS
+from repositories.research.task import TASK_JSON_FIELDS, TaskUpdate
 from schemas.enums import (
     AssumptionStatus,
     DataProfileLifecycleState,
@@ -47,13 +41,20 @@ from schemas.enums import (
     TaskKind,
     TaskLifecycleState,
 )
+from schemas.execution import ExecutionOutbox, ExecutionRun
 from schemas.planner_operations import (
     ObjectiveCreateOperationPayload,
     ObjectiveUpdateOperationPayload,
     PlannerCommitResult,
     PlannerOperation,
 )
-from schemas.provenance import ExecutionOutbox, ExecutionRun
+from schemas.research import (
+    Assumption,
+    Hypothesis,
+    Objective,
+    SessionFrame,
+    Task,
+)
 
 _COMMITTABLE_STATES = {
     PlannerOperationApprovalState.APPROVED,

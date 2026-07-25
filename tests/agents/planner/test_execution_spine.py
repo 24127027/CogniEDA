@@ -52,16 +52,9 @@ from repositories import (
     SessionFrameRepository,
     TaskRepository,
 )
-from schemas.artifacts import (
-    AnalyticalSpecification,
-    DataProfile,
-    EvaluationThresholds,
-    Evidence,
-    Hypothesis,
-    Task,
-)
 from schemas.common import (
     BaselineSummary,
+    EvaluationThresholds,
     EvidenceProvenance,
     EvidenceResultSummary,
     MethodParameter,
@@ -80,11 +73,17 @@ from schemas.enums import (
     TaskKind,
     TaskLifecycleState,
 )
+from schemas.evidence import AnalysisFrame, Evidence
 from schemas.execution.contracts import ExecutionReceiptEnvelope
 from schemas.execution.data_explorer import DataExplorerResult
 from schemas.execution.observations import AnalysisFrameObservation, EvidenceObservation
 from schemas.planner_operations import PlannerOperation
-from schemas.provenance import AnalysisFrame
+from schemas.research import (
+    AnalyticalSpecification,
+    DataProfile,
+    Hypothesis,
+    Task,
+)
 
 
 class FakeExecutor:

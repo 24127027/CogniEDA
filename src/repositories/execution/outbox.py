@@ -8,7 +8,7 @@ from sqlmodel import Session, desc, select
 
 from db.models import ExecutionOutboxRecord
 from repositories.common import record_to_schema
-from schemas.provenance import ExecutionOutbox
+from schemas.execution import ExecutionOutbox
 
 
 class ExecutionOutboxRepository:

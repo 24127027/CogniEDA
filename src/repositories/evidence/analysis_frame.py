@@ -8,7 +8,7 @@ from sqlmodel import Session, desc, select
 
 from db.models import AnalysisFrameRecord
 from repositories.common import record_to_schema, schema_to_record_payload
-from schemas.provenance import AnalysisFrame
+from schemas.evidence import AnalysisFrame
 
 ANALYSIS_FRAME_JSON_FIELDS = {"column_refs"}
 

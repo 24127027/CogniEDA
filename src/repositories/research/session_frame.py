@@ -9,8 +9,8 @@ from sqlmodel import Session, desc, select
 
 from db.models import SessionFrameRecord
 from repositories.common import record_to_schema, schema_to_record_payload
-from schemas.artifacts import SessionFrame
 from schemas.enums import SessionFrameStatus
+from schemas.research import SessionFrame
 
 SESSION_FRAME_JSON_FIELDS = {
     "data_profile_summaries",

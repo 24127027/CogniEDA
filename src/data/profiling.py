@@ -10,7 +10,6 @@ from pandas.api import types as pd_types
 
 from data.loaders import LoadedDataset, load_dataset
 from data.validation import validate_profile_input_frame
-from schemas.artifacts import DataProfile
 from schemas.common import (
     BaselineSummary,
     CategoricalColumnSummary,
@@ -21,6 +20,7 @@ from schemas.common import (
     TopValueSummary,
 )
 from schemas.enums import DataProfileMethod, LogicalDtype, QualityFlagSeverity
+from schemas.research import DataProfile
 
 
 @dataclass(frozen=True, slots=True)

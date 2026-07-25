@@ -8,10 +8,12 @@ from schemas.governance.authority import (
     ProposalAuthority,
 )
 from schemas.governance.decision import GovernanceDecision
+from schemas.governance.user_decision import UserDecision
 
 __all__ = [
     "AuthenticatedPrincipal",
     "GovernanceAuthority",
     "GovernanceDecision",
     "ProposalAuthority",
+    "UserDecision",
 ]

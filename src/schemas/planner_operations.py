@@ -12,7 +12,6 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from schemas.artifacts import AnalyticalSpecification
 from schemas.common import CogniEDABaseModel, NonEmptyStr, utc_now
 from schemas.enums import (
     AssumptionStatus,
@@ -25,6 +24,7 @@ from schemas.enums import (
     TaskKind,
     TaskLifecycleState,
 )
+from schemas.research import AnalyticalSpecification
 
 
 class TaskUpdateOperationPayload(BaseModel):

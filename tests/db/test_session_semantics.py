@@ -5,9 +5,9 @@ from uuid import uuid4
 import pytest
 
 from repositories import EvidenceRepository
-from schemas.artifacts import Evidence
 from schemas.common import EvidenceProvenance, EvidenceResultSummary
 from schemas.enums import EvidenceType
+from schemas.evidence import Evidence
 
 
 def test_evidence_repository_rejects_orphan_before_foreign_key_flush(db_session) -> None:

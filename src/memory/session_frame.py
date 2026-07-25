@@ -6,17 +6,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from uuid import UUID
 
-from schemas.artifacts import (
-    Assumption,
-    DataProfile,
-    Discovery,
-    Evidence,
-    Hypothesis,
-    Objective,
-    SessionFrame,
-    Task,
-    UserDecision,
-)
 from schemas.common import (
     AssumptionContextSummary,
     ContextProvenance,
@@ -31,6 +20,7 @@ from schemas.common import (
     ToolResultCacheSummary,
     UserDecisionContextSummary,
 )
+from schemas.discovery import Discovery
 from schemas.enums import (
     AssumptionStatus,
     ContextMode,
@@ -42,6 +32,16 @@ from schemas.enums import (
     SessionFrameStatus,
     TaskLifecycleState,
     UserDecisionStatus,
+)
+from schemas.evidence import Evidence
+from schemas.governance import UserDecision
+from schemas.research import (
+    Assumption,
+    DataProfile,
+    Hypothesis,
+    Objective,
+    SessionFrame,
+    Task,
 )
 
 from .retrieval_policy import exclusion_reason, is_allowed_in_context
