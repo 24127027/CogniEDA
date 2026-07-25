@@ -16,14 +16,18 @@ class ProposalDecisionRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def stage_create(self, record: ProposalDecisionRecord) -> ProposalDecisionRecord:
-        """Add a decision record without committing the session."""
+    def _stage_create_from_governance(
+        self, record: ProposalDecisionRecord
+    ) -> ProposalDecisionRecord:
+        """Stage a decision only for the governance application service."""
 
         self._session.add(record)
         return record
 
-    def create(self, record: ProposalDecisionRecord) -> ProposalDecisionRecord:
-        """Persist and commit a new proposal decision record."""
+    def _create_from_governance(
+        self, record: ProposalDecisionRecord
+    ) -> ProposalDecisionRecord:
+        """Persist a decision only for the governance application service."""
 
         self._session.add(record)
         try:

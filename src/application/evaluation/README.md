@@ -41,7 +41,10 @@ READY_FOR_EVALUATION Hypothesis + active Evidence
 - **Replay**: Re-publishing an identical proposal under the same claim is idempotent.
 
 ## 8. Transaction owner
-`EvaluationTransitionService` is the sole writer for `EvaluationControlRecord` lifecycle state transitions.
+`EvaluationTransitionService` owns enqueue, claim/reclaim, proposal/failure publication, retry,
+cancel, conflict, and evaluation invalidation transactions. The existing atomic Discovery-admission
+transaction alone writes `COMMITTED`, and `AtomicValidityPropagationService` may invalidate affected
+controls as part of its separate validity transaction.
 
 ## 9. Exact proposal binding
 The published proposal is stored exactly as returned by Hypothesis Analyst (`serialized_proposal`) and bound to the source bundle by `proposal_digest = canonical_sha256({"source_bundle_digest": bundle.input_digest, "proposal": proposal})`.

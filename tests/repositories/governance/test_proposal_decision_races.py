@@ -68,6 +68,7 @@ def _service(session: Session) -> DiscoveryAdmissionGovernanceService:
         session,
         workspace_id="workspace:test",
         session_id="session:test",
+        principal_id="user:lead_researcher",
     )
 
 
@@ -339,6 +340,19 @@ def test_decision_core_is_immutable_and_consumption_requires_committed_chain(
     db_session.rollback()
     db_session.refresh(decision)
     assert decision.consumed is False
+
+
+def test_governance_authority_core_and_expiry_are_immutable(db_session: Session) -> None:
+    _, authority = _setup_proposal_ready_evaluation(db_session)
+
+    with pytest.raises(IntegrityError, match="authority core is immutable"):
+        db_session.execute(
+            update(GovernanceAuthorityRecord)
+            .where(GovernanceAuthorityRecord.authority_id == authority.authority_id)
+            .values(expires_at=utc_now())
+        )
+        db_session.commit()
+    db_session.rollback()
 
 
 def test_existing_discovery_racing_plan_never_gets_overwritten(db_session: Session) -> None:

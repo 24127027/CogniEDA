@@ -16,21 +16,11 @@ from schemas.enums import (
     TaskLifecycleState,
 )
 from schemas.evaluation import DecisionRuleSnapshot, MethodParameterSnapshot
-from schemas.governance import (
-    AuthenticatedPrincipal,
-    GovernanceAuthority,
-    GovernanceDecision,
-    ProposalAuthority,
-)
 
 __all__ = [
-    "AuthenticatedPrincipal",
     "DiscoveryAdmissionPlan",
     "DiscoveryClaimSnapshot",
     "FutureAtomicWriteSet",
-    "GovernanceAuthority",
-    "GovernanceDecision",
-    "ProposalAuthority",
     "ValidityBasisSnapshot",
 ]
 

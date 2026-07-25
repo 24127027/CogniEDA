@@ -38,7 +38,8 @@ snapshots intentionally omit mutable persistence state that is not scientific in
   evaluation; it cannot represent an unaccepted profile.
 - `AnalysisFrameEvaluationSnapshot` contains immutable frame identity and view provenance without
   copying a mutable persistence record.
-- admitted `Evidence` is reused directly because Evidence is already an immutable canonical FCO.
+- `AdmittedEvidenceSnapshot` copies only active observed content and exact provenance needed for
+  evaluation; it omits timestamps, artifacts, lifecycle mutation, and unrelated persistence state.
 
 These are evaluation-specific snapshots, not aliases for persisted FCOs and not new FCOs.
 
@@ -68,7 +69,7 @@ inside a nested payload.
 
 - one `HypothesisEvaluationSnapshot` of the durably approved scientific contract;
 - one accepted `DataProfileEvaluationSnapshot`;
-- one `AnalysisFrameEvaluationSnapshot`;
+- one or more `AnalysisFrameEvaluationSnapshot` values;
 - one or more active admitted `Evidence` records;
 - typed execution details, explicit validity requirements, and an application-supplied input
   digest.

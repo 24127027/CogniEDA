@@ -13,7 +13,9 @@ Following **Package S2-A**, application responsibilities are structured into foc
 - `application/execution/`: Owns execution attempt admission, contract/receipt identity hashing, transition service, dispatching, receipt ingestion, cancellation, and recovery.
 - `application/evidence/`: Owns pure Evidence admission plan validation and the atomic AnalysisFrame + Evidence write transaction.
 - `application/evaluation/`: Owns protected synthesis bundle construction, evaluation transition state machine, CAS fencing, and evaluator runner invocation.
-- `application/governance/`: Owns authenticated principal resolution, governance authority issuance, durable proposal decision recording, and deterministic governance fingerprints.
+- `application/governance/`: Owns authenticated principal resolution, expiring immutable governance
+  authority issuance, exact-principal proposal decision recording, and deterministic governance
+  fingerprints.
 - `application/orchestrator/`: Temporarily retains atomic Discovery admission and validity propagation.
 
 There is no supported package CLI or checked-in admission command. There is also no default

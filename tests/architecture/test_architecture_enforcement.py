@@ -620,8 +620,31 @@ def test_package_s2a_dependency_directions_are_enforced() -> None:
                     if alias.name.startswith("application"):
                         violations.append(f"{path.as_posix()}: repository imports {alias.name}")
 
-    # 3. Analyst imports no governance or Discovery admission code
+    # 3. Analyst imports no application, persistence, governance, or executor peers
     for path in Path("src/agents/executor/hypothesis_analyst").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                if node.module.startswith(
+                    (
+                        "application",
+                        "db",
+                        "repositories",
+                        "schemas.governance",
+                        "schemas.discovery_admission_contracts",
+                        "agents.executor.dispatcher",
+                        "agents.executor.registry",
+                        "sqlmodel",
+                    )
+                ):
+                    violations.append(f"{path.as_posix()}: Analyst imports {node.module}")
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.startswith(("application", "db", "repositories", "sqlmodel")):
+                        violations.append(f"{path.as_posix()}: Analyst imports {alias.name}")
+
+    # 4. application.evaluation does not import governance or atomic admission
+    for path in Path("src/application/evaluation").rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module:
@@ -633,22 +656,62 @@ def test_package_s2a_dependency_directions_are_enforced() -> None:
                         "application.orchestrator.atomic_discovery_admission",
                     )
                 ):
-                    violations.append(f"{path.as_posix()}: Analyst imports {node.module}")
-
-    # 4. application.evaluation does not import governance decision services
-    for path in Path("src/application/evaluation").rglob("*.py"):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module:
-                if node.module.startswith("application.governance"):
                     violations.append(f"{path.as_posix()}: evaluation imports {node.module}")
 
-    # 5. application.governance does not invoke Hypothesis Analyst
+    # 5. application.governance does not invoke Analyst or depend on admission implementation
     for path in Path("src/application/governance").rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module:
-                if node.module.startswith("agents.executor.hypothesis_analyst"):
+                if node.module.startswith(
+                    (
+                        "agents.executor.hypothesis_analyst",
+                        "application.orchestrator.atomic_discovery_admission",
+                        "repositories.discovery_admission_claim_repository",
+                    )
+                ):
                     violations.append(f"{path.as_posix()}: governance imports {node.module}")
 
     assert not violations, f"S2-A dependency-direction violations: {violations}"
+
+
+def test_package_s2a_compatibility_exports_and_public_repository_writers_are_removed() -> None:
+    """Canonical S2-A owners must not leak through old contracts or public repository writers."""
+
+    discovery_contracts = Path("src/schemas/discovery_admission_contracts.py")
+    tree = ast.parse(discovery_contracts.read_text(encoding="utf-8"))
+    governance_exports = {
+        "AuthenticatedPrincipal",
+        "GovernanceAuthority",
+        "GovernanceDecision",
+        "ProposalAuthority",
+    }
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "schemas.governance":
+            leaked = sorted(alias.name for alias in node.names if alias.name in governance_exports)
+            if leaked:
+                violations.append(f"{discovery_contracts.as_posix()}: re-exports {leaked}")
+        elif isinstance(node, (ast.List, ast.Tuple)):
+            leaked = sorted(
+                item.value
+                for item in node.elts
+                if isinstance(item, ast.Constant)
+                and isinstance(item.value, str)
+                and item.value in governance_exports
+            )
+            if leaked:
+                violations.append(f"{discovery_contracts.as_posix()}: __all__ exports {leaked}")
+
+    forbidden_repository_writers = {
+        Path("src/repositories/evaluation/control.py"): {"stage_create", "create"},
+        Path("src/repositories/governance/proposal_decision.py"): {"stage_create", "create"},
+    }
+    for path, forbidden_names in forbidden_repository_writers.items():
+        repository_tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(repository_tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name in forbidden_names:
+                    violations.append(f"{path.as_posix()}: public writer {node.name}")
+
+    assert not violations, f"S2-A compatibility/transaction leaks remain: {violations}"

@@ -848,6 +848,7 @@ def test_genuine_end_to_end_research_lineage(db_session, epistemic_status) -> No
             evaluation_session,
             workspace_id="workspace:test",
             session_id="session:test",
+            principal_id="user:lead_researcher",
         ).record_governance_decision(
             evaluation_id=evaluation.evaluation_id,
             authority_id=authority.authority_id,

@@ -7,7 +7,8 @@
 Package S2-A decomposed governance decision authority out of `application.orchestrator` into an explicit bounded context. Governance binds an exact `DiscoveryProposal` to independently issued, durable user decision authority before Discovery admission.
 
 ## 3. Owned authority
-- Resolving authenticated principal context (`AuthenticatedPrincipalResolver`).
+- Resolving authenticated principal context (`AuthenticatedPrincipalResolver`) and binding
+  user-governed decision recording to the exact principal that owns the authority.
 - Issuing bounded, fixed-purpose, expiring governance authority grants (`GovernanceAuthorityIssuer`).
 - Verifying proposal authority, principal bindings, proposal digests, and authority fingerprints (`decision_service.py`).
 - Persisting durable `ProposalDecisionRecord` entries (`decision_service.py`).
@@ -24,7 +25,8 @@ Package S2-A decomposed governance decision authority out of `application.orches
 - Creating default anonymous principals or fake production authority.
 
 ## 5. Canonical input and output
-- **Input**: `authentication_context_id`, `evaluation_id`, `authority_id`, and explicit `GovernanceDecisionOutcome` (e.g. `APPROVED`).
+- **Input**: externally resolved authenticated principal identity, `evaluation_id`, `authority_id`,
+  and explicit `GovernanceDecisionOutcome` (for example, `APPROVED`).
 - **Output**: A persisted `ProposalDecisionRecord` bound to the exact proposal digest, evaluation key, actor, workspace, session, and decision fingerprint.
 
 ## 6. Happy path
@@ -38,7 +40,8 @@ Authenticated principal context
 
 ## 7. Failure, retry, reclaim, and replay
 - **Expired/Invalid authority**: Fails closed with `ProposalAuthorizationError`.
-- **Mismatch (principal/session/proposal/evaluation)**: Fails closed with `ProposalAuthorizationError`.
+- **Missing expiry or mismatch (principal/session/proposal/evaluation)**: Fails closed with
+  `ProposalAuthorizationError`.
 - **Same-decision replay**: Re-submitting the exact same decision with the same authority is idempotent.
 - **Conflicting decision**: Submitting a different decision for the same proposal raises `ProposalDecisionConflictError`.
 
@@ -46,7 +49,10 @@ Authenticated principal context
 `DiscoveryAdmissionGovernanceService` is the sole writer for `ProposalDecisionRecord` entries during decision submission.
 
 ## 9. Exact decision binding
-Each decision record binds `evaluation_id`, `evaluation_key`, `hypothesis_id`, `task_id`, `proposal_digest`, `bundle_digest`, `evidence_set_digest`, `actor`, `authority_id`, `workspace_id`, and `session_id`, protected by an immutable `decision_fingerprint`.
+Each decision record binds `evaluation_id`, `evaluation_key`, `hypothesis_id`, `task_id`,
+`proposal_digest`, `bundle_digest`, `evidence_set_digest`, `actor`, `authority_id`, `workspace_id`,
+and `session_id`, protected by an immutable `decision_fingerprint`. The referenced authority core,
+including issuer and expiry, is immutable in the supported SQLite schema.
 
 ## 10. Tests proving the boundary
 - `tests/application/governance/test_proposal_authorization.py`

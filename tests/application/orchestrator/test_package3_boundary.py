@@ -52,6 +52,7 @@ def test_package3_boundary_invariants(db_session: Session) -> None:
         db_session,
         workspace_id="workspace:test",
         session_id="session:test",
+        principal_id="user:lead_researcher",
     )
     decision_rec = gov_service.record_governance_decision(
         evaluation_id=published.evaluation_id,

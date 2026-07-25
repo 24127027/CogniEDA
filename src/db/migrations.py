@@ -369,6 +369,19 @@ def upgrade_proposal_decision_schema(engine: Engine) -> None:
     with engine.begin() as connection:
         connection.execute(
             text(
+                "CREATE TRIGGER IF NOT EXISTS governance_authorities_immutable_core "
+                "BEFORE UPDATE OF "
+                "authority_id, actor_identity, authority_class, workspace_id, session_id, "
+                "purpose, operation_type, issued_by, issued_at, expires_at, "
+                "authority_fingerprint, created_at "
+                "ON governance_authorities "
+                "BEGIN "
+                "SELECT RAISE(ABORT, 'governance authority core is immutable'); "
+                "END"
+            )
+        )
+        connection.execute(
+            text(
                 "CREATE TRIGGER IF NOT EXISTS proposal_decisions_immutable_core "
                 "BEFORE UPDATE OF "
                 "decision_id, authority_id, evaluation_id, evaluation_key, hypothesis_id, "

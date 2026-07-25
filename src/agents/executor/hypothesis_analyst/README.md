@@ -27,7 +27,9 @@ DiscoverySynthesisBundle -> evaluate_synthesis_bundle -> DiscoveryProposal
 
 ## 7. Failure, retry, reclaim, and replay
 - Structured output retry bounded by PydanticAI.
-- Model failure returns typed `EvaluationFailure`.
+- The Analyst may author a typed `EvaluationFailure`; provider/configuration exceptions are
+  translated and persisted by `application.evaluation.runner`.
+- Durable retry, reclaim, fencing, and replay remain application responsibilities.
 
 ## 8. Transaction owner
 Hypothesis Analyst has no transaction ownership. Application services in `application.evaluation` manage durable attempt state.

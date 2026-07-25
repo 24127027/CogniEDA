@@ -118,7 +118,8 @@ def _issue_admission_authority(
         session_id=session_id,
     )
     return issuer.issue_user_authority(
-        authentication_context_id=principal.authentication_context_id
+        authentication_context_id=principal.authentication_context_id,
+        expires_at=utc_now() + timedelta(hours=1),
     )
 
 
@@ -187,6 +188,7 @@ def _setup_authorized_admission(
         session,
         workspace_id="workspace:test",
         session_id="session:test",
+        principal_id="user:alice",
     ).record_governance_decision(
         evaluation_id=evaluation.evaluation_id,
         authority_id=grant.authority_id,
@@ -205,7 +207,8 @@ def test_governance_authority_issuer_user_grant_success(test_db_engine):
         principal = _principal()
         issuer = _issuer(session, principal)
         grant = issuer.issue_user_authority(
-            authentication_context_id=principal.authentication_context_id
+            authentication_context_id=principal.authentication_context_id,
+            expires_at=utc_now() + timedelta(hours=1),
         )
 
         assert grant.authority_id is not None
@@ -214,6 +217,18 @@ def test_governance_authority_issuer_user_grant_success(test_db_engine):
         assert grant.workspace_id == "ws:1"
         assert grant.session_id == "sess:1"
         assert grant.active is True
+        assert grant.expires_at is not None
+
+
+def test_governance_authority_issuer_requires_expiry(test_db_engine):
+    with Session(test_db_engine) as session:
+        principal = _principal()
+        issuer = _issuer(session, principal)
+
+        with pytest.raises(ProposalAuthorizationError, match="explicit expiry"):
+            issuer.issue_user_authority(
+                authentication_context_id=principal.authentication_context_id
+            )
 
 
 def test_governance_authority_issuer_cross_workspace_session_rejected(test_db_engine):
@@ -223,7 +238,8 @@ def test_governance_authority_issuer_cross_workspace_session_rejected(test_db_en
 
         with pytest.raises(ProposalAuthorizationError, match="workspace mismatch"):
             issuer.issue_user_authority(
-                authentication_context_id=principal.authentication_context_id
+                authentication_context_id=principal.authentication_context_id,
+                expires_at=utc_now() + timedelta(hours=1),
             )
 
 
@@ -248,7 +264,8 @@ def test_governance_authority_issuer_rejects_resolver_context_substitution(test_
 
         with pytest.raises(ProposalAuthorizationError, match="context identity mismatch"):
             issuer.issue_user_authority(
-                authentication_context_id=principal.authentication_context_id
+                authentication_context_id=principal.authentication_context_id,
+                expires_at=utc_now() + timedelta(hours=1),
             )
 
 
@@ -262,7 +279,10 @@ def test_record_governance_decision_exact_replay_and_conflict(test_db_engine):
         _, eval_control, _ = _setup_package2_ready_evaluation(session)
         grant = _issue_admission_authority(session)
         gov_service = DiscoveryAdmissionGovernanceService(
-            session, workspace_id="workspace:test", session_id="session:test"
+            session,
+            workspace_id="workspace:test",
+            session_id="session:test",
+            principal_id="user:alice",
         )
 
         dec1 = gov_service.record_governance_decision(
@@ -350,7 +370,10 @@ def test_atomic_discovery_admission_all_statuses(test_db_engine, epistemic_statu
         )
         grant = _issue_admission_authority(session)
         gov_service = DiscoveryAdmissionGovernanceService(
-            session, workspace_id="workspace:test", session_id="session:test"
+            session,
+            workspace_id="workspace:test",
+            session_id="session:test",
+            principal_id="user:alice",
         )
         dec = gov_service.record_governance_decision(
             evaluation_id=eval_control.evaluation_id,
@@ -409,7 +432,10 @@ def test_atomic_discovery_admission_negative_rejected_decision(test_db_engine):
         _, eval_control, _ = _setup_package2_ready_evaluation(session)
         grant = _issue_admission_authority(session)
         gov_service = DiscoveryAdmissionGovernanceService(
-            session, workspace_id="workspace:test", session_id="session:test"
+            session,
+            workspace_id="workspace:test",
+            session_id="session:test",
+            principal_id="user:alice",
         )
         dec = gov_service.record_governance_decision(
             evaluation_id=eval_control.evaluation_id,
@@ -432,7 +458,10 @@ def test_atomic_discovery_admission_negative_invalidated_evidence(test_db_engine
         lineage, eval_control, _ = _setup_package2_ready_evaluation(session)
         grant = _issue_admission_authority(session)
         gov_service = DiscoveryAdmissionGovernanceService(
-            session, workspace_id="workspace:test", session_id="session:test"
+            session,
+            workspace_id="workspace:test",
+            session_id="session:test",
+            principal_id="user:alice",
         )
         dec = gov_service.record_governance_decision(
             evaluation_id=eval_control.evaluation_id,
@@ -465,7 +494,10 @@ def test_atomic_discovery_admission_negative_parent_task(test_db_engine):
         lineage, eval_control, _ = _setup_package2_ready_evaluation(session)
         grant = _issue_admission_authority(session)
         gov_service = DiscoveryAdmissionGovernanceService(
-            session, workspace_id="workspace:test", session_id="session:test"
+            session,
+            workspace_id="workspace:test",
+            session_id="session:test",
+            principal_id="user:alice",
         )
         dec = gov_service.record_governance_decision(
             evaluation_id=eval_control.evaluation_id,
@@ -503,7 +535,10 @@ def test_atomic_discovery_admission_idempotent_replay(test_db_engine):
         _, eval_control, _ = _setup_package2_ready_evaluation(session)
         grant = _issue_admission_authority(session)
         gov_service = DiscoveryAdmissionGovernanceService(
-            session, workspace_id="workspace:test", session_id="session:test"
+            session,
+            workspace_id="workspace:test",
+            session_id="session:test",
+            principal_id="user:alice",
         )
         dec = gov_service.record_governance_decision(
             evaluation_id=eval_control.evaluation_id,
@@ -541,7 +576,10 @@ def test_atomic_discovery_admission_concurrency_two_workers(test_db_engine):
         _, eval_control, _ = _setup_package2_ready_evaluation(session1)
         grant = _issue_admission_authority(session1)
         gov_service = DiscoveryAdmissionGovernanceService(
-            session1, workspace_id="workspace:test", session_id="session:test"
+            session1,
+            workspace_id="workspace:test",
+            session_id="session:test",
+            principal_id="user:alice",
         )
         dec = gov_service.record_governance_decision(
             evaluation_id=eval_control.evaluation_id,
@@ -587,7 +625,10 @@ def test_atomic_discovery_retrieval_and_validity_invalidation(test_db_engine):
         lineage, eval_control, _ = _setup_package2_ready_evaluation(session)
         grant = _issue_admission_authority(session)
         gov_service = DiscoveryAdmissionGovernanceService(
-            session, workspace_id="workspace:test", session_id="session:test"
+            session,
+            workspace_id="workspace:test",
+            session_id="session:test",
+            principal_id="user:alice",
         )
         dec = gov_service.record_governance_decision(
             evaluation_id=eval_control.evaluation_id,
@@ -658,7 +699,10 @@ def test_coordinator_cli_entry_point(test_db_engine):
         _, eval_control, _ = _setup_package2_ready_evaluation(session)
         grant = _issue_admission_authority(session)
         gov_service = DiscoveryAdmissionGovernanceService(
-            session, workspace_id="workspace:test", session_id="session:test"
+            session,
+            workspace_id="workspace:test",
+            session_id="session:test",
+            principal_id="user:alice",
         )
         gov_service.record_governance_decision(
             evaluation_id=eval_control.evaluation_id,

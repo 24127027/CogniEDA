@@ -18,8 +18,9 @@ The current implementation is a Python backend prototype managed with `uv`. It c
 - `SessionFrameBuilder` and `SessionContextBuilder` in `src/memory/session_frame.py`
 - bounded SQL-backed Discovery retrieval in `src/memory/retrieval_engine.py`
 - a narrow approval-gated planner admission path in `src/agents/planner/`
-- a durable execution, Evidence admission, protected evaluation, Discovery governance/admission,
-  and validity protocol in `src/application/orchestrator/`
+- durable execution, Evidence admission, protected evaluation, and governance contexts under
+  `src/application/execution/`, `evidence/`, `evaluation/`, and `governance/`; atomic Discovery
+  admission and validity propagation remain under `src/application/orchestrator/`
 - per-runtime Data Explorer registration/dispatch plumbing; a concrete Data Explorer and Graph
   Miner remain absent
 - tests for planner admission, repositories, profiling, DB constraints, protected context,

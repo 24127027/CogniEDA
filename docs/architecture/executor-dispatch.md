@@ -94,9 +94,9 @@ unverified scientific content.
 `AtomicValidityPropagationService.execute_propagation()` under the configured session boundary; it
 does not duplicate transaction logic. That facade, Evidence/Discovery admission, and migration
 support are currently SQLite-only. No CLI, service loop, or worker bootstrap is supported.
-Package S1-B bounded-context restructuring is implemented. S2/S3 decomposition of the remaining
-evaluation, governance, Discovery, and validity services under `application.orchestrator` remains
-deferred.
+Package S1-B execution/Evidence restructuring and S2-A protected-evaluation/governance
+restructuring are implemented. Atomic Discovery admission and validity propagation remain under
+`application.orchestrator`; their S2-B/S3 decomposition is deferred.
 
 These gaps mean CogniEDA is not an end-to-end analytical product even though the local
 durable-to-domain contract is normalized.

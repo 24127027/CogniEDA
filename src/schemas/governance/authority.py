@@ -34,7 +34,7 @@ class GovernanceAuthority(ImmutableCogniEDABaseModel):
     operation_type: NonEmptyStr
     issued_by: NonEmptyStr
     issued_at: datetime
-    expires_at: datetime | None = None
+    expires_at: datetime
     authority_fingerprint: NonEmptyStr
 
 

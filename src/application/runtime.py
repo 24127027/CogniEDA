@@ -225,6 +225,7 @@ class CogniEDARuntime:
                 session,
                 workspace_id=principal.workspace_id,
                 session_id=principal.session_id,
+                principal_id=principal.principal_id,
             ).record_governance_decision(
                 evaluation_id=evaluation_id,
                 authority_id=authority_id,

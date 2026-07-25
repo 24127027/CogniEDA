@@ -57,6 +57,7 @@ def _setup_proposal_ready_evaluation(
         session,
         workspace_id="workspace:test",
         session_id="session:test",
+        principal_id="user:lead_researcher",
     )
     return published, gov_service, authority
 

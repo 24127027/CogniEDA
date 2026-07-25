@@ -1,6 +1,9 @@
 # Planner Workflow
 
-> **Current implementation snapshot:** 2026-07-16. Source graph topology is defined by `src/agents/planner/graph.py`; worker execution after admission lives under `src/application/orchestrator/`.
+> **Current implementation snapshot:** 2026-07-25. Source graph topology is defined by
+> `src/agents/planner/graph.py`; post-admission work is split across `application.execution`,
+> `application.evidence`, `application.evaluation`, and `application.governance`, while atomic
+> Discovery admission and validity propagation remain under `application.orchestrator`.
 
 ## Compiled graph currently in source
 

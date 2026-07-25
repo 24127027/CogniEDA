@@ -273,7 +273,7 @@ def test_partial_terminal_identity_is_quarantined_not_replayed(db_session) -> No
     assert record.state == EvaluationControlState.CONFLICT
 
 
-def test_repository_stage_create_does_not_self_commit(db_session) -> None:
+def test_repository_transition_stage_does_not_self_commit(db_session) -> None:
     lineage = persist_package2_lineage(db_session)
     bundle, manifest = build_synthesis_bundle(db_session, lineage.hypothesis_id)
     record = EvaluationControlRecord(
@@ -285,6 +285,6 @@ def test_repository_stage_create_does_not_self_commit(db_session) -> None:
         evaluation_key="k" * 64,
         serialized_manifest=manifest.model_dump(mode="json"),
     )
-    EvaluationControlRepository(db_session).stage_create(record)
+    EvaluationControlRepository(db_session)._stage_create_from_transition(record)
     db_session.rollback()
     assert db_session.get(EvaluationControlRecord, record.evaluation_id) is None

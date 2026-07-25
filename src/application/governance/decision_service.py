@@ -31,7 +31,6 @@ from db.models import (
     ProposalDecisionRecord,
     utc_now,
 )
-from repositories.discovery_admission_claim_repository import DiscoveryAdmissionClaimRepository
 from repositories.governance import ProposalDecisionRepository
 from schemas.canonical import canonical_sha256
 from schemas.discovery_admission_contracts import (
@@ -76,16 +75,19 @@ class DiscoveryAdmissionGovernanceService:
         *,
         workspace_id: str,
         session_id: str | None = None,
+        principal_id: str | None = None,
     ) -> None:
         if not workspace_id.strip():
             raise ValueError("Discovery governance requires a non-empty workspace identity.")
         if session_id is not None and not session_id.strip():
             raise ValueError("Session identity must be non-empty when supplied.")
+        if principal_id is not None and not principal_id.strip():
+            raise ValueError("Principal identity must be non-empty when supplied.")
         self._session = session
         self._decision_repo = ProposalDecisionRepository(session)
-        self._claim_repo = DiscoveryAdmissionClaimRepository(session)
         self._workspace_id = workspace_id
         self._session_id = session_id
+        self._principal_id = principal_id
 
     def extract_proposal_authority(self, evaluation_id: UUID) -> ProposalAuthority:
         """Rebuild canonical durable proposal/bundle authority from repositories."""
@@ -105,6 +107,7 @@ class DiscoveryAdmissionGovernanceService:
 
         self._require_clean_unit_of_work()
         authority_grant = self._load_governance_authority(authority_id)
+        self._verify_recording_principal(authority_grant)
         proposal_authority, _, _, _ = self._load_current_proposal(evaluation_id)
 
         existing = self._decision_repo.get_for_proposal(
@@ -166,7 +169,7 @@ class DiscoveryAdmissionGovernanceService:
             consumed=False,
         )
         try:
-            return self._decision_repo.create(record)
+            return self._decision_repo._create_from_governance(record)
         except IntegrityError as exc:
             winner = self._decision_repo.get_for_proposal(
                 evaluation_id, proposal_authority.proposal_digest
@@ -490,6 +493,8 @@ class DiscoveryAdmissionGovernanceService:
         now = utc_now()
         if require_active and (not record.active or _datetime_is_expired(record.expires_at, now)):
             raise ProposalAuthorizationError("Governance authority is inactive or expired.")
+        if record.expires_at is None:
+            raise ProposalAuthorizationError("Governance authority has no expiry.")
         if record.workspace_id != self._workspace_id:
             raise ProposalAuthorizationError("Governance authority workspace mismatch.")
         if record.authority_class == AuthorizationClass.USER_GOVERNED:
@@ -543,6 +548,18 @@ class DiscoveryAdmissionGovernanceService:
             expires_at=record.expires_at,
             authority_fingerprint=record.authority_fingerprint,
         )
+
+    def _verify_recording_principal(self, authority: GovernanceAuthority) -> None:
+        if authority.authority_class != AuthorizationClass.USER_GOVERNED:
+            return
+        if self._principal_id is None:
+            raise ProposalAuthorizationError(
+                "User-governed decisions require an authenticated principal identity."
+            )
+        if authority.actor_identity != self._principal_id:
+            raise ProposalAuthorizationError(
+                "Authenticated principal does not own this governance authority."
+            )
 
     def _is_exact_decision_replay(
         self,

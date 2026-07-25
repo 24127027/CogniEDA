@@ -122,7 +122,7 @@ class EvaluationTransitionService:
             fencing_epoch=0,
             attempt_number=1,
         )
-        self._repo.stage_create(record)
+        self._repo._stage_create_from_transition(record)
         try:
             self._session.commit()
         except IntegrityError as exc:

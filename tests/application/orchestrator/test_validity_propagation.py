@@ -175,6 +175,7 @@ def _seed_validity_lineage(session: Session, *, with_discovery: bool = True):
         session=session,
         workspace_id=_WORKSPACE,
         session_id=_SESSION,
+        principal_id="test_governor",
     ).record_governance_decision(
         evaluation_id=ready.evaluation_id,
         authority_id=admission_grant.authority_id,
@@ -560,9 +561,9 @@ def test_authority_is_durable_exact_and_not_caller_declared(db_session) -> None:
 
     valid.authority_fingerprint = "caller-forged"
     db_session.add(valid)
-    db_session.commit()
-    with pytest.raises(PermissionError, match="fingerprint"):
-        AtomicValidityPropagationService(db_session).execute_propagation(command)
+    with pytest.raises(IntegrityError, match="authority core is immutable"):
+        db_session.commit()
+    db_session.rollback()
 
 
 def test_exact_replay_requires_complete_committed_effects(db_session) -> None:
@@ -653,6 +654,7 @@ def test_stale_owner_and_existing_decision_lose_eligibility(db_session) -> None:
         session=db_session,
         workspace_id=_WORKSPACE,
         session_id=_SESSION,
+        principal_id="test_governor",
     )
     detached_plan = governance.create_admission_plan(
         evaluation_id=seed["evaluation_id"],

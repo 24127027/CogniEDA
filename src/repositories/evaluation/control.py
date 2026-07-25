@@ -23,8 +23,10 @@ class EvaluationControlRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def stage_create(self, record: EvaluationControlRecord) -> EvaluationControlRecord:
-        """Stage creation of an EvaluationControlRecord in the current session."""
+    def _stage_create_from_transition(
+        self, record: EvaluationControlRecord
+    ) -> EvaluationControlRecord:
+        """Stage creation only for EvaluationTransitionService."""
 
         self._session.add(record)
         return record

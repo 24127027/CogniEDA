@@ -69,6 +69,7 @@ def _setup_proposal_ready_evaluation(
         session,
         workspace_id="workspace:test",
         session_id="session:test",
+        principal_id="user:lead_researcher",
     )
     return published, governance, authority, lineage
 
@@ -147,6 +148,43 @@ def test_missing_or_inactive_authority_cannot_be_self_declared(db_session: Sessi
         governance.record_governance_decision(
             evaluation_id=published.evaluation_id,
             authority_id=inactive.authority_id,
+            decision=GovernanceDecisionOutcome.APPROVED,
+        )
+
+
+def test_wrong_authenticated_principal_cannot_use_another_users_authority(
+    db_session: Session,
+) -> None:
+    published, _, authority, _ = _setup_proposal_ready_evaluation(db_session)
+    wrong_principal = DiscoveryAdmissionGovernanceService(
+        db_session,
+        workspace_id="workspace:test",
+        session_id="session:test",
+        principal_id="user:other_researcher",
+    )
+
+    with pytest.raises(ProposalAuthorizationError, match="does not own"):
+        wrong_principal.record_governance_decision(
+            evaluation_id=published.evaluation_id,
+            authority_id=authority.authority_id,
+            decision=GovernanceDecisionOutcome.APPROVED,
+        )
+
+
+def test_user_governed_decision_requires_explicit_authenticated_principal(
+    db_session: Session,
+) -> None:
+    published, _, authority, _ = _setup_proposal_ready_evaluation(db_session)
+    unbound = DiscoveryAdmissionGovernanceService(
+        db_session,
+        workspace_id="workspace:test",
+        session_id="session:test",
+    )
+
+    with pytest.raises(ProposalAuthorizationError, match="authenticated principal"):
+        unbound.record_governance_decision(
+            evaluation_id=published.evaluation_id,
+            authority_id=authority.authority_id,
             decision=GovernanceDecisionOutcome.APPROVED,
         )
 

@@ -84,6 +84,8 @@ class GovernanceAuthorityIssuer:
             authenticated_at = authenticated_at.replace(tzinfo=UTC)
         if authenticated_at > now:
             raise ProposalAuthorizationError("Authenticated principal timestamp is in the future.")
+        if expires_at is None:
+            raise ProposalAuthorizationError("Governance authority requires an explicit expiry.")
         if _datetime_is_expired(expires_at, now):
             raise ProposalAuthorizationError("Cannot issue an already-expired authority grant.")
 
