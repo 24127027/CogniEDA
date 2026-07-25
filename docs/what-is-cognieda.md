@@ -140,8 +140,9 @@ parent `Task` may organize several possible drivers. One terminal analytical
 After the user approves the exact analytical contract, one `Hypothesis` binds
 the variables, cohort, method, parameters, decision rule, and expected Evidence.
 A configured Data Explorer observes the approved analysis and returns typed
-results. The application admits an `AnalysisFrame`, an `ExecutionRun`, and
-immutable `Evidence`.
+results. The application has already admitted the `ExecutionRun` with the
+approved contract; after a successful result, Evidence admission materializes
+the `AnalysisFrame` and immutable `Evidence`.
 
 Assume the observed result does not meet the approved threshold. The Evidence
 might say:
@@ -185,18 +186,23 @@ evaluated, governed, and atomically materialized. CogniEDA accepts that
 complexity because observation and interpretation have different scientific
 authority.
 
-## SessionFrame is active context, not long-term memory
+## SessionFrame is user-governed active context, not long-term memory
 
-A `SessionFrame` is a compact, persisted snapshot of what should be active for a
-particular investigation moment. It can carry an Objective snapshot, relevant
-profiles, active Tasks, planning Assumptions, Evidence and Discovery summaries,
-user pins and exclusions, warnings, dead ends, and handoff state.
+A `SessionFrame` is a user-governed active-context projection for a particular
+investigation moment. It can carry an Objective snapshot, relevant profiles,
+active Tasks, planning Assumptions, Evidence and Discovery summaries, user pins
+and exclusions, warnings, dead ends, and handoff state. Persisted frame content
+is append-oriented: changing the active context creates a successor snapshot
+rather than rewriting the selected content of the earlier frame. Lifecycle
+metadata can later mark an older frame superseded.
 
 It is not an unrestricted archive and it is not the protected conclusion
 context. A frame may contain Assumptions for planning, while the protected
 evaluation bundle excludes them structurally. A frame may point to a Discovery
 for answering or planning, while a new Discovery cannot use an existing
-Discovery as its inference premise.
+Discovery as its inference premise. Objects selected through a frame retain the
+authority rules of their own epistemic types; neither the frame nor a pin makes
+an item scientific Evidence.
 
 User governance matters because relevance is not purely a similarity score. A
 user may need to pin a valid item, exclude an irrelevant one, approve a proposed

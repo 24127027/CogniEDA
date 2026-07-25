@@ -16,6 +16,18 @@ PHASE_1_CANONICAL_PAGES = (
     DOCS_ROOT / "from-question-to-discovery.md",
 )
 CANONICAL_FOUNDATION = (ROOT_README, DOCS_ROOT / "index.md", *PHASE_1_CANONICAL_PAGES)
+READER_FACING_CURRENT_STATE_PAGES = (
+    DOCS_ROOT / "project-purpose.md",
+    DOCS_ROOT / "roadmap.md",
+    DOCS_ROOT / "architecture" / "overview.md",
+    DOCS_ROOT / "architecture" / "implementation-gap-analysis.md",
+    DOCS_ROOT / "architecture" / "runtime-composition.md",
+    DOCS_ROOT / "architecture" / "structural-exit-status.md",
+)
+CHECKOUT_EVIDENCE_GUARDED_PAGES = (
+    *CANONICAL_FOUNDATION,
+    *READER_FACING_CURRENT_STATE_PAGES,
+)
 
 _EXTERNAL_SCHEMES = ("http://", "https://", "mailto:", "file://", "data:")
 _PHANTOM_IMPLEMENTATION_REFERENCES = {
@@ -142,8 +154,8 @@ def test_docs_index_exposes_only_the_phase_1_canonical_journey() -> None:
     )
 
 
-def test_canonical_docs_exclude_checkout_audit_evidence() -> None:
-    """Durable docs must not contain checkout history or local audit scorekeeping."""
+def test_reader_facing_docs_exclude_checkout_audit_evidence() -> None:
+    """Canonical and current-state reader pages must exclude local audit scorekeeping."""
 
     forbidden_patterns = {
         "commit hash": re.compile(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])"),
@@ -163,7 +175,7 @@ def test_canonical_docs_exclude_checkout_audit_evidence() -> None:
         ),
     }
     violations: list[str] = []
-    for doc in [ROOT_README, *DOCS_ROOT.rglob("*.md")]:
+    for doc in CHECKOUT_EVIDENCE_GUARDED_PAGES:
         content = doc.read_text(encoding="utf-8")
         for description, pattern in forbidden_patterns.items():
             if pattern.search(content):

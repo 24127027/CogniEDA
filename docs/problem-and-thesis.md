@@ -117,9 +117,9 @@ state and may need regeneration when the underlying state changes.
 
 ## Stale conclusions remaining active after Evidence changes
 
-Suppose the team later discovers that the churn Evidence used an incorrect
-cohort filter. Deleting the old result destroys history. Leaving its Discovery
-active contaminates future planning and answers.
+Suppose the team later discovers that the AnalysisFrame used an incorrect 2025
+small-business cohort filter. Deleting the old result destroys history. Leaving
+its Discovery active contaminates future planning and answers.
 
 Notebook annotations and chat corrections depend on people reading the right
 later note. A vector index may continue returning the original conclusion
@@ -218,11 +218,14 @@ Notebook history is organized by execution order rather than the epistemic role
 of each artifact. Generic long-term memory may retain both obsolete and current
 state without a reliable distinction.
 
-CogniEDA uses typed durable objects for research state and `SessionFrame`
-snapshots for active context, checkpoints, and handoffs. Frames can expose pins,
+CogniEDA uses typed durable objects for research state and user-governed
+`SessionFrame` projections for active context, checkpoints, and handoffs. Each
+persisted frame is an append-oriented snapshot; user-directed changes create a
+successor rather than rewriting its selected content. Frames can expose pins,
 exclusions, warnings, stale markers, dead ends, and relevant object references.
 They are projections over governed state, not replacements for the underlying
-objects and not protected inference bundles.
+objects, scientific authority, or protected inference bundles. Objects selected
+through a frame remain governed by their own epistemic types.
 
 The complete session-resume and item-governance product experience is
 **Partially implemented**. The tradeoff is explicit frame construction,

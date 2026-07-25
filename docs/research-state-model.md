@@ -36,6 +36,7 @@ coordination, generated output, or optimization state rather than FCOs.
 | evidence-bound claim | `Discovery` | durable knowledge needs scope and validity basis |
 | active context | `SessionFrame` | continuity needs a governable projection, not raw chat |
 | provenance | `AnalysisFrame`, `ExecutionRun` | data-view and attempt identity support Evidence |
+| validity provenance | `ValidityEvent` | authorized authority changes remain traceable without becoming scientific claims |
 | generated output | `GeneratedView` | presentation is useful but not scientific authority |
 | optimization state | `EvidenceCacheEntry` | reuse must not become a scientific writer |
 
@@ -221,17 +222,20 @@ trace.
 admission, and validity interaction are **Implemented** and
 **Verified on SQLite**.
 
-## SessionFrame: governed active-context snapshot
+## SessionFrame: user-governed active-context projection
 
-A `SessionFrame` represents a compact snapshot for active work, a checkpoint,
-or a handoff. It can summarize the Objective and selected profiles, Tasks,
-Assumptions, Hypotheses, Evidence, Discoveries, user decisions, pins,
-exclusions, warnings, stale context, and dead ends.
+A `SessionFrame` represents a compact, user-governed projection for active
+work, a checkpoint, or a handoff. It can summarize the Objective and selected
+profiles, Tasks, Assumptions, Hypotheses, Evidence, Discoveries, user
+decisions, pins, exclusions, warnings, stale context, and dead ends.
 
 It needs durable identity because another operation or session must know which
 snapshot it is resuming, what preceded it, and whether it has been superseded.
 It is not raw chat, the full project history, a retrieval index, a conclusion
-bundle, or scientific knowledge.
+bundle, or scientific knowledge. Persisted frame content is append-oriented:
+user-directed context changes create an appended or successor projection rather
+than rewriting the selected content of an earlier frame. Lifecycle metadata can
+still mark an older frame superseded.
 
 Repositories append frames; approved Planner operations may create successor
 snapshots; atomic Discovery admission creates a deterministic conclusion frame;
@@ -239,10 +243,14 @@ and validity propagation can supersede affected frames. The project does not
 yet provide a complete user-facing frame editor, item-governance workflow, or
 workspace-open resume bootstrap.
 
-A frame influences future reasoning only through a mode-specific projection.
-Planning may include active Assumptions and workflow state. Answer context may
-include active Discoveries. Protected synthesis excludes Assumptions, Tasks,
-existing Discoveries, user decisions, stale state, dead ends, and caches.
+A frame may contribute selected typed objects through a mode-specific
+projection. Planning may include active Assumptions and workflow state. Answer
+context may include active Discoveries. The frame itself is not scientific
+authority, and selected objects retain the rules of their own epistemic types.
+Protected synthesis excludes the frame, arbitrary pins, Assumptions, Tasks,
+existing Discoveries, user decisions, stale state, dead ends, and caches as
+inference premises; the implemented protected evaluator reconstructs its closed
+bundle from authoritative repositories.
 
 **Implementation status:** snapshots, append/read behavior, typed projections,
 conclusion frames, and validity supersession are **Implemented**. The complete

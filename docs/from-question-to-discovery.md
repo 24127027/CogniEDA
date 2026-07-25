@@ -317,7 +317,7 @@ transitions, committed admission claim, and consumed decision.
 
 **Current status:** **Implemented** and **Verified on SQLite**.
 
-## 11. SessionFrame exposes active context without becoming inference
+## 11. SessionFrame exposes user-governed active context without becoming authority
 
 The conclusion frame points to the admitted Discovery and supporting Evidence,
 records the Objective snapshot and warnings, and contains no active
@@ -326,7 +326,11 @@ mode-specific projection.
 
 This does not mean the SessionFrame authored the conclusion. Protected
 evaluation used the repository-built bundle directly. The frame exists for
-continuity, inspection, pinning, exclusion, and handoff.
+continuity, inspection, pinning, exclusion, and handoff. User-directed context
+changes create an appended successor snapshot rather than rewriting the
+selected content of the earlier frame. The frame and its pins are not
+scientific premises; selected objects remain governed by their own epistemic
+types.
 
 **User control:** users can govern proposals and can express pins or exclusions
 in frame state. A complete interactive frame-governance and resume experience
@@ -354,9 +358,10 @@ semantic/vector index are **Deferred**.
 
 ## 13. Validity propagation keeps history but removes authority
 
-Suppose the team later learns that the AnalysisFrame used the wrong churn
-window. An authorized validity command identifies the source, expected state,
-immutable-core fingerprint, reason, scope, and idempotency key.
+Suppose the team later learns that the AnalysisFrame used an incorrect 2025
+small-business cohort filter. An authorized validity command identifies the
+source, expected state, immutable-core fingerprint, reason, scope, and
+idempotency key.
 
 The validity service discovers dependents and atomically records the source
 transition, dependent effects, and immutable ValidityEvent. The Evidence and
