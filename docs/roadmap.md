@@ -1,55 +1,81 @@
-# CogniEDA Development Roadmap
+# CogniEDA capability roadmap
 
-> **Implementation status:** Packages S1-S3 are present in the reviewed source.
-> Package S4 is the current documentation/structural-exit checkpoint. Package 7
-> is a future product slice and has not started.
+> **Implementation status:** **Partially implemented**.
+>
+> This is a capability roadmap, not a release history or proof of current
+> behavior. Source code remains authoritative for implementation status.
 
-This roadmap distinguishes reviewed implementation from target work. Commit
-history names are useful provenance, but source and tests determine current
-behavior.
+CogniEDA has a guarded in-process scientific spine, but it does not yet have a
+supported end-user product surface. The roadmap therefore advances by
+capability and preserved invariant rather than by repository package or
+implementation chronology.
 
-## Structural foundation
+## Protected foundation
 
-| Package | Reviewed outcome |
-| --- | --- |
-| Gate 0 | Core FCO schemas, SQLite initialization, and scientific-safety baseline. The `wave-1-sqlite-integration` tag points to `9b46c204eb4eed85c39b726bdce105ac5eac74a7`. |
-| S1-A | Private Data Explorer registry/dispatcher boundary and fail-closed runtime composition. |
-| S1-B | Execution transitions, recovery, and atomic Evidence admission separated into application contexts. The canonical class is `ExecutionAttemptTransitionService`. |
-| S2-A | Protected evaluation and governance separated; the Analyst authors proposals but cannot authorize or persist Discoveries. |
-| S2-B | Atomic Discovery admission and atomic validity propagation established as sole supported transaction owners. |
-| S3-A/S3-B | Canonical persistence model modules normalized behind the explicit 21-table `db.models` facade; SQLite migration/trigger tests cover the supported boundary. |
-| S4 | Canonical documentation reconstructed and adversarially reconciled with source, tests, migrations, and Git history. Final limitations are recorded in the structural-exit report. |
+The following boundaries are **Implemented** and **Verified on SQLite**:
 
-## Package 7 readiness
+- the eight-object research-state ontology and core lifecycle guards;
+- approved terminal analytical Task to Hypothesis cardinality;
+- observation-only executor output and atomic Evidence admission;
+- protected Hypothesis evaluation that returns a proposal or typed failure;
+- principal-bound governance over an exact persisted proposal;
+- atomic Discovery-chain admission;
+- atomic validity propagation with historical retention and active exclusion;
+- bounded SessionFrame projections and validity-first Discovery retrieval.
 
-The S4 verdict is **READY WITH EXPLICIT LIMITATIONS**, not a claim that a product
-surface already exists. Package 7 may build a narrow end-to-end product slice
-provided it preserves these boundaries:
+These statements concern the checked-in in-process path. They do not imply that
+a production CLI, API, worker, model provider, authentication provider, or Data
+Explorer adapter exists.
 
-- Data Explorer remains observation-only.
-- Hypothesis Analyst receives only `DiscoverySynthesisBundle` and returns a
-  typed proposal/failure.
-- user authority and exact proposal decisions precede Discovery admission;
-- only the existing atomic services materialize Evidence, Discovery, and
-  validity effects;
-- Assumptions remain excluded from conclusion synthesis;
-- proposed/non-terminal Tasks cannot execute or produce scientific claims.
+## Next product slice
 
-Likely product work includes an authenticated CLI/API bootstrap, a production
-Data Explorer adapter and worker loop, the governed dataset/profile workflow,
-and completion of Planner branches. The Planner's direct SQLModel/repository
-knowledge is documented non-blocking debt; introducing an application facade is
-preferred when that surface is touched.
+The next coherent product slice is a **Design target**:
 
-## Deferred work
+1. provide an authenticated user entry point;
+2. wire a production model adapter and a concrete observation-only Data
+   Explorer;
+3. expose Task and execution proposal approval without bypassing durable
+   authority;
+4. run the existing Evidence, evaluation, governance, Discovery, and validity
+   services through a supported worker/application boundary;
+5. surface active SessionFrame context and validity state to the user;
+6. preserve idempotency, exact-proposal authorization, and atomic scientific
+   writers end to end.
 
-- executable DVC/artifact integration and governed cleaning;
-- Graph Miner traversal plus persistent semantic/vector indexing;
-- validity-keyed Evidence cache;
-- multi-tenant service/worker deployment and production model/auth adapters;
-- broader reproducibility envelope, CI policy, and strict-mypy remediation.
+The slice is not complete until the user can distinguish proposed work,
+approved execution, observed Evidence, proposed interpretation, authorized
+Discovery, and invalidated history.
 
-See [Implementation Gap Analysis](architecture/implementation-gap-analysis.md)
-for the current gap inventory and
-[Structural Exit Status](architecture/structural-exit-status.md) for the S4
-verdict.
+## Capability work after the first product slice
+
+The following areas are **Partially implemented** or **Deferred**:
+
+- governed dataset versioning, cleaning, and executable DVC integration;
+- complete Planner answer, suggestion, review, conflict, pause, and resume
+  branches;
+- user-governed SessionFrame item management and robust project resume;
+- Graph Miner traversal and a persistent semantic or vector index;
+- validity-keyed Evidence caching that cannot author scientific claims;
+- broader reproducibility capture for code, environment, seeds, and artifacts;
+- service/worker deployment, multi-user policy, observability, and recovery;
+- database portability beyond the SQLite boundary;
+- tracked CI policy and strict static-typing remediation.
+
+## Invariants that roadmap work must preserve
+
+Future capability work must not:
+
+- promote non-FCO workflow, provenance, cache, or generated-view records into
+  durable scientific knowledge;
+- allow proposed or non-terminal Tasks to execute;
+- allow Assumptions into protected Discovery synthesis;
+- let a specialist authorize or persist its own proposal;
+- let a parent Task manufacture a Discovery from several child claims;
+- mutate the scientific core of DataProfile or Evidence;
+- make invalid or deprecated knowledge active merely because it is relevant;
+- create an alternate writer for Evidence, Discovery, or validity effects.
+
+For a source-oriented list of current gaps, see
+[Implementation gap analysis](architecture/implementation-gap-analysis.md).
+For the conceptual reading path, return to the
+[documentation index](index.md).

@@ -15,9 +15,9 @@ The current package exposes no supported CLI, HTTP service, or worker daemon.
 
 ## Consequences
 
-Tests and ad hoc scripts are not product entry points. Package 7 must introduce
-an authenticated, fail-closed bootstrap without bypassing existing transaction
-owners.
+Tests and ad hoc scripts are not product entry points. A future product phase
+must introduce an authenticated, fail-closed bootstrap without bypassing
+existing transaction owners.
 
 ## Rejected alternatives
 

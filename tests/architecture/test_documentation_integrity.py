@@ -1,4 +1,4 @@
-"""Source-backed architecture and documentation integrity checks for Package S4."""
+"""Source-backed architecture and canonical documentation integrity checks."""
 
 from __future__ import annotations
 
@@ -9,6 +9,13 @@ from urllib.parse import unquote
 
 DOCS_ROOT = Path("docs")
 ROOT_README = Path("README.md")
+PHASE_1_CANONICAL_PAGES = (
+    DOCS_ROOT / "what-is-cognieda.md",
+    DOCS_ROOT / "problem-and-thesis.md",
+    DOCS_ROOT / "research-state-model.md",
+    DOCS_ROOT / "from-question-to-discovery.md",
+)
+CANONICAL_FOUNDATION = (ROOT_README, DOCS_ROOT / "index.md", *PHASE_1_CANONICAL_PAGES)
 
 _EXTERNAL_SCHEMES = ("http://", "https://", "mailto:", "file://", "data:")
 _PHANTOM_IMPLEMENTATION_REFERENCES = {
@@ -114,19 +121,58 @@ def test_all_tracked_markdown_relative_links_and_anchors_resolve() -> None:
     assert not failures, "Broken local Markdown links or anchors:\n" + "\n".join(failures)
 
 
-def test_docs_index_links_all_canonical_documents() -> None:
-    """docs/index.md must link to every document in the canonical docs tree."""
+def test_docs_index_exposes_only_the_phase_1_canonical_journey() -> None:
+    """The Phase 1 index must expose the four concept-first foundation pages."""
 
     index_file = DOCS_ROOT / "index.md"
-    index_content = index_file.read_text(encoding="utf-8")
-    unindexed = [
-        doc.relative_to(DOCS_ROOT).as_posix()
-        for doc in DOCS_ROOT.rglob("*.md")
-        if doc != index_file
-        and doc.relative_to(DOCS_ROOT).as_posix() not in index_content
-        and doc.name not in index_content
-    ]
-    assert not unindexed, f"Canonical documents missing from docs/index.md: {unindexed}"
+    linked_markdown: set[Path] = set()
+    for _, target in _extract_markdown_links(index_file):
+        if target.startswith(_EXTERNAL_SCHEMES):
+            continue
+        path_text, _ = _split_link_target(target)
+        if not path_text or not path_text.lower().endswith(".md"):
+            continue
+        linked_markdown.add((index_file.parent / path_text).resolve())
+
+    expected = {page.resolve() for page in PHASE_1_CANONICAL_PAGES}
+    assert linked_markdown == expected, (
+        "docs/index.md must link exactly the Phase 1 canonical journey; "
+        f"expected={sorted(map(str, expected))}, "
+        f"actual={sorted(map(str, linked_markdown))}"
+    )
+
+
+def test_canonical_docs_exclude_checkout_audit_evidence() -> None:
+    """Durable docs must not contain checkout history or local audit scorekeeping."""
+
+    forbidden_patterns = {
+        "commit hash": re.compile(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])"),
+        "agent attribution": re.compile(r"\b(?:Codex|Gemini)\b", re.IGNORECASE),
+        "fixed test result": re.compile(
+            r"\b\d+\s+(?:passed|failed|skipped)\b",
+            re.IGNORECASE,
+        ),
+        "implementation object count": re.compile(
+            r"\b\d+\s+(?:(?:SQLModel|database)\s+)?"
+            r"(?:tables?|triggers?|sqlite_master\s+objects?)\b",
+            re.IGNORECASE,
+        ),
+        "package chronology": re.compile(
+            r"\b(?:Package|Wave)\s+(?:S?\d|[0-9])",
+            re.IGNORECASE,
+        ),
+    }
+    violations: list[str] = []
+    for doc in [ROOT_README, *DOCS_ROOT.rglob("*.md")]:
+        content = doc.read_text(encoding="utf-8")
+        for description, pattern in forbidden_patterns.items():
+            if pattern.search(content):
+                violations.append(f"{doc.as_posix()}: {description}")
+
+    assert not violations, (
+        "Checkout-specific audit evidence found in canonical docs: "
+        f"{violations}"
+    )
 
 
 def test_canonical_docs_do_not_name_phantom_implementation_surfaces() -> None:
@@ -177,6 +223,8 @@ def test_major_documents_distinguish_implementation_status() -> None:
     """Major pages must state implementation status or a reviewed verdict explicitly."""
 
     major_docs = [
+        DOCS_ROOT / "index.md",
+        *PHASE_1_CANONICAL_PAGES,
         DOCS_ROOT / "project-purpose.md",
         DOCS_ROOT / "roadmap.md",
         DOCS_ROOT / "architecture" / "overview.md",
@@ -197,7 +245,8 @@ def test_major_documents_distinguish_implementation_status() -> None:
         doc.as_posix()
         for doc in major_docs
         if not re.search(
-            r"implementation status|current implementation|final verdict|package 7 readiness",
+            r"implementation status|current implementation|current maturity|"
+            r"current product maturity|final verdict",
             doc.read_text(encoding="utf-8"),
             flags=re.IGNORECASE,
         )

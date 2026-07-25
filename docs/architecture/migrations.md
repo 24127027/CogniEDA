@@ -21,9 +21,9 @@ There is no generic `upgrade_database` function. Discovery-chain triggers are in
 referenced tables exist. The legacy payload step invokes the deterministic
 `LegacyPayloadMigrator` and installs its marker/quarantine assets.
 
-## Trigger set
+## Trigger families
 
-Fresh S3-B-equivalent SQLite metadata contains exactly these ten triggers:
+Fresh SQLite initialization installs guards for:
 
 - governance authority immutable core;
 - proposal decision immutable core;
@@ -33,8 +33,8 @@ Fresh S3-B-equivalent SQLite metadata contains exactly these ten triggers:
 - exact proposal-decision consumption;
 - legacy quarantine immutable update and no-delete.
 
-Exact names and DDL are enforced by `tests/db/test_s3b_sqlite_schema_equivalence.py` and
-`tests/db/test_legacy_migration.py`.
+Exact names and DDL are source-level details enforced by the focused SQLite
+schema-equivalence and legacy-migration tests.
 
 ## Guarantees and limits
 

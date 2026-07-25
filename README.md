@@ -1,106 +1,51 @@
 # CogniEDA
 
-CogniEDA is a governed research-state system for analytical investigation. Its goal is not to make an agent remember more chat history. Its goal is to keep analytical conclusions traceable to the data, method, parameters, evidence, and validity scope that support them.
+CogniEDA is validity-preserving research-state infrastructure for analytical
+investigation. It keeps conclusions bound to the dataset state, analytical
+contract, observed Evidence, scope, uncertainty, and validity conditions that
+support them. Long-running continuity follows from that governed state; retaining
+more conversation is not the primary goal.
 
-## Current Implementation Status
+CogniEDA is a governed research-state system, not a generic EDA chatbot, notebook
+history summarizer, vector-store wrapper, autonomous scientist, or general
+multi-agent framework.
 
-Implemented or verified in the current in-process/SQLite foundation:
+## Current maturity
 
-- **First-Class Objects (FCOs)**: Pydantic schemas and SQLModel tables for `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, and `SessionFrame`.
-- **Bounded Context Architecture**: Canonical schemas and persistence models are separated across research, workflow, execution, evidence, evaluation, governance, discovery, and validity contexts.
-- **Specialist Scientific Boundaries**: Observation-only Data Explorer, PydanticAI protected-evaluation Hypothesis Analyst, and user-governed proposal authorization.
-- **Atomic Admission Services**: `AtomicDiscoveryAdmissionService` (sole Discovery materialization transaction owner) and `AtomicValidityPropagationService` (sole validity propagation transaction owner).
-- **SQLite Persistence & Triggers**: Fenced execution lease tracking, immutable governance authority tables, and DDL triggers enforcing exact claim consumption.
-- **Canonical Documentation & Structural Exit**: Source-backed current/target documentation and an adversarial S4 exit assessment are linked from `docs/index.md`.
+- **Implemented:** typed research-state objects and guarded in-process paths for
+  planning approvals, execution provenance, Evidence admission, protected
+  evaluation, governance, Discovery admission, validity propagation, bounded
+  retrieval, and SessionFrame snapshots.
+- **Verified on SQLite:** the transaction, replay, fencing, and concurrency
+  behavior exercised by the current test suite.
+- **Partially implemented:** the Planner, dataset acceptance workflow,
+  SessionFrame governance experience, and end-to-end session-resume workflow.
+- **Unsupported:** a production CLI, HTTP API, worker or daemon, production
+  authentication, a concrete Data Explorer, and a default production Analyst
+  model adapter.
+- **Deferred:** executable DVC integration, governed cleaning, Graph Miner,
+  persistent semantic indexing, and Evidence Cache.
 
-Partially implemented or absent:
-
-- Supported CLI binary, HTTP REST/gRPC service, or worker daemon process.
-- Executable DVC integration.
-- Production Data Explorer sandbox runner and production model adapters.
-- Graph Miner semantic vector index persistence.
-- Complete answer/suggest/plan Planner branches and a Planner application facade.
-- A governed import/clean/accept/resume product workflow and persistent cache.
-
-## Target Architecture Summary
-
-The architecture defines exactly these first-class objects:
-
-- `Objective`
-- `DataProfile`
-- `Assumption`
-- `Task`
-- `Hypothesis`
-- `Evidence`
-- `Discovery`
-- `SessionFrame`
-
-Other concepts are deliberately not FCOs:
-
-- `Workspace` is a filesystem/runtime boundary.
-- `Question` is UI input that decomposes into a `Task`.
-- `AnalysisFrame` is provenance/data-view state.
-- `GeneratedView` is runtime output, not `Discovery`.
-- `PlannerOperation` is pending state mutation.
-- `ExecutionRun` is provenance.
-- `EvidenceCacheEntry` is cache.
-
-## Setup
-
-Prerequisites:
-
-- Python 3.12+
-- `uv`
-
-Local setup:
-
-```powershell
-uv sync
-copy .env.example .env
-```
-
-The in-process runtime does not choose a default database. Its caller supplies an explicit SQLite URL, or an external runtime factory can be selected through `COGNIEDA_RUNTIME_FACTORY`.
-
-## Verification
-
-Commands declared by the repo:
-
-```powershell
-uv run pytest
-uv run ruff check .
-uv run python -m compileall -q src
-uv run mypy src
-```
-
-`mypy` is a declared diagnostic command, but the current checkout retains known strict-typing debt. Consult the structural-exit report for the reviewed result; do not infer a clean type gate from the command being listed.
-
-## Repository Structure
-
-```text
-src/
-  agents/        Planner graph and Data Explorer / Analyst specialist agents
-  application/   Composition root, execution transition, and governed admissions
-  data/          Dataset loaders and baseline profiling
-  db/            SQLModel table models facade (`db.models`) and SQLite migrations
-  memory/        SessionFrame and context builders
-  repositories/  Persistence repositories across bounded contexts
-  schemas/       Pydantic value-object schemas across bounded contexts
-  tools/         Tool manager and configuration
-tests/           Repository, profiling, DB, application, and architecture tests
-docs/            Canonical architecture, workflow, decision, and exit status docs
-```
+The repository currently provides an in-process Python foundation. Source code is
+the authority for implemented behavior; the documentation distinguishes current
+implementation from design targets and deferred work.
 
 ## Documentation
 
-Start here:
+Start with the [canonical documentation journey](docs/index.md). It introduces
+the problem, the research-state mental model, and the path from a research
+question to evidence-bound knowledge before pointing contributors toward source
+orientation.
 
-- [Canonical Documentation Index](docs/index.md)
-- [Project Purpose](docs/project-purpose.md)
-- [Master Development Roadmap](docs/roadmap.md)
-- [Architecture Overview](docs/architecture/overview.md)
-- [Research-State Model](docs/architecture/research-state-model.md)
-- [Scientific Specialist Contracts](docs/architecture/scientific-specialist-contracts.md)
-- [Context Type Safety](docs/architecture/context-type-safety.md)
-- [Bounded Contexts](docs/architecture/bounded-contexts.md)
-- [Persistence and Transactions](docs/architecture/persistence-and-transactions.md)
-- [Structural Exit Status Report](docs/architecture/structural-exit-status.md)
+## Contributor entry points
+
+Prerequisites are Python 3.12+ and `uv`.
+
+```powershell
+uv sync
+```
+
+See [development setup](docs/development/setup.md),
+[testing](docs/development/testing.md), and
+[contributing](docs/development/contributing.md) for the current repository
+commands and guardrails.

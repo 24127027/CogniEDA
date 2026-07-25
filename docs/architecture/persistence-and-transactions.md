@@ -10,7 +10,7 @@ domain schema != repository adapter != SQLModel table != migration asset
 ```
 
 `schemas` owns typed values. `repositories` owns lookup/conversion and narrowly named staging
-hooks. `db.models` owns 21 table definitions and is the stable facade. `db.migrations` and
+hooks. `db.models` owns the table-definition facade. `db.migrations` and
 `db.legacy_migration` own SQLite upgrade and quarantine assets. Repositories do not generally own
 multi-record commits; explicit legacy/bootstrap create methods are documented exceptions.
 
