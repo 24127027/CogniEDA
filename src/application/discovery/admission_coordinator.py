@@ -6,12 +6,12 @@ from uuid import UUID
 
 from sqlmodel import Session, select
 
-from application.orchestrator.atomic_discovery_admission import (
-    AtomicDiscoveryAdmissionResult,
-    AtomicDiscoveryAdmissionService,
-)
+from application.discovery.admission_service import AtomicDiscoveryAdmissionService
 from db.models import EvaluationControlRecord, ProposalDecisionRecord
+from schemas.discovery import AtomicDiscoveryAdmissionResult
 from schemas.enums import EvaluationControlState, GovernanceDecisionOutcome
+
+__all__ = ["DiscoveryAdmissionCoordinator"]
 
 
 class DiscoveryAdmissionCoordinator:

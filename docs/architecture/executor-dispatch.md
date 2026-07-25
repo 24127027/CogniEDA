@@ -95,8 +95,9 @@ unverified scientific content.
 does not duplicate transaction logic. That facade, Evidence/Discovery admission, and migration
 support are currently SQLite-only. No CLI, service loop, or worker bootstrap is supported.
 Package S1-B execution/Evidence restructuring and S2-A protected-evaluation/governance
-restructuring are implemented. Atomic Discovery admission and validity propagation remain under
-`application.orchestrator`; their S2-B/S3 decomposition is deferred.
+restructuring are implemented. Package S2-B places atomic Discovery admission under
+`application.discovery` and validity propagation under `application.validity`;
+`application.orchestrator` retains Planner mutation commit coordination only.
 
 These gaps mean CogniEDA is not an end-to-end analytical product even though the local
 durable-to-domain contract is normalized.

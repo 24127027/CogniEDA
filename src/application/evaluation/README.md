@@ -60,6 +60,6 @@ The published proposal is stored exactly as returned by Hypothesis Analyst (`ser
 - Model invocation requires explicit PydanticAI provider configuration.
 - No supported CLI, service API, or background daemon loop is checked in.
 
-## 12. Deferred S2-B/S3 work
-- Atomic Discovery admission remains under `application.orchestrator.atomic_discovery_admission` until S2-B.
+## 12. Deferred S3 work
+- Atomic Discovery admission is owned by `application.discovery`.
 - Broad repository normalization is deferred to S3.

@@ -3,26 +3,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import UUID, uuid5
+from uuid import UUID
 
 from schemas.canonical import canonical_sha256
-from schemas.discovery_admission_contracts import DiscoveryAdmissionPlan
 from schemas.enums import AuthorizationClass, GovernanceDecisionOutcome
-
-DISCOVERY_ADMISSION_NAMESPACE = UUID("2b8f42e2-65a8-4f10-9831-d85c4908079f")
-DISCOVERY_ADMISSION_CONTRACT_VERSION = "discovery-admission/v1"
-
-
-def generate_deterministic_discovery_id(
-    hypothesis_id: UUID,
-    proposal_digest: str,
-    *,
-    contract_version: str = DISCOVERY_ADMISSION_CONTRACT_VERSION,
-) -> UUID:
-    """Derive a deterministic Discovery ID from authoritative identity."""
-
-    seed = f"{contract_version}:{hypothesis_id}:{proposal_digest}"
-    return uuid5(DISCOVERY_ADMISSION_NAMESPACE, seed)
 
 
 def compute_governance_authority_fingerprint(
@@ -101,13 +85,6 @@ def compute_decision_fingerprint(
             "workspace_id": workspace_id,
         }
     )
-
-
-def compute_admission_fingerprint(plan: DiscoveryAdmissionPlan) -> str:
-    """Fingerprint every plan field other than the fingerprint itself."""
-
-    return canonical_sha256(plan.model_dump(mode="python", exclude={"admission_fingerprint"}))
-
 
 def _canonical_datetime(value: datetime | None) -> str | None:
     if value is None:

@@ -1,7 +1,9 @@
 # Governance Application Context (`application.governance`)
 
 ## 1. Purpose
-`application.governance` owns authenticated decision authority issuance, proposal authority extraction, durable proposal decision recording, and deterministic governance fingerprint calculations.
+`application.governance` owns authenticated decision authority issuance, proposal authority
+extraction, durable proposal decision recording, and deterministic authority/decision
+fingerprint calculations.
 
 ## 2. Why the package exists
 Package S2-A decomposed governance decision authority out of `application.orchestrator` into an explicit bounded context. Governance binds an exact `DiscoveryProposal` to independently issued, durable user decision authority before Discovery admission.
@@ -12,8 +14,7 @@ Package S2-A decomposed governance decision authority out of `application.orches
 - Issuing bounded, fixed-purpose, expiring governance authority grants (`GovernanceAuthorityIssuer`).
 - Verifying proposal authority, principal bindings, proposal digests, and authority fingerprints (`decision_service.py`).
 - Persisting durable `ProposalDecisionRecord` entries (`decision_service.py`).
-- Calculating pure deterministic governance fingerprints (`fingerprints.py`).
-- Constructing detached `DiscoveryAdmissionPlan` objects for future admission cutover.
+- Calculating pure deterministic authority and decision fingerprints (`fingerprints.py`).
 
 ## 4. Forbidden responsibilities
 - Evaluating Hypotheses or calling Hypothesis Analyst.
@@ -23,6 +24,8 @@ Package S2-A decomposed governance decision authority out of `application.orches
 - Transitioning `Hypothesis` or `Task` lifecycle state.
 - Appending `SessionFrame` records.
 - Creating default anonymous principals or fake production authority.
+- Constructing `DiscoveryAdmissionPlan` objects or admission identities (owned by
+  `application.discovery.admission_plan`).
 
 ## 5. Canonical input and output
 - **Input**: externally resolved authenticated principal identity, `evaluation_id`, `authority_id`,
@@ -63,6 +66,6 @@ including issuer and expiry, is immutable in the supported SQLite schema.
 - No supported CLI, service API, or background daemon loop is checked in.
 - Persistence guarantees are verified for SQLite boundaries.
 
-## 12. Deferred S2-B/S3 work
-- Atomic Discovery admission remains under `application.orchestrator.atomic_discovery_admission` until S2-B.
+## 12. Deferred S3 work
+- Atomic Discovery admission is owned by `application.discovery`.
 - Full repository normalization is deferred to S3.

@@ -14,7 +14,7 @@ from schemas.artifacts import DataProfile
 from schemas.enums import DataProfileLifecycleState, DataProfileMethod
 
 if TYPE_CHECKING:
-    from repositories.discovery_repository import DiscoveryRepository
+    from repositories.discovery import DiscoveryRepository
     from repositories.evidence_repository import EvidenceRepository
 
 DATA_PROFILE_JSON_FIELDS = {

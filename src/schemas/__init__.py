@@ -114,12 +114,23 @@ _EXPORT_MODULES = {
     ),
     **dict.fromkeys(
         (
+            "AtomicDiscoveryAdmissionResult",
+            "DiscoveryAdmissionLease",
+            "DiscoveryAdmissionPlan",
+            "DiscoveryClaimSnapshot",
+            "FutureAtomicWriteSet",
+            "ValidityBasisSnapshot",
+        ),
+        "schemas.discovery",
+    ),
+    **dict.fromkeys(
+        (
             "ValidityPropagationCommand",
             "ValidityPropagationPlan",
             "ValidityPropagationResult",
             "ValidityTargetTransition",
         ),
-        "schemas.validity_propagation_contracts",
+        "schemas.validity",
     ),
     **dict.fromkeys(
         ("AnalysisFrameObservation", "EvidenceObservation"),

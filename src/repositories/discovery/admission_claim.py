@@ -11,6 +11,8 @@ from sqlmodel import Session, select
 from db.models import DiscoveryAdmissionClaimRecord, utc_now
 from schemas.enums import DiscoveryAdmissionClaimState
 
+__all__ = ["DiscoveryAdmissionClaimRepository"]
+
 
 class DiscoveryAdmissionClaimRepository:
     """Stage-only persistence for non-FCO Discovery admission claims."""
@@ -32,7 +34,7 @@ class DiscoveryAdmissionClaimRepository:
             )
         ).first()
 
-    def stage_enqueue(
+    def _stage_enqueue_from_atomic_admission(
         self,
         *,
         evaluation_id: UUID,
@@ -71,7 +73,7 @@ class DiscoveryAdmissionClaimRepository:
         self._session.add(record)
         return record
 
-    def stage_claim(
+    def _stage_claim_from_atomic_admission(
         self,
         claim_id: UUID,
         *,
@@ -110,28 +112,7 @@ class DiscoveryAdmissionClaimRepository:
         result = self._session.exec(statement)
         return result.rowcount == 1
 
-    def stage_reclaim(
-        self,
-        claim_id: UUID,
-        *,
-        owner: str,
-        claim_time: datetime,
-        claim_expiry: datetime,
-        claim_token_digest: str,
-        current_epoch: int,
-    ) -> bool:
-        """Reclaim an expired claim for a new attempt."""
-
-        return self.stage_claim(
-            claim_id,
-            owner=owner,
-            claim_time=claim_time,
-            claim_expiry=claim_expiry,
-            claim_token_digest=claim_token_digest,
-            current_epoch=current_epoch,
-        )
-
-    def stage_cancel(
+    def _stage_cancel_from_atomic_admission(
         self,
         claim_id: UUID,
         *,
@@ -159,7 +140,12 @@ class DiscoveryAdmissionClaimRepository:
         result = self._session.exec(statement)
         return result.rowcount == 1
 
-    def stage_invalidate(self, claim_id: UUID, *, reason: str) -> bool:
+    def _stage_invalidate_from_atomic_admission(
+        self,
+        claim_id: UUID,
+        *,
+        reason: str,
+    ) -> bool:
         """Invalidate an active or pending claim due to stale authority or invalidation."""
 
         statement = (
@@ -180,23 +166,7 @@ class DiscoveryAdmissionClaimRepository:
         result = self._session.exec(statement)
         return result.rowcount == 1
 
-    def stage_quarantine_conflict(self, claim_id: UUID, *, reason: str) -> bool:
-        """Mark claim in CONFLICT state due to duplicate or incompatible attempt."""
-
-        statement = (
-            update(DiscoveryAdmissionClaimRecord)
-            .where(DiscoveryAdmissionClaimRecord.claim_id == claim_id)
-            .values(
-                state=DiscoveryAdmissionClaimState.CONFLICT,
-                invalidation_reason=reason,
-                updated_at=utc_now(),
-            )
-            .execution_options(synchronize_session=False)
-        )
-        result = self._session.exec(statement)
-        return result.rowcount == 1
-
-    def stage_commit(
+    def _stage_commit_from_atomic_admission(
         self,
         claim_id: UUID,
         *,

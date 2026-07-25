@@ -10,16 +10,16 @@ import pytest
 from pydantic_ai.models.test import TestModel
 
 from agents.executor.types import DataExplorerExecutionContext
-from application.orchestrator.validity_propagation_service import (
-    AtomicValidityPropagationService,
-    validity_authority_scope,
-)
 from application.runtime import (
     CogniEDARuntime,
     RuntimeConfiguration,
     RuntimeConfigurationError,
 )
 from application.runtime_loader import load_runtime_from_environment
+from application.validity import (
+    AtomicValidityPropagationService,
+    validity_authority_scope,
+)
 from db.models import EvidenceRecord, ValidityEventRecord
 from package2_helpers import persist_governance_authority, persist_package2_lineage
 from schemas.enums import (
@@ -29,7 +29,7 @@ from schemas.enums import (
     ValiditySourceType,
 )
 from schemas.governance import AuthenticatedPrincipal
-from schemas.validity_propagation_contracts import ValidityPropagationCommand
+from schemas.validity import ValidityPropagationCommand
 
 
 class Resolver:
@@ -219,6 +219,49 @@ def test_runtime_exposes_validity_propagation_facade(
     )
     with pytest.raises(PermissionError, match="grant not found"):
         runtime.propagate_validity(unauthorized)
+
+
+def test_runtime_binds_user_validity_to_resolved_principal(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    with runtime.session() as session:
+        lineage = persist_package2_lineage(session)
+        purpose, operation = validity_authority_scope(
+            event_type=ValidityEventType.EVIDENCE_INVALIDATION,
+            source_type=ValiditySourceType.EVIDENCE,
+            source_id=lineage.evidence_id,
+        )
+        authority = persist_governance_authority(
+            session,
+            authority_class=AuthorizationClass.USER_GOVERNED,
+            actor_identity="user:researcher",
+            workspace_id="workspace:one",
+            session_id="session:one",
+            purpose=purpose,
+            operation_type=operation,
+        )
+        source_state, source_fingerprint = AtomicValidityPropagationService(
+            session
+        ).load_source_guard(ValiditySourceType.EVIDENCE, lineage.evidence_id)
+    command = ValidityPropagationCommand(
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=lineage.evidence_id,
+        event_type=ValidityEventType.EVIDENCE_INVALIDATION,
+        reason="Authenticated user invalidation.",
+        authority_id=authority.authority_id,
+        workspace_id="workspace:one",
+        session_id="session:one",
+        expected_source_state=source_state,
+        expected_source_fingerprint=source_fingerprint,
+        idempotency_key="runtime-user-validity-principal",
+    )
+
+    with pytest.raises(PermissionError, match="authenticated principal"):
+        runtime.propagate_validity(command)
+    result = runtime.propagate_validity(
+        command,
+        authentication_context_id="auth-context",
+    )
+    assert result.replayed is False
 
 
 def test_runtime_loader_fails_predictably_without_deployment_hook(

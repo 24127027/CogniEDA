@@ -100,5 +100,6 @@ bridges were removed. The canonical output type is
 The local runtime and validity facade are SQLite-only, expose no supported CLI, and do not start a
 worker or service loop. Package S1-B moved execution coordination to `application.execution`,
 Evidence admission to `application.evidence`, and canonical execution contracts to
-`schemas.execution`. S2/S3 decomposition of the remaining evaluation, governance, Discovery, and
-validity responsibilities is deferred.
+`schemas.execution`. Packages S2-A and S2-B moved evaluation, governance, Discovery admission,
+and validity propagation to their canonical application bounded contexts. Broader S3
+normalization remains deferred.

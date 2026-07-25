@@ -3,7 +3,7 @@
 from repositories.analysis_frame_repository import AnalysisFrameRepository
 from repositories.assumption_repository import AssumptionRepository, AssumptionUpdate
 from repositories.data_profile_repository import DataProfileRepository
-from repositories.discovery_repository import DiscoveryRepository
+from repositories.discovery import DiscoveryRepository
 from repositories.evidence_repository import EvidenceRepository
 from repositories.execution_approval_repository import ExecutionApprovalRepository
 from repositories.execution_inbox_repository import ExecutionInboxRepository
@@ -28,10 +28,10 @@ __all__ = [
     "DataProfileRepository",
     "DiscoveryRepository",
     "EvidenceRepository",
-    "ExecutionRunRepository",
     "ExecutionApprovalRepository",
     "ExecutionInboxRepository",
     "ExecutionOutboxRepository",
+    "ExecutionRunRepository",
     "HypothesisRepository",
     "HypothesisUpdate",
     "ObjectiveMutationContext",

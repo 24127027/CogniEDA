@@ -23,6 +23,8 @@ from db.models import (
 )
 from schemas.enums import ValiditySourceType
 
+__all__ = ["ValidityDependencyError", "ValidityEventRepository"]
+
 
 class ValidityDependencyError(ValueError):
     """Raised when durable lineage is incomplete or internally contradictory."""
@@ -34,7 +36,10 @@ class ValidityEventRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def stage_event(self, record: ValidityEventRecord) -> ValidityEventRecord:
+    def _stage_event_from_atomic_propagation(
+        self,
+        record: ValidityEventRecord,
+    ) -> ValidityEventRecord:
         """Stage an event without committing the caller's transaction."""
 
         self.session.add(record)

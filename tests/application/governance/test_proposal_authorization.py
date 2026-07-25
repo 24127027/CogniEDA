@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, update
 
+from application.discovery import build_discovery_admission_plan
 from application.evaluation import EvaluationTransitionService, build_synthesis_bundle
 from application.governance import (
     DiscoveryAdmissionGovernanceService,
@@ -125,7 +126,13 @@ def test_non_approved_decision_cannot_create_plan(
     decision = _record_decision(governance, published, authority, decision=outcome)
 
     with pytest.raises(ProposalAuthorizationError, match="must be APPROVED"):
-        governance.create_admission_plan(published.evaluation_id, decision.decision_id)
+        build_discovery_admission_plan(
+            db_session,
+            published.evaluation_id,
+            decision.decision_id,
+            workspace_id="workspace:test",
+            session_id="session:test",
+        )
 
     hypothesis = db_session.get(HypothesisRecord, lineage.hypothesis_id)
     task = db_session.get(TaskRecord, lineage.task_id)
@@ -372,7 +379,13 @@ def test_plan_construction_rejects_dirty_session_without_flushing(db_session: Se
     db_session.add(transient)
 
     with pytest.raises(ProposalAuthorizationError, match="clean session"):
-        governance.create_admission_plan(evaluation_id, decision_id)
+        build_discovery_admission_plan(
+            db_session,
+            evaluation_id,
+            decision_id,
+            workspace_id="workspace:test",
+            session_id="session:test",
+        )
     assert transient in db_session.new
     db_session.rollback()
 

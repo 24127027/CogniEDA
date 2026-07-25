@@ -10,7 +10,7 @@ from sqlmodel import Session
 
 from memory.retrieval_policy import exclusion_reason
 from memory.semantic_scorer import LexicalScorer, SemanticScorer
-from repositories.discovery_repository import DiscoveryRepository
+from repositories.discovery import DiscoveryRepository
 from repositories.task_repository import TaskRepository
 from schemas.artifacts import Discovery, SessionFrame, Task
 from schemas.enums import ContextMode, DiscoveryLifecycleState, FirstClassObjectType

@@ -2,8 +2,9 @@
 
 > **Current implementation snapshot:** 2026-07-25. Source graph topology is defined by
 > `src/agents/planner/graph.py`; post-admission work is split across `application.execution`,
-> `application.evidence`, `application.evaluation`, and `application.governance`, while atomic
-> Discovery admission and validity propagation remain under `application.orchestrator`.
+> `application.evidence`, `application.evaluation`, `application.governance`,
+> `application.discovery`, and `application.validity`. `application.orchestrator` retains only
+> Planner mutation commit coordination.
 
 ## Compiled graph currently in source
 

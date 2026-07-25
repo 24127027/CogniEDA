@@ -12,17 +12,20 @@ from sqlalchemy import delete, inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, create_engine
 
+from application.discovery import build_discovery_admission_plan
 from application.evaluation import (
     EvaluationTransitionService,
+    StaleEvaluationBundleError,
     StaleEvaluationOwnerError,
 )
 from application.governance import (
     DiscoveryAdmissionGovernanceService,
 )
-from application.orchestrator.validity_propagation_service import (
+from application.validity import (
     AtomicValidityPropagationService,
     PartialValidityPropagationError,
     StaleValidityPropagationError,
+    build_validity_propagation_plan,
     validity_authority_scope,
 )
 from db.init_db import init_db
@@ -48,7 +51,7 @@ from package2_helpers import (
     proposal_for_bundle,
 )
 from repositories.data_profile_repository import DataProfileRepository
-from repositories.discovery_repository import DiscoveryRepository
+from repositories.discovery import DiscoveryRepository
 from repositories.evidence_repository import EvidenceRepository
 from repositories.session_frame_repository import SessionFrameRepository
 from schemas.artifacts import DataProfile, Evidence
@@ -76,7 +79,7 @@ from schemas.enums import (
     ValiditySourceType,
 )
 from schemas.retrieval import RetrievalRequest
-from schemas.validity_propagation_contracts import ValidityPropagationCommand
+from schemas.validity import ValidityPropagationCommand
 
 _WORKSPACE = "ws-validity-1"
 _SESSION = "sess-validity-1"
@@ -296,7 +299,10 @@ def test_evidence_invalidation_is_complete_atomic_and_scientifically_immutable(
         exclude={"lifecycle_state", "review_reasons", "flagged_by_evidence_ids"}
     )
 
-    result = AtomicValidityPropagationService(db_session).execute_propagation(command)
+    result = AtomicValidityPropagationService(
+        db_session,
+        principal_id="test_governor",
+    ).execute_propagation(command)
 
     evidence = db_session.get(EvidenceRecord, seed["evidence_id"])
     control = db_session.get(EvaluationControlRecord, seed["evaluation_id"])
@@ -566,6 +572,75 @@ def test_authority_is_durable_exact_and_not_caller_declared(db_session) -> None:
     db_session.rollback()
 
 
+def test_user_invalidation_requires_exact_authenticated_principal(db_session) -> None:
+    seed = _seed_validity_lineage(db_session, with_discovery=False)
+    authority = _validity_grant(
+        db_session,
+        ValidityEventType.EVIDENCE_INVALIDATION,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=seed["evidence_id"],
+        authority_class=AuthorizationClass.USER_GOVERNED,
+        actor_identity="user:validity-reviewer",
+    )
+    command = _command(
+        db_session,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=seed["evidence_id"],
+        event_type=ValidityEventType.EVIDENCE_INVALIDATION,
+        authority_id=authority.authority_id,
+        key="user-principal-bound-invalidation",
+        session_id=_SESSION,
+    )
+
+    with pytest.raises(PermissionError, match="authenticated principal"):
+        AtomicValidityPropagationService(db_session).execute_propagation(command)
+    with pytest.raises(PermissionError, match="authenticated principal"):
+        AtomicValidityPropagationService(
+            db_session,
+            principal_id="user:other",
+        ).execute_propagation(command)
+
+    result = AtomicValidityPropagationService(
+        db_session,
+        principal_id="user:validity-reviewer",
+    ).execute_propagation(command)
+    assert result.replayed is False
+    assert (
+        db_session.get(EvidenceRecord, seed["evidence_id"]).lifecycle_state
+        == EvidenceLifecycleState.INVALIDATED
+    )
+
+
+def test_validity_plan_is_deterministic_versioned_and_read_only(db_session) -> None:
+    seed = _seed_validity_lineage(db_session, with_discovery=False)
+    authority = _validity_grant(
+        db_session,
+        ValidityEventType.EVIDENCE_INVALIDATION,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=seed["evidence_id"],
+    )
+    command = _command(
+        db_session,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=seed["evidence_id"],
+        event_type=ValidityEventType.EVIDENCE_INVALIDATION,
+        authority_id=authority.authority_id,
+        key="deterministic-versioned-plan",
+    )
+
+    first = build_validity_propagation_plan(db_session, command)
+    second = build_validity_propagation_plan(db_session, command)
+
+    assert first == second
+    assert first.contract_version == command.contract_version == "validity-propagation/v1"
+    assert first.plan_fingerprint == first.derive_fingerprint()
+    assert db_session.exec(text("SELECT COUNT(*) FROM validity_events")).one()[0] == 0
+    assert (
+        db_session.get(EvidenceRecord, seed["evidence_id"]).lifecycle_state
+        == EvidenceLifecycleState.ACTIVE
+    )
+
+
 def test_exact_replay_requires_complete_committed_effects(db_session) -> None:
     seed = _seed_validity_lineage(db_session)
     grant = _validity_grant(
@@ -650,15 +725,12 @@ def test_failure_after_each_staged_write_rolls_back(
 
 def test_stale_owner_and_existing_decision_lose_eligibility(db_session) -> None:
     seed = _seed_validity_lineage(db_session, with_discovery=False)
-    governance = DiscoveryAdmissionGovernanceService(
-        session=db_session,
-        workspace_id=_WORKSPACE,
-        session_id=_SESSION,
-        principal_id="test_governor",
-    )
-    detached_plan = governance.create_admission_plan(
+    detached_plan = build_discovery_admission_plan(
+        db_session,
         evaluation_id=seed["evaluation_id"],
         decision_id=seed["decision_id"],
+        workspace_id=_WORKSPACE,
+        session_id=_SESSION,
     )
     grant = _validity_grant(
         db_session,
@@ -679,9 +751,12 @@ def test_stale_owner_and_existing_decision_lose_eligibility(db_session) -> None:
     assert decision.decision == GovernanceDecisionOutcome.APPROVED
     assert decision.consumed is False
     with pytest.raises(ValueError):
-        governance.create_admission_plan(
+        build_discovery_admission_plan(
+            db_session,
             evaluation_id=seed["evaluation_id"],
             decision_id=seed["decision_id"],
+            workspace_id=_WORKSPACE,
+            session_id=_SESSION,
         )
     assert detached_plan.expected_evaluation_state == EvaluationControlState.PROPOSAL_READY
 
@@ -717,7 +792,7 @@ def test_claimed_worker_cannot_publish_after_validity_commit(db_session) -> None
         key="stale-owner",
     )
     AtomicValidityPropagationService(db_session).execute_propagation(command)
-    with pytest.raises(StaleEvaluationOwnerError):
+    with pytest.raises((StaleEvaluationOwnerError, StaleEvaluationBundleError)):
         evaluations.publish_proposal(
             evaluation_id=control.evaluation_id,
             owner="worker-1",

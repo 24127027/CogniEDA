@@ -49,7 +49,8 @@ Current implementation:
 - Minimal durable `AnalysisFrame` and execution-attempt `ExecutionRun` records are persisted; they do not yet provide a full reproducibility envelope.
 - Planner task selection, execution preparation, durable approval and execution admission are
   implemented. Dispatch, receipt, Evidence admission, protected evaluation, governance, Discovery
-  admission, and validity propagation run independently under `application/orchestrator`.
+  admission, and validity propagation run through their canonical application bounded contexts;
+  `application.orchestrator` retains Planner mutation commit coordination only.
 
 ## Implementation Status
 

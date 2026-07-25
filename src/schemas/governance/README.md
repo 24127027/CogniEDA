@@ -37,8 +37,9 @@ None. Governance application services own durable writes.
 
 ## 8. Binding and fingerprints
 
-These models carry exact binding inputs. Canonical authority, decision, and admission fingerprints
-are computed by `application.governance.fingerprints`; the schema layer does not duplicate them.
+These models carry exact binding inputs. Canonical authority and decision fingerprints are
+computed by `application.governance.fingerprints`; admission identity and plan fingerprints are
+owned separately by `application.discovery.admission_plan`. The schema layer duplicates neither.
 
 ## 9. Tests
 

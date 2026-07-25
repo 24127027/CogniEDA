@@ -9,7 +9,7 @@ import pytest
 
 SOURCE_ROOT = Path("src")
 TRANSITION_OWNER = "src/application/execution/transition_service.py"
-VALIDITY_OWNER = "src/application/orchestrator/validity_propagation_service.py"
+VALIDITY_OWNER = "src/application/validity/propagation_service.py"
 MODEL_DEFINITION = "src/db/models.py"
 EXECUTION_RECORDS = {
     "ExecutionRunRecord",
@@ -179,7 +179,7 @@ def test_legacy_scientific_processing_is_unreachable_in_src() -> None:
 
 def test_discovery_admission_sole_writer_enforcement() -> None:
     """EvaluationControl COMMITTED state is written only by AtomicDiscoveryAdmissionService."""
-    allowed_writer = "src/application/orchestrator/atomic_discovery_admission.py"
+    allowed_writer = "src/application/discovery/admission_service.py"
 
     violations: list[str] = []
     for path in SOURCE_ROOT.rglob("*.py"):
@@ -202,8 +202,8 @@ def test_discovery_admission_sole_writer_enforcement() -> None:
 def test_discovery_insert_and_private_stage_are_confined_to_cutover_boundary() -> None:
     """No production module may construct or stage a Discovery through another path."""
 
-    stage_owner = "src/application/orchestrator/atomic_discovery_admission.py"
-    storage_owner = "src/repositories/discovery_repository.py"
+    stage_owner = "src/application/discovery/admission_service.py"
+    storage_owner = "src/repositories/discovery/discovery.py"
     allowed_constructors = {MODEL_DEFINITION, storage_owner}
     violations: list[str] = []
 
@@ -218,13 +218,14 @@ def test_discovery_insert_and_private_stage_are_confined_to_cutover_boundary() -
                 violations.append(f"{path_text}: constructs DiscoveryRecord")
             if called_name == "_stage_create_from_atomic_admission" and path_text != stage_owner:
                 violations.append(f"{path_text}: calls private Discovery stage")
+
     assert not violations, f"Discovery writer boundary bypasses: {violations}"
 
 
 def test_discovery_repository_public_create_is_a_hard_failure() -> None:
-    """The retained compatibility symbol cannot persist a Discovery."""
+    """The retained repository symbol cannot persist a Discovery."""
 
-    tree = ast.parse(Path("src/repositories/discovery_repository.py").read_text())
+    tree = ast.parse(Path("src/repositories/discovery/discovery.py").read_text())
     create_method = next(
         node
         for node in ast.walk(tree)
@@ -263,7 +264,7 @@ def test_package6_removed_compatibility_modules_are_absent_and_unreferenced() ->
 
 
 def test_evidence_writer_and_terminal_lifecycle_writers_are_sealed() -> None:
-    """Generic repositories cannot bypass the two atomic admission transactions."""
+    """Generic repositories cannot bypass the atomic admission transactions."""
 
     evidence_source = Path("src/repositories/evidence_repository.py").read_text(encoding="utf-8")
     hypothesis_source = Path("src/repositories/hypothesis_repository.py").read_text(
@@ -455,12 +456,21 @@ def test_package_s1b_no_old_orchestrator_import_paths_remain() -> None:
         "application.orchestrator.evaluator_runner",
         "application.orchestrator.synthesis_bundle",
         "application.orchestrator.discovery_admission_governance",
+        "application.orchestrator.atomic_discovery_admission",
+        "application.orchestrator.discovery_admission_coordinator",
+        "application.orchestrator.validity_propagation_service",
+        "application.orchestrator.review_propagation",
         "application.evidence.identity",
         "schemas.execution_observations",
         "schemas.data_explorer_contracts",
         "schemas.specialist_contracts",
+        "schemas.discovery_admission_contracts",
+        "schemas.validity_propagation_contracts",
         "repositories.evaluation_control_repository",
         "repositories.proposal_decision_repository",
+        "repositories.discovery_admission_claim_repository",
+        "repositories.discovery_repository",
+        "repositories.validity_event_repository",
     ]
     violations: list[str] = []
     for root in (Path("src"), Path("tests")):
@@ -631,7 +641,7 @@ def test_package_s2a_dependency_directions_are_enforced() -> None:
                         "db",
                         "repositories",
                         "schemas.governance",
-                        "schemas.discovery_admission_contracts",
+                        "schemas.discovery",
                         "agents.executor.dispatcher",
                         "agents.executor.registry",
                         "sqlmodel",
@@ -653,7 +663,7 @@ def test_package_s2a_dependency_directions_are_enforced() -> None:
                         "application.governance",
                         "schemas.governance",
                         "repositories.governance",
-                        "application.orchestrator.atomic_discovery_admission",
+                        "application.discovery",
                     )
                 ):
                     violations.append(f"{path.as_posix()}: evaluation imports {node.module}")
@@ -666,8 +676,8 @@ def test_package_s2a_dependency_directions_are_enforced() -> None:
                 if node.module.startswith(
                     (
                         "agents.executor.hypothesis_analyst",
-                        "application.orchestrator.atomic_discovery_admission",
-                        "repositories.discovery_admission_claim_repository",
+                        "application.discovery",
+                        "repositories.discovery",
                     )
                 ):
                     violations.append(f"{path.as_posix()}: governance imports {node.module}")
@@ -676,42 +686,133 @@ def test_package_s2a_dependency_directions_are_enforced() -> None:
 
 
 def test_package_s2a_compatibility_exports_and_public_repository_writers_are_removed() -> None:
-    """Canonical S2-A owners must not leak through old contracts or public repository writers."""
-
-    discovery_contracts = Path("src/schemas/discovery_admission_contracts.py")
-    tree = ast.parse(discovery_contracts.read_text(encoding="utf-8"))
-    governance_exports = {
-        "AuthenticatedPrincipal",
-        "GovernanceAuthority",
-        "GovernanceDecision",
-        "ProposalAuthority",
-    }
-    violations: list[str] = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module == "schemas.governance":
-            leaked = sorted(alias.name for alias in node.names if alias.name in governance_exports)
-            if leaked:
-                violations.append(f"{discovery_contracts.as_posix()}: re-exports {leaked}")
-        elif isinstance(node, (ast.List, ast.Tuple)):
-            leaked = sorted(
-                item.value
-                for item in node.elts
-                if isinstance(item, ast.Constant)
-                and isinstance(item.value, str)
-                and item.value in governance_exports
-            )
-            if leaked:
-                violations.append(f"{discovery_contracts.as_posix()}: __all__ exports {leaked}")
+    """Canonical S2-A owners must not leak through old contracts or public writers."""
 
     forbidden_repository_writers = {
         Path("src/repositories/evaluation/control.py"): {"stage_create", "create"},
         Path("src/repositories/governance/proposal_decision.py"): {"stage_create", "create"},
     }
+    violations: list[str] = []
     for path, forbidden_names in forbidden_repository_writers.items():
         repository_tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(repository_tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if node.name in forbidden_names:
-                    violations.append(f"{path.as_posix()}: public writer {node.name}")
+            if (
+                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and node.name in forbidden_names
+            ):
+                violations.append(f"{path.as_posix()}: public writer {node.name}")
 
     assert not violations, f"S2-A compatibility/transaction leaks remain: {violations}"
+
+
+def test_package_s2b_discovery_and_validity_modules_moved_out_of_orchestrator() -> None:
+    """Discovery and validity modules must not exist under application.orchestrator."""
+
+    forbidden_old_files = [
+        "src/application/orchestrator/atomic_discovery_admission.py",
+        "src/application/orchestrator/discovery_admission_coordinator.py",
+        "src/application/orchestrator/validity_propagation_service.py",
+        "src/application/orchestrator/review_propagation.py",
+        "src/schemas/discovery_admission_contracts.py",
+        "src/schemas/validity_propagation_contracts.py",
+        "src/repositories/discovery_admission_claim_repository.py",
+        "src/repositories/discovery_repository.py",
+        "src/repositories/validity_event_repository.py",
+    ]
+    present = [path for path in forbidden_old_files if Path(path).exists()]
+    assert not present, f"Decomposed S2-B modules still exist in old flat locations: {present}"
+
+
+def test_package_s2b_dependency_directions_are_enforced() -> None:
+    """Package S2-B architecture and dependency direction invariants must hold."""
+
+    violations: list[str] = []
+
+    # 1. Discovery admission does not invoke Analyst or depend on decision creation logic
+    for path in Path("src/application/discovery").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                if node.module.startswith("agents.executor.hypothesis_analyst"):
+                    violations.append(f"{path.as_posix()}: discovery imports {node.module}")
+
+    # 2. Validity propagation does not import Analyst or decision services
+    for path in Path("src/application/validity").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                if node.module.startswith(
+                    (
+                        "agents.executor.hypothesis_analyst",
+                        "application.governance.decision_service",
+                    )
+                ):
+                    violations.append(f"{path.as_posix()}: validity imports {node.module}")
+
+    # 3. Governance records authority/decisions but does not own admission planning.
+    governance_tree = ast.parse(
+        Path("src/application/governance/decision_service.py").read_text(encoding="utf-8")
+    )
+    if any(
+        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "create_admission_plan"
+        for node in ast.walk(governance_tree)
+    ):
+        violations.append("application.governance: owns create_admission_plan")
+    for path in Path("src/application/governance").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                if node.module.startswith("application.discovery"):
+                    violations.append(f"{path.as_posix()}: governance imports {node.module}")
+
+    # 4. Canonical schema/repository layers remain dependency-inert.
+    for package in ("src/schemas/discovery", "src/schemas/validity"):
+        for path in Path(package).rglob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    if node.module.startswith(("application", "repositories")):
+                        violations.append(f"{path.as_posix()}: schema imports {node.module}")
+    for package in ("src/repositories/discovery", "src/repositories/validity"):
+        for path in Path(package).rglob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    if node.module.startswith("application"):
+                        violations.append(f"{path.as_posix()}: repository imports {node.module}")
+
+    # 5. Mutable repository staging hooks are private and transaction-boundary named.
+    allowed_private_hooks = {
+        "_stage_enqueue_from_atomic_admission",
+        "_stage_claim_from_atomic_admission",
+        "_stage_cancel_from_atomic_admission",
+        "_stage_invalidate_from_atomic_admission",
+        "_stage_commit_from_atomic_admission",
+        "_stage_create_from_atomic_admission",
+        "_stage_event_from_atomic_propagation",
+    }
+    for package in ("src/repositories/discovery", "src/repositories/validity"):
+        for path in Path(package).rglob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    if node.name.startswith("stage_"):
+                        violations.append(f"{path.as_posix()}: public stage hook {node.name}")
+                    if node.name.startswith("_stage_") and node.name not in allowed_private_hooks:
+                        violations.append(f"{path.as_posix()}: ambiguous stage hook {node.name}")
+
+    # 6. Discovery and validity plan policy have one implementation owner each.
+    discovery_plan = Path("src/application/discovery/admission_plan.py").read_text(
+        encoding="utf-8"
+    )
+    if ".create_admission_plan(" in discovery_plan:
+        violations.append("application.discovery.admission_plan delegates plan ownership")
+    validity_service = Path("src/application/validity/propagation_service.py").read_text(
+        encoding="utf-8"
+    )
+    for duplicate in ("_EVENT_SOURCE_ALLOWLIST =", "_EVENT_AUTHORITY ="):
+        if duplicate in validity_service:
+            violations.append(f"application.validity.propagation_service duplicates {duplicate}")
+
+    assert not violations, f"S2-B dependency-direction violations: {violations}"

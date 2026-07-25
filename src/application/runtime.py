@@ -16,6 +16,7 @@ from agents.executor.hypothesis_analyst.nodes import build_hypothesis_analyst_ag
 from agents.executor.registry import DataExplorerFactory, DataExplorerRegistry
 from agents.executor.types import DataExplorerExecutionContext
 from agents.planner.agent import Planner
+from application.discovery import DiscoveryAdmissionCoordinator
 from application.evaluation import (
     enqueue_ready_evaluations,
     run_evaluation_attempt,
@@ -27,18 +28,13 @@ from application.governance import (
     DiscoveryAdmissionGovernanceService,
     GovernanceAuthorityIssuer,
 )
-from application.orchestrator.discovery_admission_coordinator import (
-    DiscoveryAdmissionCoordinator,
-)
-from application.orchestrator.validity_propagation_service import (
-    AtomicValidityPropagationService,
-)
+from application.validity import AtomicValidityPropagationService
 from db.init_db import init_db
 from db.models import GovernanceAuthorityRecord, ProposalDecisionRecord
 from db.session import get_session
 from schemas.enums import GovernanceDecisionOutcome
 from schemas.governance import AuthenticatedPrincipal
-from schemas.validity_propagation_contracts import (
+from schemas.validity import (
     ValidityPropagationCommand,
     ValidityPropagationResult,
 )
@@ -250,8 +246,18 @@ class CogniEDARuntime:
     def propagate_validity(
         self,
         command: ValidityPropagationCommand,
+        *,
+        authentication_context_id: str | None = None,
     ) -> ValidityPropagationResult:
         """Execute one atomic validity propagation command under the runtime session."""
 
+        principal = (
+            self.resolve_principal(authentication_context_id)
+            if authentication_context_id is not None
+            else None
+        )
         with self.session() as session:
-            return AtomicValidityPropagationService(session).execute_propagation(command)
+            return AtomicValidityPropagationService(
+                session,
+                principal_id=principal.principal_id if principal is not None else None,
+            ).execute_propagation(command)

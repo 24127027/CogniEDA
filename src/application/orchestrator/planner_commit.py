@@ -20,7 +20,7 @@ from db.models import (
 )
 from repositories.assumption_repository import ASSUMPTION_JSON_FIELDS, AssumptionUpdate
 from repositories.common import apply_update, record_to_schema, schema_to_record_payload
-from repositories.discovery_repository import DiscoveryRepository
+from repositories.discovery import DiscoveryRepository
 from repositories.hypothesis_repository import HypothesisRepository, HypothesisUpdate
 from repositories.objective_repository import (
     ObjectiveMutationContext,

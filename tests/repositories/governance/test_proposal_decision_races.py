@@ -12,6 +12,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select, update
 
+from application.discovery import build_discovery_admission_plan
 from application.evaluation import EvaluationTransitionService, build_synthesis_bundle
 from application.governance import (
     DiscoveryAdmissionGovernanceService,
@@ -264,9 +265,12 @@ def test_decision_racing_stale_proposal_or_bundle_cannot_authorize_plan(
 
     if decision_result != "stale":
         with pytest.raises(ProposalAuthorizationError):
-            _service(db_session).create_admission_plan(
+            build_discovery_admission_plan(
+                db_session,
                 evaluation_id,
                 decision_result,
+                workspace_id="workspace:test",
+                session_id="session:test",
             )
 
 
@@ -288,9 +292,12 @@ def test_concurrent_plan_reuse_is_identical_read_only_and_unconsumed(
         session = get_session(database_url)
         try:
             barrier.wait(timeout=5)
-            plan = _service(session).create_admission_plan(
+            plan = build_discovery_admission_plan(
+                session,
                 evaluation_id,
                 decision_id,
+                workspace_id="workspace:test",
+                session_id="session:test",
             )
             return str(plan.deterministic_discovery_id), plan.admission_fingerprint
         finally:
@@ -375,10 +382,12 @@ def test_existing_discovery_racing_plan_never_gets_overwritten(db_session: Sessi
             barrier.wait(timeout=5)
             try:
                 return (
-                    _service(session)
-                    .create_admission_plan(
+                    build_discovery_admission_plan(
+                        session,
                         evaluation_id,
                         decision_id,
+                        workspace_id="workspace:test",
+                        session_id="session:test",
                     )
                     .admission_fingerprint
                 )

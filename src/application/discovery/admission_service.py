@@ -12,17 +12,14 @@ from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
+from application.discovery.admission_plan import build_discovery_admission_plan
 from application.evaluation import (
     SynthesisBundleError,
     build_synthesis_bundle,
     compute_evaluation_key,
     compute_evidence_set_digest,
 )
-from application.execution.transition_service import (
-    ExecutionAttemptTransitionService,
-)
 from application.governance import (
-    DiscoveryAdmissionGovernanceService,
     compute_decision_fingerprint,
     compute_governance_authority_fingerprint,
 )
@@ -44,17 +41,20 @@ from db.models import (
 )
 from memory.session_frame import SessionFrameBuilder
 from repositories.common import record_to_schema, schema_to_record_payload
-from repositories.discovery_admission_claim_repository import DiscoveryAdmissionClaimRepository
-from repositories.discovery_repository import DiscoveryRepository
+from repositories.discovery import (
+    DiscoveryAdmissionClaimRepository,
+    DiscoveryRepository,
+)
 from repositories.session_frame_repository import SESSION_FRAME_JSON_FIELDS
 from schemas.artifacts import DataProfile, Discovery, Evidence, Objective, SessionFrame
 from schemas.canonical import canonical_sha256
 from schemas.common import ImmutableCogniEDABaseModel, NonEmptyStr
-from schemas.discovery_admission_contracts import (
+from schemas.discovery import (
+    AtomicDiscoveryAdmissionResult,
+    DiscoveryAdmissionLease,
     DiscoveryAdmissionPlan,
 )
 from schemas.enums import (
-    DataProfileLifecycleState,
     DiscoveryAdmissionClaimState,
     DiscoveryAdmissionReplayDisposition,
     DiscoveryLifecycleState,
@@ -89,32 +89,6 @@ AtomicDiscoveryAdmissionError = DiscoveryAdmissionError
 AtomicDiscoveryAdmissionConflictError = DiscoveryAdmissionConflictError
 
 
-class AtomicDiscoveryAdmissionResult(ImmutableCogniEDABaseModel):
-    """Result envelope for an atomic Discovery admission transaction."""
-
-    disposition: DiscoveryAdmissionReplayDisposition
-    discovery_id: UUID
-    evaluation_id: UUID
-    decision_id: UUID
-    hypothesis_id: UUID
-    task_id: UUID
-    session_frame_id: UUID
-    admission_fingerprint: NonEmptyStr
-    committed_at: datetime
-
-
-class DiscoveryAdmissionLease(ImmutableCogniEDABaseModel):
-    """Opaque, expiring authority for one claimed admission attempt."""
-
-    claim_id: UUID
-    evaluation_id: UUID
-    decision_id: UUID
-    owner: NonEmptyStr
-    fencing_epoch: int
-    claim_token: NonEmptyStr
-    claim_expiry: datetime
-
-
 class AtomicDiscoveryAdmissionService:
     """Sole supported production service for atomic Discovery admission cutover."""
 
@@ -134,11 +108,6 @@ class AtomicDiscoveryAdmissionService:
         self._workspace_id = workspace_id
         self._session_id = session_id
         self._failure_injector = failure_injector
-        self._governance_service = DiscoveryAdmissionGovernanceService(
-            session,
-            workspace_id=workspace_id,
-            session_id=session_id,
-        )
         self._claim_repo = DiscoveryAdmissionClaimRepository(session)
 
     def execute_admission(
@@ -178,12 +147,32 @@ class AtomicDiscoveryAdmissionService:
             evaluation_id=evaluation_id,
             decision_id=decision_id,
         )
-        lease = self.claim_admission(
-            evaluation_id=evaluation_id,
-            decision_id=decision_id,
-            claim_owner=claim_owner,
-            lease_duration_seconds=lease_duration_seconds,
-        )
+        try:
+            lease = self.claim_admission(
+                evaluation_id=evaluation_id,
+                decision_id=decision_id,
+                claim_owner=claim_owner,
+                lease_duration_seconds=lease_duration_seconds,
+            )
+        except DiscoveryAdmissionConflictError:
+            self._session.rollback()
+            winner = self._claim_repo.get_by_evaluation_id(evaluation_id)
+            if (
+                winner is not None
+                and winner.state == DiscoveryAdmissionClaimState.COMMITTED
+                and winner.decision_id == decision_id
+            ):
+                reconstruction = self._reconstruct_and_verify_authority(
+                    evaluation_id=evaluation_id,
+                    decision_id=decision_id,
+                )
+                discovery = self._session.get(DiscoveryRecord, winner.discovery_id)
+                if discovery is not None:
+                    return self._handle_existing_discovery(
+                        discovery,
+                        reconstruction=reconstruction,
+                    )
+            raise
         return self.execute_claimed_admission(lease)
 
     def enqueue_admission(
@@ -201,7 +190,7 @@ class AtomicDiscoveryAdmissionService:
         )
         self._verify_admission_preconditions(reconstruction)
         try:
-            claim = self._claim_repo.stage_enqueue(
+            claim = self._claim_repo._stage_enqueue_from_atomic_admission(
                 evaluation_id=evaluation_id,
                 decision_id=decision_id,
                 proposal_digest=reconstruction.proposal_digest,
@@ -249,7 +238,7 @@ class AtomicDiscoveryAdmissionService:
         claim_expiry = now + timedelta(seconds=lease_duration_seconds)
         claim_token = token_urlsafe(32)
         token_digest = self._claim_token_digest(claim_token)
-        success = self._claim_repo.stage_claim(
+        success = self._claim_repo._stage_claim_from_atomic_admission(
             claim.claim_id,
             owner=claim_owner,
             claim_time=now,
@@ -379,14 +368,15 @@ class AtomicDiscoveryAdmissionService:
                 consumed_at=committed_at,
             )
             self._inject("decision")
-
-            self._session.flush()
             self._inject("pre_commit")
+
             self._session.commit()
+            self._session.refresh(discovery)
+            self._session.refresh(session_frame)
 
             return AtomicDiscoveryAdmissionResult(
                 disposition=DiscoveryAdmissionReplayDisposition.NEW,
-                discovery_id=deterministic_discovery_id,
+                discovery_id=discovery.discovery_id,
                 evaluation_id=lease.evaluation_id,
                 decision_id=lease.decision_id,
                 hypothesis_id=reconstruction.hypothesis.hypothesis_id,
@@ -431,7 +421,7 @@ class AtomicDiscoveryAdmissionService:
         if not reason.strip():
             raise DiscoveryAdmissionError("Admission cancellation reason cannot be empty.")
         claim = self._load_and_verify_live_claim(lease)
-        if not self._claim_repo.stage_cancel(
+        if not self._claim_repo._stage_cancel_from_atomic_admission(
             claim.claim_id,
             owner=lease.owner,
             fencing_epoch=lease.fencing_epoch,
@@ -644,7 +634,13 @@ class AtomicDiscoveryAdmissionService:
             )
 
         # 8. Reconstruct Package 3 deterministic plan
-        plan = self._governance_service.create_admission_plan(evaluation_id, decision_id)
+        plan = build_discovery_admission_plan(
+            self._session,
+            evaluation_id,
+            decision_id,
+            workspace_id=self._workspace_id,
+            session_id=self._session_id,
+        )
 
         return _AdmissionReconstruction(
             evaluation_record=eval_record,
@@ -682,6 +678,51 @@ class AtomicDiscoveryAdmissionService:
         ):
             raise DiscoveryAdmissionError("Proposal profile_id mismatch.")
 
+    def _stage_lineage_guards(
+        self,
+        reconstruction: _AdmissionReconstruction,
+        *,
+        committed_at: datetime,
+    ) -> None:
+        del committed_at
+        hyp_stmt = (
+            update(HypothesisRecord)
+            .where(
+                HypothesisRecord.hypothesis_id == reconstruction.hypothesis.hypothesis_id
+            )
+            .where(HypothesisRecord.status == HypothesisStatus.READY_FOR_EVALUATION)
+            .values(updated_at=utc_now())
+            .execution_options(synchronize_session=False)
+        )
+        self._expect_one(self._session.exec(hyp_stmt), "Hypothesis guard lock")
+
+        task_stmt = (
+            update(TaskRecord)
+            .where(TaskRecord.task_id == reconstruction.task.task_id)
+            .where(TaskRecord.lifecycle_state == TaskLifecycleState.ACTIVE)
+            .values(updated_at=utc_now())
+            .execution_options(synchronize_session=False)
+        )
+        self._expect_one(self._session.exec(task_stmt), "Task guard lock")
+
+        eval_stmt = (
+            update(EvaluationControlRecord)
+            .where(
+                EvaluationControlRecord.evaluation_id
+                == reconstruction.evaluation_record.evaluation_id
+            )
+            .where(
+                EvaluationControlRecord.fencing_epoch
+                == reconstruction.evaluation_record.fencing_epoch
+            )
+            .where(
+                EvaluationControlRecord.state == EvaluationControlState.PROPOSAL_READY
+            )
+            .values(updated_at=utc_now())
+            .execution_options(synchronize_session=False)
+        )
+        self._expect_one(self._session.exec(eval_stmt), "EvaluationControl guard lock")
+
     def _stage_discovery_insert(
         self,
         *,
@@ -708,195 +749,8 @@ class AtomicDiscoveryAdmissionService:
             created_at=created_at,
         )
         record = DiscoveryRepository(self._session)._stage_create_from_atomic_admission(discovery)
-        return record, discovery, self._discovery_fingerprint(discovery)
-
-    def _stage_lineage_guards(
-        self,
-        reconstruction: _AdmissionReconstruction,
-        *,
-        committed_at: datetime,
-    ) -> None:
-        """Acquire the write transaction while proving every validity source is still active."""
-
-        authority = reconstruction.authority_grant
-        authority_statement = (
-            update(GovernanceAuthorityRecord)
-            .where(GovernanceAuthorityRecord.authority_id == authority.authority_id)
-            .where(GovernanceAuthorityRecord.active == True)  # noqa: E712
-            .where(
-                GovernanceAuthorityRecord.authority_fingerprint == authority.authority_fingerprint
-            )
-        )
-        if authority.expires_at is not None:
-            authority_statement = authority_statement.where(
-                GovernanceAuthorityRecord.expires_at > committed_at
-            )
-        authority_result = self._session.exec(
-            authority_statement.values(active=GovernanceAuthorityRecord.active).execution_options(
-                synchronize_session=False
-            )
-        )
-        self._expect_one(authority_result, f"GovernanceAuthority {authority.authority_id}")
-
-        profile_id = reconstruction.bundle.data_profile.data_profile_id
-        profile_result = self._session.exec(
-            update(DataProfileRecord)
-            .where(DataProfileRecord.profile_id == profile_id)
-            .where(DataProfileRecord.accepted_as_ground_truth == True)  # noqa: E712
-            .where(DataProfileRecord.lifecycle_state == DataProfileLifecycleState.ACTIVE)
-            .values(lifecycle_state=DataProfileRecord.lifecycle_state)
-            .execution_options(synchronize_session=False)
-        )
-        self._expect_one(profile_result, f"DataProfile {profile_id}")
-
-        for frame in reconstruction.bundle.analysis_frames:
-            result = self._session.exec(
-                update(AnalysisFrameRecord)
-                .where(AnalysisFrameRecord.analysis_frame_id == frame.analysis_frame_id)
-                .where(AnalysisFrameRecord.validity_state == ValiditySourceState.ACTIVE)
-                .values(validity_state=AnalysisFrameRecord.validity_state)
-                .execution_options(synchronize_session=False)
-            )
-            self._expect_one(result, f"AnalysisFrame {frame.analysis_frame_id}")
-
-        for run in reconstruction.bundle.execution_runs:
-            if not ExecutionAttemptTransitionService(self._session).stage_assert_validity_active(
-                run.execution_run_id
-            ):
-                raise DiscoveryAdmissionConflictError(
-                    f"Admission lost its fence for ExecutionRun {run.execution_run_id}."
-                )
-
-        for evidence in reconstruction.bundle.admitted_evidence:
-            result = self._session.exec(
-                update(EvidenceRecord)
-                .where(EvidenceRecord.evidence_id == evidence.evidence_id)
-                .where(EvidenceRecord.lifecycle_state == EvidenceLifecycleState.ACTIVE)
-                .values(lifecycle_state=EvidenceRecord.lifecycle_state)
-                .execution_options(synchronize_session=False)
-            )
-            self._expect_one(result, f"Evidence {evidence.evidence_id}")
-
-    def _stage_hypothesis_transition(self, *, hypothesis_id: UUID) -> None:
-        statement = (
-            update(HypothesisRecord)
-            .where(HypothesisRecord.hypothesis_id == hypothesis_id)
-            .where(HypothesisRecord.status == HypothesisStatus.READY_FOR_EVALUATION)
-            .values(
-                status=HypothesisStatus.EVALUATED,
-                updated_at=utc_now(),
-            )
-            .execution_options(synchronize_session=False)
-        )
-        result = self._session.exec(statement)
-        if result.rowcount != 1:
-            raise DiscoveryAdmissionConflictError(
-                "Hypothesis transition READY_FOR_EVALUATION -> EVALUATED failed "
-                f"for {hypothesis_id}."
-            )
-
-    def _stage_task_transition(self, *, task_id: UUID) -> None:
-        statement = (
-            update(TaskRecord)
-            .where(TaskRecord.task_id == task_id)
-            .where(TaskRecord.lifecycle_state == TaskLifecycleState.ACTIVE)
-            .values(
-                lifecycle_state=TaskLifecycleState.COMPLETED,
-                updated_at=utc_now(),
-            )
-            .execution_options(synchronize_session=False)
-        )
-        result = self._session.exec(statement)
-        if result.rowcount != 1:
-            raise DiscoveryAdmissionConflictError(
-                f"Task transition ACTIVE -> COMPLETED failed for {task_id}."
-            )
-
-    def _stage_evaluation_control_commit(
-        self,
-        *,
-        evaluation_id: UUID,
-        expected_proposal_digest: str,
-        expected_bundle_digest: str,
-        expected_fencing_epoch: int,
-    ) -> None:
-        statement = (
-            update(EvaluationControlRecord)
-            .where(EvaluationControlRecord.evaluation_id == evaluation_id)
-            .where(EvaluationControlRecord.state == EvaluationControlState.PROPOSAL_READY)
-            .where(EvaluationControlRecord.proposal_digest == expected_proposal_digest)
-            .where(EvaluationControlRecord.bundle_digest == expected_bundle_digest)
-            .where(EvaluationControlRecord.fencing_epoch == expected_fencing_epoch)
-            .values(
-                state=EvaluationControlState.COMMITTED,
-                updated_at=utc_now(),
-            )
-            .execution_options(synchronize_session=False)
-        )
-        result = self._session.exec(statement)
-        if result.rowcount != 1:
-            raise DiscoveryAdmissionConflictError(
-                f"Evaluation control commit failed for evaluation {evaluation_id}."
-            )
-
-    def _stage_decision_consumption(
-        self,
-        *,
-        decision_id: UUID,
-        evaluation_id: UUID,
-        hypothesis_id: UUID,
-        proposal_digest: str,
-        consuming_discovery_id: UUID,
-        consumed_at: datetime,
-    ) -> None:
-        statement = (
-            update(ProposalDecisionRecord)
-            .where(ProposalDecisionRecord.decision_id == decision_id)
-            .where(ProposalDecisionRecord.evaluation_id == evaluation_id)
-            .where(ProposalDecisionRecord.hypothesis_id == hypothesis_id)
-            .where(ProposalDecisionRecord.proposal_digest == proposal_digest)
-            .where(ProposalDecisionRecord.decision == GovernanceDecisionOutcome.APPROVED)
-            .where(ProposalDecisionRecord.consumed == False)  # noqa: E712
-            .values(
-                consumed=True,
-                consumed_at=consumed_at,
-                consumed_by=str(consuming_discovery_id),
-                updated_at=consumed_at,
-            )
-            .execution_options(synchronize_session=False)
-        )
-        result = self._session.exec(statement)
-        if result.rowcount != 1:
-            raise DiscoveryAdmissionConflictError(
-                f"Decision consumption failed for decision {decision_id}."
-            )
-
-    def _stage_claim_commit(
-        self,
-        *,
-        claim_id: UUID,
-        lease: DiscoveryAdmissionLease,
-        discovery_id: UUID,
-        discovery_fingerprint: str,
-        session_frame_id: UUID,
-        session_frame_fingerprint: str,
-        committed_at: datetime,
-    ) -> None:
-        success = self._claim_repo.stage_commit(
-            claim_id,
-            owner=lease.owner,
-            fencing_epoch=lease.fencing_epoch,
-            claim_token_digest=self._claim_token_digest(lease.claim_token),
-            discovery_id=discovery_id,
-            discovery_fingerprint=discovery_fingerprint,
-            session_frame_id=session_frame_id,
-            session_frame_fingerprint=session_frame_fingerprint,
-            committed_at=committed_at,
-        )
-        if not success:
-            raise DiscoveryAdmissionConflictError(
-                f"Admission claim commit failed for claim {claim_id}."
-            )
+        fp = self._discovery_fingerprint(discovery)
+        return record, discovery, fp
 
     def _stage_conclusion_session_frame(
         self,
@@ -958,14 +812,118 @@ class AtomicDiscoveryAdmissionService:
         self._session.add(frame_record)
         return frame_record, self._session_frame_fingerprint(frame)
 
+    def _stage_hypothesis_transition(self, *, hypothesis_id: UUID) -> None:
+        stmt = (
+            update(HypothesisRecord)
+            .where(HypothesisRecord.hypothesis_id == hypothesis_id)
+            .where(HypothesisRecord.status == HypothesisStatus.READY_FOR_EVALUATION)
+            .values(
+                status=HypothesisStatus.EVALUATED,
+                updated_at=utc_now(),
+            )
+            .execution_options(synchronize_session=False)
+        )
+        self._expect_one(self._session.exec(stmt), "Hypothesis EVALUATED transition")
+
+    def _stage_task_transition(self, *, task_id: UUID) -> None:
+        stmt = (
+            update(TaskRecord)
+            .where(TaskRecord.task_id == task_id)
+            .where(TaskRecord.lifecycle_state == TaskLifecycleState.ACTIVE)
+            .values(
+                lifecycle_state=TaskLifecycleState.COMPLETED,
+                updated_at=utc_now(),
+            )
+            .execution_options(synchronize_session=False)
+        )
+        self._expect_one(self._session.exec(stmt), "Task COMPLETED transition")
+
+    def _stage_evaluation_control_commit(
+        self,
+        *,
+        evaluation_id: UUID,
+        expected_proposal_digest: str,
+        expected_bundle_digest: str,
+        expected_fencing_epoch: int,
+    ) -> None:
+        now = utc_now()
+        stmt = (
+            update(EvaluationControlRecord)
+            .where(EvaluationControlRecord.evaluation_id == evaluation_id)
+            .where(EvaluationControlRecord.proposal_digest == expected_proposal_digest)
+            .where(EvaluationControlRecord.bundle_digest == expected_bundle_digest)
+            .where(EvaluationControlRecord.fencing_epoch == expected_fencing_epoch)
+            .where(
+                EvaluationControlRecord.state == EvaluationControlState.PROPOSAL_READY
+            )
+            .values(
+                state=EvaluationControlState.COMMITTED,
+                updated_at=now,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        self._expect_one(self._session.exec(stmt), "EvaluationControl COMMITTED transition")
+
+    def _stage_claim_commit(
+        self,
+        *,
+        claim_id: UUID,
+        lease: DiscoveryAdmissionLease,
+        discovery_id: UUID,
+        discovery_fingerprint: str,
+        session_frame_id: UUID,
+        session_frame_fingerprint: str,
+        committed_at: datetime,
+    ) -> None:
+        token_digest = self._claim_token_digest(lease.claim_token)
+        success = self._claim_repo._stage_commit_from_atomic_admission(
+            claim_id,
+            owner=lease.owner,
+            fencing_epoch=lease.fencing_epoch,
+            claim_token_digest=token_digest,
+            discovery_id=discovery_id,
+            discovery_fingerprint=discovery_fingerprint,
+            session_frame_id=session_frame_id,
+            session_frame_fingerprint=session_frame_fingerprint,
+            committed_at=committed_at,
+        )
+        if not success:
+            raise DiscoveryAdmissionConflictError(
+                f"Failed to commit claim {claim_id} due to fencing epoch or token mismatch."
+            )
+
+    def _stage_decision_consumption(
+        self,
+        *,
+        decision_id: UUID,
+        evaluation_id: UUID,
+        hypothesis_id: UUID,
+        proposal_digest: str,
+        consuming_discovery_id: UUID,
+        consumed_at: datetime,
+    ) -> None:
+        stmt = (
+            update(ProposalDecisionRecord)
+            .where(ProposalDecisionRecord.decision_id == decision_id)
+            .where(ProposalDecisionRecord.evaluation_id == evaluation_id)
+            .where(ProposalDecisionRecord.hypothesis_id == hypothesis_id)
+            .where(ProposalDecisionRecord.proposal_digest == proposal_digest)
+            .where(ProposalDecisionRecord.consumed == False)  # noqa: E712
+            .values(
+                consumed=True,
+                consumed_by=str(consuming_discovery_id),
+                consumed_at=consumed_at,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        self._expect_one(self._session.exec(stmt), "proposal decision consumption")
+
     def _handle_existing_discovery(
         self,
         existing: DiscoveryRecord,
         *,
         reconstruction: _AdmissionReconstruction,
     ) -> AtomicDiscoveryAdmissionResult:
-        """Verify idempotent replay or raise conflict error."""
-
         expected_discovery_id = reconstruction.plan.deterministic_discovery_id
         if existing.discovery_id != expected_discovery_id:
             raise DiscoveryAdmissionConflictError(
@@ -1087,7 +1045,10 @@ class AtomicDiscoveryAdmissionService:
 
     def _invalidate_stale_claim(self, claim_id: UUID, reason: str) -> None:
         self._session.rollback()
-        if not self._claim_repo.stage_invalidate(claim_id, reason=reason):
+        if not self._claim_repo._stage_invalidate_from_atomic_admission(
+            claim_id,
+            reason=reason,
+        ):
             self._session.rollback()
             return
         self._session.commit()

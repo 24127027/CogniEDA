@@ -20,10 +20,8 @@ from application.governance.authority import (
 )
 from application.governance.fingerprints import (
     _datetime_is_expired,
-    compute_admission_fingerprint,
     compute_decision_fingerprint,
     compute_governance_authority_fingerprint,
-    generate_deterministic_discovery_id,
 )
 from db.models import (
     DiscoveryRecord,
@@ -33,11 +31,6 @@ from db.models import (
 )
 from repositories.governance import ProposalDecisionRepository
 from schemas.canonical import canonical_sha256
-from schemas.discovery_admission_contracts import (
-    DiscoveryAdmissionPlan,
-    DiscoveryClaimSnapshot,
-    ValidityBasisSnapshot,
-)
 from schemas.enums import (
     AuthorizationClass,
     DiscoveryAdmissionReplayDisposition,
@@ -46,10 +39,8 @@ from schemas.enums import (
 )
 from schemas.evaluation import (
     BundleProvenanceManifest,
-    DecisionRuleSnapshot,
     DiscoveryProposal,
     DiscoverySynthesisBundle,
-    MethodParameterSnapshot,
     compute_proposal_digest,
     validate_proposal_against_bundle,
 )
@@ -279,104 +270,6 @@ class DiscoveryAdmissionGovernanceService:
         if discovery is None:
             return DiscoveryAdmissionReplayDisposition.NEW, None
         return DiscoveryAdmissionReplayDisposition.CONFLICT, discovery
-
-    def create_admission_plan(
-        self,
-        evaluation_id: UUID,
-        decision_id: UUID,
-    ) -> DiscoveryAdmissionPlan:
-        """Construct a detached plan and perform no flush, commit, or lifecycle mutation."""
-
-        self._require_clean_unit_of_work()
-        authority, decision_record = self.verify_authorization(evaluation_id, decision_id)
-        rebuilt_authority, proposal, bundle, manifest = self._load_current_proposal(evaluation_id)
-        if rebuilt_authority != authority:
-            raise ProposalAuthorizationError(
-                "Proposal authority changed while the admission plan was being constructed."
-            )
-
-        authority_grant = self._load_governance_authority(
-            decision_record.authority_id,
-            require_active=(
-                self._session.get(EvaluationControlRecord, evaluation_id).state
-                != EvaluationControlState.COMMITTED
-            ),
-        )
-        deterministic_discovery_id = generate_deterministic_discovery_id(
-            hypothesis_id=authority.hypothesis_id,
-            proposal_digest=authority.proposal_digest,
-        )
-        claim = DiscoveryClaimSnapshot(
-            statement=proposal.claim.statement,
-            scope=proposal.claim.scope,
-            conditions=tuple(proposal.claim.conditions),
-            result=proposal.claim.result,
-        )
-        basis = ValidityBasisSnapshot(
-            data_profile_id=proposal.validity_basis.data_profile_id,
-            analysis_frame_refs=tuple(proposal.validity_basis.analysis_frame_refs),
-            hypothesis_id=proposal.validity_basis.hypothesis_id,
-            evidence_ids=tuple(proposal.validity_basis.evidence_ids),
-            method=proposal.validity_basis.method,
-            parameters=tuple(
-                MethodParameterSnapshot(name=parameter.name, value=parameter.value)
-                for parameter in proposal.validity_basis.parameters
-            ),
-            code_reference=proposal.validity_basis.code_reference,
-            environment_reference=proposal.validity_basis.environment_reference,
-            decision_rule=DecisionRuleSnapshot.from_domain(proposal.validity_basis.decision_rule),
-            strength=proposal.validity_basis.strength,
-            uncertainty=proposal.validity_basis.uncertainty,
-            assumptions_excluded_from_inference=True,
-            invalidators=tuple(proposal.validity_basis.invalidators),
-        )
-        unsigned = DiscoveryAdmissionPlan(
-            authorization_decision_id=decision_record.decision_id,
-            authorization_fingerprint=decision_record.decision_fingerprint,
-            authorization_authority_id=authority_grant.authority_id,
-            authorization_actor=authority_grant.actor_identity,
-            authorization_class=authority_grant.authority_class,
-            authorization_workspace_id=authority_grant.workspace_id,
-            authorization_session_id=authority_grant.session_id,
-            authorization_purpose=authority_grant.purpose,
-            authorization_operation_type=authority_grant.operation_type,
-            evaluation_id=authority.evaluation_id,
-            evaluation_key=authority.evaluation_key,
-            evaluation_attempt_number=authority.evaluation_attempt_number,
-            evaluation_owner=authority.evaluation_owner,
-            evaluation_fencing_epoch=authority.evaluation_fencing_epoch,
-            proposal_digest=authority.proposal_digest,
-            bundle_digest=authority.bundle_digest,
-            evidence_set_digest=authority.evidence_set_digest,
-            bundle_manifest_digest=authority.manifest_digest,
-            hypothesis_id=authority.hypothesis_id,
-            source_task_id=authority.source_task_id,
-            profile_id=authority.profile_id,
-            evidence_ids=authority.exact_evidence_ids,
-            analysis_frame_ids=authority.exact_analysis_frame_ids,
-            proposed_claim=claim,
-            epistemic_status=proposal.epistemic_status,
-            scope=proposal.scope,
-            validity_basis=basis,
-            uncertainty=proposal.validity_basis.uncertainty,
-            limitations=tuple(proposal.limitations),
-            deterministic_discovery_id=deterministic_discovery_id,
-            admission_fingerprint="0" * 64,
-        )
-        plan = unsigned.model_copy(
-            update={"admission_fingerprint": compute_admission_fingerprint(unsigned)}
-        )
-
-        final_authority, final_decision = self.verify_authorization(evaluation_id, decision_id)
-        if final_authority != authority or final_decision.decision_fingerprint != (
-            decision_record.decision_fingerprint
-        ):
-            raise ProposalAuthorizationError(
-                "Durable authority changed before admission-plan construction completed."
-            )
-        if compute_admission_fingerprint(plan) != plan.admission_fingerprint:
-            raise ProposalAuthorizationError("Admission plan fingerprint is not self-consistent.")
-        return plan
 
     def _load_current_proposal(
         self,

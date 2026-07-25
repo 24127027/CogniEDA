@@ -65,6 +65,7 @@ participate in the single transaction owned by
 - There is no checked-in concrete Data Explorer, worker bootstrap, service API, or CLI.
 
 ## 12. Deferred work
-- S2/S3 decomposition of evaluation, governance, Discovery, and validity services remains in
-  `application.orchestrator` and is outside this package.
+- Broader S3 repository and global-schema normalization remains outside this package. Evaluation,
+  governance, Discovery admission, and validity propagation already have canonical application
+  bounded contexts.
 - Production outbox worker infrastructure remains future work.

@@ -57,6 +57,7 @@ It calls only staged execution/Hypothesis/inbox transitions before issuing the s
 - There is no event publisher, service API, worker bootstrap, or CLI.
 
 ## 12. Deferred work
-- S2/S3 decomposition of evaluation, governance, Discovery, and validity services remains outside
-  this package.
+- Broader S3 repository and global-schema normalization remains outside this package. Evaluation,
+  governance, Discovery admission, and validity propagation already have canonical application
+  bounded contexts.
 - Evidence-admission event publishing remains future work.

@@ -16,7 +16,7 @@ from application.governance import (
     USER_GOVERNED_PURPOSE,
     compute_governance_authority_fingerprint,
 )
-from application.orchestrator.validity_propagation_service import (
+from application.validity import (
     AtomicValidityPropagationService,
     validity_authority_scope,
 )
@@ -64,7 +64,7 @@ from schemas.execution.contracts import (
     PreparedExecution,
 )
 from schemas.provenance import AnalysisFrame
-from schemas.validity_propagation_contracts import ValidityPropagationCommand
+from schemas.validity import ValidityPropagationCommand
 
 
 @dataclass(frozen=True, slots=True)

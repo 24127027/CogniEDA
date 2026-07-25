@@ -68,7 +68,7 @@ persisted approval record, so commit is not a universal authorization boundary.
 | Result receipt | Implemented locally | `application.execution.dispatch` reconstructs durable identity and `application.execution.receiver` stores a fenced digest. |
 | Evidence production | Implemented locally | Canonical observations are materialized as AnalysisFrame/Evidence by the fenced atomic Evidence-admission transaction. |
 | Evidence evaluation/Discovery | Implemented locally | Hypothesis Analyst evaluates only the protected bundle; an exact durable decision gates atomic Discovery admission. |
-| Conflict/staleness review | Stub/partial utilities | Review nodes are placeholders; repository propagation and bounded retrieval provide only narrow signals (`src/agents/planner/nodes.py:1582-1595`, `src/application/orchestrator/review_propagation.py:13-48`). |
+| Conflict/staleness review | Stub/partial utilities | Review nodes are placeholders; atomic validity propagation and bounded retrieval provide narrow review/staleness signals (`src/agents/planner/nodes.py:1582-1595`, `src/application/validity/propagation_service.py`). |
 | Atomic commit | Implemented locally with gaps | Planner, Evidence admission, Discovery admission, and validity propagation use explicit atomic transactions; broader product effects remain out of scope. |
 | SessionFrame update | Partially implemented | Objective, motivated Task/decomposition, and atomic Discovery admission append frames; general refresh and user item governance are absent. |
 

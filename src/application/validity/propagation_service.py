@@ -12,6 +12,12 @@ from sqlmodel import Session
 from application.governance import (
     compute_governance_authority_fingerprint,
 )
+from application.validity.propagation_plan import (
+    ACTIVE_EVALUATION_STATES,
+    ALLOWED_TRUSTED_PRODUCERS,
+    EVENT_SOURCE_ALLOWLIST,
+    validity_authority_scope,
+)
 from db.models import (
     AnalysisFrameRecord,
     DataProfileRecord,
@@ -26,7 +32,7 @@ from db.models import (
     TaskRecord,
     ValidityEventRecord,
 )
-from repositories.validity_event_repository import ValidityEventRepository
+from repositories.validity import ValidityEventRepository
 from schemas.canonical import canonical_sha256
 from schemas.enums import (
     AuthorizationClass,
@@ -42,7 +48,7 @@ from schemas.enums import (
     ValiditySourceState,
     ValiditySourceType,
 )
-from schemas.validity_propagation_contracts import (
+from schemas.validity import (
     ValidityPropagationCommand,
     ValidityPropagationPlan,
     ValidityPropagationResult,
@@ -50,81 +56,6 @@ from schemas.validity_propagation_contracts import (
 )
 
 _VALIDITY_EVENT_NAMESPACE = UUID("2aa2d86d-197b-5a73-b938-f2ac79e11057")
-_ALLOWED_TRUSTED_PRODUCERS = {
-    "system_integrity",
-    "validity_propagation_service",
-    "admission_service",
-    "receiver_service",
-}
-_EVENT_AUTHORITY = {
-    ValidityEventType.EVIDENCE_INVALIDATION: (
-        "integrity_invalidation",
-        "invalidate_source",
-    ),
-    ValidityEventType.EVIDENCE_SUPERSESSION: (
-        "supersession_propagation",
-        "supersede_source",
-    ),
-    ValidityEventType.EVIDENCE_CONFLICT: (
-        "conflict_quarantine",
-        "quarantine_source",
-    ),
-    ValidityEventType.DATA_PROFILE_INVALIDATION: (
-        "integrity_invalidation",
-        "invalidate_source",
-    ),
-    ValidityEventType.DATA_PROFILE_SUPERSESSION: (
-        "supersession_propagation",
-        "supersede_source",
-    ),
-    ValidityEventType.ANALYSIS_FRAME_INVALIDITY: (
-        "integrity_invalidation",
-        "invalidate_source",
-    ),
-    ValidityEventType.EXECUTION_RUN_CONFLICT: (
-        "conflict_quarantine",
-        "quarantine_source",
-    ),
-    ValidityEventType.PROVENANCE_CORRUPTION: (
-        "integrity_invalidation",
-        "invalidate_source",
-    ),
-}
-_EVENT_SOURCE_ALLOWLIST = {
-    ValidityEventType.EVIDENCE_INVALIDATION: {ValiditySourceType.EVIDENCE},
-    ValidityEventType.EVIDENCE_SUPERSESSION: {ValiditySourceType.EVIDENCE},
-    ValidityEventType.EVIDENCE_CONFLICT: {ValiditySourceType.EVIDENCE},
-    ValidityEventType.DATA_PROFILE_INVALIDATION: {ValiditySourceType.DATA_PROFILE},
-    ValidityEventType.DATA_PROFILE_SUPERSESSION: {ValiditySourceType.DATA_PROFILE},
-    ValidityEventType.ANALYSIS_FRAME_INVALIDITY: {ValiditySourceType.ANALYSIS_FRAME},
-    ValidityEventType.EXECUTION_RUN_CONFLICT: {ValiditySourceType.EXECUTION_RUN},
-    ValidityEventType.PROVENANCE_CORRUPTION: set(ValiditySourceType),
-}
-_ACTIVE_EVALUATION_STATES = {
-    EvaluationControlState.PENDING,
-    EvaluationControlState.CLAIMED,
-    EvaluationControlState.PROPOSAL_READY,
-    EvaluationControlState.RETRYABLE_FAILED,
-    EvaluationControlState.COMMITTED,
-}
-
-
-def validity_authority_scope(
-    *,
-    event_type: ValidityEventType,
-    source_type: ValiditySourceType,
-    source_id: UUID,
-    replacement_id: UUID | None = None,
-) -> tuple[str, str]:
-    """Return the exact durable capability scope for one source event."""
-
-    purpose, operation = _EVENT_AUTHORITY[event_type]
-    source_scope = f"{source_type.value}:{source_id}"
-    if replacement_id is not None:
-        source_scope = f"{source_scope}:{replacement_id}"
-    return purpose, f"{operation}:{source_scope}"
-
-
 class StaleValidityPropagationError(RuntimeError):
     """Raised when a source or dependent loses an expected-state fence."""
 
@@ -140,10 +71,14 @@ class AtomicValidityPropagationService:
         self,
         session: Session,
         *,
+        principal_id: str | None = None,
         failure_injector: Callable[[str], None] | None = None,
     ) -> None:
+        if principal_id is not None and not principal_id.strip():
+            raise ValueError("Validity principal identity must be non-empty when supplied.")
         self.session = session
         self.repo = ValidityEventRepository(session)
+        self._principal_id = principal_id
         self._failure_injector = failure_injector
 
     def load_source_guard(
@@ -216,7 +151,7 @@ class AtomicValidityPropagationService:
                 ],
                 processing_state="COMMITTED",
             )
-            self.repo.stage_event(event)
+            self.repo._stage_event_from_atomic_propagation(event)
             self.session.flush()
             self._inject("validity_event")
             self.session.commit()
@@ -333,7 +268,7 @@ class AtomicValidityPropagationService:
             )
 
         for evaluation_id, control in sorted(dependencies["evaluations"].items()):
-            if control.state not in _ACTIVE_EVALUATION_STATES:
+            if control.state not in ACTIVE_EVALUATION_STATES:
                 continue
             transitions.append(
                 self._transition(
@@ -512,6 +447,7 @@ class AtomicValidityPropagationService:
                 )
             )
         elif command.source_type == ValiditySourceType.ANALYSIS_FRAME:
+            target = ValiditySourceState(transition.target_state)
             result = self.session.exec(
                 update(AnalysisFrameRecord)
                 .where(AnalysisFrameRecord.analysis_frame_id == command.source_id)
@@ -520,11 +456,12 @@ class AtomicValidityPropagationService:
                     == ValiditySourceState(transition.expected_state)
                 )
                 .values(
-                    validity_state=ValiditySourceState(transition.target_state),
+                    validity_state=target,
                     validity_reason=note,
                 )
             )
         else:
+            target = ValiditySourceState(transition.target_state)
             result = self.session.exec(
                 update(ExecutionRunRecord)
                 .where(ExecutionRunRecord.execution_run_id == command.source_id)
@@ -533,11 +470,11 @@ class AtomicValidityPropagationService:
                     == ValiditySourceState(transition.expected_state)
                 )
                 .values(
-                    validity_state=ValiditySourceState(transition.target_state),
+                    validity_state=target,
                     validity_reason=note,
                 )
             )
-        self._expect_one(result, f"source {plan.source_type.value}:{plan.source_id}")
+        self._expect_one(result, f"source {command.source_type.value}:{command.source_id}")
 
     def _cas_evidence(
         self,
@@ -552,7 +489,6 @@ class AtomicValidityPropagationService:
             .where(EvidenceRecord.lifecycle_reason == evidence.lifecycle_reason)
             .values(
                 lifecycle_state=EvidenceLifecycleState(transition.target_state),
-                superseded_by_evidence_id=None,
                 lifecycle_reason=note,
             )
         )
@@ -738,8 +674,12 @@ class AtomicValidityPropagationService:
                 or authority.session_id != command.session_id
             ):
                 raise PermissionError("User-governed validity authority requires exact session.")
+            if self._principal_id is None or authority.actor_identity != self._principal_id:
+                raise PermissionError(
+                    "User-governed validity authority requires the exact authenticated principal."
+                )
         elif authority.authority_class == AuthorizationClass.TRUSTED_INTERNAL:
-            if authority.actor_identity not in _ALLOWED_TRUSTED_PRODUCERS:
+            if authority.actor_identity not in ALLOWED_TRUSTED_PRODUCERS:
                 raise PermissionError("Trusted validity producer is not allow-listed.")
             if command.session_id != authority.session_id:
                 raise PermissionError("Trusted validity authority session mismatch.")
@@ -755,11 +695,15 @@ class AtomicValidityPropagationService:
             )
         return authority
 
-    @staticmethod
-    def _validate_event_source_pair(command: ValidityPropagationCommand) -> None:
-        if command.source_type not in _EVENT_SOURCE_ALLOWLIST[command.event_type]:
+    def _validate_event_source_pair(
+        self,
+        command: ValidityPropagationCommand,
+    ) -> None:
+        allowed = EVENT_SOURCE_ALLOWLIST.get(command.event_type, set())
+        if command.source_type not in allowed:
             raise ValueError(
-                f"{command.event_type.value} is not allowed for {command.source_type.value}."
+                f"Validity event {command.event_type.value} is not supported for source "
+                f"{command.source_type.value}."
             )
 
     def _validate_source_is_eligible(

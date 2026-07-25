@@ -14,6 +14,12 @@ from sqlalchemy import text, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
+from application.discovery import (
+    AtomicDiscoveryAdmissionConflictError,
+    AtomicDiscoveryAdmissionError,
+    AtomicDiscoveryAdmissionService,
+    DiscoveryAdmissionCoordinator,
+)
 from application.evaluation import EvaluationTransitionService, build_synthesis_bundle
 from application.governance import (
     DiscoveryAdmissionGovernanceService,
@@ -21,12 +27,6 @@ from application.governance import (
     ProposalAuthorizationError,
     ProposalDecisionConflictError,
 )
-from application.orchestrator.atomic_discovery_admission import (
-    AtomicDiscoveryAdmissionConflictError,
-    AtomicDiscoveryAdmissionError,
-    AtomicDiscoveryAdmissionService,
-)
-from application.orchestrator.discovery_admission_coordinator import DiscoveryAdmissionCoordinator
 from db.init_db import init_db
 from db.models import (
     DiscoveryAdmissionClaimRecord,
@@ -45,7 +45,7 @@ from package2_helpers import (
     propagate_validity_for_test,
     proposal_for_bundle,
 )
-from repositories.discovery_repository import DiscoveryRepository
+from repositories.discovery import DiscoveryRepository
 from repositories.evidence_repository import EvidenceRepository
 from repositories.objective_repository import ObjectiveRepository
 from repositories.task_repository import TaskRepository
@@ -694,7 +694,7 @@ def test_planner_commit_discovery_creation_bypasses_blocked(test_db_engine):
         assert "Discovery creation is owned by" in result.errors[op.operation_id]
 
 
-def test_coordinator_cli_entry_point(test_db_engine):
+def test_coordinator_supported_entry_point(test_db_engine):
     with Session(test_db_engine) as session:
         _, eval_control, _ = _setup_package2_ready_evaluation(session)
         grant = _issue_admission_authority(session)

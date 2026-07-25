@@ -11,6 +11,14 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from schemas.canonical import canonical_sha256
 from schemas.enums import AuthorizationClass, ValidityEventType, ValiditySourceType
 
+__all__ = [
+    "ValidityPropagationCommand",
+    "ValidityPropagationPlan",
+    "ValidityPropagationResult",
+    "ValidityTargetTransition",
+    "ValidityTargetType",
+]
+
 ValidityTargetType = Literal[
     "source",
     "evidence",
@@ -28,6 +36,7 @@ class ValidityPropagationCommand(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
+    contract_version: Literal["validity-propagation/v1"] = "validity-propagation/v1"
     source_type: ValiditySourceType
     source_id: UUID
     event_type: ValidityEventType
@@ -94,6 +103,7 @@ class ValidityPropagationCommand(BaseModel):
 
         return canonical_sha256(
             {
+                "contract_version": self.contract_version,
                 "source_type": self.source_type.value,
                 "source_id": self.source_id,
                 "event_type": self.event_type.value,
@@ -131,6 +141,7 @@ class ValidityPropagationPlan(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
+    contract_version: Literal["validity-propagation/v1"] = "validity-propagation/v1"
     event_id: UUID
     idempotency_key: str
     request_fingerprint: str

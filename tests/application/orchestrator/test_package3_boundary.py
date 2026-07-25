@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from sqlmodel import Session, select
 
+from application.discovery import build_discovery_admission_plan
 from application.evaluation import EvaluationTransitionService, build_synthesis_bundle
 from application.governance import (
     DiscoveryAdmissionGovernanceService,
@@ -61,7 +62,13 @@ def test_package3_boundary_invariants(db_session: Session) -> None:
     )
 
     # Construct admission plan
-    gov_service.create_admission_plan(published.evaluation_id, decision_rec.decision_id)
+    build_discovery_admission_plan(
+        db_session,
+        published.evaluation_id,
+        decision_rec.decision_id,
+        workspace_id="workspace:test",
+        session_id="session:test",
+    )
 
     # 1. Package 3 writes NO DiscoveryRecord
     discoveries = db_session.exec(select(DiscoveryRecord)).all()

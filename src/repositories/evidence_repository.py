@@ -16,7 +16,7 @@ from schemas.artifacts import Evidence
 from schemas.enums import EvidenceLifecycleState
 
 if TYPE_CHECKING:
-    from repositories.discovery_repository import DiscoveryRepository
+    from repositories.discovery import DiscoveryRepository
 
 EVIDENCE_JSON_FIELDS = {
     "parameters",

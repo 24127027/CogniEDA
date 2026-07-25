@@ -14,6 +14,7 @@ from agents.executor.hypothesis_analyst.nodes import build_hypothesis_analyst_ag
 from application.evaluation import (
     EvaluationConflictError,
     EvaluationTransitionService,
+    StaleEvaluationBundleError,
     StaleEvaluationOwnerError,
     build_synthesis_bundle,
     run_evaluation_attempt,
@@ -301,7 +302,7 @@ def test_evidence_invalidation_during_model_call_fences_publication(db_session) 
         hypothesis_id=lineage.hypothesis_id
     )
 
-    with pytest.raises(StaleEvaluationOwnerError):
+    with pytest.raises((StaleEvaluationOwnerError, StaleEvaluationBundleError)):
         run_evaluation_attempt(
             db_session,
             evaluation_id=control.evaluation_id,

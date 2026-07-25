@@ -35,6 +35,7 @@ from agents.planner.types import (
     TaskCreateDraft,
     TaskDecompositionDraft,
 )
+from application.discovery import AtomicDiscoveryAdmissionService
 from application.evaluation import (
     build_synthesis_bundle,
     enqueue_ready_evaluations,
@@ -44,12 +45,7 @@ from application.execution.cancellation import authorize_retry
 from application.execution.dispatch import dispatch_pending_attempts
 from application.execution.receiver import submit_execution_result
 from application.execution.recovery import finalize_attempt
-from application.governance import (
-    DiscoveryAdmissionGovernanceService,
-)
-from application.orchestrator.atomic_discovery_admission import (
-    AtomicDiscoveryAdmissionService,
-)
+from application.governance import DiscoveryAdmissionGovernanceService
 from db.models import HypothesisRecord, TaskRecord
 from db.session import get_session
 from discovery_seed_helpers import seed_historical_discovery

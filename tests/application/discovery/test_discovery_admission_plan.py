@@ -8,19 +8,20 @@ import pytest
 from pydantic import ValidationError
 from sqlmodel import Session
 
-from application.evaluation import EvaluationTransitionService, build_synthesis_bundle
-from application.governance import (
-    DiscoveryAdmissionGovernanceService,
+from application.discovery import (
+    build_discovery_admission_plan,
     compute_admission_fingerprint,
     generate_deterministic_discovery_id,
 )
+from application.evaluation import EvaluationTransitionService, build_synthesis_bundle
+from application.governance import DiscoveryAdmissionGovernanceService
 from db.models import EvaluationControlRecord
 from package2_helpers import (
     persist_governance_authority,
     persist_package2_lineage,
     proposal_for_bundle,
 )
-from schemas.discovery_admission_contracts import DiscoveryAdmissionPlan
+from schemas.discovery import DiscoveryAdmissionPlan
 from schemas.enums import (
     DiscoveryEpistemicStatus,
     EvaluationControlState,
@@ -71,7 +72,13 @@ def test_valid_proposal_creates_one_deterministic_frozen_plan(db_session: Sessio
         decision=GovernanceDecisionOutcome.APPROVED,
     )
 
-    plan = gov_service.create_admission_plan(published.evaluation_id, decision_rec.decision_id)
+    plan = build_discovery_admission_plan(
+        db_session,
+        published.evaluation_id,
+        decision_rec.decision_id,
+        workspace_id="workspace:test",
+        session_id="session:test",
+    )
 
     assert isinstance(plan, DiscoveryAdmissionPlan)
     assert plan.evaluation_id == published.evaluation_id
@@ -102,8 +109,20 @@ def test_exact_proposal_replay_creates_same_plan_and_id(db_session: Session) -> 
         decision=GovernanceDecisionOutcome.APPROVED,
     )
 
-    plan1 = gov_service.create_admission_plan(published.evaluation_id, decision_rec.decision_id)
-    plan2 = gov_service.create_admission_plan(published.evaluation_id, decision_rec.decision_id)
+    plan1 = build_discovery_admission_plan(
+        db_session,
+        published.evaluation_id,
+        decision_rec.decision_id,
+        workspace_id="workspace:test",
+        session_id="session:test",
+    )
+    plan2 = build_discovery_admission_plan(
+        db_session,
+        published.evaluation_id,
+        decision_rec.decision_id,
+        workspace_id="workspace:test",
+        session_id="session:test",
+    )
 
     assert plan1 == plan2
     assert plan1.deterministic_discovery_id == plan2.deterministic_discovery_id
@@ -125,7 +144,13 @@ def test_admission_fingerprint_covers_scientific_and_authorization_identity(
         authority_id=authority.authority_id,
         decision=GovernanceDecisionOutcome.APPROVED,
     )
-    plan = gov_service.create_admission_plan(published.evaluation_id, decision.decision_id)
+    plan = build_discovery_admission_plan(
+        db_session,
+        published.evaluation_id,
+        decision.decision_id,
+        workspace_id="workspace:test",
+        session_id="session:test",
+    )
 
     scientific_change = plan.model_copy(
         update={
@@ -163,7 +188,13 @@ def test_all_four_epistemic_outcomes_accepted(
         decision=GovernanceDecisionOutcome.APPROVED,
     )
 
-    plan = gov_service.create_admission_plan(published.evaluation_id, decision_rec.decision_id)
+    plan = build_discovery_admission_plan(
+        db_session,
+        published.evaluation_id,
+        decision_rec.decision_id,
+        workspace_id="workspace:test",
+        session_id="session:test",
+    )
     assert plan.epistemic_status == epistemic_status
 
 
@@ -176,7 +207,13 @@ def test_scientific_meaning_preservation(db_session: Session) -> None:
         decision=GovernanceDecisionOutcome.APPROVED,
     )
 
-    plan = gov_service.create_admission_plan(published.evaluation_id, decision_rec.decision_id)
+    plan = build_discovery_admission_plan(
+        db_session,
+        published.evaluation_id,
+        decision_rec.decision_id,
+        workspace_id="workspace:test",
+        session_id="session:test",
+    )
 
     raw_proposal = published.serialized_proposal
     assert raw_proposal is not None

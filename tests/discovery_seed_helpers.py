@@ -11,7 +11,7 @@ from sqlmodel import Session
 
 from db.models import DiscoveryRecord
 from repositories.common import record_to_schema, schema_to_record_payload
-from repositories.discovery_repository import DISCOVERY_JSON_FIELDS
+from repositories.discovery import DISCOVERY_JSON_FIELDS
 from schemas.artifacts import Discovery
 
 

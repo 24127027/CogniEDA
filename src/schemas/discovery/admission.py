@@ -1,7 +1,8 @@
-"""Typed contracts for Package 3 Discovery Admission Governance."""
+"""Typed contracts for Package S2-B Discovery Admission."""
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -10,6 +11,7 @@ from pydantic import Field
 from schemas.common import ImmutableCogniEDABaseModel, NonEmptyStr
 from schemas.enums import (
     AuthorizationClass,
+    DiscoveryAdmissionReplayDisposition,
     DiscoveryEpistemicStatus,
     EvaluationControlState,
     HypothesisStatus,
@@ -18,6 +20,8 @@ from schemas.enums import (
 from schemas.evaluation import DecisionRuleSnapshot, MethodParameterSnapshot
 
 __all__ = [
+    "AtomicDiscoveryAdmissionResult",
+    "DiscoveryAdmissionLease",
     "DiscoveryAdmissionPlan",
     "DiscoveryClaimSnapshot",
     "FutureAtomicWriteSet",
@@ -64,13 +68,13 @@ DEFAULT_FUTURE_ATOMIC_WRITE_SET = (
 
 
 class FutureAtomicWriteSet(ImmutableCogniEDABaseModel):
-    """Operations required for the future Package 4 cutover transaction."""
+    """Complete current cutover operations under the retained S2-A field name."""
 
     write_operations: tuple[str, ...] = Field(default=DEFAULT_FUTURE_ATOMIC_WRITE_SET)
 
 
 class DiscoveryAdmissionPlan(ImmutableCogniEDABaseModel):
-    """Detached, deep-frozen plan for future atomic Discovery admission cutover."""
+    """Detached, deep-frozen plan for atomic Discovery admission cutover."""
 
     contract_version: Literal["discovery-admission/v1"] = "discovery-admission/v1"
     authorization_decision_id: UUID
@@ -114,3 +118,29 @@ class DiscoveryAdmissionPlan(ImmutableCogniEDABaseModel):
     deterministic_discovery_id: UUID
     admission_fingerprint: NonEmptyStr
     future_atomic_write_set: FutureAtomicWriteSet = Field(default_factory=FutureAtomicWriteSet)
+
+
+class AtomicDiscoveryAdmissionResult(ImmutableCogniEDABaseModel):
+    """Result envelope for an atomic Discovery admission transaction."""
+
+    disposition: DiscoveryAdmissionReplayDisposition
+    discovery_id: UUID
+    evaluation_id: UUID
+    decision_id: UUID
+    hypothesis_id: UUID
+    task_id: UUID
+    session_frame_id: UUID
+    admission_fingerprint: NonEmptyStr
+    committed_at: datetime
+
+
+class DiscoveryAdmissionLease(ImmutableCogniEDABaseModel):
+    """Opaque, expiring authority for one claimed admission attempt."""
+
+    claim_id: UUID
+    evaluation_id: UUID
+    decision_id: UUID
+    owner: NonEmptyStr
+    fencing_epoch: int
+    claim_token: NonEmptyStr
+    claim_expiry: datetime

@@ -8,10 +8,7 @@ from uuid import UUID
 from sqlmodel import Session, desc, select
 
 from db.models import DiscoveryRecord, EvidenceRecord, HypothesisRecord
-from repositories.common import (
-    record_to_schema,
-    schema_to_record_payload,
-)
+from repositories.common import record_to_schema, schema_to_record_payload
 from schemas.artifacts import Discovery
 from schemas.enums import (
     DiscoveryEpistemicStatus,
@@ -31,6 +28,8 @@ _DISCOVERY_REVIEW_TERMINAL_STATES = {
     DiscoveryLifecycleState.INVALIDATED,
     DiscoveryLifecycleState.DEPRECATED,
 }
+
+__all__ = ["DISCOVERY_JSON_FIELDS", "DiscoveryRepository"]
 
 
 class DiscoveryRepository:
