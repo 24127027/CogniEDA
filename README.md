@@ -4,44 +4,21 @@ CogniEDA is a governed research-state system for analytical investigation. Its g
 
 ## Current Implementation Status
 
-Implemented or partially implemented today:
+Implemented or verified in the structural foundation (Gate 0 through Package S4):
 
-- Pydantic schemas under `src/schemas/` for the target FCO set: `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, and `SessionFrame`.
-- Typed provenance/workflow records for user decisions, `AnalysisFrame`, `ExecutionRun`, execution approval/outbox/inbox, and `PlannerOperation`.
-- SQLModel tables under `src/db/`, targeted SQLite migrations, and repositories under `src/repositories/`.
-- Append-only repository surfaces for `DataProfile`, `Evidence`, `Discovery`, and `SessionFrame`.
-- Baseline dataframe profiling under `src/data/`, producing immutable `DataProfile` records with dataset path and optional DVC identity.
-- A DVC adapter interface that makes executable DVC integration explicit but not yet implemented.
-- `SessionFrameBuilder` and `SessionContextBuilder` under `src/memory/session_frame.py`, including planning vs conclusion context projection.
-- Bounded SQL-backed Discovery retrieval with lifecycle/profile filtering, structural and lexical
-  relevance, deterministic ranking, and inclusion/exclusion reasons.
-- A configured natural-language request-understanding adapter plus public `/manage_task`, `/decompose`, and `/objective` typed proposal paths. Proposed operations remain uncommitted until the caller approves the exact persisted ordered batch.
-- A user-governed one-active-Objective lifecycle with explicit transitions, optimistic locking, immutable non-FCO revision provenance, and atomic successor SessionFrame updates.
-- A narrow approval-gated planner execution admission path that atomically persists `Hypothesis`, `ExecutionRun`, and execution outbox state.
-- A durable local worker protocol with lease/fencing transitions, an observation-only result inbox,
-  reconciliation helpers, and atomic AnalysisFrame/Evidence admission.
-- A durable-worker-to-domain adapter and per-runtime Data Explorer registry/dispatcher under
-  `src/agents/executor/`. Its only durable output is the canonical observation-only
-  `DataExplorerResult`. The Hypothesis Analyst has an isolated PydanticAI protected-evaluation
-  boundary and durable fenced proposal/failure control. Exact proposal governance, atomic
-  Discovery admission, active retrieval exclusion, and atomic validity propagation are
-  implemented for the local SQLite boundary.
-- A fail-closed composition root under `src/application/runtime.py` that loads
-  an explicit `COGNIEDA_RUNTIME_FACTORY=module:factory` deployment hook.
+- **First-Class Objects (FCOs)**: Pydantic schemas and SQLModel tables for `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypothesis`, `Evidence`, `Discovery`, and `SessionFrame`.
+- **Bounded Context Architecture**: Decomposed, single-owner bounded contexts across `application`, `schemas`, `repositories`, and `db.models`.
+- **Specialist Scientific Boundaries**: Observation-only Data Explorer, PydanticAI protected-evaluation Hypothesis Analyst, and user-governed proposal authorization.
+- **Atomic Admission Services**: `AtomicDiscoveryAdmissionService` (sole Discovery materialization transaction owner) and `AtomicValidityPropagationService` (sole validity propagation transaction owner).
+- **SQLite Persistence & Triggers**: Fenced execution lease tracking, immutable governance authority tables, and DDL triggers enforcing exact claim consumption.
+- **Canonical Documentation & Structural Exit**: Reconstructed canonical documentation (`docs/index.md`) and verified Package 7 readiness (`docs/architecture/structural-exit-status.md`).
 
-Not implemented yet:
+Not implemented yet (Scheduled for Package 7+):
 
+- Supported CLI binary, HTTP REST/gRPC service, or worker daemon process.
 - Executable DVC integration.
-- A concrete Data Explorer adapter, production worker process, and general end-to-end product loop.
-- Graph/vector retrieval and general production context assembly; protected Hypothesis evaluation
-  now uses a canonical repository-built bundle, while broader context support remains a pure
-  policy, local `SessionFrame` projection, and bounded SQL-backed Discovery retrieval.
-- Evidence-cache persistence and reuse.
-- A deployment-supplied authentication resolver, Analyst model provider, Data Explorer factory,
-  service API, worker process, or product CLI. CogniEDA exposes no supported CLI product surface at Gate 0.
-- A working checked-in MCP/tool configuration for model-backed agents; the current agent config
-  names MCP servers that are not defined in `config/mcp.toml`.
-
+- Production Data Explorer sandbox runner and production model adapters.
+- Graph Miner semantic vector index persistence.
 
 ## Target Architecture Summary
 
@@ -56,13 +33,13 @@ The architecture defines exactly these first-class objects:
 - `Discovery`
 - `SessionFrame`
 
-Other important concepts are deliberately not FCOs:
+Other concepts are deliberately not FCOs:
 
 - `Workspace` is a filesystem/runtime boundary.
-- `Question` is UI input that becomes a `Task`.
+- `Question` is UI input that decomposes into a `Task`.
 - `AnalysisFrame` is provenance/data-view state.
 - `GeneratedView` is runtime output, not `Discovery`.
-- `PlannerOperation` is pending mutation.
+- `PlannerOperation` is pending state mutation.
 - `ExecutionRun` is provenance.
 - `EvidenceCacheEntry` is cache.
 
@@ -89,6 +66,7 @@ Commands declared by the repo:
 ```powershell
 uv run pytest
 uv run ruff check .
+uv run python -m compileall -q src
 uv run mypy src
 ```
 
@@ -96,32 +74,29 @@ uv run mypy src
 
 ```text
 src/
-  agents/        LangGraph agent scaffolds and planner/executor contracts
-  application/   composition root, execution orchestration, and governed admissions
-  data/          Dataset loaders, DVC boundary, validation, and baseline profiling
-  db/            SQLModel tables, engine setup, and init helper
+  agents/        Planner graph and Data Explorer / Analyst specialist agents
+  application/   Composition root, execution transition, and governed admissions
+  data/          Dataset loaders and baseline profiling
+  db/            SQLModel table models facade (`db.models`) and SQLite migrations
   memory/        SessionFrame and context builders
-  repositories/  Thin persistence repositories
-  schemas/       Pydantic FCO and value-object schemas
-  tools/         Tool manager and MCP/toolset/skill loading
-tests/           Repository, profiling, DB, and session-frame tests
-docs/            Architecture, workflow, concept, development, and reference docs
-artifacts/       Git-tracked DataProfile mirror template surface
-data/            Raw, derived, and sample data directories
-config/          Agent, skill, and MCP configuration
+  repositories/  Persistence repositories across bounded contexts
+  schemas/       Pydantic value-object schemas across bounded contexts
+  tools/         Tool manager and configuration
+tests/           Repository, profiling, DB, application, and architecture tests
+docs/            Canonical architecture, workflow, decision, and exit status docs
 ```
 
 ## Documentation
 
 Start here:
 
-- [Documentation Index](docs/index.md)
+- [Canonical Documentation Index](docs/index.md)
+- [Project Purpose](docs/project-purpose.md)
+- [Master Development Roadmap](docs/roadmap.md)
 - [Architecture Overview](docs/architecture/overview.md)
-- [First-Class Objects](docs/architecture/first-class-objects.md)
-- [Implementation Gap Analysis](docs/architecture/implementation-gap-analysis.md)
-- [Agent Responsibility Boundaries](docs/architecture/agent-responsibility-boundaries.md)
-- [Canonical Investigation Workflow](docs/architecture/canonical-investigation-workflow.md)
+- [Research-State Model](docs/architecture/research-state-model.md)
 - [Scientific Specialist Contracts](docs/architecture/scientific-specialist-contracts.md)
-- [User Research Workflow](docs/workflows/user-research-workflow.md)
-- [Development Setup](docs/development/setup.md)
-- [Testing](docs/development/testing.md)
+- [Context Type Safety](docs/architecture/context-type-safety.md)
+- [Bounded Contexts](docs/architecture/bounded-contexts.md)
+- [Persistence and Transactions](docs/architecture/persistence-and-transactions.md)
+- [Structural Exit Status Report](docs/architecture/structural-exit-status.md)

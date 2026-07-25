@@ -1,71 +1,25 @@
-# Application Execution Bounded Context (`application.execution`)
+# Execution Application Package (`src/application/execution/`)
 
-## 1. Purpose
-`src/application/execution/` is the dedicated application bounded context for execution attempt admission, state transition protocol enforcement, executor dispatch, authoritative receipt intake, cancellation, and recovery.
+> Canonical Documentation: [Execution to Evidence Workflow](../../docs/workflows/execution-to-evidence.md) | [Persistence and Transactions](../../docs/architecture/persistence-and-transactions.md)
 
-## 2. Why the package exists
-This package was established in Package S1-B to decouple execution attempt lifecycle and protocol mechanics from scientific governance, Discovery admission, and generic orchestrator clutter.
+## Purpose
+Owns execution run dispatch, lease fencing, status transitions, and retry/recovery logic.
 
-## 3. Owned authority
-- Sole production writer for `ExecutionRunRecord`, `ExecutionOutboxRecord`, and `ExecutionInboxRecord` attempt transitions (`ExecutionAttemptTransitionService`).
-- Canonical execution-contract and result-receipt hashing (`identity.py`).
-- Reconstruction of durable `PreparedExecution` contracts and outbox dispatch (`dispatch_pending_attempts`).
-- Ingestion of authoritative executor result receipts into fenced inbox rows (`submit_execution_result`).
-- Attempt cancellation and technical retry authorization (`cancel_execution_attempt`, `authorize_retry`).
-- Reconciliation of pending inbox rows and expired dispatch leases (`reconcile_execution_attempts`).
+## Owned Responsibilities
+- `ExecutionTransitionService` (`transition_service.py`).
+- Managing `ExecutionRunRecord`, `ExecutionInboxRecord`, `ExecutionOutboxRecord`, and `ExecutionApprovalRecord`.
+- Fenced lease acquisition, worker heartbeat, and attempt version incrementing.
 
-## 4. Forbidden responsibilities
-- Direct modification or insertion of `AnalysisFrame`, `Evidence`, `Discovery`, or `SessionFrame` objects.
-- Pydantic scientific evaluation or Hypothesis Analyst execution.
-- Evaluation threshold checking or p-value interpretation.
-- Direct raw SQL mutators outside `ExecutionAttemptTransitionService`.
-- Discovery proposal/admission, Hypothesis Analyst evaluation, and validity propagation.
+## Forbidden Responsibilities
+- Admitting `AnalysisFrame` or `Evidence` records (owned by `application.evidence`).
+- Mutating scientific hypothesis claims.
 
-## 5. Canonical inputs and outputs
-- **Inputs**: Task UUID, Hypothesis UUID, method ID, parameter hash, `PreparedExecution` payload.
-- **Outputs**: Durable `ExecutionRunRecord`, `ExecutionOutboxRecord`, fenced `ExecutionInboxRecord`, or technical failure receipts (`DataExplorerFailureResult`).
+## Canonical Inputs / Outputs
+- Input: `PreparedExecution`, execution request token.
+- Output: `ExecutionTransitionResult`, `ExecutionRunRecord`.
 
-## 6. Happy path
-1. Planner/application builds execution-admission operations (`build_execution_admission_operations`).
-2. `ExecutionAttemptTransitionService.stage_admit_attempt` stages `ExecutionRun` (ADMITTED) and `ExecutionOutbox` (pending); the enclosing approved Planner commit persists the pair atomically.
-3. Worker claims outbox item -> status `DISPATCH_CLAIMED` / `dispatching`.
-4. Dispatcher reconstructs `PreparedExecution` and invokes `DataExplorerDispatcherProtocol`.
-5. Receiver canonicalizes `DataExplorerResult` digest into an `ExecutionInboxRecord` (pending).
-6. Evidence admission recovery coordinator claims inbox for finalization.
+## Transaction Authority
+Sole transaction owner for execution attempt records and inbox/outbox queues.
 
-## 7. Failure and recovery path
-- If Data Explorer execution or dispatch throws an exception, dispatcher constructs a `DataExplorerFailureResult` and submits a `failed` inbox row.
-- Expired leases are reclaimed by `reconcile_execution_attempts`.
-- Interrupted or unfinalized inbox items are retried via `finalize_attempt`; the coordinator delegates all AnalysisFrame/Evidence writes to `application.evidence`.
-- Terminal technical failure consumes the authoritative inbox without creating Evidence, Discovery, or a scientific outcome.
-
-## 8. Transaction owner
-`ExecutionAttemptTransitionService` is the sole writer for mutable execution protocol records. Its
-ordinary transition methods own their commits. During Evidence admission, its `stage_*` methods
-participate in the single transaction owned by
-`application.evidence.admission_service.execute_evidence_admission_plan`.
-
-## 9. Retry / replay / fencing behavior
-- Execution attempts use strict lease epochs and fencing tokens (`lease_epoch`, `dispatch_idempotency_key`, `finalization_fencing_epoch`).
-- Authoritative result receipts require active lease matching; duplicate receipts replay idempotently, while conflicting receipts quarantine to `RESULT_CONFLICT`.
-- Technical retries spawn direct successor `ExecutionRun` rows linked by `previous_attempt_id`.
-- Reconciliation reclaims only expired dispatch/finalization claims and delegates state changes to the transition service.
-
-## 10. Tests proving the boundary
+## Tests
 - `tests/application/execution/test_transition_service.py`
-- `tests/executor/test_registry_dispatcher.py`
-- `tests/repositories/test_execution_race_conditions.py`
-- `tests/repositories/test_execution_recovery_boundaries.py`
-- `tests/architecture/test_architecture_enforcement.py`
-
-## 11. Current limitations
-- Current persistence, locking, race, and recovery guarantees are verified only for SQLite.
-- Deployment must supply an explicit worker loop to invoke `dispatch_pending_attempts` periodically.
-- External executor side effects remain at-least-once.
-- There is no checked-in concrete Data Explorer, worker bootstrap, service API, or CLI.
-
-## 12. Deferred work
-- S3-A now provides canonical execution schema/repository/model ownership and a stable
-  `db.models` facade. Discovery/validity persistence normalization beyond the mechanically split
-  registration modules remains deferred to S3-B.
-- Production outbox worker infrastructure remains future work.

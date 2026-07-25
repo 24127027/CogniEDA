@@ -1,85 +1,79 @@
-# CogniEDA Documentation Index
+# CogniEDA Canonical Documentation Index
 
-This index defines document authority after the 2026-07-21 repository-wide alignment audit. Code
-is the source of truth for current implementation. Project-owner decisions and documents marked
-canonical below define target architecture. A current implementation note cannot override a
-canonical target contract.
+Welcome to the canonical architecture, workflow, decision, and structural exit documentation for **CogniEDA**.
 
-## Canonical Target Architecture
+> [!IMPORTANT]
+> **Core Thesis**: CogniEDA is a *validity-preserving research-state infrastructure* for governed analytical investigation.
+> It is **not** a generic chat assistant, notebook wrapper, vector retrieval database, or long-memory chatbot.
 
-- [First-Class Objects](architecture/first-class-objects.md) — canonical FCO/non-FCO ontology,
-  subordinate to `AGENTS.md` and explicit project-owner decisions.
-- [Agent Responsibility Boundaries](architecture/agent-responsibility-boundaries.md) — canonical
-  Planner, Hypothesis Analyst, Data Explorer, and Graph Miner contracts.
-- [Scientific Specialist Contracts](architecture/scientific-specialist-contracts.md) — canonical
-  subordinate contract specification separating Data Explorer observation from Hypothesis Analyst
-  scientific evaluation under Agent Responsibility Boundaries.
-- [Canonical Investigation Workflow](architecture/canonical-investigation-workflow.md) — canonical
-  investigation, context, approval, persistence, error, and retry sequence.
-- `AGENTS.md` — governing repository invariants and source precedence.
+---
 
-The canonical target files named by `AGENTS.md`, `first-class-object.txt` and
-`user-agent-workflow.txt`, are not present in this workspace. The documents above make
-the applicable project-owner decisions explicit; their absence must not be filled by guessing.
+## 1. Primary Entry Points
 
-## Current Implementation And Status
+* [Project Purpose](project-purpose.md): Research intent vs. analytical infrastructure, core thesis, and design principles.
+* [Roadmap](roadmap.md): Completed structural foundation (Gate 0 through S4) and future product vertical slices (Package 7).
+* [Structural Exit Status](architecture/structural-exit-status.md): Official Package S4 structural readiness assessment and Package 7 exit verdict.
 
-- [Implementation Gap Analysis](architecture/implementation-gap-analysis.md) — concise maintained
-  gap summary comparing current implementation against target design.
-- [Architecture Overview](architecture/overview.md) — current/target system overview.
-- Note: Verification audit reports are local-only artifacts under `.local/audits/` and remain uncommitted.
+---
 
-## Document Classification
+## 2. Architecture & Design
 
-| Document | Classification | Use |
-| --- | --- | --- |
-| `README.md` | Current but incomplete | Setup, verified repository commands, and brief status only |
-| `docs/architecture/first-class-objects.md` | Canonical | FCO/non-FCO ontology |
-| `docs/architecture/agent-responsibility-boundaries.md` | Canonical | Agent ownership and contracts |
-| `docs/architecture/scientific-specialist-contracts.md` | Canonical | Subordinate contract specification for Data Explorer & Hypothesis Analyst |
-| `docs/architecture/canonical-investigation-workflow.md` | Canonical | Target responsibility flow and current overlay |
-| `.local/audits/*.md` | Local audit snapshot | Local-only verification artifacts under `.local/audits/` |
-| `docs/architecture/overview.md` | Current but incomplete | Orientation, not detailed authority |
-| `docs/architecture/planner-workflow.md` | Partially superseded | Current LangGraph topology note; canonical workflow prevails |
-| `docs/architecture/executor-dispatch.md` | Implementation note rather than specification | Current durable generic adapter only; not target agent ownership |
-| `docs/architecture/memory-model.md` | Current but incomplete | Memory/context model detail |
-| `docs/architecture/storage-layers.md` | Current but incomplete | Storage inventory and target layering |
-| `docs/architecture/session-frame.md` | Current but incomplete | SessionFrame snapshot implementation and target gap |
-| `docs/architecture/provenance-and-cache.md` | Current but incomplete | Provenance/cache implementation note |
-| `docs/workflows/user-research-workflow.md` | Partially superseded | User-facing elaboration; canonical investigation workflow prevails |
-| `docs/workflows/task-to-discovery-lifecycle.md` | Partially superseded | Local lifecycle guard note; responsibility document prevails |
-| `docs/workflows/data-profiling-and-cleaning.md` | Current but incomplete | Profiler and missing cleaning workflow |
-| `docs/concepts/*.md` | Current but incomplete | Concept explanations subordinate to canonical architecture |
-| `docs/architecture.md`, `docs/persistence.md`, `docs/data_versioning.md`, `docs/artifacts.md` | Historical context only | Compatibility entry points; do not use as complete runtime truth |
-| `docs/idea.md` | Historical context only | Ideation, not normative ontology or implementation status |
-| `src/**/README.md`, `config/README.md`, `skills/README.md` | Implementation note rather than specification | Package-local behavior/examples only |
-| `docs/development/*.md` | Current guidance or historical snapshot | Developer workflow; verification snapshots may become stale |
-| `docs/reference/glossary.md` | Current but incomplete | Terminology; canonical contracts prevail on conflict |
+* [Architecture Overview](architecture/overview.md): System organization, core layers, and architectural invariants.
+* [Research-State Model](architecture/research-state-model.md): Canonical First-Class Objects (FCOs), non-FCO boundaries, lifecycles, and immutability rules.
+* [Scientific Specialist Authority](architecture/scientific-specialist-contracts.md): Data Explorer observation vs. Hypothesis Analyst proposal authority, responsibility matrix, and protected context boundaries.
+* [Context Type Safety](architecture/context-type-safety.md): Context isolation rules (Planning, Execution, Conclusion, Governance, Retrieval) and Assumption quarantine.
+* [Bounded Contexts](architecture/bounded-contexts.md): Package decomposition map (`research`, `execution`, `evidence`, `evaluation`, `governance`, `discovery`, `validity`, `runtime`, `retrieval`, `workflow`).
+* [Runtime Composition](architecture/runtime-composition.md): In-process `CogniEDARuntime` composition and execution mechanics.
+* [Persistence and Transactions](architecture/persistence-and-transactions.md): SQLModel storage facade, repository adapters, and sole transaction owners.
+* [Validity and Invalidation](architecture/validity-and-invalidation.md): Immutable validity events, source fingerprints, and atomic invalidation propagation.
+* [Retrieval and SessionFrame](architecture/retrieval-and-session-frame.md): Active `SessionFrame` context management, bounded retrieval, and active invalidation filtering.
+* [Migrations and Schema Evolution](architecture/migrations.md): SQLite DDL migration entry point, trigger guards, and legacy quarantine.
+* [Module Responsibilities](architecture/module-responsibilities.md): Complete module-level responsibility matrix across all bounded contexts.
+* [Implementation Gap Analysis](architecture/implementation-gap-analysis.md): Implementation audit and historical progress record.
 
-No file is deleted by this audit. Partially superseded documents remain useful implementation
-notes, but they are no longer co-equal target specifications.
+---
 
-## Architecture Topics
+## 3. Workflows
 
-- [Memory Model](architecture/memory-model.md)
-- [Storage Layers](architecture/storage-layers.md)
-- [Planner Workflow](architecture/planner-workflow.md)
-- [Executor Dispatch](architecture/executor-dispatch.md)
-- [SessionFrame](architecture/session-frame.md)
-- [Provenance And Cache](architecture/provenance-and-cache.md)
+* [Workspace and Data Profile Workflow](workflows/workspace-and-data-profile.md): Immutable dataset versioning and profiling.
+* [Task to Hypothesis Workflow](workflows/task-to-hypothesis.md): Planning, task formulation, and one-to-one hypothesis binding.
+* [Execution to Evidence Workflow](workflows/execution-to-evidence.md): Analytical task dispatch, Data Explorer execution, and evidence admission.
+* [Evidence to Discovery Workflow](workflows/evidence-to-discovery.md): Protected hypothesis evaluation, proposal synthesis, and atomic discovery materialization.
+* [Governance and Admission Workflow](workflows/governance-and-admission.md): User decision recording, proposal authorization, and fenced claim validation.
+* [Validity Propagation Workflow](workflows/validity-propagation.md): Source invalidation triggering, graph propagation, and retrieval exclusion.
+* [Session Resume and Retrieval Workflow](workflows/session-resume-and-retrieval.md): Session frame initialization, active context building, and state reconstruction.
 
-## Workflows And Concepts
+---
 
-- [User Research Workflow](workflows/user-research-workflow.md)
-- [Data Profiling And Cleaning](workflows/data-profiling-and-cleaning.md)
-- [Task To Discovery Lifecycle](workflows/task-to-discovery-lifecycle.md)
-- [Object Lifecycle](concepts/object-lifecycle.md)
-- [Context Type Safety](concepts/context-type-safety.md)
-- [Validity Basis](concepts/validity-envelope.md)
+## 4. Architectural Decision Records (ADRs)
 
-## Development And Reference
+* [ADR-001: First-Class Research State](decisions/ADR-001-first-class-research-state.md): Selection of explicit typed research-state objects over generic chat/vector memory.
+* [ADR-002: Assumption Quarantine](decisions/ADR-002-assumption-quarantine.md): Mandatory exclusion of Assumptions from Conclusion/Discovery synthesis contexts.
+* [ADR-003: Specialist Scientific Authority](decisions/ADR-003-specialist-scientific-authority.md): Separation of Data Explorer observation from Hypothesis Analyst scientific proposals.
+* [ADR-004: Atomic Discovery Admission](decisions/ADR-004-atomic-discovery-admission.md): `AtomicDiscoveryAdmissionService` as sole Discovery materialization transaction owner.
+* [ADR-005: Atomic Validity Propagation](decisions/ADR-005-atomic-validity-propagation.md): `AtomicValidityPropagationService` as sole validity propagation transaction owner.
+* [ADR-006: SQLite Supported Boundary](decisions/ADR-006-sqlite-supported-boundary.md): SQLite with immediate transaction locking as the sole supported persistence runtime.
+* [ADR-007: No Supported CLI Before Product Bootstrap](decisions/ADR-007-no-supported-cli-before-product-bootstrap.md): Explicit deferral of CLI, HTTP server, and worker daemon entry points before Package 7 product bootstrap.
 
-- [Setup](development/setup.md)
-- [Testing](development/testing.md)
-- [Contributing](development/contributing.md)
-- [Glossary](reference/glossary.md)
+---
+
+## 5. Development Guides
+
+* [Development Setup](development/setup.md): Environment initialization and setup.
+* [Testing Guide](development/testing.md): Automated test execution and guidelines.
+* [Contributing Guidelines](development/contributing.md): Contribution guidelines and conventions.
+* [Code Guidelines](development/guideline.md): Coding rules and style expectations.
+* [Pull Request Template](development/pull_request_template.md): PR submission template.
+
+---
+
+## 6. Current Implementation vs. Target Design Status
+
+All canonical documentation uses standard status markers:
+* `[Implemented]`: Fully realized in active source code and covered by automated tests.
+* `[Verified on SQLite]`: Persistence and transaction semantics verified against SQLite.
+* `[Partially Implemented]`: Scaffold or incomplete implementation exists in source.
+* `[Design Target]`: Target architectural design for future packages.
+* `[Deferred]`: Intentionally postponed out of current scope.
+* `[Known Deviation]`: Identified discrepancy between target architecture and current code.
+* `[Unsupported]`: Features or entry points explicitly disallowed in current release.

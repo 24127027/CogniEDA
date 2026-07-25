@@ -1,33 +1,25 @@
-# Remaining Application Orchestrator (`application.orchestrator`)
+# Orchestrator Application Package (`src/application/orchestrator/`)
 
-## 1. Purpose and current implementation
+> Canonical Documentation: [Bounded Contexts](../../docs/architecture/bounded-contexts.md) | [Task to Hypothesis Workflow](../../docs/workflows/task-to-hypothesis.md)
 
-Following Package S2-B, `application.orchestrator` retains only genuine remaining cross-context Planner mutation coordination (`planner_commit.py`).
+## Purpose
+Owns planner commit transaction coordination and approval-gated task/hypothesis persistence.
 
-Discovery admission has been moved to `application.discovery`.
-Validity propagation has been moved to `application.validity`.
+## Owned Responsibilities
+- `commit_planner_operations` service.
+- Atomically persisting approved `PlannerOperation` batches into `tasks`, `hypotheses`, and `objectives`.
 
-### Remaining modules
+## Forbidden Responsibilities
+- Direct execution run management (owned by `application.execution`).
+- Direct evidence admission (owned by `application.evidence`).
+- Direct discovery admission (owned by `application.discovery`).
 
-| Module | Responsibility |
-| --- | --- |
-| `planner_commit.py` | Apply approved operations; atomic Planner mutation coordination. |
+## Canonical Inputs / Outputs
+- Input: Approved `PlannerOperation` list, session ID.
+- Output: `CommitPlannerOperationsResult`.
 
-## 2. Forbidden responsibilities
+## Transaction Authority
+Transaction owner for committing staged planner operations.
 
-- Execution attempt admission, dispatch, receipt, cancellation, retry, or recovery (owned by `application.execution`).
-- AnalysisFrame or Evidence creation (owned by `application.evidence`).
-- Protected evaluation bundle construction or evaluator runner (owned by `application.evaluation`).
-- Governance authority issuance or decision recording (owned by `application.governance`).
-- Discovery admission (owned by `application.discovery`).
-- Validity propagation (owned by `application.validity`).
-
-## 3. Moved in S2-B
-
-- `atomic_discovery_admission.py` & `discovery_admission_coordinator.py` -> `application.discovery`
-- `validity_propagation_service.py` -> `application.validity`
-- `review_propagation.py` -> removed (subsumed by `AtomicValidityPropagationService`)
-
-## 4. Tests
-
-- `tests/application/orchestrator/test_package3_boundary.py`
+## Tests
+- `tests/agents/planner/test_planner_operations.py`

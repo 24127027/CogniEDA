@@ -1,63 +1,25 @@
-# Application Evidence Bounded Context (`application.evidence`)
+# Evidence Application Package (`src/application/evidence/`)
 
-## 1. Purpose
-`src/application/evidence/` is the dedicated application bounded context for Evidence admission plan validation and the atomic `AnalysisFrame` + `Evidence` write transaction.
+> Canonical Documentation: [Execution to Evidence Workflow](../../docs/workflows/execution-to-evidence.md) | [Research State Model](../../docs/architecture/research-state-model.md)
 
-## 2. Why the package exists
-This package was established in Package S1-B to isolate pure deterministic Evidence plan validation (`admission_plan.py`) from the atomic database write transaction (`admission_service.py`) and ensure Evidence creation cannot be bypassed.
+## Purpose
+Owns formal admission of observed empirical results into immutable `AnalysisFrame` and `Evidence` records.
 
-## 3. Owned authority
-- Deterministic derivation of versioned `AnalysisFrame` and `Evidence` UUIDs (`generate_deterministic_analysis_frame_id`, `generate_deterministic_evidence_id`).
-- Content fingerprinting for `AnalysisFrame` and `Evidence` (`compute_analysis_frame_fingerprint`, `compute_evidence_fingerprint`).
-- Replay classification (`classify_evidence_admission_replay`).
-- Validation of authoritative inbox observations against approved contracts (`validate_and_build_evidence_admission_plan`).
-- Sole production authority for atomic `AnalysisFrameRecord` + `EvidenceRecord` insertion and attempt transition (`execute_evidence_admission_plan`).
+## Owned Responsibilities
+- `EvidenceAdmissionService` (`admission_service.py`).
+- Creating immutable `AnalysisFrameRecord` and `EvidenceRecord` from Data Explorer observations.
+- Updating target `TaskRecord` to `COMPLETED`.
 
-## 4. Forbidden responsibilities
-- Direct creation of `Discovery` or `DiscoveryProposal` objects.
-- Hypothesis evaluation or claim synthesis (owned by Hypothesis Analyst).
-- Direct modification of execution attempt protocol state outside `execute_evidence_admission_plan`.
-- Dispatch, receipt acceptance, cancellation, retry authorization, or recovery coordination.
+## Forbidden Responsibilities
+- Modifying `ExecutionRunRecord` leases (owned by `application.execution`).
+- Evaluating scientific hypotheses (owned by Hypothesis Analyst).
 
-## 5. Canonical inputs and outputs
-- **Inputs**: Prepared execution contract (`PreparedExecution`), canonical observation envelope (`ExecutionReceiptEnvelope`), `ExecutionRunRecord`, `ExecutionInboxRecord`, `DataProfileRecord`, `HypothesisRecord`, `TaskRecord`.
-- **Outputs**: Pure `EvidenceAdmissionPlan`, persisted `AnalysisFrameRecord`, persisted `EvidenceRecord`, Hypothesis status transition (`READY_FOR_EVALUATION`).
+## Canonical Inputs / Outputs
+- Input: `DataExplorerResult` / `EvidenceObservation`, run ID, task ID.
+- Output: `EvidenceAdmissionResult` (created `AnalysisFrame`, `Evidence`).
 
-## 6. Happy path
-1. Finalization recovery coordinator reads pending `ExecutionInboxRecord`.
-2. Coordinator builds and validates `EvidenceAdmissionPlan` via `validate_and_build_evidence_admission_plan`.
-3. Coordinator invokes `execute_evidence_admission_plan(session, plan)`.
-4. Transaction stages `AnalysisFrame`, `Evidence`, updates `ExecutionRun` to `EVIDENCE_ADMITTED`, updates `Hypothesis` to `READY_FOR_EVALUATION`, and marks inbox `processed`.
-5. Session commits atomically.
+## Transaction Authority
+Sole transaction owner for `AnalysisFrameRecord` and `EvidenceRecord` creation.
 
-## 7. Failure and recovery path
-- An authoritative inbox/payload identity conflict raises `EvidenceAdmissionConflictError`; the recovery coordinator delegates quarantine to the execution transition owner.
-- Other validation failures are classified as technical execution failure and create no AnalysisFrame, Evidence, Discovery, or scientific outcome.
-- A partial write or lost fence rolls back the entire admission transaction.
-- Concurrent execution of identical plan returns `True` via idempotent replay check (`_committed_admission_matches`).
-
-## 8. Transaction owner
-`execute_evidence_admission_plan` in `admission_service.py` is the sole atomic transaction owner for AnalysisFrame and Evidence creation.
-It calls only staged execution/Hypothesis/inbox transitions before issuing the single commit.
-
-## 9. Retry / replay / fencing behavior
-- Deterministic UUIDs prevent duplicate artifact creation for identical execution attempts.
-- Replay classification evaluates exact fingerprint equivalence (`NEW`, `IDEMPOTENT`, `CONFLICT`).
-- The plan binds the authoritative inbox digest, dispatch key, lease epoch, finalizer owner, fencing epoch, and expected attempt version.
-- A changed contract or artifact fingerprint is a conflict, not an idempotent retry.
-
-## 10. Tests proving the boundary
-- `tests/application/evidence/test_evidence_admission.py`
-- `tests/repositories/test_execution_scientific_commit_races.py`
-- `tests/architecture/test_architecture_enforcement.py`
-
-## 11. Current limitations
-- Current atomicity, writer locking, replay, and race behavior is verified only for SQLite.
-- Currently invoked synchronously by reconciliation or recovery helpers.
-- There is no event publisher, service API, worker bootstrap, or CLI.
-
-## 12. Deferred work
-- S3-A now provides canonical Evidence schema/repository/model ownership and a stable
-  `db.models` facade. Discovery/validity persistence normalization beyond the mechanically split
-  registration modules remains deferred to S3-B.
-- Evidence-admission event publishing remains future work.
+## Tests
+- `tests/application/evidence/test_admission_service.py`

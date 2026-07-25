@@ -1,71 +1,25 @@
-# Governance Application Context (`application.governance`)
+# Governance Application Package (`src/application/governance/`)
 
-## 1. Purpose
-`application.governance` owns authenticated decision authority issuance, proposal authority
-extraction, durable proposal decision recording, and deterministic authority/decision
-fingerprint calculations.
+> Canonical Documentation: [Governance and Admission Workflow](../../docs/workflows/governance-and-admission.md) | [Scientific Specialist Contracts](../../docs/architecture/scientific-specialist-contracts.md)
 
-## 2. Why the package exists
-Package S2-A decomposed governance decision authority out of `application.orchestrator` into an explicit bounded context. Governance binds an exact `DiscoveryProposal` to independently issued, durable user decision authority before Discovery admission.
+## Purpose
+Owns user authority token generation and immutable proposal decision recording.
 
-## 3. Owned authority
-- Resolving authenticated principal context (`AuthenticatedPrincipalResolver`) and binding
-  user-governed decision recording to the exact principal that owns the authority.
-- Issuing bounded, fixed-purpose, expiring governance authority grants (`GovernanceAuthorityIssuer`).
-- Verifying proposal authority, principal bindings, proposal digests, and authority fingerprints (`decision_service.py`).
-- Persisting durable `ProposalDecisionRecord` entries (`decision_service.py`).
-- Calculating pure deterministic authority and decision fingerprints (`fingerprints.py`).
+## Owned Responsibilities
+- `ProposalDecisionService` (`decision_service.py`).
+- Generating `GovernanceAuthorityRecord` tokens.
+- Persisting `ProposalDecisionRecord` entries (user ACCEPT / REJECT decisions).
 
-## 4. Forbidden responsibilities
-- Evaluating Hypotheses or calling Hypothesis Analyst.
-- Inventing scientific claims or modifying proposal text.
-- Admitting `Discovery` records into persistence (owned by `AtomicDiscoveryAdmissionService`).
-- Marking `EvaluationControlRecord` as `COMMITTED` (owned by `AtomicDiscoveryAdmissionService`).
-- Transitioning `Hypothesis` or `Task` lifecycle state.
-- Appending `SessionFrame` records.
-- Creating default anonymous principals or fake production authority.
-- Constructing `DiscoveryAdmissionPlan` objects or admission identities (owned by
-  `application.discovery.admission_plan`).
+## Forbidden Responsibilities
+- Authoring scientific proposals (owned by Analyst).
+- Materializing `Discovery` objects (owned by `application.discovery`).
 
-## 5. Canonical input and output
-- **Input**: externally resolved authenticated principal identity, `evaluation_id`, `authority_id`,
-  and explicit `GovernanceDecisionOutcome` (for example, `APPROVED`).
-- **Output**: A persisted `ProposalDecisionRecord` bound to the exact proposal digest, evaluation key, actor, workspace, session, and decision fingerprint.
+## Canonical Inputs / Outputs
+- Input: `DiscoveryProposal`, user action token, actor identity.
+- Output: `ProposalDecisionRecord`, `GovernanceAuthorityRecord`.
 
-## 6. Happy path
-```text
-Authenticated principal context
-  -> issue_user_authority (GovernanceAuthorityIssuer) -> GovernanceAuthorityRecord
-  -> record_governance_decision (DiscoveryAdmissionGovernanceService)
-  -> verify_authorization + verify proposal/bundle digest
-  -> persist ProposalDecisionRecord (unconsumed)
-```
+## Transaction Authority
+Sole transaction owner for `GovernanceAuthorityRecord` and `ProposalDecisionRecord` creation.
 
-## 7. Failure, retry, reclaim, and replay
-- **Expired/Invalid authority**: Fails closed with `ProposalAuthorizationError`.
-- **Missing expiry or mismatch (principal/session/proposal/evaluation)**: Fails closed with
-  `ProposalAuthorizationError`.
-- **Same-decision replay**: Re-submitting the exact same decision with the same authority is idempotent.
-- **Conflicting decision**: Submitting a different decision for the same proposal raises `ProposalDecisionConflictError`.
-
-## 8. Transaction owner
-`DiscoveryAdmissionGovernanceService` is the sole writer for `ProposalDecisionRecord` entries during decision submission.
-
-## 9. Exact decision binding
-Each decision record binds `evaluation_id`, `evaluation_key`, `hypothesis_id`, `task_id`,
-`proposal_digest`, `bundle_digest`, `evidence_set_digest`, `actor`, `authority_id`, `workspace_id`,
-and `session_id`, protected by an immutable `decision_fingerprint`. The referenced authority core,
-including issuer and expiry, is immutable in the supported SQLite schema.
-
-## 10. Tests proving the boundary
-- `tests/application/governance/test_proposal_authorization.py`
-- `tests/repositories/governance/test_proposal_decision_races.py`
-
-## 11. Current limitations
-- Production deployment must supply an explicit `AuthenticatedPrincipalResolver`.
-- No supported CLI, service API, or background daemon loop is checked in.
-- Persistence guarantees are verified for SQLite boundaries.
-
-## 12. Deferred S3 work
-- Atomic Discovery admission is owned by `application.discovery`.
-- Full repository normalization is deferred to S3.
+## Tests
+- `tests/application/governance/test_decision_service.py`
