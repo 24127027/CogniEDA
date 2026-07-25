@@ -1,5 +1,9 @@
 """Canonical execution schemas for transport, observation, and Data Explorer boundaries."""
 
+from schemas.enums import (
+    ExecutionApprovalStatus,
+    ExecutionRunStatus,
+)
 from schemas.execution.contracts import (
     ExecutionReceiptEnvelope,
     ExecutionSpecification,
@@ -14,10 +18,6 @@ from schemas.execution.data_explorer import (
     ExecutionDetails,
     TechnicalDiagnostic,
     TechnicalRetryDisposition,
-)
-from schemas.execution.lifecycle import (
-    ExecutionApprovalStatus,
-    ExecutionRunStatus,
 )
 from schemas.execution.observations import (
     AnalysisFrameObservation,

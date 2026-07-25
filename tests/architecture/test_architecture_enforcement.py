@@ -816,3 +816,109 @@ def test_package_s2b_dependency_directions_are_enforced() -> None:
             violations.append(f"application.validity.propagation_service duplicates {duplicate}")
 
     assert not violations, f"S2-B dependency-direction violations: {violations}"
+
+
+def test_package_s3a_table_models_have_one_definition_per_table() -> None:
+    """The db.models package must not duplicate SQLModel table registrations."""
+
+    table_owners: dict[str, list[str]] = {}
+    for path in Path("src/db/models").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if not (
+                isinstance(node, ast.ClassDef)
+                and any(
+                    keyword.arg == "table"
+                    and isinstance(keyword.value, ast.Constant)
+                    and keyword.value.value is True
+                    for keyword in node.keywords
+                )
+            ):
+                continue
+            table_name = next(
+                (
+                    statement.value.value
+                    for statement in node.body
+                    if isinstance(statement, ast.Assign)
+                    and any(
+                        isinstance(target, ast.Name) and target.id == "__tablename__"
+                        for target in statement.targets
+                    )
+                    and isinstance(statement.value, ast.Constant)
+                    and isinstance(statement.value.value, str)
+                ),
+                None,
+            )
+            assert table_name is not None, f"{path.as_posix()}:{node.name} lacks __tablename__"
+            table_owners.setdefault(table_name, []).append(
+                f"{path.as_posix()}:{node.name}"
+            )
+
+    assert len(table_owners) == 21
+    assert not {
+        table_name: owners
+        for table_name, owners in table_owners.items()
+        if len(owners) != 1
+    }
+
+    helper_owners: dict[str, list[str]] = {
+        "TimestampedRecord": [],
+        "utc_now": [],
+    }
+    for path in Path("src/db/models").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef) and node.name == "TimestampedRecord":
+                helper_owners[node.name].append(path.as_posix())
+            elif (
+                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and node.name == "utc_now"
+            ):
+                helper_owners[node.name].append(path.as_posix())
+    assert helper_owners == {
+        "TimestampedRecord": ["src/db/models/common.py"],
+        "utc_now": ["src/db/models/common.py"],
+    }
+
+
+def test_package_s3a_analysis_frame_writer_is_transaction_private() -> None:
+    """Only Evidence admission may call the AnalysisFrame staging hook in source."""
+
+    repository_path = Path("src/repositories/evidence/analysis_frame.py")
+    repository_tree = ast.parse(repository_path.read_text(encoding="utf-8"))
+    repository_class = next(
+        node
+        for node in repository_tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "AnalysisFrameRepository"
+    )
+    public_writers = {
+        node.name
+        for node in repository_class.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name in {"create", "save", "update", "upsert", "stage_create", "commit"}
+    }
+    assert not public_writers
+
+    staging_method = "_stage_create_from_evidence_admission"
+    callers: list[str] = []
+    for path in Path("src").rglob("*.py"):
+        if path == repository_path:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        if any(
+            isinstance(node, ast.Attribute) and node.attr == staging_method
+            for node in ast.walk(tree)
+        ):
+            callers.append(path.as_posix())
+    assert callers == ["src/application/evidence/admission_service.py"]
+
+
+def test_package_s3a_does_not_duplicate_bounded_context_enums() -> None:
+    """Persisted enum classes stay canonically defined in schemas.enums."""
+
+    removed_duplicate_modules = {
+        Path("src/schemas/research/lifecycle.py"),
+        Path("src/schemas/execution/lifecycle.py"),
+        Path("src/schemas/evidence/lifecycle.py"),
+    }
+    assert not [path.as_posix() for path in removed_duplicate_modules if path.exists()]

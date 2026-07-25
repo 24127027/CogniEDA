@@ -1,4 +1,4 @@
-"""Persistence access for typed user-decision provenance records."""
+"""Governance persistence access for typed user-decision provenance records."""
 
 from __future__ import annotations
 

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from schemas.enums import EvidenceLifecycleState, EvidenceType
 from schemas.evidence.evidence import Evidence
-from schemas.evidence.lifecycle import EvidenceLifecycleState, EvidenceType
 from schemas.evidence.provenance import (
     AnalysisFrame,
     EvidenceProvenance,

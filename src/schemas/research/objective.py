@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 from pydantic import Field
 
 from schemas.common import CogniEDABaseModel, NonEmptyStr, utc_now
-from schemas.research.lifecycle import AnalysisIntent, ObjectiveStatus
+from schemas.enums import AnalysisIntent, ObjectiveStatus
 
 
 class Objective(CogniEDABaseModel):

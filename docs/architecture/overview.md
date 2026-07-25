@@ -10,7 +10,9 @@ The canonical FCO set is `Objective`, `DataProfile`, `Assumption`, `Task`, `Hypo
 
 The current implementation is a Python backend prototype managed with `uv`. It contains:
 
-- target FCO schemas in `src/schemas/artifacts.py`
+- canonical research, execution, and Evidence schemas under `src/schemas/research/`,
+  `src/schemas/execution/`, and `src/schemas/evidence/`, with Discovery and governance schemas in
+  their existing bounded packages
 - value objects and validity/provenance summaries in `src/schemas/common.py`
 - SQLModel tables and SQLite setup in `src/db/`
 - thin repositories in `src/repositories/`
@@ -31,8 +33,8 @@ The current implementation is a Python backend prototype managed with `uv`. It c
 | Area | Status | Current implementation note |
 | --- | --- | --- |
 | Current schema layer | Implemented | Pydantic models exist for the target FCO set plus typed `UserDecision` provenance. |
-| SQLModel persistence | Implemented locally | Tables exist under `src/db/models.py`; `init_db()` creates tables for the target local schema. |
-| Repository layer | Implemented locally | Thin repositories exist for FCOs and `UserDecision` provenance, with local Task-to-Hypothesis and Hypothesis-to-Discovery admission guards. |
+| SQLModel persistence | Implemented locally | Bounded table modules exist under `src/db/models/`; the explicit `db.models` facade registers all 21 tables and `init_db()` creates the target local schema. |
+| Repository layer | Implemented locally | Bounded research, execution, Evidence, governance, Discovery, evaluation, and validity repositories exist, with local Task-to-Hypothesis and Hypothesis-to-Discovery admission guards. |
 | Data profiling | Partially implemented | Baseline dataframe profiling exists and produces immutable DataProfiles with optional DVC identity. Executable DVC integration is missing. |
 | Planner workflow | Partially implemented | Explicit commands and execution approval/admission work; answer/suggest/plan and general non-execution approval remain incomplete. Durable PlannerOperation persistence exists. |
 | Executor workflow | Partially implemented | A per-runtime registry/dispatcher accepts only an explicitly supplied Data Explorer factory. The protected Hypothesis Analyst evaluation path is implemented; concrete Data Explorer and Graph Miner implementations are absent. |

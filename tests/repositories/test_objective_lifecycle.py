@@ -16,6 +16,7 @@ from application.orchestrator.planner_commit import commit_planner_operations
 from db.init_db import init_db
 from db.session import create_db_engine, get_session
 from memory.retrieval_policy import is_allowed_in_context
+from repositories.governance import UserDecisionRepository
 from repositories.planner_operation_repository import PlannerOperationRepository
 from repositories.research import (
     ObjectiveMutationContext,
@@ -24,7 +25,6 @@ from repositories.research import (
     ObjectiveUpdate,
     SessionFrameRepository,
     TaskRepository,
-    UserDecisionRepository,
 )
 from schemas.enums import (
     ContextMode,

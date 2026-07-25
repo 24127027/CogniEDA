@@ -296,15 +296,18 @@ def persist_package2_lineage(
             status=HypothesisStatus.READY_FOR_EVALUATION,
         )
     )
-    frame = AnalysisFrameRepository(session).create(
-        AnalysisFrame(
-            data_profile_id=profile.profile_id,
-            frame_hash="frame:protected-v1",
-            frame_ref="analysis-frame:protected-v1",
-            column_refs=["x", "y"],
-            row_filter_description="complete cases",
-        )
+    frame_repository = AnalysisFrameRepository(session)
+    frame_input = AnalysisFrame(
+        data_profile_id=profile.profile_id,
+        frame_hash="frame:protected-v1",
+        frame_ref="analysis-frame:protected-v1",
+        column_refs=["x", "y"],
+        row_filter_description="complete cases",
     )
+    frame_repository._stage_create_from_evidence_admission(frame_input)
+    session.commit()
+    frame = frame_repository.get_by_id(frame_input.analysis_frame_id)
+    assert frame is not None
 
     run_id = uuid4()
     parameter_hash = method_parameter_hash(parameters)

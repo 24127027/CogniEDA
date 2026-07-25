@@ -15,7 +15,7 @@ from schemas.common import (
     NonEmptyStr,
     utc_now,
 )
-from schemas.research.lifecycle import (
+from schemas.enums import (
     AnalysisIntent,
     TaskDependencyType,
     TaskKind,

@@ -207,6 +207,18 @@ def build_evidence(hypothesis_id: UUID, profile_id: UUID, **overrides: object) -
     return Evidence(**payload)
 
 
+def seed_analysis_frame_for_test(db_session, analysis_frame: AnalysisFrame) -> AnalysisFrame:
+    """Seed provenance through the transaction-private repository hook."""
+
+    repository = AnalysisFrameRepository(db_session)
+    record = repository._stage_create_from_evidence_admission(analysis_frame)
+    db_session.commit()
+    db_session.refresh(record)
+    persisted = repository.get_by_id(analysis_frame.analysis_frame_id)
+    assert persisted is not None
+    return persisted
+
+
 def build_discovery(
     hypothesis_id: UUID,
     profile_id: UUID,
@@ -822,7 +834,8 @@ def test_analysis_frame_and_execution_run_are_minimal_provenance_refs(db_session
     hypothesis = HypothesisRepository(db_session).create(
         build_hypothesis(task.task_id, profile.profile_id)
     )
-    analysis_frame = AnalysisFrameRepository(db_session).create(
+    analysis_frame = seed_analysis_frame_for_test(
+        db_session,
         AnalysisFrame(
             data_profile_id=profile.profile_id,
             frame_hash="frame-hash:customers:v1",
@@ -883,7 +896,8 @@ def test_evidence_creation_succeeds_with_strict_provenance_validation(db_session
     hypothesis = HypothesisRepository(db_session).create(
         build_hypothesis(task.task_id, profile.profile_id)
     )
-    analysis_frame = AnalysisFrameRepository(db_session).create(
+    analysis_frame = seed_analysis_frame_for_test(
+        db_session,
         AnalysisFrame(
             data_profile_id=profile.profile_id,
             frame_hash="frame-hash:customers:v1",
@@ -966,7 +980,8 @@ def test_evidence_creation_fails_for_missing_execution_run_in_strict_mode(
     hypothesis = HypothesisRepository(db_session).create(
         build_hypothesis(task.task_id, profile.profile_id)
     )
-    analysis_frame = AnalysisFrameRepository(db_session).create(
+    analysis_frame = seed_analysis_frame_for_test(
+        db_session,
         AnalysisFrame(
             data_profile_id=profile.profile_id,
             frame_hash="frame-hash:customers:v1",
@@ -1006,7 +1021,8 @@ def test_evidence_creation_fails_for_analysis_frame_profile_mismatch(
     hypothesis = HypothesisRepository(db_session).create(
         build_hypothesis(task.task_id, profile.profile_id)
     )
-    analysis_frame = AnalysisFrameRepository(db_session).create(
+    analysis_frame = seed_analysis_frame_for_test(
+        db_session,
         AnalysisFrame(
             data_profile_id=other_profile.profile_id,
             frame_hash="frame-hash:customers:v2",
@@ -1052,7 +1068,8 @@ def test_evidence_creation_fails_for_execution_run_hypothesis_mismatch(
     second_hypothesis = HypothesisRepository(db_session).create(
         build_hypothesis(second_task.task_id, profile.profile_id)
     )
-    analysis_frame = AnalysisFrameRepository(db_session).create(
+    analysis_frame = seed_analysis_frame_for_test(
+        db_session,
         AnalysisFrame(
             data_profile_id=profile.profile_id,
             frame_hash="frame-hash:customers:v1",

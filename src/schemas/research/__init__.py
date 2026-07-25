@@ -2,20 +2,7 @@
 
 from __future__ import annotations
 
-from schemas.research.assumption import Assumption
-from schemas.research.data_profile import (
-    BaselineSummary,
-    CategoricalColumnSummary,
-    ColumnSchemaSummary,
-    DataProfile,
-    LineageStep,
-    NumericColumnSummary,
-    QualityFlag,
-    SchemaSummary,
-    TopValueSummary,
-)
-from schemas.research.hypothesis import Hypothesis
-from schemas.research.lifecycle import (
+from schemas.enums import (
     AnalysisIntent,
     AssumptionSource,
     AssumptionStatus,
@@ -33,6 +20,19 @@ from schemas.research.lifecycle import (
     TaskKind,
     TaskLifecycleState,
 )
+from schemas.research.assumption import Assumption
+from schemas.research.data_profile import (
+    BaselineSummary,
+    CategoricalColumnSummary,
+    ColumnSchemaSummary,
+    DataProfile,
+    LineageStep,
+    NumericColumnSummary,
+    QualityFlag,
+    SchemaSummary,
+    TopValueSummary,
+)
+from schemas.research.hypothesis import Hypothesis
 from schemas.research.objective import Objective, ObjectiveRevision
 from schemas.research.session_frame import SessionFrame
 from schemas.research.task import AnalyticalSpecification, Task

@@ -2,27 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import JSON, CheckConstraint, Column, Index, Text, UniqueConstraint, text
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
 
+from db.models.common import TimestampedRecord
 from schemas.enums import EvaluationControlState
-
-
-def utc_now() -> datetime:
-    """Return a timezone-aware UTC timestamp for persisted rows."""
-
-    return datetime.now(UTC)
-
-
-class TimestampedRecord(SQLModel):
-    """Shared timestamp fields for persisted rows with lifecycle transitions."""
-
-    created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
-    updated_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
 
 
 class EvaluationControlRecord(TimestampedRecord, table=True):

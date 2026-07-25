@@ -57,7 +57,7 @@ It calls only staged execution/Hypothesis/inbox transitions before issuing the s
 - There is no event publisher, service API, worker bootstrap, or CLI.
 
 ## 12. Deferred work
-- Broader S3 repository and global-schema normalization remains outside this package. Evaluation,
-  governance, Discovery admission, and validity propagation already have canonical application
-  bounded contexts.
+- S3-A now provides canonical Evidence schema/repository/model ownership and a stable
+  `db.models` facade. Discovery/validity persistence normalization beyond the mechanically split
+  registration modules remains deferred to S3-B.
 - Evidence-admission event publishing remains future work.

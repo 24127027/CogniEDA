@@ -2,20 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import JSON, Column, Text
 from sqlmodel import Field, SQLModel
 
+from db.models.common import utc_now
 from schemas.enums import EvidenceLifecycleState, EvidenceType, ValiditySourceState
-
-
-def utc_now() -> datetime:
-    """Return a timezone-aware UTC timestamp for persisted rows."""
-
-    return datetime.now(UTC)
 
 
 class AnalysisFrameRecord(SQLModel, table=True):

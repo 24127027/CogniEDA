@@ -20,7 +20,7 @@ from schemas.common import (
     TopValueSummary,
     utc_now,
 )
-from schemas.research.lifecycle import (
+from schemas.enums import (
     DataProfileLifecycleState,
     DataProfileMethod,
     DatasetSourceType,

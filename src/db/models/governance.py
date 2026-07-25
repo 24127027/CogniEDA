@@ -2,26 +2,51 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, Column, Text, UniqueConstraint
-from sqlmodel import Field, SQLModel
+from sqlalchemy import JSON, CheckConstraint, Column, Text, UniqueConstraint
+from sqlmodel import Field
 
-from schemas.enums import AuthorizationClass, GovernanceDecisionOutcome
+from db.models.common import TimestampedRecord, utc_now
+from schemas.enums import (
+    AuthorizationClass,
+    GovernanceDecisionOutcome,
+    UserDecisionStatus,
+    UserDecisionType,
+)
 
 
-def utc_now() -> datetime:
-    """Return a timezone-aware UTC timestamp for persisted rows."""
+class UserDecisionRecord(TimestampedRecord, table=True):
+    """Typed provenance for a user decision."""
 
-    return datetime.now(UTC)
+    __tablename__ = "user_decisions"
 
-
-class TimestampedRecord(SQLModel):
-    """Shared timestamp fields for persisted rows with lifecycle transitions."""
-
-    created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
-    updated_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
+    decision_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    decision_type: UserDecisionType = Field(nullable=False, index=True)
+    decision: str = Field(sa_column=Column(Text, nullable=False))
+    rationale: str = Field(sa_column=Column(Text, nullable=False))
+    status: UserDecisionStatus = Field(
+        default=UserDecisionStatus.ACTIVE,
+        nullable=False,
+        index=True,
+    )
+    alternatives_considered: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    related_task_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    related_hypothesis_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    superseded_by_decision_id: UUID | None = Field(
+        default=None,
+        foreign_key="user_decisions.decision_id",
+    )
 
 
 class GovernanceAuthorityRecord(TimestampedRecord, table=True):

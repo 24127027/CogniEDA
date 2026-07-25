@@ -9,8 +9,11 @@ from uuid import UUID, uuid4
 from pydantic import Field
 
 from schemas.common import CogniEDABaseModel, NonEmptyStr, utc_now
-from schemas.enums import ValiditySourceState
-from schemas.execution.lifecycle import ExecutionApprovalStatus, ExecutionRunStatus
+from schemas.enums import (
+    ExecutionApprovalStatus,
+    ExecutionRunStatus,
+    ValiditySourceState,
+)
 
 
 class ExecutionRun(CogniEDABaseModel):

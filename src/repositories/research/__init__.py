@@ -14,10 +14,6 @@ from repositories.research.objective import (
 from repositories.research.objective_revision import ObjectiveRevisionRepository
 from repositories.research.session_frame import SessionFrameRepository
 from repositories.research.task import TaskRepository, TaskUpdate
-from repositories.research.user_decision import (
-    UserDecisionRepository,
-    UserDecisionUpdate,
-)
 
 __all__ = [
     "AssumptionRepository",
@@ -33,6 +29,4 @@ __all__ = [
     "SessionFrameRepository",
     "TaskRepository",
     "TaskUpdate",
-    "UserDecisionRepository",
-    "UserDecisionUpdate",
 ]

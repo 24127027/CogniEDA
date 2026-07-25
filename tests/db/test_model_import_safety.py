@@ -1,41 +1,88 @@
-"""Import-order and metadata safety tests for db.models bounded context facade."""
+"""Fresh-process import-order and metadata safety for the db.models facade."""
 
 from __future__ import annotations
 
-from sqlmodel import SQLModel
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+EXPECTED_TABLES = [
+    "analysis_frames",
+    "assumptions",
+    "data_profiles",
+    "discoveries",
+    "discovery_admission_claims",
+    "evaluation_controls",
+    "evidence",
+    "execution_approvals",
+    "execution_inbox",
+    "execution_outbox",
+    "execution_runs",
+    "governance_authorities",
+    "hypotheses",
+    "objective_revisions",
+    "objectives",
+    "planner_operations",
+    "proposal_decisions",
+    "session_frames",
+    "tasks",
+    "user_decisions",
+    "validity_events",
+]
 
 
-def test_sqlmodel_metadata_registers_all_21_tables_on_db_models_import() -> None:
-    """Importing db.models must register all 21 tables in SQLModel.metadata."""
+@pytest.mark.parametrize(
+    "module_order",
+    [
+        ("db.models",),
+        (
+            "db.models.research",
+            "db.models.execution",
+            "db.models.evidence",
+            "db.models",
+        ),
+        (
+            "db.models.execution",
+            "db.models.evidence",
+            "db.models.research",
+            "db.models",
+        ),
+        (
+            "db.models.evidence",
+            "db.models.research",
+            "db.models.execution",
+            "db.models",
+        ),
+    ],
+)
+def test_fresh_process_import_orders_register_the_exact_table_set(
+    module_order: tuple[str, ...],
+) -> None:
+    """Every supported import order must register exactly the facade table set."""
 
-
-    expected_tables = {
-        "analysis_frames",
-        "assumptions",
-        "data_profiles",
-        "discoveries",
-        "discovery_admission_claims",
-        "evaluation_controls",
-        "evidence",
-        "execution_approvals",
-        "execution_inbox",
-        "execution_outbox",
-        "execution_runs",
-        "governance_authorities",
-        "hypotheses",
-        "objective_revisions",
-        "objectives",
-        "planner_operations",
-        "proposal_decisions",
-        "session_frames",
-        "tasks",
-        "user_decisions",
-        "validity_events",
-    }
-    registered_tables = set(SQLModel.metadata.tables.keys())
-    assert expected_tables.issubset(registered_tables), (
-        f"Missing tables in SQLModel.metadata: {expected_tables - registered_tables}"
+    script = (
+        "import importlib, json\n"
+        f"for name in {module_order!r}: importlib.import_module(name)\n"
+        "from sqlmodel import SQLModel\n"
+        "print(json.dumps(sorted(SQLModel.metadata.tables)))\n"
     )
+    environment = os.environ.copy()
+    source_path = str(Path("src").resolve())
+    environment["PYTHONPATH"] = os.pathsep.join(
+        item for item in (source_path, environment.get("PYTHONPATH", "")) if item
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert json.loads(completed.stdout) == EXPECTED_TABLES
 
 
 def test_db_models_exports_all_21_table_records() -> None:
@@ -71,13 +118,3 @@ def test_db_models_exports_all_21_table_records() -> None:
     for export in expected_exports:
         assert hasattr(db.models, export), f"db.models missing export {export}"
         assert export in db.models.__all__, f"{export} missing from db.models.__all__"
-
-
-def test_submodule_import_registers_tables_independently() -> None:
-    """Importing submodules directly must register their tables in SQLModel.metadata."""
-
-
-    registered_tables = set(SQLModel.metadata.tables.keys())
-    assert "objectives" in registered_tables
-    assert "execution_runs" in registered_tables
-    assert "evidence" in registered_tables

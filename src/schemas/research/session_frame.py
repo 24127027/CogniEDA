@@ -23,7 +23,7 @@ from schemas.common import (
     UserDecisionContextSummary,
     utc_now,
 )
-from schemas.research.lifecycle import SessionFrameStatus
+from schemas.enums import SessionFrameStatus
 
 
 class SessionFrame(CogniEDABaseModel):

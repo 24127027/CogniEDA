@@ -9,7 +9,11 @@ from repositories.execution import (
     ExecutionOutboxRepository,
     ExecutionRunRepository,
 )
-from repositories.governance import ProposalDecisionRepository
+from repositories.governance import (
+    ProposalDecisionRepository,
+    UserDecisionRepository,
+    UserDecisionUpdate,
+)
 from repositories.planner_operation_repository import PlannerOperationRepository
 from repositories.research import (
     AssumptionRepository,
@@ -25,8 +29,6 @@ from repositories.research import (
     SessionFrameRepository,
     TaskRepository,
     TaskUpdate,
-    UserDecisionRepository,
-    UserDecisionUpdate,
 )
 from repositories.validity import ValidityEventRepository
 

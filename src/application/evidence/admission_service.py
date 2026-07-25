@@ -113,7 +113,9 @@ def execute_evidence_admission_plan(
     transition_service = ExecutionAttemptTransitionService(session)
     try:
         if disposition == EvidenceAdmissionReplayDisposition.NEW:
-            AnalysisFrameRepository(session).stage_create(plan.analysis_frame)
+            AnalysisFrameRepository(session)._stage_create_from_evidence_admission(
+                plan.analysis_frame
+            )
             session.flush()
             if test_hook:
                 test_hook("after_analysis_frame", session)

@@ -13,7 +13,7 @@ from schemas.common import (
     NonEmptyStr,
     utc_now,
 )
-from schemas.evidence.lifecycle import EvidenceLifecycleState, EvidenceType
+from schemas.enums import EvidenceLifecycleState, EvidenceType
 from schemas.evidence.provenance import EvidenceProvenance, EvidenceResultSummary
 
 

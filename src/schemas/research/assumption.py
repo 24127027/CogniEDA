@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 from pydantic import Field, model_validator
 
 from schemas.common import CogniEDABaseModel, NonEmptyStr, utc_now
-from schemas.research.lifecycle import (
+from schemas.enums import (
     AnalysisIntent,
     AssumptionSource,
     AssumptionStatus,

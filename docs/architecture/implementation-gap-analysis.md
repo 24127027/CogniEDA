@@ -1,6 +1,6 @@
 # Implementation Gap Analysis
 
-> **Current implementation snapshot:** Package S2-B review candidate, 2026-07-25.
+> **Current implementation snapshot:** Package S3-A review candidate, 2026-07-25.
 > Code is the source of truth for current behavior. Local verification audits under
 > `.local/audits/` are ignored working records, not clean-clone documentation authority.
 
@@ -20,7 +20,7 @@
 | Atomic commit | Approved ordered operations and validity changes persist all-or-nothing | Planner, Evidence admission, finalization, validity propagation and Discovery admission each use an application-owned atomic transaction | Implemented for these local SQLite paths; broader cross-service effects remain outside one transaction |
 | Execution attempts | Durable outbox/inbox, fencing, idempotency, cancellation, retry | Transition service and race/recovery tests exist | Implemented locally; no worker bootstrap and external effects remain at-least-once |
 | Evidence admission | Observation-only, deterministic AnalysisFrame/Evidence materialization in one fenced transaction | Active execution finalization routes through fenced transaction, materializes AnalysisFrame and Evidence, advances ExecutionRun to `EVIDENCE_ADMITTED` and Hypothesis to `READY_FOR_EVALUATION` in one atomic commit with zero automatic Discovery creation | Implemented (Package 1 Cutover); active production path terminates at durable Evidence |
-| Execution/Evidence/Evaluation/Governance/Discovery/Validity bounded contexts | Execution coordination, Evidence admission, protected evaluation, governance decisions, Discovery admission, validity propagation, and canonical contracts have separate owners | `application.execution`, `application.evidence`, `application.evaluation`, `application.governance`, `application.discovery`, `application.validity`, their canonical schema packages, and targeted repositories are active; old paths are removed; user-governed decision and validity paths require the exact authenticated principal | Implemented locally through reviewed S2-B; broader repository/global-schema normalization remains deferred to S3 |
+| Schema/repository/persistence ownership | Research, execution, Evidence, governance, workflow, Discovery, evaluation, and validity records have explicit owners without duplicate definitions or alternate scientific writers | Canonical research/execution/Evidence schemas and repositories are bounded; `UserDecision` persistence is governance-owned; `PlannerOperationRecord` is workflow-owned; one explicit `db.models` facade registers the 21-table SQLModel set | Implemented locally through reviewed S3-A; Discovery/validity work beyond the mechanical model registration split remains deferred to S3-B |
 | Context type safety | Assumptions only in planning; protected Discovery synthesis | Package 2 builds immutable repository-authoritative evaluation snapshots, a closed provenance manifest, and a complete digest; the Analyst receives only that bundle | Implemented for Hypothesis evaluation; broader Graph Miner and generated-view context remain absent |
 | Discovery admission governance | Exact persisted proposal and independently authorized decision produce one atomic Discovery chain | Package 5 resolves authenticated principal context through an injected adapter; S2-A binds decision recording to that exact principal and an explicit expiring immutable authority grant, then persists the decision before separate atomic admission | Implemented locally for SQLite; the product composition root still needs a real authentication adapter |
 | Validity propagation | One authorized source event atomically invalidates every applicable dependent and current retrieval path | Package 4 supports eight typed DataProfile, AnalysisFrame, Evidence, ExecutionRun, conflict, supersession, invalidation, and provenance-corruption events through one fenced transaction and immutable event record | Implemented locally; no production authority issuer, only explicit SQLite upgrade/trigger support |
@@ -35,14 +35,16 @@
 ## Protected Invariants Already Present
 
 - Frozen DataProfile/Evidence Pydantic payloads and append-oriented repositories
-  (`src/schemas/common.py:82-90`, `src/schemas/artifacts.py:74-96`, `206-234`).
+  (`src/schemas/common.py`, `src/schemas/research/data_profile.py`,
+  `src/schemas/evidence/evidence.py`).
 - Only active terminal analytical Tasks using an accepted DataProfile admit a Hypothesis; unique
   Task/Hypothesis and Hypothesis/Discovery constraints exist
-  (`src/repositories/hypothesis_repository.py:56-92`, `src/db/models.py:212-229`, `429-466`).
+  (`src/repositories/research/hypothesis.py`, `src/db/models/research.py`,
+  `src/db/models/discovery.py`).
 - Atomic Discovery admission requires active same-Hypothesis Evidence and structured validity
   metadata; the generic repository writer is sealed
   (`src/application/discovery/admission_service.py`,
-  `src/repositories/discovery/discovery.py`, `src/schemas/artifacts.py`).
+  `src/repositories/discovery/discovery.py`, `src/schemas/discovery/claim.py`).
 - Failed execution creates no Evidence/Discovery, and Evidence admission is fenced and atomic
   (`src/application/execution/recovery/evidence_admission_recovery.py`,
   `src/application/evidence/admission_service.py`).

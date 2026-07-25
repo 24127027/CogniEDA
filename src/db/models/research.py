@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import JSON, Column, Index, Text, UniqueConstraint, text
 from sqlmodel import Field, SQLModel
 
+from db.models.common import TimestampedRecord, utc_now
 from schemas.enums import (
     AnalysisIntent,
     AssumptionSource,
@@ -20,29 +21,11 @@ from schemas.enums import (
     DatasetSourceType,
     HypothesisStatus,
     ObjectiveStatus,
-    PlannerNodeName,
-    PlannerOperationApprovalState,
-    PlannerOperationType,
     SessionFrameStatus,
     TaskDependencyType,
     TaskKind,
     TaskLifecycleState,
-    UserDecisionStatus,
-    UserDecisionType,
 )
-
-
-def utc_now() -> datetime:
-    """Return a timezone-aware UTC timestamp for persisted rows."""
-
-    return datetime.now(UTC)
-
-
-class TimestampedRecord(SQLModel):
-    """Shared timestamp fields for persisted rows with lifecycle transitions."""
-
-    created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
-    updated_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
 
 
 class ObjectiveRecord(TimestampedRecord, table=True):
@@ -227,57 +210,6 @@ class HypothesisRecord(TimestampedRecord, table=True):
         default_factory=list,
         sa_column=Column(JSON, nullable=False),
     )
-
-
-class UserDecisionRecord(TimestampedRecord, table=True):
-    """Typed provenance for a user decision."""
-
-    __tablename__ = "user_decisions"
-
-    decision_id: UUID = Field(default_factory=uuid4, primary_key=True)
-    decision_type: UserDecisionType = Field(nullable=False, index=True)
-    decision: str = Field(sa_column=Column(Text, nullable=False))
-    rationale: str = Field(sa_column=Column(Text, nullable=False))
-    status: UserDecisionStatus = Field(
-        default=UserDecisionStatus.ACTIVE,
-        nullable=False,
-        index=True,
-    )
-    alternatives_considered: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(JSON, nullable=False),
-    )
-    related_task_ids: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(JSON, nullable=False),
-    )
-    related_hypothesis_ids: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(JSON, nullable=False),
-    )
-    superseded_by_decision_id: UUID | None = Field(
-        default=None,
-        foreign_key="user_decisions.decision_id",
-    )
-
-
-class PlannerOperationRecord(SQLModel, table=True):
-    """Persisted pending mutation produced by planner nodes."""
-
-    __tablename__ = "planner_operations"
-
-    operation_id: UUID = Field(default_factory=uuid4, primary_key=True)
-    session_id: str | None = Field(default=None, index=True)
-    operation_type: PlannerOperationType = Field(nullable=False, index=True)
-    payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
-    produced_by_node: PlannerNodeName = Field(nullable=False, index=True)
-    approval_state: PlannerOperationApprovalState = Field(
-        default=PlannerOperationApprovalState.PENDING,
-        nullable=False,
-        index=True,
-    )
-    created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
-    committed_at: datetime | None = Field(default=None, nullable=True)
 
 
 class SessionFrameRecord(SQLModel, table=True):

@@ -1,5 +1,8 @@
 """Application execution bounded context."""
 
+from importlib import import_module
+from typing import Any
+
 from application.execution.admission import (
     build_execution_admission_operations,
 )
@@ -20,11 +23,6 @@ from application.execution.identity import (
 from application.execution.receiver import (
     submit_execution_result,
 )
-from application.execution.recovery import (
-    ExecutionReconciliationError,
-    finalize_attempt,
-    reconcile_execution_attempts,
-)
 from application.execution.transition_service import (
     AlreadyCompletedError,
     AlreadyFinalizingError,
@@ -32,6 +30,12 @@ from application.execution.transition_service import (
     ExecutionAttemptTransitionService,
     ExecutionTransitionError,
 )
+
+_RECOVERY_EXPORTS = {
+    "ExecutionReconciliationError",
+    "finalize_attempt",
+    "reconcile_execution_attempts",
+}
 
 __all__ = [
     "AlreadyCompletedError",
@@ -53,3 +57,13 @@ __all__ = [
     "result_payload_digest",
     "submit_execution_result",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Load recovery exports lazily so Evidence admission can import identity safely."""
+
+    if name not in _RECOVERY_EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module("application.execution.recovery"), name)
+    globals()[name] = value
+    return value

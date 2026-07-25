@@ -65,7 +65,7 @@ participate in the single transaction owned by
 - There is no checked-in concrete Data Explorer, worker bootstrap, service API, or CLI.
 
 ## 12. Deferred work
-- Broader S3 repository and global-schema normalization remains outside this package. Evaluation,
-  governance, Discovery admission, and validity propagation already have canonical application
-  bounded contexts.
+- S3-A now provides canonical execution schema/repository/model ownership and a stable
+  `db.models` facade. Discovery/validity persistence normalization beyond the mechanically split
+  registration modules remains deferred to S3-B.
 - Production outbox worker infrastructure remains future work.

@@ -18,6 +18,10 @@ The current implementation uses:
 
 - local filesystem directories for `data/`, `artifacts/`, `docs/`, `config/`, and source code
 - a local SQLModel store, defaulting to `.local/cognieda_graph.sqlite3`
+- bounded SQLModel table modules under `src/db/models/` with an explicit `db.models` registration
+  facade; the facade is the stable persistence import used by initialization and migrations
+- bounded repositories under `src/repositories/research/`, `execution/`, `evidence/`,
+  `governance/`, `discovery/`, `evaluation/`, and `validity/`
 - Git-tracked DataProfile mirror templates under `artifacts/data_profiles/`
 - no graph database implementation
 - targeted, idempotent SQLite upgrades for pre-repair execution-attempt state, Objective lifecycle,
@@ -42,6 +46,12 @@ The SQLModel store currently persists tables for:
 - `execution_inbox`
 - `execution_approvals`
 - `planner_operations`
+- `objective_revisions`
+- `evaluation_controls`
+- `governance_authorities`
+- `proposal_decisions`
+- `discovery_admission_claims`
+- `validity_events`
 
 ## Implementation Status
 

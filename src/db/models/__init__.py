@@ -6,6 +6,7 @@ Importing this package registers all table models in SQLModel.metadata.
 
 from __future__ import annotations
 
+from db.models.common import TimestampedRecord, utc_now
 from db.models.discovery import DiscoveryAdmissionClaimRecord, DiscoveryRecord
 from db.models.evaluation import EvaluationControlRecord
 from db.models.evidence import AnalysisFrameRecord, EvidenceRecord
@@ -15,21 +16,22 @@ from db.models.execution import (
     ExecutionOutboxRecord,
     ExecutionRunRecord,
 )
-from db.models.governance import GovernanceAuthorityRecord, ProposalDecisionRecord
+from db.models.governance import (
+    GovernanceAuthorityRecord,
+    ProposalDecisionRecord,
+    UserDecisionRecord,
+)
 from db.models.research import (
     AssumptionRecord,
     DataProfileRecord,
     HypothesisRecord,
     ObjectiveRecord,
     ObjectiveRevisionRecord,
-    PlannerOperationRecord,
     SessionFrameRecord,
     TaskRecord,
-    TimestampedRecord,
-    UserDecisionRecord,
-    utc_now,
 )
 from db.models.validity import ValidityEventRecord
+from db.models.workflow import PlannerOperationRecord
 
 __all__ = [
     "AnalysisFrameRecord",

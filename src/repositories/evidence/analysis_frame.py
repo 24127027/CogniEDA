@@ -19,16 +19,11 @@ class AnalysisFrameRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def create(self, analysis_frame: AnalysisFrame) -> AnalysisFrame:
-        """Persist and return a new AnalysisFrame record."""
-
-        record = self.stage_create(analysis_frame)
-        self._session.commit()
-        self._session.refresh(record)
-        return record_to_schema(AnalysisFrame, record)
-
-    def stage_create(self, analysis_frame: AnalysisFrame) -> AnalysisFrameRecord:
-        """Add provenance to a shared session without committing it."""
+    def _stage_create_from_evidence_admission(
+        self,
+        analysis_frame: AnalysisFrame,
+    ) -> AnalysisFrameRecord:
+        """Stage provenance for the application-owned Evidence admission transaction."""
 
         record = AnalysisFrameRecord(
             **schema_to_record_payload(

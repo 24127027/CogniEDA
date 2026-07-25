@@ -8,7 +8,7 @@ Target `SessionFrame` includes visible context items with object ID, object type
 
 ## Current Implementation
 
-The current `SessionFrame` model is in `src/schemas/artifacts.py`. It includes:
+The current `SessionFrame` model is in `src/schemas/research/session_frame.py`. It includes:
 
 - `session_frame_id`
 - `frame_topic`

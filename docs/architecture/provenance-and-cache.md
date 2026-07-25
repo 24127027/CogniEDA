@@ -44,8 +44,11 @@ Current provenance exists in typed but incomplete forms:
 - Objective lifecycle is stored directly on the mutable `Objective` FCO. Each governed update atomically appends one immutable non-FCO `ObjectiveRevision` containing exact before/after title, statement and status, deterministic changed fields, reason, actor, and the authorizing PlannerOperation or UserDecision reference.
 - `AnalysisFrame` exists as minimal view provenance. `ExecutionRun` is a durable attempt record with outbox/inbox/approval, lease, fencing, retry and recovery metadata.
 - `EvidenceRepository` can optionally run strict provenance dereference validation for `AnalysisFrame` and `ExecutionRun` refs when strict mode is enabled or provenance repositories are supplied.
-- `EvidenceRepository` has minimal helpers to mark Evidence superseded or invalidated without editing the observed result payload. Any `DiscoveryRepository` supplied for dependent flagging must use the exact same SQLModel session before either repository is read or mutated.
-- `DiscoveryRepository` can flag dependent Discoveries for review during same-session Evidence supersession or invalidation helpers.
+- `EvidenceRepository` rejects direct creation, supersession, invalidation, and historical-scoping
+  mutations. Creation is staged only for atomic Evidence admission; lifecycle propagation belongs
+  to `AtomicValidityPropagationService`.
+- `DiscoveryRepository` rejects independent lifecycle mutation; atomic Discovery admission and
+  validity propagation retain their established application-owned transaction boundaries.
 
 The implementation now provides real local transaction/rollback behavior at the PlannerOperation boundary. Task, decomposition, and Objective proposals are persisted as pending batches and can be approved only by their matching, session-bound proposal fingerprint and ordered operation IDs. It remains incomplete as a product workflow: plan/assumption/conflict approval routes, some enum/payload handlers, distributed recovery, and broader approval UX remain unimplemented.
 
@@ -62,11 +65,17 @@ No evidence-cache table or service is implemented.
 | `PlannerOperation` | Partially implemented | Durable envelope/table/repository, planner draft adapters and atomic local commit/rollback exist; coverage and reachability are incomplete. |
 | Objective mutation attribution | Implemented locally | `Objective.status` is authoritative current lifecycle state. `ObjectiveRevision` is append-only provenance, not an FCO; approved Planner mutations commit Objective, revision, successor SessionFrame, and operation states in one transaction. No history UI exists. |
 | Evidence provenance | Partially implemented | Required fields exist and may reference minimal provenance records. Optional strict repository validation dereferences `AnalysisFrame` and `ExecutionRun` ids and checks available DataProfile/Hypothesis ownership fields. |
-| Evidence lifecycle | Partially implemented | Repository helpers can mark Evidence as superseded or invalidated while preserving result payloads. Optional dependent-Discovery review flagging requires the exact same SQLModel session and rejects mismatches before mutation. This is repository-level safety, not transaction or rollback machinery. |
+| Evidence lifecycle | Implemented locally for governed paths | `AtomicValidityPropagationService` owns authorized invalidation/supersession and dependent-state propagation in one SQLite transaction; repository methods reject split-transaction mutation. |
 | Discovery review state | Partially implemented | `Discovery` records now carry lifecycle/review metadata, and `DiscoveryRepository.flag_by_evidence_change()` records Evidence supersession/invalidation review reasons without changing the claim, Evidence links, validity basis, or epistemic status. |
 | Cleaning provenance | Partially implemented | DataProfile preprocessing history exists; no full cleaning decision ledger exists. |
 | Evidence cache | Not implemented | `ToolResultCacheSummary` is a session-frame summary, not a cache service. |
 
 ## Architectural Risk
 
-Current `AnalysisFrame` and `ExecutionRun` records allow Evidence to identify and optionally dereference provenance, but they cannot fully answer which rows, filters, missing-data policy, method version, environment and artifact contents produced the result. They are durable minimal anchors, not full reproducibility machinery. Objective mutation attribution now combines the approved operation/decision with exact immutable revision history; it does not add merge or collaborative-editing policy. Evidence lifecycle transitions have same-session repository safety for optional Discovery flagging, but the multi-step propagation is not atomic; user review, retrieval integration and full impact analysis remain future work.
+Current `AnalysisFrame` and `ExecutionRun` records allow Evidence to identify and optionally
+dereference provenance, but they cannot fully answer which rows, filters, missing-data policy,
+method version, environment and artifact contents produced the result. They are durable minimal
+anchors, not full reproducibility machinery. Objective mutation attribution combines the approved
+operation/decision with exact immutable revision history; it does not add merge or
+collaborative-editing policy. Validity propagation is atomic for the implemented SQLite paths, but
+production authority issuance and broader impact policy remain future work.
