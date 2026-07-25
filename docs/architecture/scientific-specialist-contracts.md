@@ -24,7 +24,9 @@ do not contain PydanticAI, LangGraph, SQLModel, repository, or application-servi
 ## Canonical Schema Placement
 
 `src/schemas/execution/observations.py` owns `AnalysisFrameObservation` and
-`EvidenceObservation`. `src/schemas/execution/contracts.py` imports and uses those exact classes so transport and observation boundaries remain aligned without a field-for-field mirror.
+`EvidenceObservation`. `src/schemas/execution/data_explorer.py` owns the Data Explorer result
+models, and `src/schemas/execution/contracts.py` owns the prepared/receipt transport contracts.
+Neither `schemas.specialist_contracts` nor Planner types re-export these execution schemas.
 
 `src/schemas/specialist_contracts.py` owns all lifecycle-distinct specialist models. Its evaluation
 snapshots intentionally omit mutable persistence state that is not scientific input:

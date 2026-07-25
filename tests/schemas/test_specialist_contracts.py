@@ -18,19 +18,18 @@ from schemas.enums import (
     DiscoveryEpistemicStatus,
     EvidenceType,
 )
-from schemas.execution.contracts import (
-    AnalysisFrameObservation as ReceiptAnalysisFrameObservation,
-)
-from schemas.execution.contracts import (
-    EvidenceObservation as ReceiptEvidenceObservation,
+from schemas.execution.data_explorer import (
+    DataExplorerFailureReason,
+    DataExplorerResult,
+    DataExplorerSuccessResult,
+    ExecutionDetails,
+    TechnicalDiagnostic,
+    TechnicalRetryDisposition,
 )
 from schemas.execution.observations import AnalysisFrameObservation, EvidenceObservation
 from schemas.specialist_contracts import (
     AdmittedEvidenceSnapshot,
     AnalysisFrameEvaluationSnapshot,
-    DataExplorerFailureReason,
-    DataExplorerResult,
-    DataExplorerSuccessResult,
     DataProfileEvaluationSnapshot,
     DecisionRuleSnapshot,
     DiscoveryProposal,
@@ -38,13 +37,10 @@ from schemas.specialist_contracts import (
     EvaluationFailure,
     EvaluationFailureReason,
     EvidenceResultSnapshot,
-    ExecutionDetails,
     ExecutionRunEvaluationSnapshot,
     HypothesisAnalystResult,
     HypothesisEvaluationSnapshot,
     MethodParameterSnapshot,
-    TechnicalDiagnostic,
-    TechnicalRetryDisposition,
 )
 
 
@@ -492,11 +488,9 @@ class TestHypothesisAnalystResults:
 
 
 class TestDependencyAndOwnershipBoundaries:
-    def test_observations_have_one_schema_owner_and_legacy_import_is_a_reexport(self) -> None:
+    def test_observations_have_one_schema_owner(self) -> None:
         assert AnalysisFrameObservation.__module__ == "schemas.execution.observations"
         assert EvidenceObservation.__module__ == "schemas.execution.observations"
-        assert ReceiptAnalysisFrameObservation is AnalysisFrameObservation
-        assert ReceiptEvidenceObservation is EvidenceObservation
 
     def test_specialist_contract_types_have_no_application_or_framework_owners(self) -> None:
         contract_types = (
@@ -536,8 +530,6 @@ class TestObservationReceiptEnvelope:
         from schemas.execution.contracts import (
             ExecutionReceiptEnvelope,
         )
-        from schemas.specialist_contracts import DataExplorerSuccessResult
-
         success = DataExplorerSuccessResult(
             status="success",
             analysis_frame=_analysis_frame_observation(),

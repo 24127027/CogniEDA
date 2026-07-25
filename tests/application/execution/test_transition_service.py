@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from application.evidence.identity import result_payload_digest
+from application.execution.identity import result_payload_digest
 from application.execution.transition_service import ExecutionAttemptTransitionService
 from db.models import (
     ExecutionInboxRecord,
@@ -446,7 +446,7 @@ def test_authorize_new_attempt_reuses_hypothesis_and_idempotent(memory_session: 
     )
     memory_session.commit()
 
-    from application.evidence.identity import method_parameter_hash
+    from application.execution.identity import method_parameter_hash
     from schemas.execution.contracts import PreparedExecution
 
     prepared_payload = PreparedExecution(

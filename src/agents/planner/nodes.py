@@ -7,10 +7,10 @@ from langgraph.runtime import Runtime
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlmodel import Session
 
-from application.evidence.identity import (
+from application.execution.admission import build_execution_admission_operations
+from application.execution.identity import (
     method_parameter_hash as _method_parameter_hash,
 )
-from application.execution.admission import build_execution_admission_operations
 from application.orchestrator.planner_commit import commit_planner_operations
 from db.models import ExecutionApprovalRecord, PlannerOperationRecord
 from db.session import get_session
@@ -40,6 +40,11 @@ from schemas.enums import (
     TaskKind,
     TaskLifecycleState,
 )
+from schemas.execution.contracts import (
+    ExecutionSpecification,
+    HypothesisDraft,
+    PreparedExecution,
+)
 from schemas.planner_operations import PlannerOperation
 from schemas.provenance import ExecutionApproval
 from schemas.retrieval import RetrievalRequest
@@ -53,12 +58,9 @@ from .types import (
     ExecutionAdmission,
     ExecutionPreparation,
     ExecutionRevalidation,
-    ExecutionSpecification,
-    HypothesisDraft,
     ObjectiveCreateDraft,
     ObjectiveUpdateDraft,
     PendingUserInteraction,
-    PreparedExecution,
     RequestUnderstanding,
     RequestUnderstandingModel,
     State,

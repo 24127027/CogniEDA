@@ -6,7 +6,7 @@ from uuid import UUID
 
 from sqlmodel import Session, select
 
-from application.evidence.identity import method_parameter_hash
+from application.execution.identity import method_parameter_hash
 from db.models import DiscoveryRecord
 from repositories.analysis_frame_repository import AnalysisFrameRepository
 from repositories.data_profile_repository import DataProfileRepository

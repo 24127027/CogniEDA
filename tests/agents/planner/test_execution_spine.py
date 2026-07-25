@@ -23,9 +23,7 @@ from agents.planner.nodes import (
     select_task,
 )
 from agents.planner.types import (
-    AnalysisFrameObservation,
     Context,
-    EvidenceObservation,
     PlannerDecision,
     RequestUnderstanding,
     RequestUnderstandingModel,
@@ -84,6 +82,7 @@ from schemas.enums import (
 )
 from schemas.execution.contracts import ExecutionReceiptEnvelope
 from schemas.execution.data_explorer import DataExplorerResult
+from schemas.execution.observations import AnalysisFrameObservation, EvidenceObservation
 from schemas.planner_operations import PlannerOperation
 from schemas.provenance import AnalysisFrame
 
@@ -119,7 +118,7 @@ class FakeExecutor:
             column_refs=request.specification.variable_bindings,
         )
         if self.fail:
-            from schemas.specialist_contracts import (
+            from schemas.execution.data_explorer import (
                 DataExplorerFailureReason,
                 DataExplorerFailureResult,
             )
@@ -129,7 +128,7 @@ class FakeExecutor:
                 failure_reason=DataExplorerFailureReason.METHOD_EXECUTION_FAILURE,
                 message="Deterministic test executor failure.",
             )
-        from schemas.specialist_contracts import DataExplorerSuccessResult
+        from schemas.execution.data_explorer import DataExplorerSuccessResult
 
         return DataExplorerSuccessResult(
             status="success",
@@ -1222,7 +1221,7 @@ def test_inconclusive_execution_does_not_overclaim_no_relationship(db_session) -
 def test_executor_advisory_outcome_cannot_override_deterministic_evaluation() -> None:
     from pydantic import TypeAdapter, ValidationError
 
-    from schemas.specialist_contracts import DataExplorerResult
+    from schemas.execution.data_explorer import DataExplorerResult
 
     payload = {
         "status": "success",

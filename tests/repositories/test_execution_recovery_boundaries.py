@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from sqlalchemy import inspect, text
 
-from application.evidence.identity import result_payload_digest
+from application.execution.identity import result_payload_digest
 from application.execution.transition_service import ExecutionAttemptTransitionService
 from db.init_db import init_db
 from db.models import DataProfileRecord, ExecutionRunRecord, HypothesisRecord, TaskRecord

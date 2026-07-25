@@ -11,6 +11,12 @@ from application.execution.dispatch import (
     DataExplorerDispatcherProtocol,
     dispatch_pending_attempts,
 )
+from application.execution.identity import (
+    canonical_json_bytes,
+    canonical_sha256,
+    method_parameter_hash,
+    result_payload_digest,
+)
 from application.execution.receiver import (
     submit_execution_result,
 )
@@ -38,8 +44,12 @@ __all__ = [
     "authorize_retry",
     "build_execution_admission_operations",
     "cancel_execution_attempt",
+    "canonical_json_bytes",
+    "canonical_sha256",
     "dispatch_pending_attempts",
     "finalize_attempt",
+    "method_parameter_hash",
     "reconcile_execution_attempts",
+    "result_payload_digest",
     "submit_execution_result",
 ]

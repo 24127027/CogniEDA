@@ -11,7 +11,7 @@ from sqlalchemy import func, or_, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from application.evidence.identity import result_payload_digest
+from application.execution.identity import result_payload_digest
 from db.models import (
     ExecutionInboxRecord,
     ExecutionOutboxRecord,
@@ -814,7 +814,7 @@ class ExecutionAttemptTransitionService:
         ):
             return None
 
-        from application.evidence.identity import method_parameter_hash
+        from application.execution.identity import method_parameter_hash
         from schemas.execution.contracts import PreparedExecution
 
         try:

@@ -10,7 +10,7 @@ factory; it does not synthesize defaults.
 
 Following **Package S1-B**, application responsibilities are structured into focused bounded contexts:
 
-- `application/execution/`: Owns execution attempt admission, transition service, dispatching, receipt ingestion, cancellation, and recovery.
+- `application/execution/`: Owns execution attempt admission, contract/receipt identity hashing, transition service, dispatching, receipt ingestion, cancellation, and recovery.
 - `application/evidence/`: Owns pure Evidence admission plan validation and the atomic AnalysisFrame + Evidence write transaction.
 - `application/orchestrator/`: Temporarily retains protected evaluation execution, governance decision binding, atomic Discovery admission, and validity propagation.
 

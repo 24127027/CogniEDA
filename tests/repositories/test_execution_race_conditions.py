@@ -4,7 +4,7 @@ import threading
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from application.evidence.identity import result_payload_digest
+from application.execution.identity import result_payload_digest
 from application.execution.transition_service import ExecutionAttemptTransitionService
 from db.models import DataProfileRecord, ExecutionRunRecord, HypothesisRecord, TaskRecord
 from db.session import get_session

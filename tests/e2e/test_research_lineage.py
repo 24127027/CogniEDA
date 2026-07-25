@@ -107,12 +107,12 @@ from schemas.enums import (
     ValiditySourceType,
 )
 from schemas.execution.contracts import ExecutionReceiptEnvelope
+from schemas.execution.data_explorer import DataExplorerResult
 from schemas.execution.observations import (
     AnalysisFrameObservation,
     EvidenceObservation,
 )
 from schemas.retrieval import RetrievalRequest
-from schemas.specialist_contracts import DataExplorerResult
 
 
 class CreateObjectiveModel:
@@ -332,7 +332,7 @@ class DeterministicExecutor:
             column_refs=input.specification.variable_bindings,
         )
         if self.fail:
-            from schemas.specialist_contracts import (
+            from schemas.execution.data_explorer import (
                 DataExplorerFailureReason,
                 DataExplorerFailureResult,
             )
@@ -343,7 +343,7 @@ class DeterministicExecutor:
                 message="Deterministic technical failure.",
             )
         else:
-            from schemas.specialist_contracts import DataExplorerSuccessResult
+            from schemas.execution.data_explorer import DataExplorerSuccessResult
 
             result = DataExplorerSuccessResult(
                 status="success",

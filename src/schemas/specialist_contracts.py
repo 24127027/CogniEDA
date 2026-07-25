@@ -1,4 +1,4 @@
-"""Canonical contracts for Data Explorer and protected Hypothesis Analyst evaluation."""
+"""Canonical contracts for protected Hypothesis Analyst evaluation."""
 
 from __future__ import annotations
 
@@ -20,25 +20,12 @@ from schemas.common import (
     ValidityBasis,
 )
 from schemas.enums import AnalysisIntent, DatasetSourceType, DiscoveryEpistemicStatus, EvidenceType
-from schemas.execution.data_explorer import (
-    DataExplorerFailureReason,
-    DataExplorerFailureResult,
-    DataExplorerResult,
-    DataExplorerSuccessResult,
-    ExecutionDetails,
-    TechnicalDiagnostic,
-    TechnicalRetryDisposition,
-)
 
 __all__ = [
     "ActiveStateProof",
     "AdmittedEvidenceSnapshot",
     "AnalysisFrameEvaluationSnapshot",
     "BundleProvenanceManifest",
-    "DataExplorerFailureReason",
-    "DataExplorerFailureResult",
-    "DataExplorerResult",
-    "DataExplorerSuccessResult",
     "DataProfileEvaluationSnapshot",
     "DecisionRuleSnapshot",
     "DiscoveryProposal",
@@ -46,7 +33,6 @@ __all__ = [
     "EvaluationFailure",
     "EvaluationFailureReason",
     "EvidenceResultSnapshot",
-    "ExecutionDetails",
     "ExecutionRunEvaluationSnapshot",
     "HypothesisAnalystResult",
     "HypothesisEvaluationSnapshot",
@@ -55,8 +41,6 @@ __all__ = [
     "MethodParameterSnapshot",
     "ProvenanceManifestEntry",
     "RepositorySource",
-    "TechnicalDiagnostic",
-    "TechnicalRetryDisposition",
     "compute_proposal_digest",
     "validate_proposal_against_bundle",
 ]

@@ -20,16 +20,17 @@ from application.evidence import (
     RESOLVED_POST_ADMISSION_STATUS,
     EvidenceAdmissionPlan,
     EvidenceAdmissionReplayDisposition,
-    canonical_sha256,
     classify_evidence_admission_replay,
     compute_analysis_frame_fingerprint,
     compute_evidence_fingerprint,
     execute_evidence_admission_plan,
     generate_deterministic_analysis_frame_id,
     generate_deterministic_evidence_id,
+    validate_and_build_evidence_admission_plan,
+)
+from application.execution.identity import (
     method_parameter_hash,
     result_payload_digest,
-    validate_and_build_evidence_admission_plan,
 )
 from db.models import (
     AnalysisFrameRecord,
@@ -43,6 +44,7 @@ from db.models import (
     SessionFrameRecord,
     TaskRecord,
 )
+from schemas.canonical import canonical_sha256
 from schemas.common import EvaluationThresholds, EvidenceResultSummary, MethodParameter
 from schemas.enums import (
     EvidenceType,
@@ -757,7 +759,7 @@ def test_active_execution_to_evidence_modules_import_no_scientific_authority() -
         root / "src" / "application" / "evidence" / "admission_plan.py",
         root / "src" / "application" / "evidence" / "admission_service.py",
         root / "src" / "schemas" / "execution" / "contracts.py",
-        root / "src" / "application" / "evidence" / "identity.py",
+        root / "src" / "application" / "execution" / "identity.py",
         root / "src" / "application" / "execution" / "recovery" / "evidence_admission_recovery.py",
     )
     forbidden_symbols = {

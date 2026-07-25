@@ -37,6 +37,7 @@ ExecutionOutbox(pending)
 | `DataExplorerAdapter` | `agents.executor` | Data Explorer-specific LangGraph validation adapter |
 | `DataExplorerDispatcher` | `agents.executor` | Translate a validated prepared contract, invoke one Data Explorer adapter, and validate its actual return value as `DataExplorerResult` |
 | `DataExplorerResult` | `schemas.execution.data_explorer` | Canonical observation-only executor and durable receipt type |
+| execution method/result hashing | `application.execution.identity` | Pure canonical identity helpers for durable execution contracts and receipts |
 | `finalize_attempt()` | `application.execution.recovery` | Restart-safe, fenced Evidence admission recovery coordinator |
 
 `DataExplorerInput` contains the application-bound `execution_run_id`, `task_id`, `hypothesis_id`, and
@@ -93,7 +94,9 @@ unverified scientific content.
 `AtomicValidityPropagationService.execute_propagation()` under the configured session boundary; it
 does not duplicate transaction logic. That facade, Evidence/Discovery admission, and migration
 support are currently SQLite-only. No CLI, service loop, or worker bootstrap is supported.
-Package S1-B module/directory restructuring remains deferred.
+Package S1-B bounded-context restructuring is implemented. S2/S3 decomposition of the remaining
+evaluation, governance, Discovery, and validity services under `application.orchestrator` remains
+deferred.
 
 These gaps mean CogniEDA is not an end-to-end analytical product even though the local
 durable-to-domain contract is normalized.

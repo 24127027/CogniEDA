@@ -1,4 +1,4 @@
-"""Authority-neutral canonicalization for execution contracts and artifacts."""
+"""Authority-neutral canonicalization for execution contracts and receipts."""
 
 from __future__ import annotations
 

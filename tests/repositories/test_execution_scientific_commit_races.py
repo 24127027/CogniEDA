@@ -12,16 +12,11 @@ import pytest
 from sqlalchemy import text
 from sqlmodel import Session, select
 
-from agents.planner.types import (
-    AnalysisFrameObservation,
-    EvidenceObservation,
-    PreparedExecution,
-)
-from application.evidence.identity import (
+from application.execution.cancellation import cancel_execution_attempt
+from application.execution.identity import (
     method_parameter_hash,
     result_payload_digest,
 )
-from application.execution.cancellation import cancel_execution_attempt
 from application.execution.receiver import submit_execution_result
 from application.execution.recovery import finalize_attempt
 from application.execution.transition_service import (
@@ -55,7 +50,8 @@ from schemas.enums import (
     TaskKind,
     TaskLifecycleState,
 )
-from schemas.execution.contracts import ExecutionReceiptEnvelope
+from schemas.execution.contracts import ExecutionReceiptEnvelope, PreparedExecution
+from schemas.execution.observations import AnalysisFrameObservation, EvidenceObservation
 
 logger = logging.getLogger(__name__)
 

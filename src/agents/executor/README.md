@@ -4,6 +4,12 @@ This package is the non-persistent Data Explorer adapter invocation layer used b
 worker. It does not own Planner admission, attempt transitions, result receipt, Evidence admission,
 evaluation, governance, Discovery admission, or validity propagation.
 
+## Purpose and authority
+
+The package validates one application-prepared execution contract, resolves exactly one configured
+Data Explorer adapter, invokes it, and validates one observation-only result. It has no durable
+writer or transaction authority.
+
 ## Implemented contracts
 
 | Component | Current role |
@@ -14,9 +20,11 @@ evaluation, governance, Discovery admission, or validity propagation.
 | `DataExplorerRegistry` | Registers exactly one explicit Data Explorer executor id and lazy factory per runtime, rejects any second registration, validates the constructed adapter, and caches the successful instance |
 | `DataExplorerAdapter` | Data Explorer-specific LangGraph adapter that validates graph output as `DataExplorerResult` |
 | `DataExplorerDispatcher` | Validates claimed attempt identity, builds `DataExplorerInput`, invokes one configured Data Explorer adapter, and validates its returned value as `DataExplorerResult` |
-| `DataExplorerResult` | Canonical observation-only result imported from `schemas.data_explorer_contracts` |
+| `DataExplorerResult` | Canonical observation-only result imported from `schemas.execution.data_explorer` |
 
 The durable caller supplies a claimed `PreparedExecution`. The package does not accept Planner state or construct durable contracts.
+
+## Happy path
 
 ```python
 context = DataExplorerExecutionContext()
@@ -38,7 +46,14 @@ factory product is not cached. The durable worker converts resolution, factory, 
 invocation exceptions into a failed result receipt without creating Evidence or Discovery. Graph
 Miner and Hypothesis Analyst have no registry entry or package-level executor alias.
 
-## Boundary rules
+## Failure and recovery
+
+Registry, factory, adapter, invocation, and result-validation failures remain technical. The
+application worker converts them to `DataExplorerFailureResult`, and
+`application.execution.receiver` persists the fenced receipt. This package does not reclaim leases,
+authorize retries, finalize Evidence, or recover durable state.
+
+## Forbidden responsibilities and boundary rules
 
 - Durable transport and attempt fencing stay in `application.execution`.
 - The registry never changes run/outbox/inbox state.
@@ -48,6 +63,13 @@ Miner and Hypothesis Analyst have no registry entry or package-level executor al
   coordinator can create only AnalysisFrame and Evidence.
 - Graph Miner and Hypothesis Analyst remain outside Data Explorer dispatch and do not use the
   Data Explorer result specialization. Their identifiers fail exact registry lookup.
+
+## Transaction, retry, replay, and fencing ownership
+
+This package owns no transaction. `application.execution.ExecutionAttemptTransitionService` owns
+run/outbox/inbox protocol writes and fencing. Technical retry creates a new durable attempt before
+this adapter layer is invoked again. Duplicate/replayed result classification occurs after dispatch
+at the authoritative receiver/transition boundary.
 
 ## Removed generic executor symbols
 
@@ -59,7 +81,14 @@ the duplicate capability-layer `ExecutionResult`, legacy `ExecutorResult`, and c
 bridges were removed. The canonical output type is
 `schemas.execution.data_explorer.DataExplorerResult`.
 
-## Not yet implemented
+## Tests
+
+- `tests/executor/test_registry_dispatcher.py`
+- `tests/application/test_runtime_composition.py`
+- `tests/architecture/test_architecture_enforcement.py`
+- `tests/e2e/test_research_lineage.py`
+
+## Limitations and not yet implemented
 
 - runnable default executor graphs;
 - concrete runtime dependencies or cooperative cancellation in `DataExplorerExecutionContext`;
@@ -69,4 +98,7 @@ bridges were removed. The canonical output type is
 - executor-authored Evidence or Discovery (these remain forbidden; executors return observations only).
 
 The local runtime and validity facade are SQLite-only, expose no supported CLI, and do not start a
-worker or service loop. Package S1-B directory/module restructuring remains deferred.
+worker or service loop. Package S1-B moved execution coordination to `application.execution`,
+Evidence admission to `application.evidence`, and canonical execution contracts to
+`schemas.execution`. S2/S3 decomposition of the remaining evaluation, governance, Discovery, and
+validity responsibilities is deferred.

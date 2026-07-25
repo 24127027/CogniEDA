@@ -10,12 +10,6 @@ from pydantic import Field
 
 from schemas.common import CogniEDABaseModel, EvaluationThresholds, MethodParameter
 from schemas.execution.data_explorer import DataExplorerResult
-from schemas.execution.observations import (
-    AnalysisFrameObservation as AnalysisFrameObservation,
-)
-from schemas.execution.observations import (
-    EvidenceObservation as EvidenceObservation,
-)
 
 
 class HypothesisDraft(CogniEDABaseModel):

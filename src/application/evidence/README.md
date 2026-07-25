@@ -17,6 +17,7 @@ This package was established in Package S1-B to isolate pure deterministic Evide
 - Direct creation of `Discovery` or `DiscoveryProposal` objects.
 - Hypothesis evaluation or claim synthesis (owned by Hypothesis Analyst).
 - Direct modification of execution attempt protocol state outside `execute_evidence_admission_plan`.
+- Dispatch, receipt acceptance, cancellation, retry authorization, or recovery coordination.
 
 ## 5. Canonical inputs and outputs
 - **Inputs**: Prepared execution contract (`PreparedExecution`), canonical observation envelope (`ExecutionReceiptEnvelope`), `ExecutionRunRecord`, `ExecutionInboxRecord`, `DataProfileRecord`, `HypothesisRecord`, `TaskRecord`.
@@ -30,15 +31,20 @@ This package was established in Package S1-B to isolate pure deterministic Evide
 5. Session commits atomically.
 
 ## 7. Failure and recovery path
-- Inbox conflict or invalid payload causes `EvidenceAdmissionConflictError`, quarantining the attempt (`RESULT_CONFLICT`).
+- An authoritative inbox/payload identity conflict raises `EvidenceAdmissionConflictError`; the recovery coordinator delegates quarantine to the execution transition owner.
+- Other validation failures are classified as technical execution failure and create no AnalysisFrame, Evidence, Discovery, or scientific outcome.
+- A partial write or lost fence rolls back the entire admission transaction.
 - Concurrent execution of identical plan returns `True` via idempotent replay check (`_committed_admission_matches`).
 
 ## 8. Transaction owner
 `execute_evidence_admission_plan` in `admission_service.py` is the sole atomic transaction owner for AnalysisFrame and Evidence creation.
+It calls only staged execution/Hypothesis/inbox transitions before issuing the single commit.
 
 ## 9. Retry / replay / fencing behavior
 - Deterministic UUIDs prevent duplicate artifact creation for identical execution attempts.
 - Replay classification evaluates exact fingerprint equivalence (`NEW`, `IDEMPOTENT`, `CONFLICT`).
+- The plan binds the authoritative inbox digest, dispatch key, lease epoch, finalizer owner, fencing epoch, and expected attempt version.
+- A changed contract or artifact fingerprint is a conflict, not an idempotent retry.
 
 ## 10. Tests proving the boundary
 - `tests/application/evidence/test_evidence_admission.py`
@@ -46,7 +52,11 @@ This package was established in Package S1-B to isolate pure deterministic Evide
 - `tests/architecture/test_architecture_enforcement.py`
 
 ## 11. Current limitations
+- Current atomicity, writer locking, replay, and race behavior is verified only for SQLite.
 - Currently invoked synchronously by reconciliation or recovery helpers.
+- There is no event publisher, service API, worker bootstrap, or CLI.
 
 ## 12. Deferred work
-- Event publishing for Evidence admission events (S4).
+- S2/S3 decomposition of evaluation, governance, Discovery, and validity services remains outside
+  this package.
+- Evidence-admission event publishing remains future work.

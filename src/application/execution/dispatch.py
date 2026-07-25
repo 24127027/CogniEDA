@@ -10,7 +10,7 @@ from typing import Protocol
 from sqlmodel import Session
 
 from agents.executor.types import DataExplorerExecutionContext
-from application.evidence.identity import method_parameter_hash
+from application.execution.identity import method_parameter_hash
 from application.execution.receiver import submit_execution_result
 from application.execution.transition_service import ExecutionAttemptTransitionService
 from db.models import (

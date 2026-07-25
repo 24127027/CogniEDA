@@ -8,7 +8,7 @@ from uuid import UUID
 from pydantic import TypeAdapter
 from sqlmodel import Session
 
-from application.evidence.identity import result_payload_digest
+from application.execution.identity import result_payload_digest
 from db.models import ExecutionInboxRecord
 from schemas.execution.contracts import ExecutionReceiptEnvelope
 

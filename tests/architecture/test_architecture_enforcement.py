@@ -385,6 +385,7 @@ def test_package_s1b_execution_and_evidence_modules_moved_out_of_orchestrator() 
         "src/application/orchestrator/reconciler.py",
         "src/application/orchestrator/transition_service.py",
         "src/application/orchestrator/evidence_admission.py",
+        "src/application/evidence/identity.py",
         "src/schemas/execution_observations.py",
         "src/schemas/data_explorer_contracts.py",
     ]
@@ -450,14 +451,144 @@ def test_package_s1b_no_old_orchestrator_import_paths_remain() -> None:
         "application.orchestrator.reconciler",
         "application.orchestrator.transition_service",
         "application.orchestrator.evidence_admission",
+        "application.evidence.identity",
         "schemas.execution_observations",
         "schemas.data_explorer_contracts",
     ]
     violations: list[str] = []
-    for path in Path("src").rglob("*.py"):
-        source = path.read_text(encoding="utf-8")
-        for forbidden in forbidden_imports:
-            if f"import {forbidden}" in source or f"from {forbidden}" in source:
-                violations.append(f"{path.as_posix()}: {forbidden}")
+    for root in (Path("src"), Path("tests")):
+        for path in root.rglob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                imported_modules: list[str] = []
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    imported_modules.append(node.module)
+                elif isinstance(node, ast.Import):
+                    imported_modules.extend(alias.name for alias in node.names)
+                for imported_module in imported_modules:
+                    if imported_module in forbidden_imports:
+                        violations.append(f"{path.as_posix()}: {imported_module}")
 
-    assert not violations, f"Old import paths found in src: {violations}"
+    assert not violations, f"Old import paths found in active code/tests: {violations}"
+
+
+def test_package_s1b_execution_schema_compatibility_exports_are_removed() -> None:
+    """Execution models must be imported from their canonical schemas.execution owners."""
+
+    forbidden_exports = {
+        "AnalysisFrameObservation",
+        "DataExplorerFailureReason",
+        "DataExplorerFailureResult",
+        "DataExplorerResult",
+        "DataExplorerSuccessResult",
+        "EvidenceObservation",
+        "ExecutionDetails",
+        "ExecutionSpecification",
+        "HypothesisDraft",
+        "PreparedExecution",
+        "TechnicalDiagnostic",
+        "TechnicalRetryDisposition",
+    }
+    violations: list[str] = []
+
+    specialist_path = Path("src/schemas/specialist_contracts.py")
+    specialist_tree = ast.parse(specialist_path.read_text(encoding="utf-8"))
+    for node in ast.walk(specialist_tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "schemas.execution.data_explorer":
+            imported = sorted(alias.name for alias in node.names if alias.name in forbidden_exports)
+            if imported:
+                violations.append(f"{specialist_path.as_posix()}: re-exports {imported}")
+
+    contracts_path = Path("src/schemas/execution/contracts.py")
+    contracts_tree = ast.parse(contracts_path.read_text(encoding="utf-8"))
+    for node in ast.walk(contracts_tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "schemas.execution.observations":
+            imported = sorted(alias.name for alias in node.names if alias.name in forbidden_exports)
+            if imported:
+                violations.append(f"{contracts_path.as_posix()}: re-exports {imported}")
+
+    planner_types_path = Path("src/agents/planner/types.py")
+    planner_tree = ast.parse(planner_types_path.read_text(encoding="utf-8"))
+    for node in ast.walk(planner_tree):
+        if isinstance(node, ast.Assign):
+            names = {
+                target.id
+                for target in node.targets
+                if isinstance(target, ast.Name) and target.id in forbidden_exports
+            }
+            if names:
+                violations.append(
+                    f"{planner_types_path.as_posix()}: aliases {sorted(names)}"
+                )
+        elif isinstance(node, ast.ImportFrom) and node.module == "schemas.execution.observations":
+            imported = sorted(alias.name for alias in node.names if alias.name in forbidden_exports)
+            if imported:
+                violations.append(
+                    f"{planner_types_path.as_posix()}: re-exports {imported}"
+                )
+
+    for root in (Path("src"), Path("tests")):
+        for path in root.rglob("*.py"):
+            if path == specialist_path:
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if not (
+                    isinstance(node, ast.ImportFrom)
+                    and node.module == "schemas.specialist_contracts"
+                ):
+                    continue
+                imported = sorted(
+                    alias.name for alias in node.names if alias.name in forbidden_exports
+                )
+                if imported:
+                    violations.append(
+                        f"{path.as_posix()}: imports compatibility symbols {imported}"
+                    )
+
+    assert not violations, f"Execution-schema compatibility exports remain: {violations}"
+
+
+def test_package_s1b_application_dependency_directions_are_enforced() -> None:
+    """Execution and Evidence contexts may depend only on their explicit neighbors."""
+
+    evidence_allowed_execution_imports = {
+        "application.execution.identity",
+        "application.execution.transition_service",
+    }
+    violations: list[str] = []
+
+    for path in Path("src/application/execution").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom) or not node.module:
+                continue
+            if node.module.startswith("application.orchestrator"):
+                violations.append(f"{path.as_posix()}: imports {node.module}")
+            if (
+                node.module.startswith("application.evidence")
+                and "recovery" not in path.parts
+            ):
+                violations.append(f"{path.as_posix()}: imports {node.module} outside recovery")
+            if node.module.startswith("agents.executor.hypothesis_analyst"):
+                violations.append(f"{path.as_posix()}: imports {node.module}")
+
+    for path in Path("src/application/evidence").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom) or not node.module:
+                continue
+            if (
+                node.module.startswith("application.execution")
+                and node.module not in evidence_allowed_execution_imports
+            ):
+                violations.append(f"{path.as_posix()}: imports {node.module}")
+            if node.module.startswith(
+                (
+                    "application.orchestrator",
+                    "agents.executor.hypothesis_analyst",
+                )
+            ):
+                violations.append(f"{path.as_posix()}: imports {node.module}")
+
+    assert not violations, f"S1-B dependency-direction violations: {violations}"

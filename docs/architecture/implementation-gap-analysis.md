@@ -1,6 +1,6 @@
 # Implementation Gap Analysis
 
-> **Current implementation snapshot:** Gate 0 candidate reviewed 2026-07-24.
+> **Current implementation snapshot:** Package S1-B review candidate, 2026-07-25.
 > Code is the source of truth for current behavior. Local verification audits under
 > `.local/audits/` are ignored working records, not clean-clone documentation authority.
 
@@ -20,6 +20,7 @@
 | Atomic commit | Approved ordered operations and validity changes persist all-or-nothing | Planner, Evidence admission, finalization, validity propagation and Discovery admission each use an application-owned atomic transaction | Implemented for these local SQLite paths; broader cross-service effects remain outside one transaction |
 | Execution attempts | Durable outbox/inbox, fencing, idempotency, cancellation, retry | Transition service and race/recovery tests exist | Implemented locally; no worker bootstrap and external effects remain at-least-once |
 | Evidence admission | Observation-only, deterministic AnalysisFrame/Evidence materialization in one fenced transaction | Active execution finalization routes through fenced transaction, materializes AnalysisFrame and Evidence, advances ExecutionRun to `EVIDENCE_ADMITTED` and Hypothesis to `READY_FOR_EVALUATION` in one atomic commit with zero automatic Discovery creation | Implemented (Package 1 Cutover); active production path terminates at durable Evidence |
+| Execution/Evidence bounded contexts | Execution coordination, Evidence admission, and canonical execution schemas have separate owners | `application.execution`, `application.evidence`, and `schemas.execution` are active; old orchestrator/schema paths and compatibility exports are removed | Implemented by S1-B; remaining evaluation/governance/Discovery/validity decomposition is deferred to S2/S3 |
 | Context type safety | Assumptions only in planning; protected Discovery synthesis | Package 2 builds immutable repository-authoritative evaluation snapshots, a closed provenance manifest, and a complete digest; the Analyst receives only that bundle | Implemented for Hypothesis evaluation; broader Graph Miner and generated-view context remain absent |
 | Discovery admission governance | Exact persisted proposal and independently authorized decision produce one atomic Discovery chain | Package 5 resolves authenticated principal context through an injected adapter, persists an exact decision, durably claims admission, reconstructs under the SQLite writer lock, and atomically commits Discovery plus lifecycle, decision, claim and conclusion-frame companions | Implemented locally for SQLite; the product composition root still needs a real authentication adapter |
 | Validity propagation | One authorized source event atomically invalidates every applicable dependent and current retrieval path | Package 4 supports eight typed DataProfile, AnalysisFrame, Evidence, ExecutionRun, conflict, supersession, invalidation, and provenance-corruption events through one fenced transaction and immutable event record | Implemented locally; no production authority issuer, only explicit SQLite upgrade/trigger support |
@@ -43,7 +44,8 @@
   (`src/application/orchestrator/atomic_discovery_admission.py`,
   `src/repositories/discovery_repository.py`, `src/schemas/artifacts.py`).
 - Failed execution creates no Evidence/Discovery, and Evidence admission is fenced and atomic
-  (`src/application/orchestrator/finalizer.py:24-188`).
+  (`src/application/execution/recovery/evidence_admission_recovery.py`,
+  `src/application/evidence/admission_service.py`).
 - Local Discovery Synthesis projection excludes Assumptions, Tasks and existing Discoveries
   (`src/memory/session_frame.py:196-251`).
 

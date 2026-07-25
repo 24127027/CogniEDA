@@ -23,7 +23,7 @@ from schemas.execution.contracts import (
     HypothesisDraft,
     PreparedExecution,
 )
-from schemas.specialist_contracts import (
+from schemas.execution.data_explorer import (
     DataExplorerFailureReason,
     DataExplorerFailureResult,
     DataExplorerResult,

@@ -10,11 +10,7 @@ from uuid import UUID, uuid5
 
 from pydantic import BaseModel
 
-from application.evidence.identity import (
-    canonical_sha256,
-    method_parameter_hash,
-    result_payload_digest,
-)
+from application.execution.identity import method_parameter_hash, result_payload_digest
 from db.models import (
     DataProfileRecord,
     ExecutionInboxRecord,
@@ -23,6 +19,7 @@ from db.models import (
     TaskRecord,
 )
 from schemas.artifacts import Evidence
+from schemas.canonical import canonical_sha256
 from schemas.common import EvidenceProvenance
 from schemas.enums import (
     DataProfileLifecycleState,

@@ -65,7 +65,7 @@ persisted approval record, so commit is not a universal authorization boundary.
 | Hypothesis operationalization | Implemented but architecturally misaligned | Planner Task decomposition and `prepare_execution` compile the contract; Hypothesis Analyst is a stub (`src/agents/planner/types.py:357-483`, `src/agents/planner/nodes.py:971-1147`). |
 | Approval/admission | Implemented narrow path | Durable approval, revalidation, Hypothesis/Run/outbox atomic admission (`src/agents/planner/nodes.py:1151-1297`, `1599-1914`). |
 | Data Explorer execution | Contract and bootstrap implemented; adapter absent | The composition root requires explicit Data Explorer registration and does not register Graph Miner (`src/application/runtime.py`). |
-| Result receipt | Implemented locally | Worker reconstructs durable identity and receiver stores a fenced digest (`src/application/orchestrator/dispatcher.py:27-134`, `receiver.py:16-76`). |
+| Result receipt | Implemented locally | `application.execution.dispatch` reconstructs durable identity and `application.execution.receiver` stores a fenced digest. |
 | Evidence production | Implemented locally | Canonical observations are materialized as AnalysisFrame/Evidence by the fenced atomic Evidence-admission transaction. |
 | Evidence evaluation/Discovery | Implemented locally | Hypothesis Analyst evaluates only the protected bundle; an exact durable decision gates atomic Discovery admission. |
 | Conflict/staleness review | Stub/partial utilities | Review nodes are placeholders; repository propagation and bounded retrieval provide only narrow signals (`src/agents/planner/nodes.py:1582-1595`, `src/application/orchestrator/review_propagation.py:13-48`). |
@@ -77,10 +77,10 @@ persisted approval record, so commit is not a universal authorization boundary.
 - PydanticAI owns LLM structured-output validation and bounded model retries.
 - LangGraph owns deterministic routing, interrupts, checkpoints, and resume state only.
 - Application transition services own leases, fencing, result idempotency, cancellation, and
-  technical retries (`src/application/orchestrator/transition_service.py`).
+  technical retries (`src/application/execution/transition_service.py`).
 - Repositories and commit own domain validation and transaction rollback.
 - A failed execution retains ExecutionRun/inbox provenance but creates no Evidence or Discovery
-  (`src/application/orchestrator/finalizer.py:168-188`).
+  (`src/application/execution/recovery/evidence_admission_recovery.py`).
 - A changed scientific contract requires a new governed proposal; it is not a technical retry.
 
 ## Runtime Entry-Point Reality

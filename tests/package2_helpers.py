@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 from sqlmodel import Session
 
-from application.evidence.identity import method_parameter_hash
+from application.execution.identity import method_parameter_hash
 from application.orchestrator.discovery_admission_governance import (
     ALLOWED_TRUSTED_OPERATION_TYPES,
     ALLOWED_TRUSTED_PURPOSES,

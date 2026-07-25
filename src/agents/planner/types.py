@@ -24,12 +24,6 @@ from schemas.enums import (
     TaskLifecycleState,
 )
 from schemas.execution import contracts as execution_contracts
-from schemas.execution.observations import (
-    AnalysisFrameObservation as AnalysisFrameObservation,
-)
-from schemas.execution.observations import (
-    EvidenceObservation as EvidenceObservation,
-)
 from schemas.planner_operations import (
     AssumptionStateUpdateOperationPayload,
     ConflictFlagOperationPayload,
@@ -41,10 +35,6 @@ from schemas.planner_operations import (
     TaskStateChangeOperationPayload,
     TaskUpdateOperationPayload,
 )
-
-ExecutionSpecification = execution_contracts.ExecutionSpecification
-HypothesisDraft = execution_contracts.HypothesisDraft
-PreparedExecution = execution_contracts.PreparedExecution
 
 PlannerIntent = Literal[
     "answer",
@@ -688,7 +678,7 @@ class State(BaseModel):
     execution_preparation: ExecutionPreparation | None = None
     preparation_phase: Literal["draft", "claim"] = "draft"
     execution_revalidation: ExecutionRevalidation | None = None
-    prepared_execution: PreparedExecution | None = None
+    prepared_execution: execution_contracts.PreparedExecution | None = None
     execution_admission: ExecutionAdmission | None = None
     evidence_admission: EvidenceAdmission | None = None
     execution_review: ExecutionReviewResult | None = None
