@@ -6,6 +6,10 @@
 The operational rationale is owned by
 [Runtime and composition boundary](../runtime-and-composition-boundary.md) and
 [Persistence and transaction ownership](../persistence-and-transaction-ownership.md).
+Planner coordination is owned by
+[Planner boundary and operation model](../planner-boundary-and-operation-model.md);
+retrieval ranking and scale are owned by
+[Retrieval strategy and scaling](../retrieval-strategy-and-scaling.md).
 This page remains a contributor-facing package map.
 
 | Module | Owns | Must not own | Runtime entry |

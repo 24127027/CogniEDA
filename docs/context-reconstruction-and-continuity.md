@@ -227,5 +227,10 @@ is under `src/application/`.
 Focused verification is under `tests/memory/`, `tests/agents/planner/`,
 `tests/application/`, `tests/repositories/`, and `tests/e2e/`.
 
+Selection and checkpoint limits continue in
+[SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md).
+The product-process gap continues in
+[Product surface and bootstrap boundary](product-surface-and-bootstrap-boundary.md).
+
 Continue with the running example in
 [From research state to active context](from-research-state-to-active-context.md).

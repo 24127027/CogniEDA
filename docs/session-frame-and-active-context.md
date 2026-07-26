@@ -251,5 +251,7 @@ Focused verification is under `tests/memory/`, `tests/agents/planner/`,
 Continue with
 [Retrieval and context type safety](retrieval-and-context-type-safety.md), then
 [Context reconstruction and continuity](context-reconstruction-and-continuity.md).
+Selection, succession, checkpoint, and scaling limits are owned by
+[SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md).
 Validity-change consequences continue in
 [Invalidation and active retrieval](invalidation-and-active-retrieval.md).

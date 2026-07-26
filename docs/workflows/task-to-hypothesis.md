@@ -1,8 +1,13 @@
 # Task-to-Hypothesis Workflow
 
-> **Implementation status:** Partial planner workflow, verified at the library
-> and SQLite integration levels. Natural-language planning branches remain
-> scaffold-level.
+> **Implementation status:** **Partially implemented** and **Verified on
+> SQLite** for the fresh execution-contract path. Natural-language planning
+> branches and existing-Hypothesis reuse remain incomplete.
+
+The canonical Planner owner is
+[Planner boundary and operation model](../planner-boundary-and-operation-model.md);
+the request-to-approval narrative is
+[From user request to approved operation](../from-user-request-to-approved-operation.md).
 
 ## Implemented path
 
@@ -19,8 +24,8 @@ Planner nodes stage durable `PlannerOperation` and `ExecutionApproval` workflow
 records. Approved ordinary research-state operations are committed through
 `src/application/orchestrator/planner_commit.py`. Execution approval is
 revalidated against current Task and DataProfile state before
-`commit_execution_contract` creates or transitions the single Hypothesis and
-stages execution admission.
+`commit_execution_contract` creates the single Hypothesis and stages execution
+admission on the fresh path.
 
 ## Protected invariants
 
@@ -41,3 +46,7 @@ after exact execution-contract approval. Planner nodes still open SQLModel
 sessions and know repository/record types; this is documented non-blocking
 application-boundary debt. The supported Planner commit path rejects generic
 creation of `AnalysisFrame`, `Evidence`, and `Discovery`.
+
+The current existing-Hypothesis branch proposes a generic Hypothesis-state
+change that execution-bundle validation rejects because the transition service
+owns that lifecycle. It fails closed but is not a supported reuse path.

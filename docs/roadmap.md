@@ -77,5 +77,9 @@ Future capability work must not:
 
 For a source-oriented list of current gaps, see
 [Implementation gap analysis](architecture/implementation-gap-analysis.md).
+The prerequisite boundary for the next product slice is
+[Product surface and bootstrap boundary](product-surface-and-bootstrap-boundary.md);
+Planner extraction triggers are in
+[Planner boundary and operation model](planner-boundary-and-operation-model.md).
 For the conceptual reading path, return to the
 [documentation index](index.md).

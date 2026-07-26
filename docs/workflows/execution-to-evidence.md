@@ -7,6 +7,8 @@
 The reader-first workflow is
 [From execution to Discovery](../from-execution-to-discovery.md), and the
 authority rationale is [Scientific authority](../scientific-authority.md).
+The preceding approval boundary is
+[From user request to approved operation](../from-user-request-to-approved-operation.md).
 This page retains the technical execution-to-Evidence sequence.
 
 ## Transaction sequence

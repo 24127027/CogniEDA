@@ -1,6 +1,10 @@
 # CogniEDA Project Purpose and Epistemic Core
 
-> **Implementation status:** The research-state core, protected scientific admission paths, and their SQLite transaction semantics are implemented. Product bootstrap, concrete executor/model adapters, DVC, cache, and several Planner branches remain partial or absent.
+> **Implementation status:** The research-state core and protected scientific
+> admission paths are **Implemented**, with transaction behavior **Verified on
+> SQLite**. Product bootstrap and production adapters are **Unsupported**;
+> executable DVC, cache, and several Planner branches are **Partially
+> implemented**, **Deferred**, or **Unsupported**.
 
 CogniEDA is a **governed research-state system for analytical investigation**. It bridges the critical gap between ungrounded natural-language reasoning and rigorous data analysis by providing validity-preserving research-state infrastructure.
 
@@ -58,3 +62,6 @@ To preserve architectural integrity, CogniEDA is explicitly **not**:
 * Scientific Authority: [scientific-specialist-contracts.md](architecture/scientific-specialist-contracts.md)
 * Research State Model: [research-state-model.md](architecture/research-state-model.md)
 * Structural Exit Status: [structural-exit-status.md](architecture/structural-exit-status.md)
+* Planner Boundary: [planner-boundary-and-operation-model.md](planner-boundary-and-operation-model.md)
+* Retrieval Strategy: [retrieval-strategy-and-scaling.md](retrieval-strategy-and-scaling.md)
+* Product Surface: [product-surface-and-bootstrap-boundary.md](product-surface-and-bootstrap-boundary.md)

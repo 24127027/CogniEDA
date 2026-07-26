@@ -1,13 +1,18 @@
 # Session Resume and Retrieval Workflow
 
-> **Implementation status:** Implemented as library-level append/read/projection
-> and bounded SQL retrieval. No production workspace-open or UI resume bootstrap
-> exists.
+> **Implementation status:** **Partially implemented**. Library-level
+> append/read/projection, bounded SQL retrieval, and narrow durable approval
+> resume exist; no production workspace-open, durable graph checkpoint, or UI
+> resume bootstrap exists.
 
 The canonical owner is
 [Context reconstruction and continuity](../context-reconstruction-and-continuity.md);
 [Retrieval and context type safety](../retrieval-and-context-type-safety.md)
-owns admissibility and ranking; and
+owns admissibility;
+[Retrieval strategy and scaling](../retrieval-strategy-and-scaling.md)
+owns ranking and budget decisions;
+[SessionFrame scaling and resume boundary](../session-frame-scaling-and-resume-boundary.md)
+owns selection and checkpoint limits; and
 [Invalidation and active retrieval](../invalidation-and-active-retrieval.md)
 owns validity-change consequences. This page retains the compact technical
 sequence.
@@ -45,3 +50,7 @@ frame in the workspace database and invoking the context builder. Current lookup
 does not filter by application session, Objective, or branch. The repository
 does not yet ship a CLI, API, or process bootstrap that maps a filesystem
 workspace open into this sequence automatically.
+
+Durable PlannerOperation and ExecutionApproval records can restore their exact
+pending workflow state by identity. The default LangGraph `MemorySaver` cannot
+restore arbitrary graph progress after a process restart.

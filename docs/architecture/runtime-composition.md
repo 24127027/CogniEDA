@@ -5,6 +5,8 @@
 
 The reader-facing rationale and deployment boundary are owned by
 [Runtime and composition boundary](../runtime-and-composition-boundary.md).
+Unsupported product processes and bootstrap prerequisites are owned by
+[Product surface and bootstrap boundary](../product-surface-and-bootstrap-boundary.md).
 This page retains source-level composition orientation.
 
 ## Current implementation

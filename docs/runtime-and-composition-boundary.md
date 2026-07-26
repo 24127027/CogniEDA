@@ -158,6 +158,11 @@ authority.
 
 ## Related canonical concepts
 
+- [Product surface and bootstrap boundary](product-surface-and-bootstrap-boundary.md)
+  owns the unsupported product-process inventory and coherent bootstrap
+  prerequisites.
+- [Planner boundary and operation model](planner-boundary-and-operation-model.md)
+  owns proposal, approval, resume, and commit delegation after composition.
 - [Persistence and transaction ownership](persistence-and-transaction-ownership.md)
   explains the writers composed behind the runtime.
 - [SQLite boundary and portability](sqlite-boundary-and-portability.md) defines

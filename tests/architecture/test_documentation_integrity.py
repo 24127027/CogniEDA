@@ -46,6 +46,13 @@ PHASE_3B1_CANONICAL_PAGES = (
     DOCS_ROOT / "database-initialization-and-migrations.md",
     DOCS_ROOT / "from-runtime-composition-to-atomic-persistence.md",
 )
+PHASE_3B2_CANONICAL_PAGES = (
+    DOCS_ROOT / "planner-boundary-and-operation-model.md",
+    DOCS_ROOT / "from-user-request-to-approved-operation.md",
+    DOCS_ROOT / "retrieval-strategy-and-scaling.md",
+    DOCS_ROOT / "session-frame-scaling-and-resume-boundary.md",
+    DOCS_ROOT / "product-surface-and-bootstrap-boundary.md",
+)
 CORE_EPISTEMIC_ADRS = (
     DOCS_ROOT / "decisions" / "ADR-001-first-class-research-state.md",
     DOCS_ROOT / "decisions" / "ADR-002-assumption-quarantine.md",
@@ -56,7 +63,16 @@ CORE_EPISTEMIC_ADRS = (
 SQLITE_BOUNDARY_ADR = (
     DOCS_ROOT / "decisions" / "ADR-006-sqlite-supported-boundary.md"
 )
-COMPLETE_DECISION_ANATOMY_ADRS = (*CORE_EPISTEMIC_ADRS, SQLITE_BOUNDARY_ADR)
+PRODUCT_BOOTSTRAP_ADR = (
+    DOCS_ROOT
+    / "decisions"
+    / "ADR-007-no-supported-cli-before-product-bootstrap.md"
+)
+COMPLETE_DECISION_ANATOMY_ADRS = (
+    *CORE_EPISTEMIC_ADRS,
+    SQLITE_BOUNDARY_ADR,
+    PRODUCT_BOOTSTRAP_ADR,
+)
 PHASE_3A_DECISION_PAGES = (*PHASE_3A_CANONICAL_PAGES, *CORE_EPISTEMIC_ADRS)
 CANONICAL_READER_PAGES = (
     *PHASE_1_CANONICAL_PAGES,
@@ -64,6 +80,7 @@ CANONICAL_READER_PAGES = (
     *PHASE_2A_CANONICAL_PAGES,
     *PHASE_2B_CANONICAL_PAGES,
     *PHASE_3B1_CANONICAL_PAGES,
+    *PHASE_3B2_CANONICAL_PAGES,
 )
 CANONICAL_FOUNDATION = (ROOT_README, DOCS_ROOT / "index.md", *CANONICAL_READER_PAGES)
 READER_FACING_CURRENT_STATE_PAGES = (
@@ -78,6 +95,7 @@ CHECKOUT_EVIDENCE_GUARDED_PAGES = (
     *CANONICAL_FOUNDATION,
     *CORE_EPISTEMIC_ADRS,
     SQLITE_BOUNDARY_ADR,
+    PRODUCT_BOOTSTRAP_ADR,
     *READER_FACING_CURRENT_STATE_PAGES,
 )
 
@@ -444,7 +462,9 @@ def test_recent_canonical_pages_use_canonical_status_labels() -> None:
         *PHASE_2B_CANONICAL_PAGES,
         *PHASE_3A_DECISION_PAGES,
         *PHASE_3B1_CANONICAL_PAGES,
+        *PHASE_3B2_CANONICAL_PAGES,
         SQLITE_BOUNDARY_ADR,
+        PRODUCT_BOOTSTRAP_ADR,
     ):
         content = doc.read_text(encoding="utf-8")
         emphasized = re.findall(r"\*\*([^*\n]+)\*\*", content)
@@ -636,6 +656,123 @@ def test_operational_docs_reject_backend_and_enforcement_overclaims() -> None:
                 violations.append(f"{doc.as_posix()}: {label}")
 
     assert not violations, f"Operational-boundary overclaims found: {violations}"
+
+
+def test_phase_3b2_docs_preserve_planner_retrieval_resume_and_product_boundaries() -> None:
+    """Planner coordination and product seams must not acquire false authority."""
+
+    planner = PHASE_3B2_CANONICAL_PAGES[0].read_text(encoding="utf-8")
+    workflow = PHASE_3B2_CANONICAL_PAGES[1].read_text(encoding="utf-8")
+    retrieval = PHASE_3B2_CANONICAL_PAGES[2].read_text(encoding="utf-8")
+    session_frame = PHASE_3B2_CANONICAL_PAGES[3].read_text(encoding="utf-8")
+    product = PHASE_3B2_CANONICAL_PAGES[4].read_text(encoding="utf-8")
+
+    required_terms = {
+        "Planner boundary": (
+            planner,
+            (
+                "It does not own scientific truth",
+                "NON-BLOCKING DOCUMENTED DEBT",
+                "direct durable mutation bypass",
+                "commit_planner_operations",
+            ),
+        ),
+        "approval workflow": (
+            workflow,
+            (
+                "raw user request",
+                "durable PlannerOperation or execution approval",
+                "repository-current revalidation",
+                "commit or fail closed",
+            ),
+        ),
+        "retrieval boundary": (
+            retrieval,
+            (
+                "Ranking may choose among admissible candidates",
+                "default `LexicalScorer`",
+                "request `objective_id` not used as a filter",
+                "request `session_frame_id` not independently bound",
+                "Graph Miner",
+            ),
+        ),
+        "SessionFrame boundary": (
+            session_frame,
+            (
+                "database-global",
+                "`session_id`, `user_id`, or `objective_id`",
+                "LangGraph default `MemorySaver`",
+                "not complete restart-safe product continuity",
+            ),
+        ),
+        "product boundary": (
+            product,
+            (
+                "in-process application runtime",
+                "does not yet have a supported product process",
+                "contains orientation only",
+                "minimum coherent product boundary",
+            ),
+        ),
+    }
+    missing = [
+        f"{label}: {term}"
+        for label, (content, terms) in required_terms.items()
+        for term in terms
+        if re.sub(r"\s+", " ", term.casefold())
+        not in re.sub(r"\s+", " ", content.casefold())
+    ]
+    assert not missing, f"Phase 3B-2 boundary statements are incomplete: {missing}"
+
+    combined = "\n".join(
+        page.read_text(encoding="utf-8") for page in PHASE_3B2_CANONICAL_PAGES
+    )
+    forbidden_patterns = {
+        "Planner scientific authorship": re.compile(
+            r"\bPlanner nodes? (?:author|create|materialize)s? "
+            r"(?:`?Evidence`?|`?Discover(?:y|ies)`?)\b",
+            re.IGNORECASE,
+        ),
+        "Planner scientific transaction ownership": re.compile(
+            r"\bPlanner nodes? (?:are|serve as|act as) (?:the )?"
+            r"(?:scientific )?transaction owners?\b",
+            re.IGNORECASE,
+        ),
+        "implemented scaffold path": re.compile(
+            r"\b(?:answer|suggestion|result review|conflict review|project closure)"
+            r"(?: path| workflow)?\b[^.\n]{0,80}\b(?:is|are|remains?) "
+            r"\*\*Implemented\*\*",
+            re.IGNORECASE,
+        ),
+        "implemented semantic or Graph Miner path": re.compile(
+            r"\b(?:semantic retrieval|vector retrieval|Graph Miner)\b"
+            r".{0,100}\*\*Implemented\*\*",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "fully scoped SessionFrame": re.compile(
+            r"\bSessionFrame\b.{0,100}\bfully "
+            r"(?:user|session|Objective|branch)[-\s]scoped\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "durable in-memory checkpoint": re.compile(
+            r"\bMemorySaver\b.{0,100}\b(?:durable|restart-safe)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "runtime advertised as product process": re.compile(
+            r"\bCogniEDARuntime\b.{0,100}\b(?:is|provides) (?:a )?"
+            r"(?:CLI|HTTP API|worker|daemon)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "implemented bootstrap directory": re.compile(
+            r"\bapplication/bootstrap\b.{0,100}\b(?:is|provides) "
+            r"(?:an? )?(?:implemented|production) bootstrap\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+    }
+    violations = [
+        label for label, pattern in forbidden_patterns.items() if pattern.search(combined)
+    ]
+    assert not violations, f"Phase 3B-2 authority overclaims found: {violations}"
 
 
 def test_phase_3a_decisions_preserve_core_epistemic_boundaries() -> None:

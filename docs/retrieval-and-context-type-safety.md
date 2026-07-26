@@ -269,5 +269,6 @@ Focused verification is under `tests/memory/`, `tests/architecture/`,
 `tests/application/`, and `tests/e2e/`.
 
 Return to [SessionFrame and active context](session-frame-and-active-context.md),
-or continue to
+continue to [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md)
+for ranking, budget, and scaling decisions, or continue to
 [Context reconstruction and continuity](context-reconstruction-and-continuity.md).

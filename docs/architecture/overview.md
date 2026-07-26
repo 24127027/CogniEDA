@@ -7,12 +7,16 @@ Reader-first concept owners:
 [Scientific authority](../scientific-authority.md),
 [Protected evaluation context](../protected-evaluation-context.md), and
 [Governance and Discovery admission](../governance-and-discovery-admission.md),
+[Planner boundary and operation model](../planner-boundary-and-operation-model.md),
 [SessionFrame and active context](../session-frame-and-active-context.md),
 [Retrieval and context type safety](../retrieval-and-context-type-safety.md),
+[Retrieval strategy and scaling](../retrieval-strategy-and-scaling.md),
 [Context reconstruction and continuity](../context-reconstruction-and-continuity.md),
-[Validity over time](../validity-over-time.md), and
+[SessionFrame scaling and resume boundary](../session-frame-scaling-and-resume-boundary.md),
+[Validity over time](../validity-over-time.md),
 [Atomic validity propagation](../atomic-validity-propagation.md),
 [Runtime and composition boundary](../runtime-and-composition-boundary.md),
+[Product surface and bootstrap boundary](../product-surface-and-bootstrap-boundary.md),
 [Persistence and transaction ownership](../persistence-and-transaction-ownership.md),
 and [SQLite boundary and portability](../sqlite-boundary-and-portability.md).
 This page remains a source-oriented architecture summary.
@@ -45,6 +49,11 @@ Implemented paths include approval-gated Planner operations, fenced execution at
 AnalysisFrame/Evidence admission, protected evaluation, durable governance decisions, atomic
 Discovery admission, validity propagation, bounded Discovery retrieval, and SessionFrame
 snapshots.
+
+Planner answer, suggestion, result-review, conflict-review, durable graph
+pause/resume, and project-closure paths are not complete. The current Planner
+opens repository sessions directly, but its generic commit fails closed for
+Evidence, Discovery, and protected terminal scientific transitions.
 
 ## Target design and unsupported surfaces
 

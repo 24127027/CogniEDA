@@ -193,6 +193,7 @@ admission guarantee. Those are **Unsupported** deployment possibilities or
 ## Related canonical concepts
 
 - [Runtime and composition boundary](runtime-and-composition-boundary.md)
+- [Product surface and bootstrap boundary](product-surface-and-bootstrap-boundary.md)
 - [Persistence and transaction ownership](persistence-and-transaction-ownership.md)
 - [SQLite boundary and portability](sqlite-boundary-and-portability.md)
 - [Database initialization and migrations](database-initialization-and-migrations.md)

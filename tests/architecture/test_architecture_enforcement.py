@@ -334,6 +334,39 @@ def test_planner_scientific_writers_and_terminal_transitions_fail_closed() -> No
     assert "generic PlannerOperation cannot set EVALUATED state" in source
 
 
+def test_planner_nodes_do_not_author_scientific_records_and_delegate_execution() -> None:
+    """Planner proposals cannot become Evidence/Discovery or own attempt admission."""
+
+    forbidden_operation_types = {
+        "CREATE_ANALYSIS_FRAME",
+        "CREATE_EVIDENCE",
+        "CREATE_DISCOVERY",
+    }
+    violations: list[str] = []
+    for path in Path("src/agents/planner").glob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and _called_name(node) in {
+                "Evidence",
+                "Discovery",
+            }:
+                violations.append(f"{path.as_posix()}: constructs {_called_name(node)}")
+            if isinstance(node, ast.Attribute) and node.attr in forbidden_operation_types:
+                violations.append(f"{path.as_posix()}: proposes {node.attr}")
+
+    assert not violations, f"Planner scientific-authority bypasses: {violations}"
+
+    planner_source = Path("src/agents/planner/nodes.py").read_text(encoding="utf-8")
+    commit_source = Path(
+        "src/application/orchestrator/planner_commit.py"
+    ).read_text(encoding="utf-8")
+    assert "build_execution_admission_operations" in planner_source
+    assert "commit_planner_operations" in planner_source
+    assert "ExecutionAttemptTransitionService(session)" in commit_source
+    assert "stage_hypothesis_testing_for_execution" in commit_source
+    assert "stage_admit_attempt" in commit_source
+
+
 def test_production_has_no_test_model_or_graph_miner_registration() -> None:
     """Deployment composition must supply real adapters and register Data Explorer only."""
 

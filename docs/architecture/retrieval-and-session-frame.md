@@ -7,7 +7,9 @@
 Canonical reader explanations:
 [SessionFrame and active context](../session-frame-and-active-context.md),
 [Retrieval and context type safety](../retrieval-and-context-type-safety.md),
-[Context reconstruction and continuity](../context-reconstruction-and-continuity.md), and
+[Retrieval strategy and scaling](../retrieval-strategy-and-scaling.md),
+[Context reconstruction and continuity](../context-reconstruction-and-continuity.md),
+[SessionFrame scaling and resume boundary](../session-frame-scaling-and-resume-boundary.md), and
 [Invalidation and active retrieval](../invalidation-and-active-retrieval.md).
 This page retains the concise source-oriented reference.
 
@@ -46,6 +48,11 @@ context-only rather than removed before ranking; no independent operation-scope 
 The request's Objective and SessionFrame identifiers do not filter the repository query. A
 superseded SessionFrame is not returned by `get_latest_active`, and supported Planner call sites
 reject it before retrieval.
+
+Operational ranking, budget distortion, commit-time profile revalidation, and
+semantic-scaling triggers belong to the retrieval-strategy owner above. Frame
+selection, global latest semantics, checkpointing, and product resume belong to
+the SessionFrame-scaling owner.
 
 ## Deferred work
 

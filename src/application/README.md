@@ -4,6 +4,10 @@
 > [Runtime and composition boundary](../../docs/runtime-and-composition-boundary.md)
 > and
 > [Persistence and transaction ownership](../../docs/persistence-and-transaction-ownership.md).
+> Planner and product-process boundaries:
+> [Planner boundary and operation model](../../docs/planner-boundary-and-operation-model.md)
+> and
+> [Product surface and bootstrap boundary](../../docs/product-surface-and-bootstrap-boundary.md).
 > Contributor maps:
 > [Bounded Contexts](../../docs/architecture/bounded-contexts.md) and
 > [Architecture Overview](../../docs/architecture/overview.md).

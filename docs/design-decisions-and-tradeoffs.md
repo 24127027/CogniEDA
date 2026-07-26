@@ -18,9 +18,10 @@ the ADRs preserve the identity of individual decisions.
 > SessionFrame seams described here are **Implemented** or **Partially
 > implemented** as identified per decision. Transaction and concurrency claims
 > are **Verified on SQLite** only. The current runtime, persistence ownership,
-> SQLite, initialization, and migration decisions are reconstructed below.
-> Product bootstrap, Planner/retrieval follow-up, distributed execution, and
-> deployment topology remain **Deferred**.
+> SQLite, initialization, migration, Planner, retrieval, SessionFrame-scaling,
+> and product-surface decisions are reconstructed below. Concrete production
+> adapters, product bootstrap, semantic retrieval, distributed execution, and
+> deployment topology remain **Deferred** or **Unsupported**.
 
 ## How CogniEDA classifies a decision
 
@@ -83,7 +84,22 @@ above. Package names are implementation orientation, not invariants.
 | Decision | Classification | Current status | Durable obligation or limitation | Canonical owner |
 | --- | --- | --- | --- | --- |
 | in-process runtime | Current-stage implementation choice | **Implemented** | keep one visible, fail-closed composition boundary even if the topology changes | [Runtime and composition boundary](runtime-and-composition-boundary.md) |
-| `runtime_loader` external-factory seam | Durable operational boundary | **Implemented** | deployment supplies adapters and credentials explicitly; the environment hook itself may change | [Runtime and composition boundary](runtime-and-composition-boundary.md#what-runtimeloader-owns) |
+| `runtime_loader` external-factory seam | Partially implemented product seam | **Implemented** | deployment supplies adapters and credentials explicitly; loading a runtime is not product bootstrap | [Product surface and bootstrap boundary](product-surface-and-bootstrap-boundary.md#the-runtime-factory-seam) |
+| `PlannerOperation` staging | Durable operational boundary | **Implemented** | preserve typed, session-bound, inspectable proposals before mutation | [Planner boundary and operation model](planner-boundary-and-operation-model.md#planneroperation-is-pending-workflow-state) |
+| Planner direct repository reads | Known temporary deviation | **Implemented** | bounded reads do not confer lifecycle or scientific authority | [Planner boundary and operation model](planner-boundary-and-operation-model.md#persistence-access-classification) |
+| Planner session construction | Known temporary deviation | **Implemented** | local composition remains visible but should move behind a facade when topology expands | [Planner boundary and operation model](planner-boundary-and-operation-model.md#why-facade-extraction-is-deferred) |
+| Planner approval-record writes | Known temporary deviation | **Implemented** | workflow metadata may be direct today; exact approval and scientific ownership must remain separate | [Planner boundary and operation model](planner-boundary-and-operation-model.md#approval-and-resume-boundaries) |
+| Planner commit node | Durable operational boundary | **Implemented** | coordinate the canonical transaction owner without becoming a scientific writer | [Planner boundary and operation model](planner-boundary-and-operation-model.md#what-the-planner-owns) |
+| execution-contract coordination | Partially implemented product seam | **Partially implemented** | fresh admission is atomic; existing-Hypothesis reuse and approved-failure recovery remain incomplete | [Planner boundary and operation model](planner-boundary-and-operation-model.md#execution-contract-coordination) |
+| Planner application-facade extraction | Deferred design decision | **Deferred** | extract on topology, approval, reuse, or isolation triggers without weakening delegation | [Planner boundary and operation model](planner-boundary-and-operation-model.md#why-facade-extraction-is-deferred) |
+| lexical retrieval | Current-stage implementation choice | **Implemented** | ranking follows authority and may be replaced without weakening admissibility | [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md#lexical-scoring-is-a-current-stage-choice) |
+| bounded recent retrieval window | Current-stage implementation choice | **Implemented** | bounded cost accepts recall loss for older unreferenced Discoveries | [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md#current-retrieval-pipeline) |
+| wrong-profile context-only candidates | Known temporary deviation | **Implemented** fail-closed | candidates cannot motivate work but may consume the result budget | [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md#known-retrieval-deviations) |
+| operation-scope retrieval filter | Deferred design decision | **Deferred** | lexical scope similarity is not scientific admissibility | [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md#scope-is-not-a-lexical-fact) |
+| SessionFrame successor snapshots | Durable operational boundary | **Implemented** | preserve visible succession and historical context without in-place rewrite | [SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md#snapshot-succession) |
+| database-global latest-active frame | Known temporary deviation | **Implemented** | selection is not user, session, Objective, or branch scoped | [SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md#selection-is-currently-database-global) |
+| in-memory graph checkpointing | Current-stage implementation choice | **Implemented** in process only | never equate process-local graph state with restart-safe continuity | [SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md#checkpoint-and-resume-seams) |
+| durable approval resume | Partially implemented product seam | **Partially implemented** | exact records survive restart; complete conversation and graph progress do not | [SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md#checkpoint-and-resume-seams) |
 | application-owned transactions | Durable operational boundary | **Verified on SQLite** | one owner commits every load-bearing scientific write set or none of it | [Persistence and transaction ownership](persistence-and-transaction-ownership.md#current-transaction-owners) |
 | repository adapters | Durable operational boundary | **Implemented** | repositories stage and query; they do not become workflow or scientific-authority owners | [Persistence and transaction ownership](persistence-and-transaction-ownership.md#repositories-are-adapters) |
 | private transaction staging | Durable operational boundary | **Implemented** with convention-level privacy | preserve non-committing staging even if the language-level API changes | [Persistence and transaction ownership](persistence-and-transaction-ownership.md#why-staging-hooks-are-private) |
@@ -95,7 +111,7 @@ above. Package names are implementation orientation, not invariants.
 | fail-closed legacy quarantine | Durable operational boundary | **Verified on SQLite** | preserved data does not gain scientific legitimacy without verifiable lineage and authority | [Database initialization and migrations](database-initialization-and-migrations.md#legacy-quarantine) |
 | SQLite writer-serialization concurrency model | SQLite-specific mechanism | **Verified on SQLite** | another backend needs explicit isolation, locking, ordering, and race verification | [SQLite boundary and portability](sqlite-boundary-and-portability.md#sqlite-specific-mechanisms) |
 | another database backend | Deferred portability decision | **Deferred** | repository abstraction alone cannot establish support | [SQLite boundary and portability](sqlite-boundary-and-portability.md#requirements-before-another-backend-is-supported) |
-| packaged CLI, API, worker, or daemon | Unsupported deployment possibility | **Unsupported** | requires a separate product-bootstrap and operational-ownership decision | [Runtime and composition boundary](runtime-and-composition-boundary.md) |
+| packaged CLI, API, worker, or daemon | Unsupported product surface | **Unsupported** | requires production identity, adapters, durable coordination, recovery, and one coherent integration slice | [Product surface and bootstrap boundary](product-surface-and-bootstrap-boundary.md) |
 
 ## 1. Typed research state instead of conversation history
 
@@ -713,12 +729,18 @@ The following mechanisms are not foundational invariants:
 | in-process runtime composition | Current-stage implementation choice | composition is **Implemented**; product bootstrap and automatic operational recovery are **Unsupported** |
 | `db.models` compatibility facade | Known temporary deviation | deterministic registration is **Implemented**; bounded model modules remain the physical owners |
 | targeted in-code migration sequence | Known temporary deviation | upgrades are **Verified on SQLite**; an immutable revision registry and general downgrade path are **Unsupported** |
-| deterministic lexical scoring | Current-stage implementation choice | ranking may change after admissibility; retrieval implementation belongs to the operational decision follow-up |
+| `PlannerOperation` staging | Durable operational boundary | approval and replay are **Implemented**; added workflow records and evolving operation schemas are accepted costs |
+| direct Planner persistence composition | Known temporary deviation | bounded reads and workflow-record writes are **Implemented**; no alternate scientific writer was found |
+| execution-contract coordination | Partially implemented product seam | fresh admission is atomic; approved-failure recovery and existing-Hypothesis reuse are **Known deviation** |
+| deterministic lexical scoring | Current-stage implementation choice | ranking is **Implemented** after lifecycle handling; semantic or vector retrieval is **Deferred** |
 | database-global latest-active SessionFrame selection | Known temporary deviation | selection is not yet user, Objective, or branch scoped |
+| in-memory graph checkpointing | Current-stage implementation choice | graph continuity is process-local; durable approval records provide only bounded resume |
 | generic synthesis-named SessionFrame projection | Known temporary deviation | it is architecture-blocked from protected evaluation |
 | pin-only SessionFrame freshness | Known temporary deviation | repository-current retrieval excludes invalid authority even when the frame is not marked stale |
 | wrong-profile context-only items consuming result budget | Known temporary deviation | they cannot motivate work but may reduce the visible same-profile result set |
 | operation-scope retrieval admission | Deferred design decision | no current request contract enforces a complete operation-specific admissibility policy |
+| deployment-supplied runtime factory | Partially implemented product seam | runtime loading is **Implemented**; product identity, adapters, loops, and recovery remain **Unsupported** |
+| packaged product process | Unsupported product surface | no supported CLI, API, worker, daemon, or Python bootstrap exists |
 | distributed scientific transactions | Unsupported future possibility | no supported distributed ownership or portability guarantee exists |
 
 ## What future redesigns must preserve
@@ -742,13 +764,14 @@ may change. A redesign must still preserve:
 
 ## Deferred operational decision scope
 
-This page does not decide SQLite as a long-term backend, Planner persistence
-coupling, lexical versus semantic retrieval implementation, SessionFrame
-selection mechanics at scale, product CLI/API/worker timing, deployment
-authentication, distributed execution, or a portable concurrency mechanism.
-Those topics remain **Deferred** and must preserve the epistemic and operational
-invariants above. A future backend decision must not be inferred from the
-current SQLModel or repository interfaces.
+This page classifies current Planner persistence coupling, lexical retrieval,
+SessionFrame selection, and product-surface deferral. It does not choose the
+future Planner facade, semantic retrieval/index design, branch and multi-user
+frame model, concrete product interface, deployment authentication,
+distributed execution, SQLite replacement, or a portable concurrency
+mechanism. Those designs remain **Deferred** and must preserve the epistemic and
+operational invariants above. A future backend decision must not be inferred
+from the current SQLModel or repository interfaces.
 
 ## Related decision records
 
@@ -758,6 +781,7 @@ current SQLModel or repository interfaces.
 - [ADR-004: Atomic Discovery admission](decisions/ADR-004-atomic-discovery-admission.md)
 - [ADR-005: Atomic validity propagation](decisions/ADR-005-atomic-validity-propagation.md)
 - [ADR-006: SQLite as the supported persistence boundary](decisions/ADR-006-sqlite-supported-boundary.md)
+- [ADR-007: No supported CLI before product bootstrap is coherent](decisions/ADR-007-no-supported-cli-before-product-bootstrap.md)
 
 ## Implementation orientation
 
@@ -765,7 +789,8 @@ The primary source boundaries are under `src/schemas/`, `src/db/models/`,
 `src/repositories/`, `src/agents/executor/`, `src/agents/planner/`,
 `src/application/evidence/`, `src/application/evaluation/`,
 `src/application/governance/`, `src/application/discovery/`,
-`src/application/validity/`, and `src/memory/`.
+`src/application/validity/`, `src/application/runtime.py`,
+`src/application/runtime_loader.py`, and `src/memory/`.
 
 Focused verification is under `tests/architecture/`, `tests/application/`,
 `tests/memory/`, `tests/repositories/`, and `tests/e2e/`.

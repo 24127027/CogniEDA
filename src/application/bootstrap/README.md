@@ -9,6 +9,8 @@ factory loading in `src/application/runtime_loader.py`. There is no
 
 The canonical current boundary is
 [Runtime and composition boundary](../../../docs/runtime-and-composition-boundary.md).
+The product-process inventory and minimum coherent bootstrap are owned by
+[Product surface and bootstrap boundary](../../../docs/product-surface-and-bootstrap-boundary.md).
 
 ## Target design
 

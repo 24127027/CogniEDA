@@ -9,6 +9,10 @@ The canonical authority explanation is
 ownership are explained by
 [Runtime and composition boundary](../runtime-and-composition-boundary.md) and
 [Persistence and transaction ownership](../persistence-and-transaction-ownership.md).
+Planner coordination is owned by
+[Planner boundary and operation model](../planner-boundary-and-operation-model.md);
+product-process absence is owned by
+[Product surface and bootstrap boundary](../product-surface-and-bootstrap-boundary.md).
 This page retains the package and dependency map for contributors.
 
 ## Current package map

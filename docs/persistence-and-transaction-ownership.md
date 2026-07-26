@@ -211,6 +211,8 @@ replay identity, and no physically valid but epistemically contradictory state.
 
 ## Related canonical concepts
 
+- [Planner boundary and operation model](planner-boundary-and-operation-model.md)
+- [From user request to approved operation](from-user-request-to-approved-operation.md)
 - [SQLite boundary and portability](sqlite-boundary-and-portability.md)
 - [Database initialization and migrations](database-initialization-and-migrations.md)
 - [From runtime composition to atomic persistence](from-runtime-composition-to-atomic-persistence.md)
