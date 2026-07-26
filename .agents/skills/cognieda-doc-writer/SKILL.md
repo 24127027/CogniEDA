@@ -25,7 +25,7 @@ Use this skill to maintain CogniEDA documentation without overclaiming implement
    - `Known deviation`
    - `Not yet implemented`
    - `Architectural risk`
-5. Update `docs/architecture/implementation-gap-analysis.md` when drift is found.
+5. Update `docs/reference/architecture/implementation-gaps.md` when drift is found.
 6. Run the repo's available verification commands after documentation edits when practical.
 
 ## Source Priority

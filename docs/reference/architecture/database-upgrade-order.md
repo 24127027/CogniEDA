@@ -1,15 +1,15 @@
-# Migrations and schema evolution
+# Database upgrade order
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [SQLite initialization and migrations](../operations/sqlite-and-migrations.md).
-> **Contributor entry:** [Contributor documentation](../development/index.md).
-> **Current-state owner:** [CogniEDA current state](../current-state.md).
+> [SQLite initialization and migrations](../../operations/sqlite-and-migrations.md).
+> **Contributor entry:** [Contributor documentation](../../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../current-state.md).
 
 > **Implementation status:** current upgrade chain **Implemented** and
 > **Verified on SQLite**.
 
 The reader-facing initialization, history, and quarantine rationale is owned by
-[SQLite initialization and migrations](../operations/sqlite-and-migrations.md).
+[SQLite initialization and migrations](../../operations/sqlite-and-migrations.md).
 This page retains the exact contributor-oriented call order.
 
 ## Initialization order

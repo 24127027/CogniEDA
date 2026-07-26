@@ -184,7 +184,7 @@ governance.
 - [Planner operations and approvals](planner-and-approvals.md)
 - [SessionFrame scaling and resume limits](../concepts/context/session-frame-scaling.md)
 - [Persistence and transactions](persistence-and-transactions.md)
-- [ADR-007: no supported CLI before coherent product bootstrap](../decisions/ADR-007-no-supported-cli-before-product-bootstrap.md)
+- [A product interface requires complete bootstrap](../design-decisions/product-interface-requires-complete-bootstrap.md)
 
 ## Implementation orientation
 

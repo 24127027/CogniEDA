@@ -270,6 +270,6 @@ exit criteria.
 - configuration and agent capabilities: `config/`, `skills/`, and `src/tools/`
 
 For technical detail, continue with the
-[architecture overview](architecture/overview.md), the
-[implementation gap analysis](architecture/implementation-gap-analysis.md),
+[System overview](reference/architecture/system-overview.md), the
+[Implementation gaps](reference/architecture/implementation-gaps.md),
 and the [product surface boundary](operations/product-bootstrap.md).

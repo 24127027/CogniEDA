@@ -1,4 +1,6 @@
-# ADR-007: No supported CLI before product bootstrap is coherent
+# A product interface requires complete bootstrap
+
+Decision ID: D-007
 
 **Decision classification:** Durable operational boundary.
 

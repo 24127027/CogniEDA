@@ -278,7 +278,7 @@ the authority boundary at read time.
 
 The tradeoff between retained history and active exclusion is summarized in
 [Design decisions and tradeoffs](../../design-decisions/index.md#15-historical-retention-and-active-exclusion).
-[ADR-005](../../decisions/ADR-005-atomic-validity-propagation.md) records the atomic
+[Propagating validity changes atomically](../../design-decisions/propagating-validity-changes-atomically.md) records the atomic
 validity decision and its redesign constraints.
 
 ## Implementation orientation

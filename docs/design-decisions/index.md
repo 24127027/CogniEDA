@@ -11,13 +11,11 @@ This page is the canonical entry point for the reasoning behind that
 architecture. It explains why the core epistemic boundaries exist, what they
 cost, where current source only partially realizes them, and what a future
 redesign must preserve. Concept pages remain the owners of detailed behavior;
-the ADRs preserve the identity of individual decisions.
+the individual decision records preserve each decision's identity.
 
-> **S4.2B path transition:** This canonical guide now lives under
-> `docs/design-decisions/`, while the seven decision records remain under
-> `docs/decisions/` with their existing `ADR-00N` paths and titles until
-> S4.2C. The links on this page deliberately use those current record paths;
-> the decision-record migration is not complete.
+These pages record durable architectural decisions. They are commonly called
+Architecture Decision Records, but CogniEDA uses descriptive filenames and
+Decision IDs instead of ADR-prefixed paths.
 
 > **Implementation status:** The guarded research-state, scientific-authority,
 > protected-evaluation, Discovery-admission, validity, retrieval, and
@@ -43,9 +41,9 @@ the ADRs preserve the identity of individual decisions.
 | Unsupported product surface | No supported entry point or executable product capability currently provides the behavior | require a coherent implementation and a new status review before relying on it |
 
 Current-state claims use the shared vocabulary defined in
-[the documentation index](../index.md#implementation-status-vocabulary). An ADR
-records why a boundary exists; source and tests determine whether that boundary
-is implemented.
+[the documentation index](../index.md#implementation-status-vocabulary). A
+decision record explains why a boundary exists; source and tests determine
+whether that boundary is implemented.
 
 ## How source conformance is reported
 
@@ -790,13 +788,13 @@ from the current SQLModel or repository interfaces.
 
 ## Related decision records
 
-- [ADR-001: First-Class research state](../decisions/ADR-001-first-class-research-state.md)
-- [ADR-002: Assumption quarantine](../decisions/ADR-002-assumption-quarantine.md)
-- [ADR-003: Specialist scientific authority](../decisions/ADR-003-specialist-scientific-authority.md)
-- [ADR-004: Atomic Discovery admission](../decisions/ADR-004-atomic-discovery-admission.md)
-- [ADR-005: Atomic validity propagation](../decisions/ADR-005-atomic-validity-propagation.md)
-- [ADR-006: SQLite as the supported persistence boundary](../decisions/ADR-006-sqlite-supported-boundary.md)
-- [ADR-007: No supported CLI before product bootstrap is coherent](../decisions/ADR-007-no-supported-cli-before-product-bootstrap.md)
+- [Research-state objects](research-state-objects.md)
+- [Assumptions guide planning only](assumptions-guide-planning-only.md)
+- [Scientific authority by role](scientific-authority-by-role.md)
+- [Creating Discoveries after authorization](creating-discoveries-after-authorization.md)
+- [Propagating validity changes atomically](propagating-validity-changes-atomically.md)
+- [SQLite as the verified database](sqlite-as-the-verified-database.md)
+- [A product interface requires complete bootstrap](product-interface-requires-complete-bootstrap.md)
 
 ## Implementation orientation
 

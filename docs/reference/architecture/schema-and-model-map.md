@@ -1,9 +1,9 @@
-# Research-State Model
+# Schema and model map
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Research-state objects and roles](../concepts/research-state/objects-and-roles.md).
-> **Contributor entry:** [Contributor documentation](../development/index.md).
-> **Current-state owner:** [CogniEDA current state](../current-state.md).
+> [Research-state objects and roles](../../concepts/research-state/objects-and-roles.md).
+> **Contributor entry:** [Contributor documentation](../../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../current-state.md).
 
 > **Implementation status:** target ontology `[Implemented]`; several lifecycle and product
 > governance surfaces remain `[Partially Implemented]`.

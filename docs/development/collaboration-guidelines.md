@@ -1,4 +1,4 @@
-# Development & Collaboration Guidelines
+# Collaboration guidelines
 
 This document outlines the standard practices for collaborating on this repository. Adhering to these guidelines ensures a clean codebase, efficient reviews, and smooth teamwork.
 
@@ -33,4 +33,4 @@ Strictly adhere to the following naming conventions across the codebase:
 
 ## 4. Pull Request Message Structure
 
-To outline what changed and make reviews easier, use the following structured template `docs/development/pull_request_template.md` in the repository.
+To outline what changed and make reviews easier, use the following structured template `docs/development/pull-request-template.md` in the repository.

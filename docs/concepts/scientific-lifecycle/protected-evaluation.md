@@ -298,9 +298,9 @@ failure.
 The broader tradeoff between useful planning context and admissible scientific
 premises is summarized in
 [Design decisions and tradeoffs](../../design-decisions/index.md).
-[ADR-002](../../decisions/ADR-002-assumption-quarantine.md) records the Assumption
+[Assumptions guide planning only](../../design-decisions/assumptions-guide-planning-only.md) records the Assumption
 quarantine decision, and
-[ADR-003](../../decisions/ADR-003-specialist-scientific-authority.md) records the
+[Scientific authority by role](../../design-decisions/scientific-authority-by-role.md) records the
 closed specialist-authority boundary.
 
 ## Implementation orientation

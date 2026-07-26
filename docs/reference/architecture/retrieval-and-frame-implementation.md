@@ -1,21 +1,21 @@
-# Retrieval and SessionFrame
+# Retrieval and frame implementation
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Context type safety and retrieval](../concepts/context/context-type-safety.md).
-> **Contributor entry:** [Contributor documentation](../development/index.md).
-> **Current-state owner:** [CogniEDA current state](../current-state.md).
+> [Context type safety and retrieval](../../concepts/context/context-type-safety.md).
+> **Contributor entry:** [Contributor documentation](../../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../current-state.md).
 
 > **Implementation status:** bounded Discovery retrieval and typed projections
 > are **Implemented**; the general session-resume product workflow is
 > **Partially implemented**.
 
 Canonical reader explanations:
-[SessionFrame and active context](../concepts/context/session-frame.md),
-[Context type safety and retrieval](../concepts/context/context-type-safety.md),
-[Retrieval strategy](../concepts/context/retrieval-strategy.md),
-[Context continuity and resume](../concepts/context/continuity-and-resume.md),
-[SessionFrame scaling and resume limits](../concepts/context/session-frame-scaling.md), and
-[Active retrieval after invalidation](../concepts/validity/active-retrieval-after-invalidation.md).
+[SessionFrame and active context](../../concepts/context/session-frame.md),
+[Context type safety and retrieval](../../concepts/context/context-type-safety.md),
+[Retrieval strategy](../../concepts/context/retrieval-strategy.md),
+[Context continuity and resume](../../concepts/context/continuity-and-resume.md),
+[SessionFrame scaling and resume limits](../../concepts/context/session-frame-scaling.md), and
+[Active retrieval after invalidation](../../concepts/validity/active-retrieval-after-invalidation.md).
 This page retains the concise source-oriented reference.
 
 ## Current SessionFrame behavior
@@ -38,7 +38,7 @@ Evidence, stale caches, and superseded frames are excluded as defined by `retrie
 
 The protected Hypothesis Analyst path does not consume SessionFrame projections; it uses the
 closed repository-built bundle described in
-[Protected evaluation](../concepts/scientific-lifecycle/protected-evaluation.md). Current production
+[Protected evaluation](../../concepts/scientific-lifecycle/protected-evaluation.md). Current production
 `SessionContextBuilder` call sites request Planning Context only.
 
 ## Discovery retrieval

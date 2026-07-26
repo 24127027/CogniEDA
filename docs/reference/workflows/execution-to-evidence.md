@@ -1,19 +1,19 @@
-# Execution-to-Evidence Workflow
+# Execution-to-Evidence workflow
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Execution to Discovery](../concepts/scientific-lifecycle/execution-to-discovery.md).
-> **Contributor entry:** [Contributor documentation](../development/index.md).
-> **Current-state owner:** [CogniEDA current state](../current-state.md).
+> [Execution to Discovery](../../concepts/scientific-lifecycle/execution-to-discovery.md).
+> **Contributor entry:** [Contributor documentation](../../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../current-state.md).
 
 > **Implementation status:** **Implemented** and **Verified on SQLite** for the
 > library/runtime path. No production worker or concrete Data Explorer adapter is
 > shipped.
 
 The reader-first workflow is
-[Execution to Discovery](../concepts/scientific-lifecycle/execution-to-discovery.md), and the
-authority rationale is [Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md).
+[Execution to Discovery](../../concepts/scientific-lifecycle/execution-to-discovery.md), and the
+authority rationale is [Scientific authority](../../concepts/scientific-lifecycle/scientific-authority.md).
 The preceding approval boundary is
-[Operation approval workflows](../operations/operation-approval-workflows.md).
+[Operation approval workflows](../../operations/operation-approval-workflows.md).
 This page retains the technical execution-to-Evidence sequence.
 
 ## Transaction sequence

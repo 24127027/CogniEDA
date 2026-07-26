@@ -1,15 +1,15 @@
-# Governance and Admission Workflow
+# Authorize and admit Discovery
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md).
-> **Contributor entry:** [Contributor documentation](../development/index.md).
-> **Current-state owner:** [CogniEDA current state](../current-state.md).
+> [Discovery governance and admission](../../concepts/scientific-lifecycle/discovery-governance-and-admission.md).
+> **Contributor entry:** [Contributor documentation](../../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../current-state.md).
 
 > **Implementation status:** **Implemented** and **Verified on SQLite** for Discovery
 > proposal decisions and admission authority.
 
 The canonical reader explanation is
-[Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md).
+[Discovery governance and admission](../../concepts/scientific-lifecycle/discovery-governance-and-admission.md).
 This page retains the source-oriented decision and consumption sequence.
 
 ## Authority and decision

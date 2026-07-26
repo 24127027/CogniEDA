@@ -1,4 +1,6 @@
-# ADR-005: Atomic validity propagation
+# Propagating validity changes atomically
+
+Decision ID: D-005
 
 **Decision classification:** Durable architectural decision.
 
@@ -135,7 +137,7 @@ than hiding or deleting it.
 
 ## Related canonical concepts
 
-- [Design decisions and tradeoffs](../design-decisions/index.md)
+- [Design decisions and tradeoffs](index.md)
 - [Validity over time](../concepts/validity/validity-over-time.md)
 - [Atomic validity propagation](../concepts/validity/validity-propagation.md)
 - [SessionFrame and active context](../concepts/context/session-frame.md)

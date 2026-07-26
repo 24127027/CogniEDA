@@ -1,4 +1,6 @@
-# ADR-004: Atomic Discovery admission
+# Creating Discoveries after authorization
+
+Decision ID: D-004
 
 **Decision classification:** Durable architectural decision.
 
@@ -124,11 +126,11 @@ documented.
 
 ## Related canonical concepts
 
-- [Design decisions and tradeoffs](../design-decisions/index.md)
+- [Design decisions and tradeoffs](index.md)
 - [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md)
 - [Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md)
 - [Investigation lifecycle](../concepts/research-state/investigation-lifecycle.md)
-- [ADR-003: Separated scientific authority](ADR-003-specialist-scientific-authority.md)
+- [Scientific authority by role](scientific-authority-by-role.md)
 
 ## Implementation orientation
 

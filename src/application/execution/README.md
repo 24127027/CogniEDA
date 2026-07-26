@@ -6,8 +6,8 @@
 > **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
 
 Canonical references:
-[Execution to Evidence](../../../docs/workflows/execution-to-evidence.md) and
-[Persistence and Transactions](../../../docs/architecture/persistence-and-transactions.md).
+[Execution-to-Evidence workflow](../../../docs/reference/workflows/execution-to-evidence.md) and
+[Transaction write sets](../../../docs/reference/architecture/transaction-write-sets.md).
 
 `ExecutionAttemptTransitionService` owns durable run-attempt, dispatch outbox,
 result inbox, lease/fencing, failure, retry, cancellation, and evidence-admission

@@ -377,9 +377,9 @@ boundary.
 The epistemic reason for independent governance, exact proposal-copy, and one
 admission transaction is summarized in
 [Design decisions and tradeoffs](../../design-decisions/index.md).
-[ADR-003](../../decisions/ADR-003-specialist-scientific-authority.md) owns authority
+[Scientific authority by role](../../design-decisions/scientific-authority-by-role.md) owns authority
 separation, and
-[ADR-004](../../decisions/ADR-004-atomic-discovery-admission.md) owns atomic
+[Creating Discoveries after authorization](../../design-decisions/creating-discoveries-after-authorization.md) owns atomic
 materialization.
 
 ## Implementation orientation

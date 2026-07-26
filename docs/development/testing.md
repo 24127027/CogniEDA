@@ -39,7 +39,7 @@ Architecture tests protect boundaries. They do not prove complete product
 behavior. Do not weaken them merely to make a new dependency convenient. If a
 boundary legitimately changes: review the decision, change source, run focused
 tests, update the architecture test, update documentation, and add/update an
-ADR when the change is durable.
+decision record when the change is durable.
 
 ## Covered boundaries
 

@@ -377,7 +377,7 @@ The rationale for typed research state, the exact FCO boundary, bounded
 cardinality, and historical retention is summarized in
 [Design decisions and tradeoffs](../../design-decisions/index.md) and
 preserved in
-[ADR-001: First-Class research state](../../decisions/ADR-001-first-class-research-state.md).
+[Research-state objects](../../design-decisions/research-state-objects.md).
 
 ### Implementation orientation
 

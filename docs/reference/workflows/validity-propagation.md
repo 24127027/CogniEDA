@@ -1,17 +1,17 @@
-# Validity Propagation Workflow
+# Validity propagation workflow
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Atomic validity propagation](../concepts/validity/validity-propagation.md).
-> **Contributor entry:** [Contributor documentation](../development/index.md).
-> **Current-state owner:** [CogniEDA current state](../current-state.md).
+> [Atomic validity propagation](../../concepts/validity/validity-propagation.md).
+> **Contributor entry:** [Contributor documentation](../../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../current-state.md).
 
 > **Implementation status:** **Implemented** and **Verified on SQLite** for the
 > supported source/event matrix, exact replay, changed-command conflict,
 > compare-and-set guards, and dependent-state propagation.
 
 Canonical rationale and mechanics:
-[Validity over time](../concepts/validity/validity-over-time.md) and
-[Atomic validity propagation](../concepts/validity/validity-propagation.md). This page
+[Validity over time](../../concepts/validity/validity-over-time.md) and
+[Atomic validity propagation](../../concepts/validity/validity-propagation.md). This page
 retains the compact technical sequence.
 
 ## Atomic path
@@ -49,5 +49,5 @@ excluded by persisted lifecycle state and repository-backed retrieval policy;
 they remain in SQLite for provenance and audit.
 
 The active-context consequence is summarized in
-[Context type safety and retrieval](../concepts/context/context-type-safety.md) and
-[Active retrieval after invalidation](../concepts/validity/active-retrieval-after-invalidation.md).
+[Context type safety and retrieval](../../concepts/context/context-type-safety.md) and
+[Active retrieval after invalidation](../../concepts/validity/active-retrieval-after-invalidation.md).

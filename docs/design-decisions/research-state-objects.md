@@ -1,4 +1,6 @@
-# ADR-001: First-Class research state
+# Research-state objects
+
+Decision ID: D-001
 
 **Decision classification:** Foundational invariant.
 
@@ -138,7 +140,7 @@ must preserve existing object identity rather than silently reinterpret it.
 
 ## Related canonical concepts
 
-- [Design decisions and tradeoffs](../design-decisions/index.md)
+- [Design decisions and tradeoffs](index.md)
 - [Research-state objects and roles](../concepts/research-state/objects-and-roles.md)
 - [Investigation lifecycle](../concepts/research-state/investigation-lifecycle.md)
 - [Context continuity and resume](../concepts/context/continuity-and-resume.md)

@@ -161,7 +161,7 @@ Planner nodes should produce operations rather than directly mutating persistent
 
 - Inspect code before editing docs.
 - Label `Current implementation`, `Target design`, `Implementation status`, `Known deviation`, and `Not yet implemented` explicitly.
-- Update [docs/architecture/implementation-gap-analysis.md](docs/architecture/implementation-gap-analysis.md) when drift is found.
+- Update [docs/reference/architecture/implementation-gaps.md](docs/reference/architecture/implementation-gaps.md) when drift is found.
 - Do not turn design targets into false implementation claims.
 - Do not treat generated summaries as architectural truth.
 - Update `README.md` only with verified commands and implemented features.

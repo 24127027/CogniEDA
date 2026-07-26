@@ -1,9 +1,9 @@
-# Structural foundation status
+# Implemented boundaries
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [CogniEDA current state](../current-state.md).
-> **Contributor entry:** [Contributor documentation](../development/index.md).
-> **Current-state owner:** [CogniEDA current state](../current-state.md).
+> [CogniEDA current state](../../current-state.md).
+> **Contributor entry:** [Contributor documentation](../../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../current-state.md).
 
 > **Technical-scope qualification:** this reference maps the current in-process
 > structural boundaries. Guarded persistence behavior is **Verified on SQLite**;
@@ -17,18 +17,18 @@ history belong in ignored local audit records rather than canonical
 documentation.
 
 The canonical maturity narrative is
-[CogniEDA current state](../current-state.md). Capability comparison belongs to
-the [capability and maturity map](../capability-and-maturity-map.md), and future
-dependencies belong to the [roadmap](../roadmap.md).
+[CogniEDA current state](../../current-state.md). Capability comparison belongs to
+the [capability and maturity map](../../capability-and-maturity-map.md), and future
+dependencies belong to the [roadmap](../../roadmap.md).
 
 Canonical operational ownership is explained in
-[Runtime composition](../operations/runtime-composition.md),
-[Product bootstrap](../operations/product-bootstrap.md),
-[Planner operations and approvals](../operations/planner-and-approvals.md),
-[Retrieval strategy](../concepts/context/retrieval-strategy.md),
-[SessionFrame scaling and resume limits](../concepts/context/session-frame-scaling.md),
-[Persistence and transactions](../operations/persistence-and-transactions.md),
-and [SQLite and portability](../operations/sqlite-and-portability.md).
+[Runtime composition](../../operations/runtime-composition.md),
+[Product bootstrap](../../operations/product-bootstrap.md),
+[Planner operations and approvals](../../operations/planner-and-approvals.md),
+[Retrieval strategy](../../concepts/context/retrieval-strategy.md),
+[SessionFrame scaling and resume limits](../../concepts/context/session-frame-scaling.md),
+[Persistence and transactions](../../operations/persistence-and-transactions.md),
+and [SQLite and portability](../../operations/sqlite-and-portability.md).
 
 ## Current authority map
 

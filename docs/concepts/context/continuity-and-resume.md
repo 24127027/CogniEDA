@@ -211,7 +211,7 @@ and latency. None may bypass lifecycle, profile, scope, epistemic-type, or
 protected-evaluation boundaries.
 
 The current technical validity sequence is described in
-[Validity propagation workflow](../../workflows/validity-propagation.md). Its
+[Validity propagation workflow](../../reference/workflows/validity-propagation.md). Its
 canonical temporal-authority and active-context consequences are
 [Validity over time](../validity/validity-over-time.md) and
 [Active retrieval after invalidation](../validity/active-retrieval-after-invalidation.md).

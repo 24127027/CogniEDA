@@ -117,8 +117,9 @@ Follow the tracks in order. Within a track, read top to bottom.
 
 1. [Design decisions and tradeoffs](design-decisions/index.md) explains
    which boundaries are foundational or durable, which mechanisms are
-   temporary, what they cost, and what future redesigns must preserve. Its ADR
-   links provide decision detail without interrupting the conceptual tracks.
+   temporary, what they cost, and what future redesigns must preserve. Its
+   decision-record links provide detail without interrupting the conceptual
+   tracks.
 
 Together these thirty pages form the current canonical project
 explanation. Problem, mental model, authority, validity, and context precede
@@ -142,14 +143,14 @@ tests protect a change; it is not part of the thirty-page conceptual journey.
 The thirty documents above are the recommended path for understanding CogniEDA.
 They use implementation references only as optional verification aids.
 
-The repository also retains architecture pages, workflow pages, decision
-records, development guides, and package READMEs created before this narrative
-foundation. They remain useful implementation reference, but they are not the
-canonical reading sequence. Those documents are classified as contributor
-guidance, ADRs, technical references, agent instructions, or the legacy
-transition surface. Canonical pages own concepts; retained references own only
-their source-level mechanics. Source code and tests remain the authority for
-current behavior.
+The repository also retains architecture and workflow technical references,
+decision records, development guides, and package READMEs created before this
+narrative foundation. They remain useful implementation references, but they
+are not the canonical reading sequence. Those documents are classified as
+contributor guidance, design-decision records, technical references, agent
+instructions, or the legacy transition surface. Canonical pages own concepts;
+retained references own only their source-level mechanics. Source code and
+tests remain the authority for current behavior.
 
 ## Implementation-status vocabulary
 

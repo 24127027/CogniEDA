@@ -1,4 +1,6 @@
-# ADR-003: Separated scientific authority
+# Scientific authority by role
+
+Decision ID: D-003
 
 **Decision classification:** Durable architectural decision.
 
@@ -120,11 +122,11 @@ the approved scientific content in flight.
 
 ## Related canonical concepts
 
-- [Design decisions and tradeoffs](../design-decisions/index.md)
+- [Design decisions and tradeoffs](index.md)
 - [Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md)
 - [Protected evaluation](../concepts/scientific-lifecycle/protected-evaluation.md)
 - [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md)
-- [ADR-004: Atomic Discovery admission](ADR-004-atomic-discovery-admission.md)
+- [Creating Discoveries after authorization](creating-discoveries-after-authorization.md)
 
 ## Implementation orientation
 

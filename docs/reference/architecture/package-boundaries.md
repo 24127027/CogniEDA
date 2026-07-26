@@ -1,23 +1,23 @@
-# Bounded Contexts
+# Package boundaries
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Runtime composition](../operations/runtime-composition.md).
-> **Contributor entry:** [Contributor documentation](../development/index.md).
-> **Current-state owner:** [CogniEDA current state](../current-state.md).
+> [Runtime composition](../../operations/runtime-composition.md).
+> **Contributor entry:** [Contributor documentation](../../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../current-state.md).
 
 > **Implementation status:** package ownership **Implemented**; runtime
 > deployment surfaces **Partially implemented**; persistence guarantees
 > **Verified on SQLite**.
 
 The canonical authority explanation is
-[Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md). Runtime and persistence
+[Scientific authority](../../concepts/scientific-lifecycle/scientific-authority.md). Runtime and persistence
 ownership are explained by
-[Runtime composition](../operations/runtime-composition.md) and
-[Persistence and transactions](../operations/persistence-and-transactions.md).
+[Runtime composition](../../operations/runtime-composition.md) and
+[Persistence and transactions](../../operations/persistence-and-transactions.md).
 Planner coordination is owned by
-[Planner operations and approvals](../operations/planner-and-approvals.md);
+[Planner operations and approvals](../../operations/planner-and-approvals.md);
 product-process absence is owned by
-[Product bootstrap](../operations/product-bootstrap.md).
+[Product bootstrap](../../operations/product-bootstrap.md).
 This page retains the package and dependency map for contributors.
 
 ## Current package map
@@ -53,4 +53,4 @@ repositories.
 `src/application/bootstrap/` and `src/application/events/` contain READMEs only. They are not active
 Python bounded contexts. Graph Miner has stub code but no runtime registration.
 
-See [Module Responsibilities](module-responsibilities.md) for write ownership and dependencies.
+See [Source ownership](source-ownership.md) for write ownership and dependencies.

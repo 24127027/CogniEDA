@@ -1,18 +1,18 @@
-# Task-to-Hypothesis Workflow
+# Task-to-Hypothesis workflow
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Planner operations and approvals](../operations/planner-and-approvals.md).
-> **Contributor entry:** [Contributor documentation](../development/index.md).
-> **Current-state owner:** [CogniEDA current state](../current-state.md).
+> [Planner operations and approvals](../../operations/planner-and-approvals.md).
+> **Contributor entry:** [Contributor documentation](../../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../current-state.md).
 
 > **Implementation status:** **Partially implemented** and **Verified on
 > SQLite** for the fresh execution-contract path. Natural-language planning
 > branches and existing-Hypothesis reuse remain incomplete.
 
 The canonical Planner owner is
-[Planner operations and approvals](../operations/planner-and-approvals.md);
+[Planner operations and approvals](../../operations/planner-and-approvals.md);
 the request-to-approval narrative is
-[Operation approval workflows](../operations/operation-approval-workflows.md).
+[Operation approval workflows](../../operations/operation-approval-workflows.md).
 
 ## Implemented path
 

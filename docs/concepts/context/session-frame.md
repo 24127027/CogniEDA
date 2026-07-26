@@ -234,7 +234,7 @@ Why user-governed active context remains separate from scientific authority is
 summarized in
 [Design decisions and tradeoffs](../../design-decisions/index.md#17-user-governed-active-context).
 The historical-retention consequences of stale frames are preserved in
-[ADR-005](../../decisions/ADR-005-atomic-validity-propagation.md).
+[Propagating validity changes atomically](../../design-decisions/propagating-validity-changes-atomically.md).
 
 ## Implementation orientation
 

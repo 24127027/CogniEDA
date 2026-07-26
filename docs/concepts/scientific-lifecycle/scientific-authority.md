@@ -341,9 +341,9 @@ authorization, and all-or-nothing admission—must survive any redesign.
 
 [Design decisions and tradeoffs](../../design-decisions/index.md) classifies
 which authority boundaries must survive a redesign.
-[ADR-003](../../decisions/ADR-003-specialist-scientific-authority.md) preserves the
+[Scientific authority by role](../../design-decisions/scientific-authority-by-role.md) preserves the
 specialist-authority decision, and
-[ADR-004](../../decisions/ADR-004-atomic-discovery-admission.md) preserves the
+[Creating Discoveries after authorization](../../design-decisions/creating-discoveries-after-authorization.md) preserves the
 all-or-nothing admission decision.
 
 ## Implementation orientation

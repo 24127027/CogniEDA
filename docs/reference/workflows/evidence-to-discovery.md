@@ -1,17 +1,17 @@
-# Evidence-to-Discovery Workflow
+# Evidence-to-Discovery workflow
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md).
-> **Contributor entry:** [Contributor documentation](../development/index.md).
-> **Current-state owner:** [CogniEDA current state](../current-state.md).
+> [Discovery governance and admission](../../concepts/scientific-lifecycle/discovery-governance-and-admission.md).
+> **Contributor entry:** [Contributor documentation](../../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../current-state.md).
 
 > **Implementation status:** **Implemented** and **Verified on SQLite** for protected
 > evaluation, governance, replay fencing, and atomic admission.
 
 Canonical explanations:
-[Protected evaluation](../concepts/scientific-lifecycle/protected-evaluation.md),
-[Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md),
-and [Execution to Discovery](../concepts/scientific-lifecycle/execution-to-discovery.md). This page
+[Protected evaluation](../../concepts/scientific-lifecycle/protected-evaluation.md),
+[Discovery governance and admission](../../concepts/scientific-lifecycle/discovery-governance-and-admission.md),
+and [Execution to Discovery](../../concepts/scientific-lifecycle/execution-to-discovery.md). This page
 retains the compact technical sequence.
 
 ## Protected evaluation

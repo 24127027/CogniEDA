@@ -6,7 +6,7 @@
 > **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
 
 Canonical reference:
-[Governance and Admission](../../../docs/workflows/governance-and-admission.md).
+[Authorize and admit Discovery](../../../docs/reference/workflows/authorize-and-admit-discovery.md).
 
 `GovernanceAuthorityIssuer` persists expiring authority bound to the resolved
 principal, workspace/session, fixed purpose and operation type, issuer, and

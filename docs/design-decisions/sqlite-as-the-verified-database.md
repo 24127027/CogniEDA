@@ -1,4 +1,6 @@
-# ADR-006: SQLite as the supported persistence boundary
+# SQLite as the verified database
+
+Decision ID: D-006
 
 **Decision classification:** Current-stage implementation choice.
 

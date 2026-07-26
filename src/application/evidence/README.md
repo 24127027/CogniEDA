@@ -6,7 +6,7 @@
 > **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
 
 Canonical reference:
-[Execution to Evidence](../../../docs/workflows/execution-to-evidence.md).
+[Execution-to-Evidence workflow](../../../docs/reference/workflows/execution-to-evidence.md).
 
 This package validates observation-only results, builds deterministic frozen
 `EvidenceAdmissionPlan` values, and executes the sole supported AnalysisFrame

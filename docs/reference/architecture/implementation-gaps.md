@@ -1,24 +1,24 @@
-# Implementation gap analysis
+# Implementation gaps
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [CogniEDA current state](../current-state.md).
-> **Contributor entry:** [Contributor documentation](../development/index.md).
-> **Current-state owner:** [CogniEDA current state](../current-state.md).
+> [CogniEDA current state](../../current-state.md).
+> **Contributor entry:** [Contributor documentation](../../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../current-state.md).
 
 > **Scope:** This is a source-oriented current-versus-target reference, not a
 > project maturity scorecard. Source code remains authoritative for the local
 > mechanics and limitations recorded here.
 
 Canonical reader-facing maturity and comparison now belong to
-[CogniEDA current state](../current-state.md) and the
-[capability and maturity map](../capability-and-maturity-map.md). Future
-sequencing and exit criteria belong to the [roadmap](../roadmap.md).
+[CogniEDA current state](../../current-state.md) and the
+[capability and maturity map](../../capability-and-maturity-map.md). Future
+sequencing and exit criteria belong to the [roadmap](../../roadmap.md).
 
 Reader-facing ownership for the operational gaps belongs to
-[Planner operations and approvals](../operations/planner-and-approvals.md),
-[Retrieval strategy](../concepts/context/retrieval-strategy.md),
-[SessionFrame scaling and resume limits](../concepts/context/session-frame-scaling.md),
-and [Product bootstrap](../operations/product-bootstrap.md).
+[Planner operations and approvals](../../operations/planner-and-approvals.md),
+[Retrieval strategy](../../concepts/context/retrieval-strategy.md),
+[SessionFrame scaling and resume limits](../../concepts/context/session-frame-scaling.md),
+and [Product bootstrap](../../operations/product-bootstrap.md).
 
 ## Current implementation versus target
 
@@ -71,7 +71,7 @@ and [Product bootstrap](../operations/product-bootstrap.md).
 
 The owning sources are the schema, model, repository, application, Planner,
 executor, and memory packages identified in the
-[module responsibilities](module-responsibilities.md) reference.
+[Source ownership](source-ownership.md) reference.
 
 ## Highest-risk gaps
 

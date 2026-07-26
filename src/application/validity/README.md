@@ -8,8 +8,8 @@
 Canonical references:
 [Validity over time](../../../docs/concepts/validity/validity-over-time.md),
 [Atomic validity propagation](../../../docs/concepts/validity/validity-propagation.md),
-[ADR-005](../../../docs/decisions/ADR-005-atomic-validity-propagation.md) and
-[Validity Propagation](../../../docs/workflows/validity-propagation.md).
+[Propagating validity changes atomically](../../../docs/design-decisions/propagating-validity-changes-atomically.md) and
+[Validity propagation workflow](../../../docs/reference/workflows/validity-propagation.md).
 
 `AtomicValidityPropagationService` verifies durable authority and source
 fingerprints, derives a versioned plan, applies compare-and-set source and

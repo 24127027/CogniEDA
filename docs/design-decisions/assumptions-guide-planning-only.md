@@ -1,4 +1,6 @@
-# ADR-002: Assumption quarantine
+# Assumptions guide planning only
+
+Decision ID: D-002
 
 **Decision classification:** Foundational invariant.
 
@@ -115,7 +117,7 @@ signal and require an explicit user decision before changing planning state.
 
 ## Related canonical concepts
 
-- [Design decisions and tradeoffs](../design-decisions/index.md)
+- [Design decisions and tradeoffs](index.md)
 - [Protected evaluation](../concepts/scientific-lifecycle/protected-evaluation.md)
 - [Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md)
 - [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md)

@@ -318,7 +318,7 @@ how committed validity state is enforced at read time.
 
 The invariant-versus-mechanism classification is summarized in
 [Design decisions and tradeoffs](../../design-decisions/index.md#16-atomic-validity-propagation).
-[ADR-005](../../decisions/ADR-005-atomic-validity-propagation.md) preserves the
+[Propagating validity changes atomically](../../design-decisions/propagating-validity-changes-atomically.md) preserves the
 decision, rejected alternatives, limitations, and revisit triggers.
 
 ## Implementation orientation

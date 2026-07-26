@@ -14,8 +14,8 @@ status; use these pages to choose a safe change location.
 4. Read the focused tests before changing their boundary. Do not infer a
    product capability from a protocol, directory, or isolated test fixture.
 5. Use the [change-boundary guide](change-boundary-guide.md) to identify every
-   affected layer, required documentation, and whether an ADR or migration is
-   needed.
+   affected layer, required documentation, and whether a decision record or
+   migration is needed.
 
 The tracked default configuration is not a runnable product deployment. There
 is no supported CLI, HTTP API, worker, daemon, concrete Data Explorer, or
@@ -29,7 +29,7 @@ library foundation with explicit dependency injection; see
 | --- | --- | --- |
 | Meaning and invariant | [Canonical reader journey](../index.md) | relevant schema, owner, and focused test |
 | Current maturity or known deviation | [Current state](../current-state.md), [capability map](../capability-and-maturity-map.md), and [roadmap](../roadmap.md) | source only after the status boundary is clear |
-| Durable architectural rationale | [Design decisions and tradeoffs](../design-decisions/index.md) and the linked ADR | owner and architecture tests |
+| Durable architectural rationale | [Design decisions and tradeoffs](../design-decisions/index.md) and the linked decision record | owner and architecture tests |
 | Source responsibility and transaction owner | [Code orientation](code-orientation.md) | local package README and focused tests |
 | Where a change belongs | [Change-boundary guide](change-boundary-guide.md) | schema, repository, model, migration, and application owner |
 | Test selection and commands | [Testing strategy](testing.md) | nearest focused test and `tests/architecture/` |
@@ -77,14 +77,14 @@ Use a technical reference only after its canonical owner and this contributor
 hub establish the concept and safe change boundary. The retained references are
 grouped by the implementation question they answer:
 
-- [Architecture references](../architecture/overview.md) cover module,
-  persistence, migration, runtime, specialist, retrieval, and validity
-  mechanics. Their source-oriented gaps remain in the
-  [implementation-gap analysis](../architecture/implementation-gap-analysis.md).
-- [Workflow references](../workflows/task-to-hypothesis.md),
-  [execution to Evidence](../workflows/execution-to-evidence.md),
-  [governance and admission](../workflows/governance-and-admission.md), and
-  [validity propagation](../workflows/validity-propagation.md) preserve exact
+- The [System overview](../reference/architecture/system-overview.md) leads to
+  source ownership, persistence, migration, runtime, scientific-component,
+  retrieval, and validity mechanics. Source-oriented gaps remain in
+  [Implementation gaps](../reference/architecture/implementation-gaps.md).
+- The [Task-to-Hypothesis workflow](../reference/workflows/task-to-hypothesis.md),
+  [Execution-to-Evidence workflow](../reference/workflows/execution-to-evidence.md),
+  [Authorize and admit Discovery](../reference/workflows/authorize-and-admit-discovery.md),
+  and [Validity propagation workflow](../reference/workflows/validity-propagation.md) preserve exact
   preconditions, transitions, replay, and failure sequencing.
 - Local package contracts begin at [application](../../src/application/README.md),
   [Data Explorer adapters](../../src/agents/executor/README.md),
@@ -115,8 +115,8 @@ full run is warranted. Update:
   Package 7 readiness;
 - contributor pages for source ownership, test locations, or change workflow;
 - a package README only for local mechanics; and
-- an ADR for a durable invariant, backend policy, architectural decision, or
-  product-bootstrap policy.
+- a decision record for a durable invariant, backend policy, architectural
+  decision, or product-bootstrap policy.
 
 ## Technical-reference maintenance
 

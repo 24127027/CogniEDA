@@ -175,7 +175,7 @@ and explicit failure semantics on the supported backend.
 - [SQLite initialization and migrations](sqlite-and-migrations.md)
 - [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md)
 - [Atomic validity propagation](../concepts/validity/validity-propagation.md)
-- [ADR-006: SQLite as the supported persistence boundary](../decisions/ADR-006-sqlite-supported-boundary.md)
+- [SQLite as the verified database](../design-decisions/sqlite-as-the-verified-database.md)
 
 ## Implementation orientation
 

@@ -1,9 +1,9 @@
-# Session Resume and Retrieval Workflow
+# Resume and retrieve context
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Context continuity and resume](../concepts/context/continuity-and-resume.md).
-> **Contributor entry:** [Contributor documentation](../development/index.md).
-> **Current-state owner:** [CogniEDA current state](../current-state.md).
+> [Context continuity and resume](../../concepts/context/continuity-and-resume.md).
+> **Contributor entry:** [Contributor documentation](../../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../current-state.md).
 
 > **Implementation status:** **Partially implemented**. Library-level
 > append/read/projection, bounded SQL retrieval, and narrow durable approval
@@ -11,14 +11,14 @@
 > resume bootstrap exists.
 
 The canonical owner is
-[Context continuity and resume](../concepts/context/continuity-and-resume.md);
-[Context type safety and retrieval](../concepts/context/context-type-safety.md)
+[Context continuity and resume](../../concepts/context/continuity-and-resume.md);
+[Context type safety and retrieval](../../concepts/context/context-type-safety.md)
 owns admissibility;
-[Retrieval strategy](../concepts/context/retrieval-strategy.md)
+[Retrieval strategy](../../concepts/context/retrieval-strategy.md)
 owns ranking and budget decisions;
-[SessionFrame scaling and resume limits](../concepts/context/session-frame-scaling.md)
+[SessionFrame scaling and resume limits](../../concepts/context/session-frame-scaling.md)
 owns selection and checkpoint limits; and
-[Active retrieval after invalidation](../concepts/validity/active-retrieval-after-invalidation.md)
+[Active retrieval after invalidation](../../concepts/validity/active-retrieval-after-invalidation.md)
 owns validity-change consequences. This page retains the compact technical
 sequence.
 

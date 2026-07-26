@@ -5,8 +5,8 @@
 > **Contributor entry:** [Contributor documentation](../../../docs/development/index.md).
 > **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
 
-Canonical references: [Scientific Specialist Contracts](../../../docs/architecture/scientific-specialist-contracts.md)
-and [Evidence to Discovery](../../../docs/workflows/evidence-to-discovery.md).
+Canonical references: [Scientific component contracts](../../../docs/reference/architecture/scientific-component-contracts.md)
+and [Evidence-to-Discovery workflow](../../../docs/reference/workflows/evidence-to-discovery.md).
 
 `EvaluationTransitionService` owns durable `EvaluationControl` enqueue, claim,
 proposal/failure publication, retry, cancellation, invalidation, and conflict

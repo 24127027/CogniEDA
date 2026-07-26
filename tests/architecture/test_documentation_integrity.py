@@ -68,27 +68,34 @@ PHASE_3B2_CANONICAL_PAGES = (
     DOCS_ROOT / "concepts" / "context" / "session-frame-scaling.md",
     DOCS_ROOT / "operations" / "product-bootstrap.md",
 )
-CORE_EPISTEMIC_ADRS = (
-    DOCS_ROOT / "decisions" / "ADR-001-first-class-research-state.md",
-    DOCS_ROOT / "decisions" / "ADR-002-assumption-quarantine.md",
-    DOCS_ROOT / "decisions" / "ADR-003-specialist-scientific-authority.md",
-    DOCS_ROOT / "decisions" / "ADR-004-atomic-discovery-admission.md",
-    DOCS_ROOT / "decisions" / "ADR-005-atomic-validity-propagation.md",
-)
-SQLITE_BOUNDARY_ADR = (
-    DOCS_ROOT / "decisions" / "ADR-006-sqlite-supported-boundary.md"
-)
-PRODUCT_BOOTSTRAP_ADR = (
+CORE_EPISTEMIC_DECISIONS = (
+    DOCS_ROOT / "design-decisions" / "research-state-objects.md",
+    DOCS_ROOT / "design-decisions" / "assumptions-guide-planning-only.md",
+    DOCS_ROOT / "design-decisions" / "scientific-authority-by-role.md",
     DOCS_ROOT
-    / "decisions"
-    / "ADR-007-no-supported-cli-before-product-bootstrap.md"
+    / "design-decisions"
+    / "creating-discoveries-after-authorization.md",
+    DOCS_ROOT
+    / "design-decisions"
+    / "propagating-validity-changes-atomically.md",
 )
-COMPLETE_DECISION_ANATOMY_ADRS = (
-    *CORE_EPISTEMIC_ADRS,
-    SQLITE_BOUNDARY_ADR,
-    PRODUCT_BOOTSTRAP_ADR,
+SQLITE_BOUNDARY_DECISION = (
+    DOCS_ROOT / "design-decisions" / "sqlite-as-the-verified-database.md"
 )
-PHASE_3A_DECISION_PAGES = (*PHASE_3A_CANONICAL_PAGES, *CORE_EPISTEMIC_ADRS)
+PRODUCT_BOOTSTRAP_DECISION = (
+    DOCS_ROOT
+    / "design-decisions"
+    / "product-interface-requires-complete-bootstrap.md"
+)
+COMPLETE_DECISION_RECORDS = (
+    *CORE_EPISTEMIC_DECISIONS,
+    SQLITE_BOUNDARY_DECISION,
+    PRODUCT_BOOTSTRAP_DECISION,
+)
+PHASE_3A_DECISION_PAGES = (
+    *PHASE_3A_CANONICAL_PAGES,
+    *CORE_EPISTEMIC_DECISIONS,
+)
 CANONICAL_READER_PAGES = (
     *PHASE_1_CANONICAL_PAGES,
     *PHASE_4A_CANONICAL_PAGES,
@@ -140,34 +147,42 @@ CONTRIBUTOR_DOCUMENTATION_PAGES = (
 ALL_CONTRIBUTOR_DOCUMENTATION_PAGES = (
     *CONTRIBUTOR_DOCUMENTATION_PAGES,
     DOCS_ROOT / "development" / "contributing.md",
-    DOCS_ROOT / "development" / "guideline.md",
-    DOCS_ROOT / "development" / "pull_request_template.md",
+    DOCS_ROOT / "development" / "collaboration-guidelines.md",
+    DOCS_ROOT / "development" / "pull-request-template.md",
 )
-PHASE_4C_TECHNICAL_REFERENCE_PAGES = (
-    *(DOCS_ROOT / "architecture" / name for name in (
-        "bounded-contexts.md",
-        "context-type-safety.md",
-        "implementation-gap-analysis.md",
-        "migrations.md",
-        "module-responsibilities.md",
-        "overview.md",
-        "persistence-and-transactions.md",
-        "research-state-model.md",
-        "retrieval-and-session-frame.md",
+ARCHITECTURE_REFERENCE_PAGES = tuple(
+    DOCS_ROOT / "reference" / "architecture" / name
+    for name in (
+        "package-boundaries.md",
+        "protected-context-enforcement.md",
+        "implementation-gaps.md",
+        "database-upgrade-order.md",
+        "source-ownership.md",
+        "system-overview.md",
+        "transaction-write-sets.md",
+        "schema-and-model-map.md",
+        "retrieval-and-frame-implementation.md",
         "runtime-composition.md",
-        "scientific-specialist-contracts.md",
-        "structural-exit-status.md",
-        "validity-and-invalidation.md",
-    )),
-    *(DOCS_ROOT / "workflows" / name for name in (
+        "scientific-component-contracts.md",
+        "implemented-boundaries.md",
+        "validity-implementation.md",
+    )
+)
+WORKFLOW_REFERENCE_PAGES = tuple(
+    DOCS_ROOT / "reference" / "workflows" / name
+    for name in (
         "evidence-to-discovery.md",
         "execution-to-evidence.md",
-        "governance-and-admission.md",
-        "session-resume-and-retrieval.md",
+        "authorize-and-admit-discovery.md",
+        "resume-and-retrieve-context.md",
         "task-to-hypothesis.md",
         "validity-propagation.md",
-        "workspace-and-data-profile.md",
-    )),
+        "dataset-and-data-profile.md",
+    )
+)
+PHASE_4C_TECHNICAL_REFERENCE_PAGES = (
+    *ARCHITECTURE_REFERENCE_PAGES,
+    *WORKFLOW_REFERENCE_PAGES,
 )
 S4_2B_STABLE_CANONICAL_ENTRY_PATHS = (
     DOCS_ROOT / "index.md",
@@ -286,19 +301,119 @@ S4_2B_MOVED_CANONICAL_H1 = {
     / "atomic-persistence-workflow.md": "Atomic persistence workflow",
     DOCS_ROOT / "design-decisions" / "index.md": "Design decisions and tradeoffs",
 }
+S4_2C_FINAL_H1 = {
+    DOCS_ROOT / "design-decisions" / "research-state-objects.md": "Research-state objects",
+    DOCS_ROOT
+    / "design-decisions"
+    / "assumptions-guide-planning-only.md": "Assumptions guide planning only",
+    DOCS_ROOT
+    / "design-decisions"
+    / "scientific-authority-by-role.md": "Scientific authority by role",
+    DOCS_ROOT
+    / "design-decisions"
+    / "creating-discoveries-after-authorization.md": (
+        "Creating Discoveries after authorization"
+    ),
+    DOCS_ROOT
+    / "design-decisions"
+    / "propagating-validity-changes-atomically.md": (
+        "Propagating validity changes atomically"
+    ),
+    DOCS_ROOT
+    / "design-decisions"
+    / "sqlite-as-the-verified-database.md": "SQLite as the verified database",
+    DOCS_ROOT
+    / "design-decisions"
+    / "product-interface-requires-complete-bootstrap.md": (
+        "A product interface requires complete bootstrap"
+    ),
+    DOCS_ROOT / "development" / "collaboration-guidelines.md": (
+        "Collaboration guidelines"
+    ),
+    DOCS_ROOT / "reference" / "architecture" / "package-boundaries.md": (
+        "Package boundaries"
+    ),
+    DOCS_ROOT
+    / "reference"
+    / "architecture"
+    / "protected-context-enforcement.md": "Protected context enforcement",
+    DOCS_ROOT / "reference" / "architecture" / "implementation-gaps.md": (
+        "Implementation gaps"
+    ),
+    DOCS_ROOT
+    / "reference"
+    / "architecture"
+    / "database-upgrade-order.md": "Database upgrade order",
+    DOCS_ROOT / "reference" / "architecture" / "source-ownership.md": (
+        "Source ownership"
+    ),
+    DOCS_ROOT / "reference" / "architecture" / "system-overview.md": "System overview",
+    DOCS_ROOT
+    / "reference"
+    / "architecture"
+    / "transaction-write-sets.md": "Transaction write sets",
+    DOCS_ROOT / "reference" / "architecture" / "schema-and-model-map.md": (
+        "Schema and model map"
+    ),
+    DOCS_ROOT
+    / "reference"
+    / "architecture"
+    / "retrieval-and-frame-implementation.md": (
+        "Retrieval and frame implementation"
+    ),
+    DOCS_ROOT / "reference" / "architecture" / "runtime-composition.md": (
+        "Runtime composition"
+    ),
+    DOCS_ROOT
+    / "reference"
+    / "architecture"
+    / "scientific-component-contracts.md": "Scientific component contracts",
+    DOCS_ROOT / "reference" / "architecture" / "implemented-boundaries.md": (
+        "Implemented boundaries"
+    ),
+    DOCS_ROOT / "reference" / "architecture" / "validity-implementation.md": (
+        "Validity implementation"
+    ),
+    DOCS_ROOT / "reference" / "workflows" / "evidence-to-discovery.md": (
+        "Evidence-to-Discovery workflow"
+    ),
+    DOCS_ROOT / "reference" / "workflows" / "execution-to-evidence.md": (
+        "Execution-to-Evidence workflow"
+    ),
+    DOCS_ROOT
+    / "reference"
+    / "workflows"
+    / "authorize-and-admit-discovery.md": "Authorize and admit Discovery",
+    DOCS_ROOT / "reference" / "workflows" / "resume-and-retrieve-context.md": (
+        "Resume and retrieve context"
+    ),
+    DOCS_ROOT / "reference" / "workflows" / "task-to-hypothesis.md": (
+        "Task-to-Hypothesis workflow"
+    ),
+    DOCS_ROOT / "reference" / "workflows" / "validity-propagation.md": (
+        "Validity propagation workflow"
+    ),
+    DOCS_ROOT / "reference" / "workflows" / "dataset-and-data-profile.md": (
+        "Dataset and DataProfile workflow"
+    ),
+}
+S4_2C_DECISION_IDS = {
+    path: f"D-{index:03d}"
+    for index, path in enumerate(COMPLETE_DECISION_RECORDS, start=1)
+}
 CANONICAL_FOUNDATION = (ROOT_README, DOCS_ROOT / "index.md", *CANONICAL_READER_PAGES)
 READER_FACING_CURRENT_STATE_PAGES = (
     DOCS_ROOT / "project-purpose.md",
-    DOCS_ROOT / "architecture" / "overview.md",
-    DOCS_ROOT / "architecture" / "implementation-gap-analysis.md",
-    DOCS_ROOT / "architecture" / "runtime-composition.md",
-    DOCS_ROOT / "architecture" / "structural-exit-status.md",
+    DOCS_ROOT / "reference" / "architecture" / "system-overview.md",
+    DOCS_ROOT / "reference" / "architecture" / "implementation-gaps.md",
+    DOCS_ROOT / "reference" / "architecture" / "runtime-composition.md",
+    DOCS_ROOT / "reference" / "architecture" / "implemented-boundaries.md",
 )
 CHECKOUT_EVIDENCE_GUARDED_PAGES = (
     *CANONICAL_FOUNDATION,
-    *CORE_EPISTEMIC_ADRS,
-    SQLITE_BOUNDARY_ADR,
-    PRODUCT_BOOTSTRAP_ADR,
+    *CORE_EPISTEMIC_DECISIONS,
+    SQLITE_BOUNDARY_DECISION,
+    PRODUCT_BOOTSTRAP_DECISION,
     *READER_FACING_CURRENT_STATE_PAGES,
 )
 
@@ -531,15 +646,15 @@ def test_docs_index_exposes_exact_canonical_journey() -> None:
     assert not unexpected, f"docs/index.md has unclassified Markdown links: {unexpected}"
 
 
-def test_s4_2b_canonical_structure_matches_approved_intermediate_state() -> None:
-    """S4.2B must move only canonical pages and classify every docs page once."""
+def test_s4_2c_final_documentation_structure_matches_manifest() -> None:
+    """S4.2C must preserve canonical paths and classify every docs page once."""
 
     transition_page = DOCS_ROOT / "project-purpose.md"
     expected_docs = {
         *S4_2B_STABLE_CANONICAL_ENTRY_PATHS,
         *CANONICAL_READER_PAGES,
         *ALL_CONTRIBUTOR_DOCUMENTATION_PAGES,
-        *COMPLETE_DECISION_ANATOMY_ADRS,
+        *COMPLETE_DECISION_RECORDS,
         *PHASE_4C_TECHNICAL_REFERENCE_PAGES,
         transition_page,
     }
@@ -556,10 +671,25 @@ def test_s4_2b_canonical_structure_matches_approved_intermediate_state() -> None
     )
     assert not [path for path in S4_2B_OLD_CANONICAL_PATHS if path.exists()]
     assert actual_docs == expected_docs, (
-        "S4.2B docs classification drifted; "
+        "S4.2C docs classification drifted; "
         f"missing={sorted(expected_docs - actual_docs)}; "
         f"unexpected={sorted(actual_docs - expected_docs)}"
     )
+
+    classifications = (
+        set(CANONICAL_READER_PAGES),
+        set(ALL_CONTRIBUTOR_DOCUMENTATION_PAGES),
+        set(COMPLETE_DECISION_RECORDS),
+        set(PHASE_4C_TECHNICAL_REFERENCE_PAGES),
+        {transition_page},
+    )
+    overlaps = [
+        sorted(left & right)
+        for index, left in enumerate(classifications)
+        for right in classifications[index + 1 :]
+        if left & right
+    ]
+    assert not overlaps, f"S4.2C documentation classifications overlap: {overlaps}"
 
 
 def test_s4_2b_moved_canonical_titles_match_manifest() -> None:
@@ -575,8 +705,8 @@ def test_s4_2b_moved_canonical_titles_match_manifest() -> None:
     assert not mismatches, "S4.2B canonical H1 drift:\n" + "\n".join(mismatches)
 
 
-def test_s4_2b_preserves_deferred_documentation_classifications() -> None:
-    """Decision, contributor, and reference moves remain deferred to S4.2C."""
+def test_s4_2c_final_paths_titles_and_decision_ids_match_manifest() -> None:
+    """Decision, contributor, and reference paths must match the final target tree."""
 
     transition_page = DOCS_ROOT / "project-purpose.md"
     legacy_pages = {
@@ -585,28 +715,113 @@ def test_s4_2b_preserves_deferred_documentation_classifications() -> None:
         if "This legacy entry point is retained" in path.read_text(encoding="utf-8")
     }
     decision_guide_files = set((DOCS_ROOT / "design-decisions").glob("*.md"))
-    decision_record_files = set((DOCS_ROOT / "decisions").glob("*.md"))
-    architecture_files = set((DOCS_ROOT / "architecture").glob("*.md"))
-    workflow_files = set((DOCS_ROOT / "workflows").glob("*.md"))
 
     assert legacy_pages == {transition_page}
-    assert decision_guide_files == {PHASE_3A_CANONICAL_PAGES[0]}
-    assert decision_record_files == set(COMPLETE_DECISION_ANATOMY_ADRS)
+    assert decision_guide_files == {
+        PHASE_3A_CANONICAL_PAGES[0],
+        *COMPLETE_DECISION_RECORDS,
+    }
     assert all(
         path.parent == DOCS_ROOT / "development"
         for path in ALL_CONTRIBUTOR_DOCUMENTATION_PAGES
     )
     assert set(ALL_CONTRIBUTOR_DOCUMENTATION_PAGES) <= set(DOCS_ROOT.rglob("*.md"))
-    assert architecture_files == {
-        path
-        for path in PHASE_4C_TECHNICAL_REFERENCE_PAGES
-        if path.parent == DOCS_ROOT / "architecture"
+    assert len(ALL_CONTRIBUTOR_DOCUMENTATION_PAGES) == 8
+    assert len(ARCHITECTURE_REFERENCE_PAGES) == 13
+    assert len(WORKFLOW_REFERENCE_PAGES) == 7
+    assert set((DOCS_ROOT / "reference" / "architecture").glob("*.md")) == set(
+        ARCHITECTURE_REFERENCE_PAGES
+    )
+    assert set((DOCS_ROOT / "reference" / "workflows").glob("*.md")) == set(
+        WORKFLOW_REFERENCE_PAGES
+    )
+    assert not (DOCS_ROOT / "decisions").exists()
+    assert not (DOCS_ROOT / "architecture").exists()
+    assert not (DOCS_ROOT / "workflows").exists()
+
+    h1_mismatches = []
+    for path, expected_h1 in S4_2C_FINAL_H1.items():
+        first_line = path.read_text(encoding="utf-8").splitlines()[0]
+        if first_line != f"# {expected_h1}":
+            h1_mismatches.append(
+                f"{path.as_posix()}: expected '# {expected_h1}', got {first_line!r}"
+            )
+    assert not h1_mismatches, "S4.2C H1 drift:\n" + "\n".join(h1_mismatches)
+
+    decision_id_failures = []
+    for path, decision_id in S4_2C_DECISION_IDS.items():
+        lines = path.read_text(encoding="utf-8").splitlines()
+        metadata = f"Decision ID: {decision_id}"
+        if lines[2:3] != [metadata] or lines.count(metadata) != 1:
+            decision_id_failures.append(f"{path.as_posix()}: expected one {metadata}")
+    assert not decision_id_failures, "Decision ID drift:\n" + "\n".join(
+        decision_id_failures
+    )
+
+    pull_request_template = DOCS_ROOT / "development" / "pull-request-template.md"
+    assert pull_request_template.read_text(encoding="utf-8").startswith("## Description\n")
+
+    prefixed_paths = [
+        path.as_posix()
+        for path in DOCS_ROOT.rglob("*.md")
+        if path.name.casefold().startswith("adr-")
+    ]
+    prefixed_h1 = [
+        path.as_posix()
+        for path in DOCS_ROOT.rglob("*.md")
+        if path.read_text(encoding="utf-8").splitlines()[0].casefold().startswith(
+            "# adr-"
+        )
+    ]
+    prefixed_labels = [
+        path.as_posix()
+        for path in _tracked_markdown_files()
+        if re.search(
+            r"\[[^\]]*\bADR-00[1-7]\b[^\]]*\]\(",
+            path.read_text(encoding="utf-8"),
+        )
+    ]
+    assert not prefixed_paths, f"ADR-prefixed paths remain: {prefixed_paths}"
+    assert not prefixed_h1, f"ADR-prefixed H1 titles remain: {prefixed_h1}"
+    assert not prefixed_labels, f"ADR-prefixed navigation labels remain: {prefixed_labels}"
+
+    tracked_content = {
+        path: path.read_text(encoding="utf-8") for path in _tracked_markdown_files()
     }
-    assert workflow_files == {
+    old_path_tokens = (
+        "docs/decisions/",
+        "docs/architecture/",
+        "docs/workflows/",
+        "docs/development/guideline.md",
+        "docs/development/pull_request_template.md",
+    )
+    old_path_mentions = [
+        f"{path.as_posix()}: {token}"
+        for path, content in tracked_content.items()
+        for token in old_path_tokens
+        if token in content
+    ]
+    assert not old_path_mentions, "Old S4.2C paths remain:\n" + "\n".join(
+        old_path_mentions
+    )
+
+    decision_guide = PHASE_3A_CANONICAL_PAGES[0]
+    acronym_pages = [
         path
-        for path in PHASE_4C_TECHNICAL_REFERENCE_PAGES
-        if path.parent == DOCS_ROOT / "workflows"
-    }
+        for path, content in tracked_content.items()
+        if re.search(r"\bADRs?\b", content)
+    ]
+    assert acronym_pages == [decision_guide]
+    guide_content = tracked_content[decision_guide]
+    assert guide_content.count("Architecture Decision Records") == 1
+    assert len(re.findall(r"\bADRs?\b", guide_content)) == 1
+    primary_list = guide_content.split("## Related decision records\n", maxsplit=1)[
+        1
+    ].split("\n## ", maxsplit=1)[0]
+    primary_targets = [
+        target for _, target in re.findall(r"\[([^\]]*)\]\(([^)]+)\)", primary_list)
+    ]
+    assert primary_targets == [path.name for path in COMPLETE_DECISION_RECORDS]
 
 
 def test_contributor_docs_are_separate_and_preserve_core_boundaries() -> None:
@@ -749,7 +964,7 @@ def test_canonical_source_references_exist() -> None:
     """Inline source and test orientation paths on canonical pages must resolve."""
 
     violations: list[str] = []
-    for doc in (*CANONICAL_READER_PAGES, *COMPLETE_DECISION_ANATOMY_ADRS):
+    for doc in (*CANONICAL_READER_PAGES, *COMPLETE_DECISION_RECORDS):
         content = doc.read_text(encoding="utf-8")
         for reference in re.findall(r"`((?:src|tests)/[^`\n]+)`", content):
             if not Path(reference).exists():
@@ -952,8 +1167,8 @@ def test_recent_canonical_pages_use_canonical_status_labels() -> None:
         *PHASE_3A_DECISION_PAGES,
         *PHASE_3B1_CANONICAL_PAGES,
         *PHASE_3B2_CANONICAL_PAGES,
-        SQLITE_BOUNDARY_ADR,
-        PRODUCT_BOOTSTRAP_ADR,
+        SQLITE_BOUNDARY_DECISION,
+        PRODUCT_BOOTSTRAP_DECISION,
     ):
         content = doc.read_text(encoding="utf-8")
         emphasized = re.findall(r"\*\*([^*\n]+)\*\*", content)
@@ -995,9 +1210,9 @@ def test_phase_3a_docs_and_source_define_exactly_eight_fcos() -> None:
     }
     assert source_values == expected_values
 
-    adr = CORE_EPISTEMIC_ADRS[0].read_text(encoding="utf-8")
+    decision = CORE_EPISTEMIC_DECISIONS[0].read_text(encoding="utf-8")
     documented_names = set(
-        re.findall(r"^\d+\. `([A-Z][A-Za-z]+)`", adr, flags=re.MULTILINE)
+        re.findall(r"^\d+\. `([A-Z][A-Za-z]+)`", decision, flags=re.MULTILINE)
     )
     expected_names = {
         "Objective",
@@ -1039,9 +1254,9 @@ def test_tracked_docs_preserve_at_most_one_scientific_cardinality() -> None:
     assert not violations, f"Exactly-one cardinality overclaims found: {violations}"
 
     agent_guide = Path("AGENTS.md").read_text(encoding="utf-8")
-    workflow = (DOCS_ROOT / "workflows" / "task-to-hypothesis.md").read_text(
-        encoding="utf-8"
-    )
+    workflow = (
+        DOCS_ROOT / "reference" / "workflows" / "task-to-hypothesis.md"
+    ).read_text(encoding="utf-8")
     canonical_model = PHASE_1_CANONICAL_PAGES[2].read_text(encoding="utf-8")
     assert "generates at most one `Hypothesis`" in agent_guide
     assert "produces at most one `Discovery`" in agent_guide
@@ -1054,7 +1269,7 @@ def test_tracked_docs_preserve_at_most_one_scientific_cardinality() -> None:
 
 
 def test_phase_3c_uses_one_decision_classification_vocabulary() -> None:
-    """ADRs and the decision guide must use the reviewed classification set."""
+    """Decision records and the guide must use the reviewed classification set."""
 
     allowed = {
         "Foundational invariant",
@@ -1067,8 +1282,8 @@ def test_phase_3c_uses_one_decision_classification_vocabulary() -> None:
         "Unsupported product surface",
     }
     failures: list[str] = []
-    for adr in COMPLETE_DECISION_ANATOMY_ADRS:
-        content = adr.read_text(encoding="utf-8")
+    for decision in COMPLETE_DECISION_RECORDS:
+        content = decision.read_text(encoding="utf-8")
         match = re.search(
             r"^\*\*Decision classification:\*\*\s*(.+?)\.\s*$",
             content,
@@ -1076,7 +1291,7 @@ def test_phase_3c_uses_one_decision_classification_vocabulary() -> None:
         )
         if match is None or match.group(1) not in allowed:
             failures.append(
-                f"{adr.as_posix()}: "
+                f"{decision.as_posix()}: "
                 f"{match.group(1) if match is not None else 'missing'}"
             )
 
@@ -1093,8 +1308,8 @@ def test_phase_3c_uses_one_decision_classification_vocabulary() -> None:
         "Current-stage product-surface deferral",
     ):
         if obsolete in guide or any(
-            obsolete in adr.read_text(encoding="utf-8")
-            for adr in COMPLETE_DECISION_ANATOMY_ADRS
+            obsolete in decision.read_text(encoding="utf-8")
+            for decision in COMPLETE_DECISION_RECORDS
         ):
             failures.append(f"obsolete decision classification: {obsolete}")
 
@@ -1344,8 +1559,8 @@ def test_phase_4a_roadmap_has_dependency_order_and_observable_package_boundaries
     assert claimed_fcos <= allowed_fcos
 
 
-def test_reconstructed_adrs_expose_complete_decision_anatomy() -> None:
-    """Reconstructed ADRs must preserve rationale, limits, and redesign guidance."""
+def test_decision_records_expose_complete_decision_anatomy() -> None:
+    """Decision records must preserve rationale, limits, and redesign guidance."""
 
     required_headings = {
         "context",
@@ -1364,17 +1579,19 @@ def test_reconstructed_adrs_expose_complete_decision_anatomy() -> None:
         "implementation orientation",
     }
     failures: list[str] = []
-    for adr in COMPLETE_DECISION_ANATOMY_ADRS:
-        content = adr.read_text(encoding="utf-8")
+    for decision in COMPLETE_DECISION_RECORDS:
+        content = decision.read_text(encoding="utf-8")
         headings = {
             match.group(1).strip().lower()
             for match in re.finditer(r"^##\s+(.+?)\s*$", content, flags=re.MULTILINE)
         }
         missing = sorted(required_headings - headings)
         if missing:
-            failures.append(f"{adr.as_posix()}: missing headings {missing}")
+            failures.append(f"{decision.as_posix()}: missing headings {missing}")
         if re.search(r"^\*\*Status:\*\*\s*Accepted\b", content, flags=re.MULTILINE):
-            failures.append(f"{adr.as_posix()}: uses Accepted as implementation proof")
+            failures.append(
+                f"{decision.as_posix()}: uses Accepted as implementation proof"
+            )
 
     assert not failures, "Incomplete core decision records:\n" + "\n".join(failures)
 
@@ -1470,7 +1687,7 @@ def test_operational_docs_reject_backend_and_enforcement_overclaims() -> None:
         ),
     }
     violations: list[str] = []
-    for doc in (*PHASE_3B1_CANONICAL_PAGES, SQLITE_BOUNDARY_ADR):
+    for doc in (*PHASE_3B1_CANONICAL_PAGES, SQLITE_BOUNDARY_DECISION):
         content = doc.read_text(encoding="utf-8")
         for label, pattern in forbidden_patterns.items():
             if pattern.search(content):
@@ -1687,19 +1904,7 @@ def test_major_documents_distinguish_implementation_status() -> None:
         DOCS_ROOT / "index.md",
         *CANONICAL_READER_PAGES,
         DOCS_ROOT / "roadmap.md",
-        DOCS_ROOT / "architecture" / "overview.md",
-        DOCS_ROOT / "architecture" / "research-state-model.md",
-        DOCS_ROOT / "architecture" / "scientific-specialist-contracts.md",
-        DOCS_ROOT / "architecture" / "context-type-safety.md",
-        DOCS_ROOT / "architecture" / "bounded-contexts.md",
-        DOCS_ROOT / "architecture" / "runtime-composition.md",
-        DOCS_ROOT / "architecture" / "persistence-and-transactions.md",
-        DOCS_ROOT / "architecture" / "validity-and-invalidation.md",
-        DOCS_ROOT / "architecture" / "retrieval-and-session-frame.md",
-        DOCS_ROOT / "architecture" / "migrations.md",
-        DOCS_ROOT / "architecture" / "module-responsibilities.md",
-        DOCS_ROOT / "architecture" / "structural-exit-status.md",
-        *DOCS_ROOT.joinpath("workflows").glob("*.md"),
+        *PHASE_4C_TECHNICAL_REFERENCE_PAGES,
     ]
     missing = [
         doc.as_posix()
