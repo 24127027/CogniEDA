@@ -33,11 +33,19 @@ admission on the fresh path.
   enter execution preparation.
 - The bound `DataProfile` must be active, accepted as ground truth, and match the
   Task.
-- One terminal analytical Task has exactly one Hypothesis.
-- Parent/organizing Tasks do not create Hypotheses or execute.
+- One eligible terminal analytical Task has at most one Hypothesis.
+- Parent/organizing Tasks create neither Hypotheses nor Discoveries and do not
+  execute.
 - A proposed Task cannot execute.
 - Execution admission places the Hypothesis in `TESTING`; evidence admission
   later transitions it to `READY_FOR_EVALUATION`.
+
+“At most one” is a cardinality rule, not a guarantee that every Task reaches
+scientific admission. A cancelled or technically failed execution creates no
+Discovery. Evaluation failure creates no proposal, and governance rejection or
+cancellation creates no Discovery. A supported, contradicted, inconclusive, or
+insufficient-evidence proposal may create the one allowed Discovery only after
+authorization and atomic admission.
 
 ## Boundaries and limitations
 

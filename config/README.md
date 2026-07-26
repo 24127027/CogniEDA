@@ -1,6 +1,18 @@
 # Configuration Files
 
-This directory contains configuration files for CogniEDA agents and Model Context Protocol (MCP) servers.
+This directory contains configuration contracts and checked-in example
+configuration for CogniEDA agents, skills, and Model Context Protocol (MCP)
+servers.
+
+## Current implementation status
+
+The checked-in configuration is not a runnable deployment configuration.
+`agents.toml` references `filesystem` and `neo4j`, while their definitions in
+`mcp.toml` are commented examples. `skills.toml` references directories under
+`skills/`, but no tracked `SKILL.md` definitions currently exist there.
+`ToolManager` fails explicitly when an agent requests an undefined MCP server.
+A deployment or test must supply a coherent replacement before model-backed
+configured agents are runnable.
 
 ## `agents.toml`
 
@@ -25,7 +37,9 @@ In this example:
 
 ## `mcp.toml`
 
-This file configures the connection details for various MCP (Model Context Protocol) servers. These servers expose external functionalities as toolsets to CogniEDA agents.
+This file is the loader input for MCP connection details. In the checked-in
+file, every server block is commented and therefore no MCP toolset is defined.
+The following is an activation example, not current supported configuration.
 
 **Example:**
 ```toml
@@ -41,3 +55,9 @@ url = "http://localhost:8000/mcp"
 In this example:
 - The `filesystem` MCP server is configured to use `stdio` transport, executing a local command.
 - The `neo4j` MCP server is configured to use `http` transport, connecting to a specified URL.
+
+## `skills.toml`
+
+This file defines `SkillsCapability` configuration. Its current directory
+entries are placeholders until matching tracked skill definitions or
+deployment-supplied directories exist.

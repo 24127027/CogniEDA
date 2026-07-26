@@ -68,7 +68,14 @@ anchors are checked by
 
 ## Tool And MCP Config
 
-`config/agents.toml` and `config/skills.toml` contain worker/skill configuration. `config/mcp.toml` is primarily commented examples. `src/tools/manager.py` loads all three surfaces. The exported graph/dataset built-ins remain placeholders.
+`config/agents.toml` and `config/skills.toml` contain worker/skill
+configuration. `config/mcp.toml` contains only commented examples, so the MCP
+names referenced by the checked-in agent configuration are currently
+undefined. The configured skill directories also contain no tracked
+`SKILL.md` files. `src/tools/manager.py` loads all three surfaces and fails
+explicitly on an undefined MCP reference. Supply coherent deployment
+configuration before using model-backed configured Planner adapters. The
+exported graph/dataset built-ins remain placeholders.
 
 ## Current verification note
 

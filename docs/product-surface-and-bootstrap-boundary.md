@@ -53,6 +53,7 @@ not a supported product contract.
 | production Analyst provider | **Unsupported** | the runtime requires a configured model |
 | concrete production Data Explorer | **Unsupported** | an identity and factory must be injected |
 | Graph Miner | **Unsupported** | no executable registered production capability |
+| tracked default agent capability configuration | **Known deviation** | configured MCP names are undefined and configured skill directories contain no tracked definitions |
 
 An internal `__main__` helper in the Planner graph module renders graph
 structure for development. It is not a product entry point. A dependency such
@@ -77,6 +78,21 @@ The seam is useful but intentionally narrow. It does not:
 
 It is a **Partially implemented** product seam, not product bootstrap.
 
+## Tracked capability configuration is not a deployment
+
+`config/agents.toml` assigns `filesystem` to the Planner and Hypothesis Analyst
+and `neo4j` to Graph Miner, while `config/mcp.toml` contains only commented
+examples. `ToolManager` therefore fails explicitly when a configured
+PydanticAI adapter asks for one of those undefined MCP toolsets. In addition,
+`config/skills.toml` names skill directories under `skills/`, but the tracked
+tree contains no `SKILL.md` definitions there.
+
+This is a **Known deviation** in the checked-in developer configuration and a
+product-readiness blocker, not a scientific-authority bypass. Explicit slash
+commands and tests with injected fakes can still exercise bounded Planner
+paths. A deployment must provide a coherent, validated agent/MCP/skill
+configuration before model-backed Planner adapters are a supported capability.
+
 ## Minimum coherent product boundary
 
 A first supported product surface needs one complete slice rather than a thin
@@ -86,14 +102,15 @@ wrapper around the runtime. At minimum it must define:
 2. a production principal and authorization policy;
 3. workspace, Objective, Planner session, and SessionFrame selection;
 4. SQLite database lifecycle and migration failure handling;
-5. a configured production Analyst provider;
-6. a concrete Data Explorer and executable method registry;
-7. typed request, approval, cancellation, clarification, and resume
+5. coherent, validated model, MCP, tool, and skill configuration;
+6. a configured production Analyst provider;
+7. a concrete Data Explorer and executable method registry;
+8. typed request, approval, cancellation, clarification, and resume
    interactions;
-8. execution dispatch, receipt, reconciliation, and restart recovery;
-9. user-visible results, controlled failures, and stale-state reporting;
-10. logs, health, resource limits, and operational ownership; and
-11. security, compatibility, and release policy for the chosen interface.
+9. execution dispatch, receipt, reconciliation, and restart recovery;
+10. user-visible results, controlled failures, and stale-state reporting;
+11. logs, health, resource limits, and operational ownership; and
+12. security, compatibility, and release policy for the chosen interface.
 
 The interface can initially be a CLI, API, desktop process, or another bounded
 host. Its shape is secondary to preserving the same authority, transaction,
@@ -125,6 +142,7 @@ The next product-integration work must not begin by adding command syntax. Its
 blocking prerequisites are:
 
 - production identity and authorization;
+- coherent deployment capability configuration;
 - a configured Analyst provider;
 - a concrete Data Explorer;
 - durable user-interaction coordination across restart; and

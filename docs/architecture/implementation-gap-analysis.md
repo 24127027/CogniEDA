@@ -39,7 +39,7 @@ and [Product surface and bootstrap boundary](../product-surface-and-bootstrap-bo
 | Dataset versioning and cleaning | Approved physical transformations create new versions and DataProfiles | CSV/Parquet profiling and a DVC interface exist | **Partially implemented**; executable DVC and governed cleaning are **Deferred** |
 | Retrieval | Governed graph traversal with validity, scope, lineage, and relevance | Bounded repository retrieval applies explicit and lifecycle exclusion before deterministic lexical scoring; commit revalidates exact active profile, while wrong-profile context can consume budget and Objective, SessionFrame-identity, and operation-scope filters are absent | **Partially implemented**; Graph Miner, semantic indexing, and typed operation-scope admission are **Deferred** |
 | Evidence cache | Validity-keyed reuse that can never author Discovery | No durable cache service exists | **Deferred** |
-| Product surface | Supported authenticated entry point and restart-safe coordination | A fail-closed in-process composition root and external runtime-factory seam require deployment-supplied identity, Analyst, and Data Explorer adapters | **Unsupported**; no CLI, API, worker, daemon, or Python bootstrap |
+| Product surface | Supported authenticated entry point and restart-safe coordination | A fail-closed in-process composition root and external runtime-factory seam require deployment-supplied identity, Analyst, and Data Explorer adapters; tracked agent capability configuration references undefined MCP servers and skill directories without tracked definitions | **Unsupported**; no CLI, API, worker, daemon, Python bootstrap, or runnable default capability configuration |
 | Quality gates | Reproducible tests, lint, formatting, typing, startup, migrations, and CI | Local commands and extensive tests exist | **Partially implemented**; tracked CI and strict typing remain absent or incomplete |
 
 ## Protected invariants already present
@@ -49,7 +49,7 @@ and [Product surface and bootstrap boundary](../product-surface-and-bootstrap-bo
   admit a Hypothesis.
 - One Task admits at most one Hypothesis, and one Hypothesis admits at most one
   Discovery.
-- Parent Tasks do not produce Discoveries.
+- Parent Tasks produce neither Hypotheses nor Discoveries.
 - Evidence admission is observation-only, fenced, and atomic; failure produces
   no Evidence or Discovery.
 - Protected Discovery synthesis excludes Assumptions, Tasks, existing
@@ -88,6 +88,11 @@ executor, and memory packages identified in the
    application services, repository guards, or architecture tests.
 12. The targeted migration sequence lacks mechanically immutable revision
     identities even though historical behavior must remain append-only.
+13. The tracked agent capability configuration is not self-consistent:
+    `config/agents.toml` references MCP servers whose definitions are commented
+    out, and configured skill directories contain no tracked skill definitions.
+    Model-backed Planner adapters therefore require corrected deployment
+    configuration before they are runnable.
 
 ## Target dependency order
 

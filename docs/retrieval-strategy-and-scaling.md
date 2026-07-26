@@ -113,9 +113,11 @@ commit guard, not a complete scientific-admissibility engine.
 | wrong-profile context-only candidates | Known temporary deviation | cannot motivate work, but can consume result budget |
 | request `objective_id` not used as a filter | Known temporary deviation | retrieval does not independently prove Objective compatibility |
 | request `session_frame_id` not independently bound | Known temporary deviation | current Planner passes the exact loaded frame, but the engine does not verify that identity |
-| no operation-specific scope filter | Deferred design decision | scope text affects ranking; it does not prove operation compatibility |
+| no operation-specific scope filter | Known temporary deviation | scope text affects ranking; it does not prove operation compatibility |
+| complete operation-scope policy | Deferred design decision | typed requirements, comparison, explanation, and commit enforcement are not designed |
 | semantic/vector index | Deferred design decision | no supported implementation |
-| Graph Miner | Unsupported product surface | configuration vocabulary exists, but no executable capability is registered |
+| graph-retrieval design | Deferred design decision | traversal, indexing, and graph admissibility are not designed as a supported workflow |
+| executable Graph Miner | Unsupported product surface | configuration vocabulary exists, but no executable capability is registered |
 
 These limitations do not currently let an inactive or wrong-profile Discovery
 motivate a committed Task after revalidation. If any supported path did allow
@@ -132,6 +134,10 @@ enforcement.
 Until that policy exists, the current safe minimum is exact active-profile and
 lifecycle revalidation. Documentation must not describe that minimum as full
 Objective, SessionFrame, or operation-scope admissibility.
+
+The absence of an independent filter is a **Known deviation** in current
+behavior. The complete policy that would replace it is a **Deferred design
+decision**.
 
 ## Graph Miner and semantic retrieval
 

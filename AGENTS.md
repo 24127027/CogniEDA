@@ -14,7 +14,18 @@ Your highest priority is epistemic correctness: every conclusion must remain tra
 
 ## Current Implementation Warning
 
-The local schema and persistence layer use the target FCO names. Minimal durable `PlannerOperation`, `AnalysisFrame`, `ExecutionRun`, execution approval/outbox/inbox, and scientific-finalization paths now exist. Configured request understanding and `/manage_task` Task-proposal approval work, but several product/runtime pieces remain scaffold-level: answer/suggest/plan planner branches are incomplete, concrete executor graphs and executable DVC integration are not implemented, cache persistence is absent, and no production CLI/service/worker bootstrap exists.
+The local schema and persistence layer use the target FCO names. Durable
+`PlannerOperation`, `AnalysisFrame`, `ExecutionRun`, execution
+approval/outbox/inbox, and scientific-finalization paths exist. Explicit
+`/manage_task` proposal approval works, and configured model-backed Planner
+adapters work when a caller supplies coherent model, tool, MCP, and skill
+configuration. The tracked defaults are not a runnable deployment
+configuration: `config/agents.toml` names MCP servers whose definitions are
+commented out, and the configured skill directories contain no tracked skill
+definitions. Answer, suggestion, review, pause, dataset, cleaning, and closure
+product paths remain incomplete; a concrete production Data Explorer,
+executable DVC integration, cache persistence, and a production
+CLI/service/worker bootstrap do not exist.
 
 ## Target FCO Set
 
@@ -38,6 +49,7 @@ Do not introduce these as FCOs unless explicitly instructed by the project owner
 - `PlannerOperation`
 - `ExecutionRun`
 - `EvidenceCacheEntry`
+- `ValidityEvent`
 
 ## Target Non-FCO Boundaries
 
@@ -48,6 +60,8 @@ Do not introduce these as FCOs unless explicitly instructed by the project owner
 - `PlannerOperation` is pending mutation, not an FCO.
 - `ExecutionRun` is provenance, not an FCO.
 - `EvidenceCacheEntry` is cache, not an FCO.
+- `ValidityEvent` is immutable governance/provenance, not an FCO or scientific
+  claim.
 
 ## Target Invariants
 
@@ -58,10 +72,13 @@ Do not introduce these as FCOs unless explicitly instructed by the project owner
 - `Assumption` may guide planning but must be excluded from Conclusion/Discovery Synthesis Context.
 - Proposed `Task`s cannot execute.
 - Only active terminal analytical `Task`s can generate `Hypothesis` objects.
-- One terminal analytical `Task` generates exactly one `Hypothesis`.
-- One `Hypothesis` produces exactly one `Discovery`.
-- Parent `Task`s do not produce `Discovery` objects.
-- Planner nodes produce operations; `commit` persists approved operations atomically.
+- One eligible terminal analytical `Task` generates at most one `Hypothesis`.
+- One `Hypothesis` produces at most one `Discovery`.
+- Parent `Task`s produce neither `Hypothesis` nor `Discovery` objects.
+- Technical execution failure, evaluation failure, and governance rejection or
+  cancellation produce no `Discovery`.
+- Planner nodes produce operations; `commit` delegates the approved ordinary
+  operation batch to `commit_planner_operations`, which owns that transaction.
 
 ## Epistemic Discipline
 

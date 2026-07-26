@@ -56,6 +56,10 @@ the SessionFrame-scaling owner.
 
 ## Deferred work
 
-**Deferred:** Graph Miner traversal, persistent semantic/vector indexes, a general historical query
-mode, explicit comparative scope, session scoping/cardinality policy, and a user-facing resume
+**Known deviation:** No independent operation-scope filter exists in the current
+request or retrieval path.
+
+**Deferred:** The complete typed operation-scope policy, Graph Miner traversal,
+persistent semantic/vector indexes, a general historical query mode, explicit
+comparative scope, session scoping/cardinality policy, and a user-facing resume
 interface.

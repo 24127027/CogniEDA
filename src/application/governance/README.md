@@ -4,9 +4,11 @@ Canonical reference:
 [Governance and Admission](../../../docs/workflows/governance-and-admission.md).
 
 `GovernanceAuthorityIssuer` persists expiring authority bound to the resolved
-principal, action, resource, workspace/session, and proposal identity.
-`DiscoveryAdmissionGovernanceService` verifies that authority and records an
-exact `APPROVED`, `REJECTED`, or `CANCELLED` proposal decision.
+principal, workspace/session, fixed purpose and operation type, issuer, and
+expiry.
+`DiscoveryAdmissionGovernanceService` separately binds that authority to the
+exact evaluation, proposal, bundle, Evidence set, Hypothesis, and Task while
+recording an `APPROVED`, `REJECTED`, or `CANCELLED` proposal decision.
 
 Governance neither authors the proposal nor materializes a Discovery. Decision
 consumption belongs to the atomic Discovery transaction.

@@ -330,6 +330,7 @@ one Hypothesis
   <= one Discovery
 
 parent Task
+  -> no Hypothesis
   -> no Discovery
 ```
 

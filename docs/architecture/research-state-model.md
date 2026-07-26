@@ -38,7 +38,8 @@ Exactly these eight objects are FCOs:
 - protected evaluation requires an active accepted DataProfile and active Evidence;
 - Discovery admission requires same-Hypothesis active Evidence and structured claim, scope, and
   validity basis;
-- parent Tasks cannot enter the execution/evaluation/admission terminal path;
+- parent Tasks create neither Hypotheses nor Discoveries and cannot enter the
+  execution/evaluation/admission terminal path;
 - Assumptions and existing Discoveries cannot enter the protected evaluation bundle.
 
 ## Known deviations and partial areas

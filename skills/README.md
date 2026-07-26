@@ -2,6 +2,15 @@
 
 This directory contains the skill definitions used by CogniEDA agents.
 
+## Current implementation status
+
+The loader and configuration schema exist, but this tracked directory currently
+contains no runtime `SKILL.md` definitions. The entries in
+`config/skills.toml` point to intended directories that are not present in the
+tracked tree. The structure below is the required format for future or
+deployment-supplied skills; it is not proof that the configured skills are
+currently runnable.
+
 Skills are written as `SKILL.md` files and loaded dynamically by `pydantic_ai_skills`. They provide reusable, context-aware instructions and domain-specific guidance to agents without requiring alterations to the core application prompts.
 
 ## Directory Structure

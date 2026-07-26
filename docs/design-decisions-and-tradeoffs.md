@@ -29,10 +29,12 @@ the ADRs preserve the identity of individual decisions.
 | --- | --- | --- |
 | Foundational invariant | A rule that protects the core validity thesis | change its implementation, not silently remove its protection |
 | Durable architectural decision | A boundary expected to survive major product evolution | replace mechanisms while preserving authority and failure semantics |
+| Durable operational boundary | A runtime or persistence responsibility that must remain explicit even if its mechanism moves | change packaging while retaining one visible owner and fail-closed handoff |
 | Current-stage implementation choice | A reasonable local mechanism rather than part of the epistemic thesis | replace it when scale, portability, or product needs justify the cost |
 | Known temporary deviation | Source differs from the preferred long-term boundary without creating a supported authority bypass | keep it explicit and remove it through dedicated work |
+| Partially implemented product seam | A coherent library or workflow seam exists without the complete operable product behavior | finish the missing identity, interaction, recovery, and deployment behavior before advertising it |
 | Deferred design decision | The project has not yet selected or implemented the complete design | do not present a possible solution as current behavior |
-| Unsupported future possibility | A conceivable direction with no current commitment or supported path | require a new decision before relying on it |
+| Unsupported product surface | No supported entry point or executable product capability currently provides the behavior | require a coherent implementation and a new status review before relying on it |
 
 Current-state claims use the shared vocabulary defined in
 [the documentation index](index.md#implementation-status-vocabulary). An ADR
@@ -95,7 +97,10 @@ above. Package names are implementation orientation, not invariants.
 | lexical retrieval | Current-stage implementation choice | **Implemented** | ranking follows authority and may be replaced without weakening admissibility | [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md#lexical-scoring-is-a-current-stage-choice) |
 | bounded recent retrieval window | Current-stage implementation choice | **Implemented** | bounded cost accepts recall loss for older unreferenced Discoveries | [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md#current-retrieval-pipeline) |
 | wrong-profile context-only candidates | Known temporary deviation | **Implemented** fail-closed | candidates cannot motivate work but may consume the result budget | [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md#known-retrieval-deviations) |
-| operation-scope retrieval filter | Deferred design decision | **Deferred** | lexical scope similarity is not scientific admissibility | [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md#scope-is-not-a-lexical-fact) |
+| missing operation-scope admission | Known temporary deviation | **Known deviation** | the current request has no independent compatibility field or predicate | [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md#scope-is-not-a-lexical-fact) |
+| complete operation-scope policy | Deferred design decision | **Deferred** | lexical scope similarity is not scientific admissibility | [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md#scope-is-not-a-lexical-fact) |
+| graph-retrieval design | Deferred design decision | **Deferred** | traversal, persistent indexing, and graph admissibility need a separate design | [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md#graph-miner-and-semantic-retrieval) |
+| executable Graph Miner | Unsupported product surface | **Unsupported** | no executable capability is registered in the runtime | [Product surface and bootstrap boundary](product-surface-and-bootstrap-boundary.md) |
 | SessionFrame successor snapshots | Durable operational boundary | **Implemented** | preserve visible succession and historical context without in-place rewrite | [SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md#snapshot-succession) |
 | database-global latest-active frame | Known temporary deviation | **Implemented** | selection is not user, session, Objective, or branch scoped | [SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md#selection-is-currently-database-global) |
 | in-memory graph checkpointing | Current-stage implementation choice | **Implemented** in process only | never equate process-local graph state with restart-safe continuity | [SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md#checkpoint-and-resume-seams) |
@@ -106,12 +111,13 @@ above. Package names are implementation orientation, not invariants.
 | SQLModel | Current-stage implementation choice | **Implemented** | physical mapping must not own ontology, transactions, or retrieval policy | [Persistence and transaction ownership](persistence-and-transaction-ownership.md#sqlmodel-and-the-dbmodels-facade) |
 | `db.models` facade | Known temporary deviation | **Implemented** | it is the only deliberate compatibility facade and must remain explicit and deterministic | [Persistence and transaction ownership](persistence-and-transaction-ownership.md#sqlmodel-and-the-dbmodels-facade) |
 | SQLite | Current-stage implementation choice | **Verified on SQLite** | current guarantees stop at the backend actually initialized and tested | [SQLite boundary and portability](sqlite-boundary-and-portability.md) |
-| SQLite triggers | SQLite-specific mechanism | **Verified on SQLite** for the installed families | selected database guards supplement, but do not replace, application ownership | [SQLite boundary and portability](sqlite-boundary-and-portability.md#triggers-are-bounded-protection) |
+| SQLite triggers | Current-stage implementation choice | **Verified on SQLite** for the installed families | these SQLite-specific guards supplement, but do not replace, application ownership | [SQLite boundary and portability](sqlite-boundary-and-portability.md#triggers-are-bounded-protection) |
 | targeted in-code migration system | Known temporary deviation | **Verified on SQLite** with limited history enforcement | new transformations append; released migration behavior is not rewritten | [Database initialization and migrations](database-initialization-and-migrations.md#current-migration-model) |
 | fail-closed legacy quarantine | Durable operational boundary | **Verified on SQLite** | preserved data does not gain scientific legitimacy without verifiable lineage and authority | [Database initialization and migrations](database-initialization-and-migrations.md#legacy-quarantine) |
-| SQLite writer-serialization concurrency model | SQLite-specific mechanism | **Verified on SQLite** | another backend needs explicit isolation, locking, ordering, and race verification | [SQLite boundary and portability](sqlite-boundary-and-portability.md#sqlite-specific-mechanisms) |
-| another database backend | Deferred portability decision | **Deferred** | repository abstraction alone cannot establish support | [SQLite boundary and portability](sqlite-boundary-and-portability.md#requirements-before-another-backend-is-supported) |
+| SQLite writer-serialization concurrency model | Current-stage implementation choice | **Verified on SQLite** | this SQLite-specific mechanism must be replaced by explicit isolation, locking, ordering, and race verification on another backend | [SQLite boundary and portability](sqlite-boundary-and-portability.md#sqlite-specific-mechanisms) |
+| another database backend | Deferred design decision | **Deferred** | repository abstraction alone cannot establish support | [SQLite boundary and portability](sqlite-boundary-and-portability.md#requirements-before-another-backend-is-supported) |
 | packaged CLI, API, worker, or daemon | Unsupported product surface | **Unsupported** | requires production identity, adapters, durable coordination, recovery, and one coherent integration slice | [Product surface and bootstrap boundary](product-surface-and-bootstrap-boundary.md) |
+| tracked default agent capability configuration | Known temporary deviation | **Known deviation** | configured MCP names are undefined and configured skill directories contain no tracked definitions, so deployment must supply a coherent replacement | [Product surface and bootstrap boundary](product-surface-and-bootstrap-boundary.md#tracked-capability-configuration-is-not-a-deployment) |
 
 ## 1. Typed research state instead of conversation history
 
@@ -300,12 +306,13 @@ above. Package names are implementation orientation, not invariants.
   generate a Discovery, or synthesize child results into a parent Discovery.
 - **Decision:** Task remains an FCO for governed workflow identity while
   remaining non-scientific. Only an eligible active terminal analytical Task
-  may generate at most one Hypothesis; a parent Task produces no Discovery.
+  may generate at most one Hypothesis; a parent Task produces neither a
+  Hypothesis nor a Discovery.
 - **Invariant protected:** Workflow intent, decomposition, and lifecycle cannot
   substitute for observed Evidence and protected interpretation.
 - **Current implementation:** **Implemented**. Planner, repository, evaluation,
   and admission guards reject proposed, inactive, non-analytical, or parent
-  Tasks. Database uniqueness limits each Task to one Hypothesis.
+  Tasks. Database uniqueness limits each Task to at most one Hypothesis.
 - **Tradeoffs:** Users must decompose broad work, manage more Task states, and
   request a separate presentation for a parent answer.
 - **Known limitations:** Parent-task GeneratedView synthesis is a **Design
@@ -725,7 +732,7 @@ The following mechanisms are not foundational invariants:
 
 | Item | Classification | Boundary |
 | --- | --- | --- |
-| SQLite synchronization, writer serialization, and current trigger behavior | Current-stage implementation choice and SQLite-specific mechanism | atomicity is **Verified on SQLite**; backend portability is **Deferred** |
+| SQLite synchronization, writer serialization, and current trigger behavior | Current-stage implementation choice | these mechanisms are SQLite-specific; atomicity is **Verified on SQLite** and backend portability is **Deferred** |
 | in-process runtime composition | Current-stage implementation choice | composition is **Implemented**; product bootstrap and automatic operational recovery are **Unsupported** |
 | `db.models` compatibility facade | Known temporary deviation | deterministic registration is **Implemented**; bounded model modules remain the physical owners |
 | targeted in-code migration sequence | Known temporary deviation | upgrades are **Verified on SQLite**; an immutable revision registry and general downgrade path are **Unsupported** |
@@ -738,10 +745,12 @@ The following mechanisms are not foundational invariants:
 | generic synthesis-named SessionFrame projection | Known temporary deviation | it is architecture-blocked from protected evaluation |
 | pin-only SessionFrame freshness | Known temporary deviation | repository-current retrieval excludes invalid authority even when the frame is not marked stale |
 | wrong-profile context-only items consuming result budget | Known temporary deviation | they cannot motivate work but may reduce the visible same-profile result set |
-| operation-scope retrieval admission | Deferred design decision | no current request contract enforces a complete operation-specific admissibility policy |
+| missing operation-scope retrieval admission | Known temporary deviation | no current request contract enforces an independent compatibility field or predicate |
+| complete operation-scope policy | Deferred design decision | typed requirements, comparison rules, explanation, and commit enforcement are not designed |
 | deployment-supplied runtime factory | Partially implemented product seam | runtime loading is **Implemented**; product identity, adapters, loops, and recovery remain **Unsupported** |
 | packaged product process | Unsupported product surface | no supported CLI, API, worker, daemon, or Python bootstrap exists |
-| distributed scientific transactions | Unsupported future possibility | no supported distributed ownership or portability guarantee exists |
+| tracked default agent capability configuration | Known temporary deviation | MCP references and skill directories are not self-consistent; model-backed adapters need deployment-supplied correction |
+| distributed scientific transactions | Deferred design decision | no distributed ownership design or portability guarantee has been selected |
 
 ## What future redesigns must preserve
 

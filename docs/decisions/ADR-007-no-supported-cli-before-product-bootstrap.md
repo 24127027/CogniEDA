@@ -1,7 +1,6 @@
 # ADR-007: No supported CLI before product bootstrap is coherent
 
-**Decision classification:** Current-stage product-surface deferral with durable
-authority and recovery obligations.
+**Decision classification:** Durable operational boundary.
 
 **Implementation status:** The in-process runtime and external factory loader
 are **Implemented**, and current persistence behavior is **Verified on SQLite**.

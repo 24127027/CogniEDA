@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import re
 import subprocess
+import tomllib
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -81,6 +82,35 @@ CANONICAL_READER_PAGES = (
     *PHASE_2B_CANONICAL_PAGES,
     *PHASE_3B1_CANONICAL_PAGES,
     *PHASE_3B2_CANONICAL_PAGES,
+)
+CANONICAL_READER_JOURNEY = (
+    PHASE_1_CANONICAL_PAGES[0],
+    PHASE_1_CANONICAL_PAGES[1],
+    PHASE_1_CANONICAL_PAGES[2],
+    PHASE_1_CANONICAL_PAGES[3],
+    PHASE_2A_CANONICAL_PAGES[0],
+    PHASE_2A_CANONICAL_PAGES[1],
+    PHASE_2A_CANONICAL_PAGES[2],
+    PHASE_2A_CANONICAL_PAGES[3],
+    PHASE_2B2_CANONICAL_PAGES[0],
+    PHASE_2B2_CANONICAL_PAGES[1],
+    PHASE_2B2_CANONICAL_PAGES[2],
+    PHASE_2B2_CANONICAL_PAGES[3],
+    PHASE_2B1_CANONICAL_PAGES[0],
+    PHASE_2B1_CANONICAL_PAGES[1],
+    PHASE_3B2_CANONICAL_PAGES[2],
+    PHASE_2B1_CANONICAL_PAGES[2],
+    PHASE_3B2_CANONICAL_PAGES[3],
+    PHASE_2B1_CANONICAL_PAGES[3],
+    PHASE_3B2_CANONICAL_PAGES[0],
+    PHASE_3B2_CANONICAL_PAGES[1],
+    PHASE_3B1_CANONICAL_PAGES[0],
+    PHASE_3B2_CANONICAL_PAGES[4],
+    PHASE_3B1_CANONICAL_PAGES[1],
+    PHASE_3B1_CANONICAL_PAGES[2],
+    PHASE_3B1_CANONICAL_PAGES[3],
+    PHASE_3B1_CANONICAL_PAGES[4],
+    PHASE_3A_CANONICAL_PAGES[0],
 )
 CANONICAL_FOUNDATION = (ROOT_README, DOCS_ROOT / "index.md", *CANONICAL_READER_PAGES)
 READER_FACING_CURRENT_STATE_PAGES = (
@@ -207,20 +237,20 @@ def test_docs_index_exposes_exact_canonical_journey() -> None:
     """The index must expose the complete concept-first canonical journey."""
 
     index_file = DOCS_ROOT / "index.md"
-    linked_markdown: set[Path] = set()
+    linked_markdown: list[Path] = []
     for _, target in _extract_markdown_links(index_file):
         if target.startswith(_EXTERNAL_SCHEMES):
             continue
         path_text, _ = _split_link_target(target)
         if not path_text or not path_text.lower().endswith(".md"):
             continue
-        linked_markdown.add((index_file.parent / path_text).resolve())
+        linked_markdown.append((index_file.parent / path_text).resolve())
 
-    expected = {page.resolve() for page in CANONICAL_READER_PAGES}
+    expected = [page.resolve() for page in CANONICAL_READER_JOURNEY]
     assert linked_markdown == expected, (
-        "docs/index.md must link exactly the canonical reader journey; "
-        f"expected={sorted(map(str, expected))}, "
-        f"actual={sorted(map(str, linked_markdown))}"
+        "docs/index.md must link every canonical page exactly once in the "
+        f"intended journey; expected={list(map(str, expected))}, "
+        f"actual={list(map(str, linked_markdown))}"
     )
 
 
@@ -521,6 +551,140 @@ def test_phase_3a_docs_and_source_define_exactly_eight_fcos() -> None:
         "SessionFrame",
     }
     assert documented_names == expected_names
+
+
+def test_tracked_docs_preserve_at_most_one_scientific_cardinality() -> None:
+    """Stopping paths must not be rewritten as exactly-one cardinality."""
+
+    forbidden_patterns = (
+        re.compile(
+            r"\b(?:one\s+)?(?:eligible\s+)?(?:active\s+)?"
+            r"(?:terminal analytical\s+)?`?Task`?\s+"
+            r"(?:generates?|produces?|has|admits?|creates?)\s+"
+            r"exactly one\s+`?Hypothesis`?\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\b(?:one\s+)?`?Hypothesis`?\s+"
+            r"(?:generates?|produces?|has|admits?|creates?)\s+"
+            r"exactly one\s+`?Discovery`?\b",
+            re.IGNORECASE,
+        ),
+    )
+    violations = [
+        f"{doc.as_posix()}: {pattern.pattern}"
+        for doc in _tracked_markdown_files()
+        for pattern in forbidden_patterns
+        if pattern.search(doc.read_text(encoding="utf-8"))
+    ]
+    assert not violations, f"Exactly-one cardinality overclaims found: {violations}"
+
+    agent_guide = Path("AGENTS.md").read_text(encoding="utf-8")
+    workflow = (DOCS_ROOT / "workflows" / "task-to-hypothesis.md").read_text(
+        encoding="utf-8"
+    )
+    canonical_model = (DOCS_ROOT / "research-state-model.md").read_text(
+        encoding="utf-8"
+    )
+    assert "generates at most one `Hypothesis`" in agent_guide
+    assert "produces at most one `Discovery`" in agent_guide
+    assert "has at most one Hypothesis" in workflow
+    assert re.search(
+        r"parent Task\s+-> no Hypothesis\s+-> no Discovery",
+        canonical_model,
+        flags=re.IGNORECASE,
+    )
+
+
+def test_phase_3c_uses_one_decision_classification_vocabulary() -> None:
+    """ADRs and the decision guide must use the reviewed classification set."""
+
+    allowed = {
+        "Foundational invariant",
+        "Durable architectural decision",
+        "Durable operational boundary",
+        "Current-stage implementation choice",
+        "Known temporary deviation",
+        "Partially implemented product seam",
+        "Deferred design decision",
+        "Unsupported product surface",
+    }
+    failures: list[str] = []
+    for adr in COMPLETE_DECISION_ANATOMY_ADRS:
+        content = adr.read_text(encoding="utf-8")
+        match = re.search(
+            r"^\*\*Decision classification:\*\*\s*(.+?)\.\s*$",
+            content,
+            flags=re.MULTILINE,
+        )
+        if match is None or match.group(1) not in allowed:
+            failures.append(
+                f"{adr.as_posix()}: "
+                f"{match.group(1) if match is not None else 'missing'}"
+            )
+
+    guide = PHASE_3A_CANONICAL_PAGES[0].read_text(encoding="utf-8")
+    for classification in allowed:
+        if f"| {classification} |" not in guide:
+            failures.append(
+                f"{PHASE_3A_CANONICAL_PAGES[0].as_posix()}: "
+                f"missing {classification}"
+            )
+    for obsolete in (
+        "Unsupported future possibility",
+        "Deferred portability decision",
+        "Current-stage product-surface deferral",
+    ):
+        if obsolete in guide or any(
+            obsolete in adr.read_text(encoding="utf-8")
+            for adr in COMPLETE_DECISION_ANATOMY_ADRS
+        ):
+            failures.append(f"obsolete decision classification: {obsolete}")
+
+    assert not failures, "Decision-classification drift:\n" + "\n".join(failures)
+
+
+def test_checked_in_agent_capability_gap_is_documented_from_configuration() -> None:
+    """Tracked configuration must not be mistaken for a runnable deployment."""
+
+    with Path("config/agents.toml").open("rb") as file:
+        agents = tomllib.load(file)
+    with Path("config/mcp.toml").open("rb") as file:
+        mcp = tomllib.load(file)
+    with Path("config/skills.toml").open("rb") as file:
+        skills = tomllib.load(file)
+
+    referenced_mcp = {
+        server
+        for worker in agents.values()
+        for server in worker.get("mcp", [])
+    }
+    missing_mcp = referenced_mcp - set(mcp)
+    tracked_skill_definitions = {
+        path
+        for path in _tracked_markdown_files()
+        if path.name == "SKILL.md" and Path("skills") in path.parents
+    }
+    missing_skill_definitions = {
+        directory
+        for skill in skills.values()
+        for directory in skill.get("directories", [])
+        if not any(
+            definition.is_relative_to(Path(directory))
+            for definition in tracked_skill_definitions
+        )
+    }
+    has_gap = bool(missing_mcp or missing_skill_definitions)
+
+    config_doc = Path("config/README.md").read_text(encoding="utf-8")
+    product_doc = PRODUCT_BOOTSTRAP_ADR.parent.parent.joinpath(
+        "product-surface-and-bootstrap-boundary.md"
+    ).read_text(encoding="utf-8")
+    tools_doc = Path("src/tools/README.md").read_text(encoding="utf-8")
+
+    assert ("not a runnable deployment configuration" in config_doc) is has_gap
+    assert ("Tracked capability configuration is not a deployment" in product_doc) is has_gap
+    assert ("undefined-MCP failure" in tools_doc) is bool(missing_mcp)
 
 
 def test_reconstructed_adrs_expose_complete_decision_anatomy() -> None:

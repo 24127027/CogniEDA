@@ -1,7 +1,6 @@
 # ADR-006: SQLite as the supported persistence boundary
 
-**Decision classification:** Current-stage implementation choice with durable
-transaction-safety obligations.
+**Decision classification:** Current-stage implementation choice.
 
 **Implementation status:** **Verified on SQLite**. Other database backends and
 distributed transaction topologies are **Unsupported**.
