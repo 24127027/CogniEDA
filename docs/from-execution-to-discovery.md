@@ -67,9 +67,11 @@ The prepared execution contract binds:
 - configured Data Explorer identity.
 
 The user approves the exact contract fingerprint. At commit, the application
-reloads current Task and DataProfile authority, then creates or reuses the one
-Hypothesis allowed for that terminal Task and admits an `ExecutionRun` plus
-dispatch outbox.
+reloads current Task and DataProfile authority. On the supported fresh-admission
+path it then creates the one Hypothesis allowed for that terminal Task and
+admits an `ExecutionRun` plus dispatch outbox. An attempted reuse of an existing
+nonterminal Hypothesis currently fails closed at lifecycle ownership and
+remains a **Known deviation**.
 
 The Hypothesis is the bounded test contract. It is not a conclusion. The
 ExecutionRun is attempt provenance, not an FCO or scientific claim.

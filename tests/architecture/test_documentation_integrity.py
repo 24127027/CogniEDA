@@ -448,6 +448,46 @@ def test_contributor_docs_are_separate_and_preserve_core_boundaries() -> None:
     assert not violations, f"Contributor-boundary overclaims found: {violations}"
 
 
+def test_documentation_navigation_does_not_reopen_completed_phase_4c_work() -> None:
+    """Current navigation must not describe completed consolidation as future work."""
+
+    navigation_pages = (DOCS_ROOT / "index.md", DOCS_ROOT / "development" / "index.md")
+    stale_handoff = re.compile(
+        r"\b(?:(?:deferred|handoff)\s+to\s+Phase\s+4C|Phase\s+4C\s+handoff)\b",
+        re.IGNORECASE,
+    )
+    violations = [
+        page.as_posix()
+        for page in navigation_pages
+        if stale_handoff.search(page.read_text(encoding="utf-8"))
+    ]
+    assert not violations, f"Completed Phase 4C work was reopened: {violations}"
+
+
+def test_current_execution_docs_do_not_claim_supported_hypothesis_reuse() -> None:
+    """The documented supported path must stop at the current reuse failure."""
+
+    execution_pages = (
+        DOCS_ROOT / "research-state-model.md",
+        DOCS_ROOT / "from-question-to-discovery.md",
+        DOCS_ROOT / "from-execution-to-discovery.md",
+    )
+    reuse_overclaim = re.compile(
+        r"\bcreat(?:e|es|ed|ing)\s+or\s+reus(?:e|es|ed|ing)\b",
+        re.IGNORECASE,
+    )
+    violations = [
+        page.as_posix()
+        for page in execution_pages
+        if reuse_overclaim.search(page.read_text(encoding="utf-8"))
+    ]
+    assert not violations, f"Existing-Hypothesis reuse overclaims found: {violations}"
+    assert all(
+        "fails closed at lifecycle ownership" in page.read_text(encoding="utf-8")
+        for page in execution_pages
+    )
+
+
 def test_reader_facing_docs_exclude_checkout_audit_evidence() -> None:
     """Canonical and current-state reader pages must exclude local audit scorekeeping."""
 

@@ -145,10 +145,11 @@ They use implementation references only as optional verification aids.
 The repository also retains architecture pages, workflow pages, decision
 records, development guides, and package READMEs created before this narrative
 foundation. They remain useful implementation reference, but they are not the
-canonical reading sequence. Later documentation work will reconcile, rewrite,
-merge, or relocate them without discarding source-grounded detail. Until that
-work is complete, source code and tests remain the authority for current
-behavior.
+canonical reading sequence. Those documents are classified as contributor
+guidance, ADRs, technical references, agent instructions, or the legacy
+transition surface. Canonical pages own concepts; retained references own only
+their source-level mechanics. Source code and tests remain the authority for
+current behavior.
 
 ## Implementation-status vocabulary
 
@@ -167,17 +168,17 @@ Every implementation claim in the canonical narrative uses these meanings:
 A schema, protocol, directory, injected interface, or test fixture is not enough
 by itself to make a feature **Implemented**.
 
-## Documentation follow-up boundaries
+## Documentation maintenance boundaries
 
-- **Phase 4B:** contributor code orientation, package navigation,
-  transaction-owner maps, focused-test locations, and change guidance are now
-  provided in the separate contributor layer.
-- **Deferred to Phase 4C:** technical-reference consolidation, duplicate
-  removal, redirects, file relocation, and link migration after unique content
-  and inbound links are accounted for.
-- **Deferred to Phase 5:** final documentation-system review follows Phase 4C;
-  product work remains governed by the dependency and invariant boundaries in
-  the roadmap.
+- Contributor code orientation, package navigation, transaction-owner maps,
+  focused-test locations, and change guidance belong in the separate
+  contributor layer.
+- Retained technical references have already been classified and linked to
+  their concept and contributor owners. Future consolidation, relocation, or
+  retirement still requires unique-content and inbound-link review.
+- Checkout-specific documentation verification belongs in ignored local audit
+  records. Product work remains governed by the dependency and invariant
+  boundaries in the roadmap.
 
-These are future documentation or product responsibilities, not claims that
-the corresponding workflows are implemented.
+These are documentation ownership rules, not claims that the corresponding
+product workflows are implemented.

@@ -118,9 +118,12 @@ full run is warranted. Update:
 - an ADR for a durable invariant, backend policy, architectural decision, or
   product-bootstrap policy.
 
-## Phase 4C handoff
+## Technical-reference maintenance
 
-Phase 4C may consolidate, relocate, retire, or redirect duplicate technical
-references only after it accounts for unique content and inbound links. Do not
-perform that cleanup as part of an ordinary contributor change. The current
-source-and-change matrix and inventory handoff are local Phase 4B evidence.
+Retained technical references are already classified and linked to their
+canonical concept and contributor owners. Update them when their source-level
+mechanics change, but do not let them regain conceptual or global maturity
+ownership. Consolidation, relocation, retirement, or redirection still requires
+an explicit unique-content and inbound-link review; it is not incidental
+cleanup for an ordinary contributor change. Checkout-specific matrices and
+verification results remain ignored local evidence.

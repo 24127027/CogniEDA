@@ -153,12 +153,14 @@ It needs durable identity so execution attempts, Evidence, evaluation, and the
 eventual Discovery all refer to the same contract. It is not an Assumption, an
 executor request alone, a result, or a conclusion.
 
-On the current supported path, the approved execution contract creates or
-reuses the single Hypothesis for the Task and admits an execution attempt.
-Evidence admission advances it to ready for evaluation. Atomic Discovery
-admission alone moves it to evaluated; authorized validity propagation can move
-a pre-Discovery Hypothesis back to awaiting additional Evidence or attach
-review state after validity loss.
+On the current supported fresh-admission path, the approved execution contract
+creates the single Hypothesis for the Task and admits an execution attempt.
+The branch that attempts to reuse an existing nonterminal Hypothesis currently
+fails closed at lifecycle ownership and is a **Known deviation**. Evidence
+admission advances the fresh Hypothesis to ready for evaluation. Atomic
+Discovery admission alone moves it to evaluated; authorized validity
+propagation can move a pre-Discovery Hypothesis back to awaiting additional
+Evidence or attach review state after validity loss.
 
 The protected evaluator uses the Hypothesis as its evaluand. It must not expand
 the scope, change the method, or substitute another Evidence set.

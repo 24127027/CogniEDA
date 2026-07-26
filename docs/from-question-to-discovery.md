@@ -125,8 +125,10 @@ accepted DataProfile. It binds:
 
 Preparing the contract does not authorize execution. The user must approve its
 exact fingerprint. At commit, the application revalidates the Task, DataProfile,
-contract, session binding, and approval state. It then creates or reuses the one
-Hypothesis allowed for that Task and admits an execution attempt.
+contract, session binding, and approval state. On the supported fresh-admission
+path it then creates the one Hypothesis allowed for that Task and admits an
+execution attempt. An attempted reuse of an existing nonterminal Hypothesis
+currently fails closed at lifecycle ownership and remains a **Known deviation**.
 
 **User control:** approve or cancel the exact execution contract. Changed
 content needs a new approval.
