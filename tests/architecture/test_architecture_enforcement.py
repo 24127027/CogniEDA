@@ -58,6 +58,37 @@ def _imports_execution_records(tree: ast.AST) -> bool:
 
 
 MIGRATION_OWNER = "src/db/legacy_migration.py"
+DATABASE_INITIALIZER = Path("src/db/init_db.py")
+
+
+def test_database_initialization_preserves_load_bearing_upgrade_order() -> None:
+    """Existing repair, metadata creation, claim guards, and quarantine stay ordered."""
+
+    tree = ast.parse(DATABASE_INITIALIZER.read_text(encoding="utf-8"))
+    init_function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "init_db"
+    )
+    ordered_calls = tuple(
+        called_name
+        for statement in init_function.body
+        if isinstance(statement, ast.Expr)
+        and isinstance(statement.value, ast.Call)
+        and (called_name := _called_name(statement.value)) is not None
+    )
+    assert ordered_calls == (
+        "upgrade_pre_repair_database",
+        "upgrade_objective_lifecycle_schema",
+        "upgrade_task_motivation_schema",
+        "upgrade_task_review_schema",
+        "upgrade_evaluation_control_schema",
+        "upgrade_proposal_decision_schema",
+        "upgrade_validity_events_schema",
+        "create_all",
+        "upgrade_discovery_admission_claim_schema",
+        "upgrade_legacy_payloads_schema",
+    )
 
 
 def _violations(source: str, path: str) -> list[str]:

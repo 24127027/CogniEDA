@@ -11,6 +11,9 @@
 | Area | Target design | Current implementation | Status and principal gap |
 | --- | --- | --- | --- |
 | FCO ontology | Exactly Objective, DataProfile, Assumption, Task, Hypothesis, Evidence, Discovery, and SessionFrame | Pydantic schemas, persistence models, and repositories use this set | **Implemented**; there is no production graph abstraction |
+| Runtime composition | One explicit, fail-closed composition boundary independent of deployment topology | `CogniEDARuntime` and an external factory loader assemble injected dependencies in process and initialize persistence | **Implemented**; a production deployment factory, product process, and automatic recovery loop are **Unsupported** |
+| Persistence ownership | One application owner per load-bearing multi-record transition; repositories remain adapters | Scientific cutovers have explicit application owners, private staging hooks, public writer seals, and architecture checks | **Implemented** and **Verified on SQLite**; direct ORM/SQL access is a convention and database-credential boundary rather than absolute enforcement |
+| Database evolution | Immutable, ordered, fail-closed upgrades across supported historical states | Startup applies a fixed sequence of targeted SQLite upgrades and legacy quarantine | **Partially implemented**; current behavior is **Verified on SQLite**, but no immutable revision registry, general downgrade, or online migration exists |
 | Planner governance | Understand intent, stage governed operations, coordinate specialists, and commit approved changes | Narrow Task, decomposition, Objective, and execution proposal paths exist; several nodes know sessions and repository records | **Partially implemented**; direct persistence knowledge is a **Known deviation** |
 | Hypothesis Analyst | Operationalize a Task and evaluate Evidence without raw-data access | Protected evaluation consumes a closed repository-built bundle and returns a typed proposal or failure; the Planner still authors the operational contract | **Partially implemented**; evaluation exists, operationalization ownership is a **Known deviation** |
 | Data Explorer | Execute an approved contract and return observation-only output | Typed result, registry, dispatcher, and per-runtime factory boundaries exist | **Partially implemented**; a concrete production adapter is **Unsupported** |
@@ -70,6 +73,10 @@ executor, and memory packages identified in the
 6. Provenance is not yet sufficient for broad reproducibility claims.
 7. Strict static typing and tracked CI remain repository-level quality debt.
 8. Changed-contract successor creation is outside the current retry path.
+9. Direct ORM or SQL access can bypass invariants that are enforced only by
+   application services, repository guards, or architecture tests.
+10. The targeted migration sequence lacks mechanically immutable revision
+    identities even though historical behavior must remain append-only.
 
 ## Target dependency order
 
@@ -97,4 +104,5 @@ This is design sequencing, not implementation history:
   SessionFrame changes;
 - SessionFrame current-cardinality, scoping, and legacy migration policy;
 - supported product surface and deployment topology;
+- backend portability, concurrency, and migration-tooling policy;
 - release-gate policy for lint, formatting, typing, and CI.

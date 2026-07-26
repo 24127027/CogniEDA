@@ -7,6 +7,9 @@ in-process composition root is `src/application/runtime.py`, with external
 factory loading in `src/application/runtime_loader.py`. There is no
 `dependency_container.py`, worker bootstrap, or startup lifecycle here.
 
+The canonical current boundary is
+[Runtime and composition boundary](../../../docs/runtime-and-composition-boundary.md).
+
 ## Target design
 
 A future bootstrap package may:

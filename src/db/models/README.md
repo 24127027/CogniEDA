@@ -4,7 +4,12 @@
 
 This package owns SQLModel table definitions for all persisted CogniEDA research-state and provenance records.
 
-The `db.models` package acts as the explicit persistence facade for the repository. Importing `db.models` registers all 21 table models in `SQLModel.metadata`.
+The `db.models` package is the only deliberate persistence compatibility facade.
+Importing it registers all currently defined table models in
+`SQLModel.metadata`. It does not own domain ontology or transaction semantics.
+
+The canonical boundary is
+[Persistence and transaction ownership](../../../docs/persistence-and-transaction-ownership.md#sqlmodel-and-the-dbmodels-facade).
 
 ## 2. Model Ownership by Bounded Context
 
@@ -41,7 +46,7 @@ Both are owned strictly by `db.models.common` to prevent duplicate persistence d
 
 ## 4. Invariants and Facade Safety
 
-1. **Exact Table Registration**: Exactly 21 `table=True` classes are defined across 8 bounded model modules (`research`, `execution`, `evidence`, `evaluation`, `governance`, `discovery`, `validity`, `workflow`).
-2. **Facade Re-export**: `db.models.__init__.py` re-exports all 21 table classes plus `TimestampedRecord` and `utc_now` in `__all__`.
-3. **Import Order Safety**: Importing `db.models` or importing individual bounded model modules in any order registers the exact same set of 21 tables in `SQLModel.metadata`.
+1. **Exact Table Registration**: Each table has one `table=True` definition in its bounded model module.
+2. **Facade Re-export**: `db.models.__init__.py` explicitly re-exports the current table classes plus `TimestampedRecord` and `utc_now` in `__all__`.
+3. **Import Order Safety**: Importing `db.models` or importing individual bounded model modules in any order registers the same table set in `SQLModel.metadata`.
 4. **No Alternate Writers**: Database models contain no application write logic or transaction handling.

@@ -1,7 +1,11 @@
-# Runtime Composition
+# Runtime composition
 
-> **Implementation status:** in-process composition `[Implemented]`; production bootstrap
-> `[Unsupported]`; database semantics `[Verified on SQLite]`.
+> **Implementation status:** in-process composition **Implemented**; production
+> bootstrap **Unsupported**; database semantics **Verified on SQLite**.
+
+The reader-facing rationale and deployment boundary are owned by
+[Runtime and composition boundary](../runtime-and-composition-boundary.md).
+This page retains source-level composition orientation.
 
 ## Current implementation
 
@@ -25,16 +29,19 @@ The runtime exposes:
 
 Each method opens a fresh session from the one configured database URL. Durable outbox/inbox,
 evaluation control, admission claims, and validity events allow services to reconstruct work after
-process restart. There is no automatic background loop.
+process restart. The runtime object, registry, and Planner are process-local, and
+there is no automatic background loop.
 
 ## Deployment boundary
 
 `runtime_loader.load_runtime_from_environment` requires
 `COGNIEDA_RUNTIME_FACTORY=module:factory`; it does not supply default production adapters.
 The `src/application/bootstrap/` directory contains no Python implementation.
+`application.orchestrator` coordinates approved Planner-operation commits; it
+is not the composition root.
 
 ## Unsupported surfaces
 
-`[Unsupported]` The repository has no packaged CLI, HTTP/gRPC API, daemon, worker process,
+**Unsupported:** The repository has no packaged CLI, HTTP/gRPC API, daemon, worker process,
 authentication implementation, production Data Explorer, or default production model provider.
 Tests and direct Python calls are not product entry points.

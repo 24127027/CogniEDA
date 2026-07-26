@@ -32,7 +32,11 @@ Database behavior:
 - `CogniEDARuntime` itself requires a non-empty explicit database URL in
   `RuntimeConfiguration`; it does not silently select that fallback.
 - SQLite foreign keys are enabled on connect.
-- `init_db()` creates all SQLModel tables.
+- `init_db()` applies ordered targeted upgrades, creates missing current
+  SQLModel tables, installs selected guards, and runs legacy quarantine.
+
+See [Database initialization and migrations](../database-initialization-and-migrations.md)
+for the supported fresh and existing-database boundary.
 
 Agent LLM behavior:
 
@@ -44,8 +48,11 @@ Agent LLM behavior:
 
 Product Surface:
 
-CogniEDA exposes no supported CLI product surface at Gate 0.
+CogniEDA exposes no supported CLI product surface.
 The codebase is structured as an in-process library and runtime composition root (`src/application/runtime.py`).
+
+See [Runtime and composition boundary](../runtime-and-composition-boundary.md)
+for the deployment-supplied factory seam and unsupported product surfaces.
 
 Verification commands:
 

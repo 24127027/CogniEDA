@@ -1,7 +1,12 @@
-# Module Responsibility Matrix
+# Module responsibility matrix
 
-> **Implementation status:** `[Implemented]` for the checked-in modules; missing deployment
-> adapters are `[Deferred]`.
+> **Implementation status:** **Implemented** for the checked-in modules; missing
+> deployment adapters are **Deferred**.
+
+The operational rationale is owned by
+[Runtime and composition boundary](../runtime-and-composition-boundary.md) and
+[Persistence and transaction ownership](../persistence-and-transaction-ownership.md).
+This page remains a contributor-facing package map.
 
 | Module | Owns | Must not own | Runtime entry |
 | --- | --- | --- | --- |

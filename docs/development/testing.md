@@ -30,13 +30,18 @@ The suite includes:
 - validity authority, full dependent effects, replay, races, and retrieval
   exclusion;
 - SessionFrame projection and bounded Discovery retrieval;
-- SQLite migrations, legacy quarantine, 21-table facade, and trigger equivalence;
+- SQLite migrations, legacy quarantine, deterministic model-facade
+  registration, and trigger equivalence;
 - canonical documentation inventory, links, anchors, and forbidden phantom
   source claims.
 
 Concurrency tests use file-backed SQLite where independent connections matter.
 External analytical/model work uses injected fakes; passing tests do not prove a
 live provider, worker, or production adapter.
+
+The claims supported by these suites are summarized in
+[Persistence and transaction ownership](../persistence-and-transaction-ownership.md)
+and [SQLite boundary and portability](../sqlite-boundary-and-portability.md).
 
 ## Important limitations
 

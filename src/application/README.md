@@ -1,6 +1,12 @@
 # Application Layer Package (`src/application/`)
 
-> Canonical Documentation: [Bounded Contexts](../../docs/architecture/bounded-contexts.md) | [Architecture Overview](../../docs/architecture/overview.md)
+> Canonical documentation:
+> [Runtime and composition boundary](../../docs/runtime-and-composition-boundary.md)
+> and
+> [Persistence and transaction ownership](../../docs/persistence-and-transaction-ownership.md).
+> Contributor maps:
+> [Bounded Contexts](../../docs/architecture/bounded-contexts.md) and
+> [Architecture Overview](../../docs/architecture/overview.md).
 
 ## Purpose
 The `application` layer coordinates domain transactions, execution transitions, governance decisions, scientific admissions, and validity propagation across CogniEDA bounded contexts.

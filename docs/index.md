@@ -59,6 +59,21 @@ Read the canonical narrative in this order:
 17. [From validity change to reconstructed context](from-validity-change-to-reconstructed-context.md)
     follows the running churn example from an Evidence defect through later
     repository-current context.
+18. [Runtime and composition boundary](runtime-and-composition-boundary.md)
+    explains the in-process composition root, deployment-supplied dependencies,
+    runtime loader, and absent product surfaces.
+19. [Persistence and transaction ownership](persistence-and-transaction-ownership.md)
+    separates schemas, repositories, physical models, and migrations while
+    identifying the application owners of atomic durable changes.
+20. [SQLite boundary and portability](sqlite-boundary-and-portability.md)
+    states what is verified today, which mechanisms are SQLite-specific, and
+    what another backend would need to prove.
+21. [Database initialization and migrations](database-initialization-and-migrations.md)
+    follows fresh initialization, existing-database upgrade, trigger
+    installation, immutable migration history, and legacy quarantine.
+22. [From runtime composition to atomic persistence](from-runtime-composition-to-atomic-persistence.md)
+    applies those operational boundaries to one exact-copy Discovery-admission
+    transaction.
 
 Together these pages form the current canonical project explanation. They are
 concept-first: problem, mental model, investigation, authority, protected
@@ -67,7 +82,7 @@ and continuity come before packages or symbols.
 
 ## Project understanding and source orientation
 
-The seventeen documents above are the recommended path for understanding CogniEDA.
+The twenty-two documents above are the recommended path for understanding CogniEDA.
 They use implementation references only as optional verification aids.
 
 The repository also retains architecture pages, workflow pages, decision
@@ -99,10 +114,9 @@ by itself to make a feature **Implemented**.
 
 The following narrative areas are intentionally not complete here:
 
-- **Deferred:** Phase 3B operational decisions about backend choice, runtime
-  composition, persistence packaging, retrieval mechanisms, migration strategy,
-  product bootstrap, deployment authentication, distributed execution, and
-  database portability;
+- **Deferred:** remaining operational decisions about Planner persistence
+  coupling, retrieval mechanisms, product bootstrap, deployment authentication,
+  distributed execution, and product-surface timing;
 - **Deferred:** current-state detail, roadmap, package-level code orientation,
   and relocation or retirement of stale implementation reference;
 - **Deferred:** adversarial consistency review across terminology, links, status

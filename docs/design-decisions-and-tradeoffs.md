@@ -17,8 +17,10 @@ the ADRs preserve the identity of individual decisions.
 > protected-evaluation, Discovery-admission, validity, retrieval, and
 > SessionFrame seams described here are **Implemented** or **Partially
 > implemented** as identified per decision. Transaction and concurrency claims
-> are **Verified on SQLite** only. Operational backend, runtime, deployment, and
-> scaling choices are **Deferred** to Phase 3B.
+> are **Verified on SQLite** only. The current runtime, persistence ownership,
+> SQLite, initialization, and migration decisions are reconstructed below.
+> Product bootstrap, Planner/retrieval follow-up, distributed execution, and
+> deployment topology remain **Deferred**.
 
 ## How CogniEDA classifies a decision
 
@@ -72,6 +74,28 @@ patch. Documentation must not redefine the decision to legitimize the defect.
 | user-governed active context | Durable architectural decision | **Partially implemented** | C | [SessionFrame and active context](session-frame-and-active-context.md) |
 
 No reviewed decision is E-class on the supported path.
+
+## Operational decision map
+
+Operational mechanisms are classified separately from the epistemic decisions
+above. Package names are implementation orientation, not invariants.
+
+| Decision | Classification | Current status | Durable obligation or limitation | Canonical owner |
+| --- | --- | --- | --- | --- |
+| in-process runtime | Current-stage implementation choice | **Implemented** | keep one visible, fail-closed composition boundary even if the topology changes | [Runtime and composition boundary](runtime-and-composition-boundary.md) |
+| `runtime_loader` external-factory seam | Durable operational boundary | **Implemented** | deployment supplies adapters and credentials explicitly; the environment hook itself may change | [Runtime and composition boundary](runtime-and-composition-boundary.md#what-runtimeloader-owns) |
+| application-owned transactions | Durable operational boundary | **Verified on SQLite** | one owner commits every load-bearing scientific write set or none of it | [Persistence and transaction ownership](persistence-and-transaction-ownership.md#current-transaction-owners) |
+| repository adapters | Durable operational boundary | **Implemented** | repositories stage and query; they do not become workflow or scientific-authority owners | [Persistence and transaction ownership](persistence-and-transaction-ownership.md#repositories-are-adapters) |
+| private transaction staging | Durable operational boundary | **Implemented** with convention-level privacy | preserve non-committing staging even if the language-level API changes | [Persistence and transaction ownership](persistence-and-transaction-ownership.md#why-staging-hooks-are-private) |
+| SQLModel | Current-stage implementation choice | **Implemented** | physical mapping must not own ontology, transactions, or retrieval policy | [Persistence and transaction ownership](persistence-and-transaction-ownership.md#sqlmodel-and-the-dbmodels-facade) |
+| `db.models` facade | Known temporary deviation | **Implemented** | it is the only deliberate compatibility facade and must remain explicit and deterministic | [Persistence and transaction ownership](persistence-and-transaction-ownership.md#sqlmodel-and-the-dbmodels-facade) |
+| SQLite | Current-stage implementation choice | **Verified on SQLite** | current guarantees stop at the backend actually initialized and tested | [SQLite boundary and portability](sqlite-boundary-and-portability.md) |
+| SQLite triggers | SQLite-specific mechanism | **Verified on SQLite** for the installed families | selected database guards supplement, but do not replace, application ownership | [SQLite boundary and portability](sqlite-boundary-and-portability.md#triggers-are-bounded-protection) |
+| targeted in-code migration system | Known temporary deviation | **Verified on SQLite** with limited history enforcement | new transformations append; released migration behavior is not rewritten | [Database initialization and migrations](database-initialization-and-migrations.md#current-migration-model) |
+| fail-closed legacy quarantine | Durable operational boundary | **Verified on SQLite** | preserved data does not gain scientific legitimacy without verifiable lineage and authority | [Database initialization and migrations](database-initialization-and-migrations.md#legacy-quarantine) |
+| SQLite writer-serialization concurrency model | SQLite-specific mechanism | **Verified on SQLite** | another backend needs explicit isolation, locking, ordering, and race verification | [SQLite boundary and portability](sqlite-boundary-and-portability.md#sqlite-specific-mechanisms) |
+| another database backend | Deferred portability decision | **Deferred** | repository abstraction alone cannot establish support | [SQLite boundary and portability](sqlite-boundary-and-portability.md#requirements-before-another-backend-is-supported) |
+| packaged CLI, API, worker, or daemon | Unsupported deployment possibility | **Unsupported** | requires a separate product-bootstrap and operational-ownership decision | [Runtime and composition boundary](runtime-and-composition-boundary.md) |
 
 ## 1. Typed research state instead of conversation history
 
@@ -685,7 +709,10 @@ The following mechanisms are not foundational invariants:
 
 | Item | Classification | Boundary |
 | --- | --- | --- |
-| SQLite synchronization, writer serialization, and current trigger behavior | Current-stage implementation choice | atomicity is **Verified on SQLite**; backend portability is **Deferred** |
+| SQLite synchronization, writer serialization, and current trigger behavior | Current-stage implementation choice and SQLite-specific mechanism | atomicity is **Verified on SQLite**; backend portability is **Deferred** |
+| in-process runtime composition | Current-stage implementation choice | composition is **Implemented**; product bootstrap and automatic operational recovery are **Unsupported** |
+| `db.models` compatibility facade | Known temporary deviation | deterministic registration is **Implemented**; bounded model modules remain the physical owners |
+| targeted in-code migration sequence | Known temporary deviation | upgrades are **Verified on SQLite**; an immutable revision registry and general downgrade path are **Unsupported** |
 | deterministic lexical scoring | Current-stage implementation choice | ranking may change after admissibility; retrieval implementation belongs to the operational decision follow-up |
 | database-global latest-active SessionFrame selection | Known temporary deviation | selection is not yet user, Objective, or branch scoped |
 | generic synthesis-named SessionFrame projection | Known temporary deviation | it is architecture-blocked from protected evaluation |
@@ -713,15 +740,15 @@ may change. A redesign must still preserve:
 - historical retention with active exclusion; and
 - user-visible context governance that cannot restore invalid authority.
 
-## Deferred Phase 3B operational decision scope
+## Deferred operational decision scope
 
-This page does not decide SQLite as a long-term backend, in-process runtime
-composition, repository and transaction-owner packaging, Planner persistence
+This page does not decide SQLite as a long-term backend, Planner persistence
 coupling, lexical versus semantic retrieval implementation, SessionFrame
-selection mechanics at scale, migration strategy, CLI/API/worker timing,
-deployment authentication, distributed execution, or database portability.
-Those topics belong to Phase 3B and must preserve the epistemic invariants
-above.
+selection mechanics at scale, product CLI/API/worker timing, deployment
+authentication, distributed execution, or a portable concurrency mechanism.
+Those topics remain **Deferred** and must preserve the epistemic and operational
+invariants above. A future backend decision must not be inferred from the
+current SQLModel or repository interfaces.
 
 ## Related decision records
 
@@ -730,6 +757,7 @@ above.
 - [ADR-003: Specialist scientific authority](decisions/ADR-003-specialist-scientific-authority.md)
 - [ADR-004: Atomic Discovery admission](decisions/ADR-004-atomic-discovery-admission.md)
 - [ADR-005: Atomic validity propagation](decisions/ADR-005-atomic-validity-propagation.md)
+- [ADR-006: SQLite as the supported persistence boundary](decisions/ADR-006-sqlite-supported-boundary.md)
 
 ## Implementation orientation
 

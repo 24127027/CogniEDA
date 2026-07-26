@@ -39,6 +39,13 @@ PHASE_2B_CANONICAL_PAGES = (
     *PHASE_2B1_CANONICAL_PAGES,
     *PHASE_2B2_CANONICAL_PAGES,
 )
+PHASE_3B1_CANONICAL_PAGES = (
+    DOCS_ROOT / "runtime-and-composition-boundary.md",
+    DOCS_ROOT / "persistence-and-transaction-ownership.md",
+    DOCS_ROOT / "sqlite-boundary-and-portability.md",
+    DOCS_ROOT / "database-initialization-and-migrations.md",
+    DOCS_ROOT / "from-runtime-composition-to-atomic-persistence.md",
+)
 CORE_EPISTEMIC_ADRS = (
     DOCS_ROOT / "decisions" / "ADR-001-first-class-research-state.md",
     DOCS_ROOT / "decisions" / "ADR-002-assumption-quarantine.md",
@@ -46,12 +53,17 @@ CORE_EPISTEMIC_ADRS = (
     DOCS_ROOT / "decisions" / "ADR-004-atomic-discovery-admission.md",
     DOCS_ROOT / "decisions" / "ADR-005-atomic-validity-propagation.md",
 )
+SQLITE_BOUNDARY_ADR = (
+    DOCS_ROOT / "decisions" / "ADR-006-sqlite-supported-boundary.md"
+)
+COMPLETE_DECISION_ANATOMY_ADRS = (*CORE_EPISTEMIC_ADRS, SQLITE_BOUNDARY_ADR)
 PHASE_3A_DECISION_PAGES = (*PHASE_3A_CANONICAL_PAGES, *CORE_EPISTEMIC_ADRS)
 CANONICAL_READER_PAGES = (
     *PHASE_1_CANONICAL_PAGES,
     *PHASE_3A_CANONICAL_PAGES,
     *PHASE_2A_CANONICAL_PAGES,
     *PHASE_2B_CANONICAL_PAGES,
+    *PHASE_3B1_CANONICAL_PAGES,
 )
 CANONICAL_FOUNDATION = (ROOT_README, DOCS_ROOT / "index.md", *CANONICAL_READER_PAGES)
 READER_FACING_CURRENT_STATE_PAGES = (
@@ -65,6 +77,7 @@ READER_FACING_CURRENT_STATE_PAGES = (
 CHECKOUT_EVIDENCE_GUARDED_PAGES = (
     *CANONICAL_FOUNDATION,
     *CORE_EPISTEMIC_ADRS,
+    SQLITE_BOUNDARY_ADR,
     *READER_FACING_CURRENT_STATE_PAGES,
 )
 
@@ -243,7 +256,7 @@ def test_canonical_source_references_exist() -> None:
     """Inline source and test orientation paths on canonical pages must resolve."""
 
     violations: list[str] = []
-    for doc in (*CANONICAL_READER_PAGES, *CORE_EPISTEMIC_ADRS):
+    for doc in (*CANONICAL_READER_PAGES, *COMPLETE_DECISION_ANATOMY_ADRS):
         content = doc.read_text(encoding="utf-8")
         for reference in re.findall(r"`((?:src|tests)/[^`\n]+)`", content):
             if not Path(reference).exists():
@@ -427,7 +440,12 @@ def test_recent_canonical_pages_use_canonical_status_labels() -> None:
         re.IGNORECASE,
     )
     violations: list[str] = []
-    for doc in (*PHASE_2B_CANONICAL_PAGES, *PHASE_3A_DECISION_PAGES):
+    for doc in (
+        *PHASE_2B_CANONICAL_PAGES,
+        *PHASE_3A_DECISION_PAGES,
+        *PHASE_3B1_CANONICAL_PAGES,
+        SQLITE_BOUNDARY_ADR,
+    ):
         content = doc.read_text(encoding="utf-8")
         emphasized = re.findall(r"\*\*([^*\n]+)\*\*", content)
         violations.extend(
@@ -485,8 +503,8 @@ def test_phase_3a_docs_and_source_define_exactly_eight_fcos() -> None:
     assert documented_names == expected_names
 
 
-def test_phase_3a_core_adrs_expose_complete_decision_anatomy() -> None:
-    """Core ADRs must preserve rationale, alternatives, limits, and redesign guidance."""
+def test_reconstructed_adrs_expose_complete_decision_anatomy() -> None:
+    """Reconstructed ADRs must preserve rationale, limits, and redesign guidance."""
 
     required_headings = {
         "context",
@@ -505,7 +523,7 @@ def test_phase_3a_core_adrs_expose_complete_decision_anatomy() -> None:
         "implementation orientation",
     }
     failures: list[str] = []
-    for adr in CORE_EPISTEMIC_ADRS:
+    for adr in COMPLETE_DECISION_ANATOMY_ADRS:
         content = adr.read_text(encoding="utf-8")
         headings = {
             match.group(1).strip().lower()
@@ -518,6 +536,106 @@ def test_phase_3a_core_adrs_expose_complete_decision_anatomy() -> None:
             failures.append(f"{adr.as_posix()}: uses Accepted as implementation proof")
 
     assert not failures, "Incomplete core decision records:\n" + "\n".join(failures)
+
+
+def test_operational_docs_preserve_runtime_and_persistence_ownership() -> None:
+    """Operational prose must keep composition, coordination, and writes distinct."""
+
+    runtime = PHASE_3B1_CANONICAL_PAGES[0].read_text(encoding="utf-8")
+    persistence = PHASE_3B1_CANONICAL_PAGES[1].read_text(encoding="utf-8")
+    migration = PHASE_3B1_CANONICAL_PAGES[3].read_text(encoding="utf-8")
+
+    required_runtime_patterns = {
+        "runtime owns composition": re.compile(
+            r"\bCogniEDARuntime\b.{0,240}\bcomposition\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "loader owns external factory seam": re.compile(
+            r"\bruntime_loader\b.{0,240}\bdeployment seam\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "orchestrator is not composition root": re.compile(
+            r"\borchestrator\b.{0,180}\bnot the composition root\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "bootstrap is not implemented": re.compile(
+            r"\bapplication/bootstrap\b.{0,180}\bno Python implementation\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+    }
+    missing_runtime = [
+        label for label, pattern in required_runtime_patterns.items() if not pattern.search(runtime)
+    ]
+
+    required_persistence_terms = {
+        "domain schema",
+        "repository",
+        "sqlmodel model",
+        "migration",
+        "direct orm",
+        "bypass",
+        "not interchangeable",
+    }
+    persistence_normalized = persistence.casefold()
+    missing_persistence = sorted(
+        term for term in required_persistence_terms if term not in persistence_normalized
+    )
+
+    assert not missing_runtime, f"Runtime ownership is incomplete: {missing_runtime}"
+    assert not missing_persistence, (
+        "Persistence-layer ownership or bypass qualification is incomplete: "
+        f"{missing_persistence}"
+    )
+    assert re.search(
+        r"\bHistorical migrations? (?:are|is) immutable records?\b",
+        migration,
+        flags=re.IGNORECASE,
+    )
+
+
+def test_operational_docs_reject_backend_and_enforcement_overclaims() -> None:
+    """SQLite qualification and layered enforcement must remain explicit."""
+
+    forbidden_patterns = {
+        "repository as transaction owner": re.compile(
+            r"\brepositories? (?:are|act as|serve as) (?:the )?"
+            r"(?:application )?transaction owners?\b",
+            re.IGNORECASE,
+        ),
+        "db.models as domain owner": re.compile(
+            r"\bdb\.models (?:owns|defines) (?:the )?"
+            r"(?:domain|ontology|FCO model)\b",
+            re.IGNORECASE,
+        ),
+        "PostgreSQL support overclaim": re.compile(
+            r"\bPostgreSQL (?:is|as) (?:currently )?"
+            r"(?:supported|implemented|verified)\b",
+            re.IGNORECASE,
+        ),
+        "cross-database parity overclaim": re.compile(
+            r"\bcross-database (?:parity|guarantees?|atomicity) (?:is|are) "
+            r"(?:supported|implemented|verified|guaranteed)\b",
+            re.IGNORECASE,
+        ),
+        "editable historical migration": re.compile(
+            r"\bhistorical migrations? (?:may|can|should|must) be "
+            r"(?:edited|rewritten|reordered)\b",
+            re.IGNORECASE,
+        ),
+        "universal trigger protection": re.compile(
+            r"\btriggers? (?:enforce|protect|guarantee) "
+            r"(?:all|every|universal) (?:scientific )?(?:payloads?|invariants?)\b",
+            re.IGNORECASE,
+        ),
+    }
+    violations: list[str] = []
+    for doc in (*PHASE_3B1_CANONICAL_PAGES, SQLITE_BOUNDARY_ADR):
+        content = doc.read_text(encoding="utf-8")
+        for label, pattern in forbidden_patterns.items():
+            if pattern.search(content):
+                violations.append(f"{doc.as_posix()}: {label}")
+
+    assert not violations, f"Operational-boundary overclaims found: {violations}"
 
 
 def test_phase_3a_decisions_preserve_core_epistemic_boundaries() -> None:

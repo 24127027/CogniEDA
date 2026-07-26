@@ -11,7 +11,10 @@ Reader-first concept owners:
 [Retrieval and context type safety](../retrieval-and-context-type-safety.md),
 [Context reconstruction and continuity](../context-reconstruction-and-continuity.md),
 [Validity over time](../validity-over-time.md), and
-[Atomic validity propagation](../atomic-validity-propagation.md).
+[Atomic validity propagation](../atomic-validity-propagation.md),
+[Runtime and composition boundary](../runtime-and-composition-boundary.md),
+[Persistence and transaction ownership](../persistence-and-transaction-ownership.md),
+and [SQLite boundary and portability](../sqlite-boundary-and-portability.md).
 This page remains a source-oriented architecture summary.
 
 CogniEDA is validity-preserving research-state infrastructure for governed analytical

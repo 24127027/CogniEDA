@@ -11,6 +11,11 @@ Checkout-specific baselines, command output, object counts, and implementation
 history belong in ignored local audit records rather than canonical
 documentation.
 
+Canonical operational ownership is explained in
+[Runtime and composition boundary](../runtime-and-composition-boundary.md),
+[Persistence and transaction ownership](../persistence-and-transaction-ownership.md),
+and [SQLite boundary and portability](../sqlite-boundary-and-portability.md).
+
 ## Current authority map
 
 | Context | Canonical source owner | Transaction or mutation owner | Durable limitation |
@@ -58,6 +63,9 @@ repositories is a **Known deviation**, not a scientific-writer bypass.
 - **Deferred:** Graph Miner traversal, persistent semantic indexing, executable
   DVC/cleaning, and Evidence cache.
 - **Known deviation:** strict static typing remains repository debt.
+- **Known deviation:** targeted in-code migration history has no immutable
+  revision registry, and supported-path ORM boundaries are not absolute against
+  direct database access.
 - **Verified on SQLite:** scientific admission and validity transactions; no
   broader database guarantee is made.
 

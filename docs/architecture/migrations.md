@@ -1,6 +1,11 @@
-# Migrations and Schema Evolution
+# Migrations and schema evolution
 
-> **Implementation status:** current upgrade chain `[Implemented]` and `[Verified on SQLite]`.
+> **Implementation status:** current upgrade chain **Implemented** and
+> **Verified on SQLite**.
+
+The reader-facing initialization, history, and quarantine rationale is owned by
+[Database initialization and migrations](../database-initialization-and-migrations.md).
+This page retains the exact contributor-oriented call order.
 
 ## Initialization order
 
@@ -43,6 +48,9 @@ quarantine, interrupted migration rollback/retry, model import order, and SQLite
 One historical task-motivation downgrade helper exists; the project does not claim a general
 rollback framework.
 
-`[Known Deviation]` These are targeted in-code SQLite upgrade assets, not Alembic revisions.
-Historical migration functions must not be reordered or rewritten merely to improve documentation.
+**Known deviation:** These are targeted in-code SQLite upgrade assets, not
+Alembic revisions. Historical migration behavior is an immutable record of an
+already-released transformation: new changes require a new append-only upgrade
+step rather than reordering or rewriting old behavior. The current function
+chain has no general revision registry that mechanically enforces that rule.
 No non-SQLite guarantee is claimed.

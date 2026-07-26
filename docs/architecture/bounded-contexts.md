@@ -5,8 +5,11 @@
 > **Verified on SQLite**.
 
 The canonical authority explanation is
-[Scientific authority](../scientific-authority.md). This page retains the
-package and dependency map for contributors.
+[Scientific authority](../scientific-authority.md). Runtime and persistence
+ownership are explained by
+[Runtime and composition boundary](../runtime-and-composition-boundary.md) and
+[Persistence and transaction ownership](../persistence-and-transaction-ownership.md).
+This page retains the package and dependency map for contributors.
 
 ## Current package map
 
@@ -23,8 +26,9 @@ package and dependency map for contributors.
 | runtime | typed configuration in `application.runtime` | none | none | `CogniEDARuntime`, `runtime_loader` |
 | retrieval | `schemas.retrieval` and context summaries | research/discovery repositories | no index table | `memory.retrieval_engine`, `retrieval_policy`, `session_frame` |
 
-`db.models` is the stable 21-table facade. Its eight implementation modules are persistence
-ownership modules, not domain schemas or repositories.
+`db.models` is the explicit persistence compatibility facade. Its bounded
+implementation modules own physical mappings, not domain schemas or
+repositories.
 
 ## Dependency rules
 
