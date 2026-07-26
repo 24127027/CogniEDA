@@ -11,6 +11,13 @@ The running question is:
 > Within the 2025 small-business subscription cohort, is longer first-response
 > time associated with 90-day churn?
 
+The execution-through-admission portion is expanded in
+[From execution to Discovery](from-execution-to-discovery.md). Its three
+load-bearing mechanisms are owned by
+[Scientific authority](scientific-authority.md),
+[Protected evaluation context](protected-evaluation-context.md), and
+[Governance and Discovery admission](governance-and-discovery-admission.md).
+
 ## The whole path
 
 ```text

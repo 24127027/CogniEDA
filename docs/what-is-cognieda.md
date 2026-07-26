@@ -247,7 +247,12 @@ Read [Problem and thesis](problem-and-thesis.md) for the failure modes behind th
 design. Then read [Research-state model](research-state-model.md) for the
 objects and lifecycle boundaries, followed by
 [From question to Discovery](from-question-to-discovery.md) for the complete
-conceptual investigation.
+conceptual investigation. The authority chain continues in
+[Scientific authority](scientific-authority.md),
+[Protected evaluation context](protected-evaluation-context.md), and
+[Governance and Discovery admission](governance-and-discovery-admission.md).
+The focused workflow is
+[From execution to Discovery](from-execution-to-discovery.md).
 
 ### Implementation orientation
 

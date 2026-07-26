@@ -12,7 +12,7 @@ The canonical thesis is:
 
 ## Recommended reading journey
 
-Read the Phase 1 foundation in this order:
+Read the canonical narrative in this order:
 
 1. [What is CogniEDA?](what-is-cognieda.md) introduces the practical problem,
    the project thesis, the running example, and the current maturity boundary.
@@ -23,23 +23,34 @@ Read the Phase 1 foundation in this order:
 4. [From question to Discovery](from-question-to-discovery.md) follows one
    investigation end to end, showing where authority changes hands, where the
    user governs, and when state becomes durable.
+5. [Scientific authority](scientific-authority.md) explains why observation,
+   evaluation, governance, and materialization must remain separate.
+6. [Protected evaluation context](protected-evaluation-context.md) distinguishes
+   planning context from the closed repository-built input allowed to support a
+   scientific proposal.
+7. [Governance and Discovery admission](governance-and-discovery-admission.md)
+   explains exact authorization, proposal-copy, atomic admission, replay,
+   fencing, conflict, and the SQLite verification boundary.
+8. [From execution to Discovery](from-execution-to-discovery.md) applies those
+   three mechanisms to the running example from an approved analytical Task
+   through durable Discovery.
 
-Together these pages form the canonical Phase 1 project explanation. They are
-concept-first: problem, mental model, investigation, and governing principles
-come before packages or symbols.
+Together these pages form the current canonical project explanation. They are
+concept-first: problem, mental model, investigation, authority, protected
+context, governance, and admission come before packages or symbols.
 
 ## Project understanding and source orientation
 
-The four documents above are the recommended path for understanding CogniEDA.
+The eight documents above are the recommended path for understanding CogniEDA.
 They use implementation references only as optional verification aids.
 
 The repository also retains architecture pages, workflow pages, decision
 records, development guides, and package READMEs created before this narrative
 foundation. They remain useful implementation reference, but they are not the
-canonical reading sequence for Phase 1. Later S4.1 phases will reconcile,
-rewrite, merge, or relocate them without discarding source-grounded detail.
-Until that work is complete, source code and tests remain the authority for
-current behavior.
+canonical reading sequence. Later documentation work will reconcile, rewrite,
+merge, or relocate them without discarding source-grounded detail. Until that
+work is complete, source code and tests remain the authority for current
+behavior.
 
 ## Implementation-status vocabulary
 
@@ -58,17 +69,19 @@ Every implementation claim in the canonical narrative uses these meanings:
 A schema, protocol, directory, injected interface, or test fixture is not enough
 by itself to make a feature **Implemented**.
 
-## Later documentation phases
+## Deferred narrative areas
 
-The following narrative layers are intentionally not complete in Phase 1:
+The following narrative areas are intentionally not complete here:
 
-- **Phase 2:** scientific authority, protected context, memory, SessionFrame
-  governance, retrieval, invalidation, and validity propagation;
-- **Phase 3:** architectural decisions, alternatives, tradeoffs, risks, scaling
+- **Deferred:** SessionFrame reconstruction and governance, retrieval policy,
+  active-context reconstruction, validity propagation, active exclusion, and
+  multi-session continuity;
+- **Deferred:** broader architectural decisions, alternatives, risks, scaling
   boundaries, and redesign triggers;
-- **Phase 4:** current-state detail, roadmap, package-level code orientation,
+- **Deferred:** current-state detail, roadmap, package-level code orientation,
   and relocation or retirement of stale implementation reference;
-- **Phase 5:** adversarial consistency review across terminology, links, status
+- **Deferred:** adversarial consistency review across terminology, links, status
   claims, source, and tests.
 
-These are future sections, not links to documents that do not yet exist.
+These are future sections, not claims that the corresponding product workflows
+are implemented.

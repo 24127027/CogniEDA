@@ -1,6 +1,13 @@
 # System Architecture Overview
 
-> **Implementation status:** `[Partially Implemented]`; persistence and guarded transactions are `[Verified on SQLite]`.
+> **Implementation status:** **Partially implemented**; persistence and guarded
+> transactions are **Verified on SQLite**.
+
+Reader-first concept owners:
+[Scientific authority](../scientific-authority.md),
+[Protected evaluation context](../protected-evaluation-context.md), and
+[Governance and Discovery admission](../governance-and-discovery-admission.md).
+This page remains a source-oriented architecture summary.
 
 CogniEDA is validity-preserving research-state infrastructure for governed analytical
 investigation. Its priority order is:
@@ -33,10 +40,10 @@ snapshots.
 
 ## Target design and unsupported surfaces
 
-`[Design Target]` The broader product workflow adds interactive entry points, concrete production
+**Design target:** The broader product workflow adds interactive entry points, concrete production
 adapters, executable dataset versioning, and more complete retrieval.
 
-`[Unsupported]` No checked-in CLI, HTTP/gRPC service, worker daemon, production Data Explorer,
+**Unsupported:** No checked-in CLI, HTTP/gRPC service, worker daemon, production Data Explorer,
 production authentication resolver, or default Hypothesis Analyst model provider exists.
 Graph Miner and the event/bootstrap package directories are scaffold or documentation-only.
 

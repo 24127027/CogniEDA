@@ -1,8 +1,13 @@
 # Execution-to-Evidence Workflow
 
-> **Implementation status:** Implemented and verified on SQLite for the
+> **Implementation status:** **Implemented** and **Verified on SQLite** for the
 > library/runtime path. No production worker or concrete Data Explorer adapter is
 > shipped.
+
+The reader-first workflow is
+[From execution to Discovery](../from-execution-to-discovery.md), and the
+authority rationale is [Scientific authority](../scientific-authority.md).
+This page retains the technical execution-to-Evidence sequence.
 
 ## Transaction sequence
 

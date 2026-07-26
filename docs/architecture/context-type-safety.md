@@ -1,7 +1,12 @@
 # Context Type Safety
 
-> **Implementation status:** protected Hypothesis evaluation `[Implemented]`; generic
-> SessionFrame projections `[Partially Implemented]`; broader product context assembly `[Deferred]`.
+> **Implementation status:** protected Hypothesis evaluation **Implemented**;
+> generic SessionFrame projections **Partially implemented**; broader product
+> context assembly **Deferred**.
+
+The canonical reader explanation is
+[Protected evaluation context](../protected-evaluation-context.md). This page
+retains the concise implementer reference.
 
 ## Structurally enforced protected evaluation
 
@@ -28,7 +33,9 @@ Conclusion/discovery-synthesis projections exclude Assumptions, Tasks, existing 
 decisions, dead ends, stale context, and caches.
 
 These projections are policy helpers, not the protected evaluator's authority. The protected
-evaluator uses the repository-built bundle directly.
+evaluator uses the repository-built bundle directly. Architecture enforcement prevents the
+protected Analyst, evaluation, governance, and Discovery packages from consuming
+`SessionContextBuilder` or `ContextBundle`.
 
 ## Active retrieval
 
@@ -39,8 +46,8 @@ SessionFrames superseded. `SessionFrameRepository.get_latest_active` excludes su
 
 ## Known limitations
 
-`[Known Deviation]` The general retrieval policy accepts some provenance references by string type
+**Known deviation:** The general retrieval policy accepts some provenance references by string type
 and has no explicit historical/audit context mode.
 
-`[Partially Implemented]` SessionFrames are stored snapshots; there is no supported session-resume
+**Partially implemented:** SessionFrames are stored snapshots; there is no supported session-resume
 UI, item-level governance workflow, or general automatic context refresh.

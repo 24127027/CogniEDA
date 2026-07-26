@@ -1,7 +1,11 @@
 # Persistence and Transactions
 
-> **Implementation status:** normalized ownership `[Implemented]`; transaction and trigger
-> guarantees `[Verified on SQLite]`.
+> **Implementation status:** normalized ownership **Implemented**; transaction
+> and trigger guarantees **Verified on SQLite**.
+
+The reader-first Discovery transaction explanation is
+[Governance and Discovery admission](../governance-and-discovery-admission.md).
+This page retains package-level commit ownership and write sets.
 
 ## Layer separation
 
@@ -53,5 +57,5 @@ identities, exact fingerprints, or unique constraints. Evidence admission and Di
 recognize exact committed replay; validity exact replay verifies the persisted complete effect
 plan. Changed payloads/commands conflict. Failures roll back each owned transaction.
 
-`[Known Deviation]` External Data Explorer side effects are at-least-once. Cross-service workflow
+**Known deviation:** External Data Explorer side effects are at-least-once. Cross-service workflow
 steps are not one distributed transaction. All concurrency and trigger claims are SQLite-only.

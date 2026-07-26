@@ -1,7 +1,12 @@
 # Bounded Contexts
 
-> **Implementation status:** package ownership `[Implemented]`; runtime deployment surfaces
-> `[Partially Implemented]`; persistence guarantees `[Verified on SQLite]`.
+> **Implementation status:** package ownership **Implemented**; runtime
+> deployment surfaces **Partially implemented**; persistence guarantees
+> **Verified on SQLite**.
+
+The canonical authority explanation is
+[Scientific authority](../scientific-authority.md). This page retains the
+package and dependency map for contributors.
 
 ## Current package map
 

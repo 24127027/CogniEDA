@@ -222,6 +222,10 @@ trace.
 admission, and validity interaction are **Implemented** and
 **Verified on SQLite**.
 
+For the authority rationale and transaction boundary, see
+[Scientific authority](scientific-authority.md) and
+[Governance and Discovery admission](governance-and-discovery-admission.md).
+
 ## SessionFrame: user-governed active-context projection
 
 A `SessionFrame` represents a compact, user-governed projection for active
@@ -255,6 +259,9 @@ bundle from authoritative repositories.
 **Implementation status:** snapshots, append/read behavior, typed projections,
 conclusion frames, and validity supersession are **Implemented**. The complete
 user-governed experience is **Partially implemented**.
+
+The distinction between a SessionFrame projection and protected evaluation is
+owned by [Protected evaluation context](protected-evaluation-context.md).
 
 ## Important non-FCO records and artifacts
 

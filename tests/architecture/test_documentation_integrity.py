@@ -15,7 +15,14 @@ PHASE_1_CANONICAL_PAGES = (
     DOCS_ROOT / "research-state-model.md",
     DOCS_ROOT / "from-question-to-discovery.md",
 )
-CANONICAL_FOUNDATION = (ROOT_README, DOCS_ROOT / "index.md", *PHASE_1_CANONICAL_PAGES)
+PHASE_2A_CANONICAL_PAGES = (
+    DOCS_ROOT / "scientific-authority.md",
+    DOCS_ROOT / "protected-evaluation-context.md",
+    DOCS_ROOT / "governance-and-discovery-admission.md",
+    DOCS_ROOT / "from-execution-to-discovery.md",
+)
+CANONICAL_READER_PAGES = (*PHASE_1_CANONICAL_PAGES, *PHASE_2A_CANONICAL_PAGES)
+CANONICAL_FOUNDATION = (ROOT_README, DOCS_ROOT / "index.md", *CANONICAL_READER_PAGES)
 READER_FACING_CURRENT_STATE_PAGES = (
     DOCS_ROOT / "project-purpose.md",
     DOCS_ROOT / "roadmap.md",
@@ -133,8 +140,8 @@ def test_all_tracked_markdown_relative_links_and_anchors_resolve() -> None:
     assert not failures, "Broken local Markdown links or anchors:\n" + "\n".join(failures)
 
 
-def test_docs_index_exposes_only_the_phase_1_canonical_journey() -> None:
-    """The Phase 1 index must expose the four concept-first foundation pages."""
+def test_docs_index_exposes_exact_canonical_journey() -> None:
+    """The index must expose the complete concept-first canonical journey."""
 
     index_file = DOCS_ROOT / "index.md"
     linked_markdown: set[Path] = set()
@@ -146,9 +153,9 @@ def test_docs_index_exposes_only_the_phase_1_canonical_journey() -> None:
             continue
         linked_markdown.add((index_file.parent / path_text).resolve())
 
-    expected = {page.resolve() for page in PHASE_1_CANONICAL_PAGES}
+    expected = {page.resolve() for page in CANONICAL_READER_PAGES}
     assert linked_markdown == expected, (
-        "docs/index.md must link exactly the Phase 1 canonical journey; "
+        "docs/index.md must link exactly the canonical reader journey; "
         f"expected={sorted(map(str, expected))}, "
         f"actual={sorted(map(str, linked_markdown))}"
     )
@@ -200,6 +207,60 @@ def test_canonical_docs_do_not_name_phantom_implementation_surfaces() -> None:
     assert not violations, f"Phantom implementation references found: {violations}"
 
 
+def test_canonical_source_references_exist() -> None:
+    """Inline source and test orientation paths on canonical pages must resolve."""
+
+    violations: list[str] = []
+    for doc in CANONICAL_READER_PAGES:
+        content = doc.read_text(encoding="utf-8")
+        for reference in re.findall(r"`((?:src|tests)/[^`\n]+)`", content):
+            if not Path(reference).exists():
+                violations.append(f"{doc.as_posix()}: {reference}")
+
+    assert not violations, f"Missing canonical source references: {violations}"
+
+
+def test_phase_2a_canonical_pages_reject_authority_overclaims() -> None:
+    """Phase 2A prose must not assign scientific authority to the wrong layer."""
+
+    forbidden_patterns = {
+        "unsafe protected input": re.compile(
+            r"\bprotected (?:conclusion|discovery|evaluation|synthesis)"
+            r"(?: [a-z-]+){0,3} (?:includes?|contains?|admits?) "
+            r"(?:an? )?(?:Assumption|SessionFrame)s?\b",
+            re.IGNORECASE,
+        ),
+        "governance scientific authorship": re.compile(
+            r"\bgovernance (?:authors?|creates?|materializes?|rewrites?)\b",
+            re.IGNORECASE,
+        ),
+        "application scientific rewriting": re.compile(
+            r"\bapplication(?: services?| layer| code)? "
+            r"(?:authors?|paraphrases?|rewrites?|normalizes?)\b",
+            re.IGNORECASE,
+        ),
+        "concrete Data Explorer overclaim": re.compile(
+            r"\b(?:concrete|production) Data Explorer "
+            r"(?:is|exists as|remains) (?:implemented|available|shipped|supported)\b",
+            re.IGNORECASE,
+        ),
+        "cross-database guarantee": re.compile(
+            r"\b(?:cross-database|database-independent|all-database) "
+            r"(?:atomicity|transactions?|guarantees?) "
+            r"(?:is|are) (?:implemented|supported|verified|guaranteed)\b",
+            re.IGNORECASE,
+        ),
+    }
+    violations: list[str] = []
+    for doc in PHASE_2A_CANONICAL_PAGES:
+        content = doc.read_text(encoding="utf-8")
+        for label, pattern in forbidden_patterns.items():
+            if pattern.search(content):
+                violations.append(f"{doc.as_posix()}: {label}")
+
+    assert not violations, f"Scientific-authority overclaims found: {violations}"
+
+
 def test_unsupported_cli_or_service_claims_are_absent_from_canonical_docs() -> None:
     """Canonical docs must not advertise an implemented product process."""
 
@@ -236,7 +297,7 @@ def test_major_documents_distinguish_implementation_status() -> None:
 
     major_docs = [
         DOCS_ROOT / "index.md",
-        *PHASE_1_CANONICAL_PAGES,
+        *CANONICAL_READER_PAGES,
         DOCS_ROOT / "project-purpose.md",
         DOCS_ROOT / "roadmap.md",
         DOCS_ROOT / "architecture" / "overview.md",

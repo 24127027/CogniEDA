@@ -1,7 +1,13 @@
 # Evidence-to-Discovery Workflow
 
-> **Implementation status:** Implemented and verified on SQLite for protected
+> **Implementation status:** **Implemented** and **Verified on SQLite** for protected
 > evaluation, governance, replay fencing, and atomic admission.
+
+Canonical explanations:
+[Protected evaluation context](../protected-evaluation-context.md),
+[Governance and Discovery admission](../governance-and-discovery-admission.md),
+and [From execution to Discovery](../from-execution-to-discovery.md). This page
+retains the compact technical sequence.
 
 ## Protected evaluation
 

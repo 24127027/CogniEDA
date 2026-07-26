@@ -399,6 +399,39 @@ def test_package_s1a_specialists_have_no_compatibility_executor_surface() -> Non
     assert "hypothesis_analyst" not in package_source
 
 
+def test_protected_scientific_path_does_not_consume_session_context_projection() -> None:
+    """Protected evaluation must reconstruct authority instead of using frame summaries."""
+
+    protected_roots = (
+        Path("src/agents/executor/hypothesis_analyst"),
+        Path("src/application/evaluation"),
+        Path("src/application/governance"),
+        Path("src/application/discovery"),
+    )
+    forbidden_symbols = {"ContextBundle", "SessionContextBuilder"}
+    violations: list[str] = []
+
+    for root in protected_roots:
+        for path in root.glob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom):
+                    for alias in node.names:
+                        if alias.name in forbidden_symbols:
+                            violations.append(
+                                f"{path.as_posix()}: imports {alias.name}"
+                            )
+                elif isinstance(node, ast.Name) and node.id in forbidden_symbols:
+                    violations.append(f"{path.as_posix()}: uses {node.id}")
+                elif isinstance(node, ast.Attribute) and node.attr in forbidden_symbols:
+                    violations.append(f"{path.as_posix()}: uses .{node.attr}")
+
+    assert not violations, (
+        "Protected scientific paths must use the repository-built "
+        f"DiscoverySynthesisBundle, not SessionFrame projections: {violations}"
+    )
+
+
 def test_package_s1b_execution_and_evidence_modules_moved_out_of_orchestrator() -> None:
     """Old execution/Evidence files must not exist in application.orchestrator."""
 

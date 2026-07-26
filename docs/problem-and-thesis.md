@@ -248,6 +248,11 @@ The additional proposal, decision, and admission lifecycle is expensive. It is
 also where CogniEDA can preserve exact wording, reject stale authority, and
 atomically complete the terminal scientific chain.
 
+The reader-first explanation is split across
+[Scientific authority](scientific-authority.md),
+[Protected evaluation context](protected-evaluation-context.md), and
+[Governance and Discovery admission](governance-and-discovery-admission.md).
+
 ## Why immutable data and Evidence state matter
 
 `DataProfile` and `Evidence` scientific payloads are immutable. Correcting

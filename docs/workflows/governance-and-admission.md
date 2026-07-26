@@ -1,13 +1,19 @@
 # Governance and Admission Workflow
 
-> **Implementation status:** Implemented and verified on SQLite for Discovery
+> **Implementation status:** **Implemented** and **Verified on SQLite** for Discovery
 > proposal decisions and admission authority.
+
+The canonical reader explanation is
+[Governance and Discovery admission](../governance-and-discovery-admission.md).
+This page retains the source-oriented decision and consumption sequence.
 
 ## Authority and decision
 
 `GovernanceAuthorityIssuer` in `src/application/governance/authority.py`
-persists an expiring authority bound to the authenticated principal, action,
-resource, and proposal digest. It does not create a Discovery.
+persists an expiring authority bound to the authenticated principal,
+workspace/session, purpose, operation, issuer, and expiry. It does not create a
+Discovery. The durable decision separately binds that authority to the exact
+evaluation, proposal, bundle, Evidence set, Hypothesis, and Task.
 
 `DiscoveryAdmissionGovernanceService` in
 `src/application/governance/decision_service.py` validates that authority and
