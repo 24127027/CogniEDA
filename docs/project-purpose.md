@@ -2,9 +2,10 @@
 
 > **Implementation status:** The research-state core and protected scientific
 > admission paths are **Implemented**, with transaction behavior **Verified on
-> SQLite**. Product bootstrap and production adapters are **Unsupported**;
-> executable DVC, cache, and several Planner branches are **Partially
-> implemented**, **Deferred**, or **Unsupported**.
+> SQLite**. Product bootstrap and production adapters are **Unsupported**.
+> Dataset evolution, cache, context continuity, and several Planner branches
+> are **Partially implemented**, **Deferred**, or **Unsupported**. The canonical
+> maturity account is [CogniEDA current state](current-state.md).
 
 CogniEDA is a **governed research-state system for analytical investigation**. It bridges the critical gap between ungrounded natural-language reasoning and rigorous data analysis by providing validity-preserving research-state infrastructure.
 
@@ -27,7 +28,7 @@ CogniEDA solves these failures by enforcing a **typed, governed, validity-preser
 Priority Order of Invariants:
 1. **Conclusion Validity and Traceability**: Every claim (`Discovery`) must be deterministically bound to immutable observed `Evidence` generated from an audited execution on a specific `DataProfile`.
 2. **Context Type Safety**: Strict type boundaries prevent `Assumption` objects, raw conversation history, or rejected tasks from entering scientific synthesis contexts.
-3. **Multi-Session Continuity**: Research state is durable across sessions using structured First-Class Objects (FCOs) persisted in a single-writer relational database (SQLite).
+3. **Multi-Session Continuity**: Durable typed research state can support continuity across sessions. Complete product-level resume, scoped SessionFrame selection, and restart-safe graph progress are not yet implemented; SQLite persistence alone does not establish that product workflow.
 
 ---
 
@@ -65,3 +66,6 @@ To preserve architectural integrity, CogniEDA is explicitly **not**:
 * Planner Boundary: [planner-boundary-and-operation-model.md](planner-boundary-and-operation-model.md)
 * Retrieval Strategy: [retrieval-strategy-and-scaling.md](retrieval-strategy-and-scaling.md)
 * Product Surface: [product-surface-and-bootstrap-boundary.md](product-surface-and-bootstrap-boundary.md)
+* Current State: [current-state.md](current-state.md)
+* Capability Map: [capability-and-maturity-map.md](capability-and-maturity-map.md)
+* Roadmap: [roadmap.md](roadmap.md)

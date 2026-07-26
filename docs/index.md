@@ -21,6 +21,18 @@ Follow the tracks in order. Within a track, read top to bottom.
 2. [Problem and thesis](problem-and-thesis.md) examines the failure modes that
    motivate governed research state and the tradeoffs of the design response.
 
+### Current state and roadmap
+
+1. [CogniEDA current state](current-state.md) states the canonical maturity
+   boundary: what works in process, what remains partial, and what is
+   unsupported.
+2. [Capability and maturity map](capability-and-maturity-map.md) compares the
+   implemented infrastructure, incomplete workflows, known deviations, and
+   product consequences by domain.
+3. [Dependency-driven roadmap](roadmap.md) classifies the blockers and
+   observable exit criteria for one coherent product slice and later
+   trigger-based work.
+
 ### Research-state model
 
 1. [Research-state model](research-state-model.md) explains the durable objects,
@@ -108,14 +120,14 @@ Follow the tracks in order. Within a track, read top to bottom.
    temporary, what they cost, and what future redesigns must preserve. Its ADR
    links provide decision detail without interrupting the conceptual tracks.
 
-Together these twenty-seven pages form the current canonical project
+Together these thirty pages form the current canonical project
 explanation. Problem, mental model, authority, context, and validity precede
 runtime and persistence detail; repository symbols remain optional
 implementation orientation.
 
 ## Project understanding and source orientation
 
-The twenty-seven documents above are the recommended path for understanding CogniEDA.
+The thirty documents above are the recommended path for understanding CogniEDA.
 They use implementation references only as optional verification aids.
 
 The repository also retains architecture pages, workflow pages, decision
@@ -143,16 +155,16 @@ Every implementation claim in the canonical narrative uses these meanings:
 A schema, protocol, directory, injected interface, or test fixture is not enough
 by itself to make a feature **Implemented**.
 
-## Phase 4 and Phase 5 remain pending
+## Phase 4B, Phase 4C, and Phase 5 remain pending
 
-- **Deferred to Phase 4:** current-state consolidation, roadmap refinement, and
-  contributor/package-level orientation.
-- **Deferred to Phase 5:** merge, redirect, relocate, or retire duplicate
-  technical references only after their unique content and inbound links are
-  accounted for.
-- **Deferred product design:** deployment authentication, distributed
-  execution, semantic retrieval implementation, and the concrete product
-  interface.
+- **Deferred to Phase 4B:** contributor code orientation, package navigation,
+  transaction-owner maps, focused-test locations, and package README
+  simplification.
+- **Deferred to Phase 4C:** technical-reference consolidation, duplicate
+  removal, redirects, file relocation, and link migration after unique content
+  and inbound links are accounted for.
+- **Deferred to Phase 5:** product work only through the dependency and
+  invariant boundaries in the roadmap.
 
 These are future documentation or product responsibilities, not claims that
 the corresponding workflows are implemented.

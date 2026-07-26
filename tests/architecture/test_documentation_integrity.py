@@ -17,6 +17,11 @@ PHASE_1_CANONICAL_PAGES = (
     DOCS_ROOT / "research-state-model.md",
     DOCS_ROOT / "from-question-to-discovery.md",
 )
+PHASE_4A_CANONICAL_PAGES = (
+    DOCS_ROOT / "current-state.md",
+    DOCS_ROOT / "capability-and-maturity-map.md",
+    DOCS_ROOT / "roadmap.md",
+)
 PHASE_3A_CANONICAL_PAGES = (DOCS_ROOT / "design-decisions-and-tradeoffs.md",)
 PHASE_2A_CANONICAL_PAGES = (
     DOCS_ROOT / "scientific-authority.md",
@@ -77,6 +82,7 @@ COMPLETE_DECISION_ANATOMY_ADRS = (
 PHASE_3A_DECISION_PAGES = (*PHASE_3A_CANONICAL_PAGES, *CORE_EPISTEMIC_ADRS)
 CANONICAL_READER_PAGES = (
     *PHASE_1_CANONICAL_PAGES,
+    *PHASE_4A_CANONICAL_PAGES,
     *PHASE_3A_CANONICAL_PAGES,
     *PHASE_2A_CANONICAL_PAGES,
     *PHASE_2B_CANONICAL_PAGES,
@@ -86,6 +92,9 @@ CANONICAL_READER_PAGES = (
 CANONICAL_READER_JOURNEY = (
     PHASE_1_CANONICAL_PAGES[0],
     PHASE_1_CANONICAL_PAGES[1],
+    PHASE_4A_CANONICAL_PAGES[0],
+    PHASE_4A_CANONICAL_PAGES[1],
+    PHASE_4A_CANONICAL_PAGES[2],
     PHASE_1_CANONICAL_PAGES[2],
     PHASE_1_CANONICAL_PAGES[3],
     PHASE_2A_CANONICAL_PAGES[0],
@@ -115,7 +124,6 @@ CANONICAL_READER_JOURNEY = (
 CANONICAL_FOUNDATION = (ROOT_README, DOCS_ROOT / "index.md", *CANONICAL_READER_PAGES)
 READER_FACING_CURRENT_STATE_PAGES = (
     DOCS_ROOT / "project-purpose.md",
-    DOCS_ROOT / "roadmap.md",
     DOCS_ROOT / "architecture" / "overview.md",
     DOCS_ROOT / "architecture" / "implementation-gap-analysis.md",
     DOCS_ROOT / "architecture" / "runtime-composition.md",
@@ -270,7 +278,8 @@ def test_reader_facing_docs_exclude_checkout_audit_evidence() -> None:
             re.IGNORECASE,
         ),
         "package chronology": re.compile(
-            r"\b(?:Package|Wave)\s+(?:S?\d|[0-9])",
+            r"\b(?:Package|Wave)\s+S?\d+(?:\.\d+)*\s+"
+            r"(?:commit|baseline|completion|delivered|history|proved|proves)\b",
             re.IGNORECASE,
         ),
     }
@@ -489,6 +498,7 @@ def test_recent_canonical_pages_use_canonical_status_labels() -> None:
     )
     violations: list[str] = []
     for doc in (
+        *PHASE_4A_CANONICAL_PAGES,
         *PHASE_2B_CANONICAL_PAGES,
         *PHASE_3A_DECISION_PAGES,
         *PHASE_3B1_CANONICAL_PAGES,
@@ -681,10 +691,212 @@ def test_checked_in_agent_capability_gap_is_documented_from_configuration() -> N
         "product-surface-and-bootstrap-boundary.md"
     ).read_text(encoding="utf-8")
     tools_doc = Path("src/tools/README.md").read_text(encoding="utf-8")
+    phase_4a_docs = [
+        page.read_text(encoding="utf-8") for page in PHASE_4A_CANONICAL_PAGES
+    ]
 
     assert ("not a runnable deployment configuration" in config_doc) is has_gap
     assert ("Tracked capability configuration is not a deployment" in product_doc) is has_gap
     assert ("undefined-MCP failure" in tools_doc) is bool(missing_mcp)
+    for content in phase_4a_docs:
+        documents_missing_mcp = bool(
+            re.search(
+                r"\bMCP\b.{0,100}\b(?:undefined|not defined|unresolved)\b",
+                content,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+        )
+        documents_missing_skills = bool(
+            re.search(
+                r"\bskills?\b.{0,120}\b(?:no tracked|absent|unresolved)\b",
+                content,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+        )
+        assert documents_missing_mcp is bool(missing_mcp)
+        assert documents_missing_skills is bool(missing_skill_definitions)
+
+
+def test_phase_4a_pages_preserve_current_product_and_retrieval_boundaries() -> None:
+    """Current-state summaries must distinguish library seams from product support."""
+
+    current_state = PHASE_4A_CANONICAL_PAGES[0].read_text(encoding="utf-8")
+    capability_map = PHASE_4A_CANONICAL_PAGES[1].read_text(encoding="utf-8")
+    combined = f"{current_state}\n{capability_map}"
+
+    required_current_state_headings = {
+        "current system boundary",
+        "implemented research-state infrastructure",
+        "implemented scientific lifecycle",
+        "implemented active-context and validity controls",
+        "partial planner and continuity workflows",
+        "current runtime and persistence boundary",
+        "unsupported product surfaces",
+        "known deviations",
+        "what the project is ready for next",
+        "implementation orientation",
+    }
+    current_state_headings = {
+        match.group(1).strip().casefold()
+        for match in re.finditer(
+            r"^##\s+(.+?)\s*$",
+            current_state,
+            flags=re.MULTILINE,
+        )
+    }
+    assert required_current_state_headings <= current_state_headings
+
+    required_boundaries = {
+        "in-process library": re.compile(r"\bin-process Python library\b", re.IGNORECASE),
+        "unsupported product process": re.compile(
+            r"\bsupported\b.{0,40}\bproduct\b.{0,40}\bprocess\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "concrete Data Explorer absent": re.compile(
+            r"\bconcrete production Data Explorer\b",
+            re.IGNORECASE,
+        ),
+        "production identity absent": re.compile(
+            r"\bproduction (?:principal|identity)\b",
+            re.IGNORECASE,
+        ),
+        "lexical current retrieval": re.compile(
+            r"\bdeterministic lexical\b|\blexical ranking\b",
+            re.IGNORECASE,
+        ),
+        "Graph Miner deferred or unsupported": re.compile(
+            r"\bGraph Miner\b.{0,120}\b(?:Deferred|Unsupported)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "SQLite qualification": re.compile(r"\bVerified on SQLite\b", re.IGNORECASE),
+    }
+    missing = [
+        label
+        for label, pattern in required_boundaries.items()
+        if not pattern.search(combined)
+    ]
+    assert not missing, f"Phase 4A current-state boundaries are incomplete: {missing}"
+
+    forbidden_overclaims = {
+        "implemented product process": re.compile(
+            r"\b(?:CLI|HTTP API|worker|daemon|product process)\b.{0,80}"
+            r"\*\*Implemented\*\*",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "implemented production identity": re.compile(
+            r"\bproduction (?:identity|principal)\b.{0,80}\*\*Implemented\*\*",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "implemented concrete Data Explorer": re.compile(
+            r"\bconcrete (?:production )?Data Explorer\b.{0,80}"
+            r"\*\*Implemented\*\*",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "semantic current retrieval": re.compile(
+            r"\bcurrent (?:retrieval|scorer)\b.{0,100}\bsemantic\b.{0,60}"
+            r"\*\*Implemented\*\*",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "complete resume": re.compile(
+            r"\bcomplete (?:product |workflow |session )?resume\b.{0,80}"
+            r"\*\*Implemented\*\*",
+            re.IGNORECASE | re.DOTALL,
+        ),
+    }
+    violations = [
+        label
+        for label, pattern in forbidden_overclaims.items()
+        if pattern.search(combined)
+    ]
+    assert not violations, f"Phase 4A product overclaims found: {violations}"
+
+
+def test_phase_4a_roadmap_has_dependency_order_and_observable_package_boundaries() -> None:
+    """Package 7 must preserve authority and expose complete milestone anatomy."""
+
+    roadmap = PHASE_4A_CANONICAL_PAGES[2].read_text(encoding="utf-8")
+    package_headings = (
+        "Package 7A — trusted local identity and Analyst adapters",
+        "Package 7B — Concrete Data Explorer",
+        "Package 7C — restart-safe in-process coordination",
+        "Package 7D — persistent end-to-end product slice",
+    )
+    positions = [roadmap.index(f"## {heading}") for heading in package_headings]
+    assert positions == sorted(positions)
+
+    required_subheadings = {
+        "purpose",
+        "why it is needed",
+        "prerequisites",
+        "protected invariants",
+        "required implementation outcomes",
+        "non-goals",
+        "known risks",
+        "exit criteria",
+        "dependencies",
+        "what becomes possible afterward",
+    }
+    for index, (heading, start) in enumerate(zip(package_headings, positions, strict=True)):
+        end = positions[index + 1] if index + 1 < len(positions) else len(roadmap)
+        section = roadmap[start:end]
+        subheadings = {
+            match.group(1).strip().casefold()
+            for match in re.finditer(r"^###\s+(.+?)\s*$", section, flags=re.MULTILINE)
+        }
+        missing = sorted(required_subheadings - subheadings)
+        assert not missing, f"{heading} is missing roadmap fields: {missing}"
+        assert "**Current status:** **Design target**." in section
+
+    for blocker_class in (
+        "Structural blocker",
+        "Product blocker",
+        "Operational blocker",
+        "Configuration blocker",
+        "Documentation dependency",
+        "Acceptable local limitation",
+    ):
+        assert blocker_class in roadmap
+
+    invariant_patterns = {
+        "no ninth FCO": re.compile(r"\bintroduce a ninth FCO\b", re.IGNORECASE),
+        "observation-only Data Explorer": re.compile(
+            r"\bData Explorer\b.{0,100}\bobservation-only\b|"
+            r"\bobservation-only Data Explorer\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "Assumption quarantine": re.compile(
+            r"\bAssumptions?\b.{0,120}\bprotected synthesis\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "exact proposal copy": re.compile(r"\bexact proposal-copy\b", re.IGNORECASE),
+        "atomic admission": re.compile(r"\batomic Discovery admission\b", re.IGNORECASE),
+    }
+    missing_invariants = [
+        label for label, pattern in invariant_patterns.items() if not pattern.search(roadmap)
+    ]
+    assert not missing_invariants, (
+        "Roadmap does not preserve required scientific boundaries: "
+        f"{missing_invariants}"
+    )
+
+    allowed_fcos = {
+        "Objective",
+        "DataProfile",
+        "Assumption",
+        "Task",
+        "Hypothesis",
+        "Evidence",
+        "Discovery",
+        "SessionFrame",
+    }
+    claimed_fcos = {
+        match.group(1)
+        for match in re.finditer(
+            r"\b([A-Z][A-Za-z0-9]+)\s+(?:is|becomes)\s+an?\s+FCO\b",
+            roadmap,
+        )
+    }
+    assert claimed_fcos <= allowed_fcos
 
 
 def test_reconstructed_adrs_expose_complete_decision_anatomy() -> None:

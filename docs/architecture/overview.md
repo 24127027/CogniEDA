@@ -3,6 +3,11 @@
 > **Implementation status:** **Partially implemented**; persistence and guarded
 > transactions are **Verified on SQLite**.
 
+The canonical maturity summary is
+[CogniEDA current state](../current-state.md), and future dependencies belong
+to the [dependency-driven roadmap](../roadmap.md). This page owns the compact
+technical architecture view.
+
 Reader-first concept owners:
 [Scientific authority](../scientific-authority.md),
 [Protected evaluation context](../protected-evaluation-context.md), and

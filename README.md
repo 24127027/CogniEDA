@@ -23,6 +23,8 @@ multi-agent framework.
 - **Unsupported:** a production CLI, HTTP API, worker or daemon, production
   authentication, a concrete Data Explorer, and a default production Analyst
   model adapter.
+- **Known deviation:** checked-in model-backed agent configuration references
+  undefined MCP servers and skill directories without tracked definitions.
 - **Deferred:** executable DVC integration, governed cleaning, Graph Miner,
   persistent semantic indexing, and Evidence Cache.
 
@@ -32,10 +34,10 @@ implementation from design targets and deferred work.
 
 ## Documentation
 
-Start with the [canonical documentation journey](docs/index.md). It introduces
-the problem, the research-state mental model, and the path from a research
-question to evidence-bound knowledge before pointing contributors toward source
-orientation.
+Start with the [canonical documentation journey](docs/index.md). For the
+verified maturity boundary, see [current state](docs/current-state.md), the
+[capability and maturity map](docs/capability-and-maturity-map.md), and the
+[dependency-driven roadmap](docs/roadmap.md).
 
 ## Contributor entry points
 

@@ -11,6 +11,11 @@ Checkout-specific baselines, command output, object counts, and implementation
 history belong in ignored local audit records rather than canonical
 documentation.
 
+The canonical maturity narrative is
+[CogniEDA current state](../current-state.md). Capability comparison belongs to
+the [capability and maturity map](../capability-and-maturity-map.md), and future
+dependencies belong to the [roadmap](../roadmap.md).
+
 Canonical operational ownership is explained in
 [Runtime and composition boundary](../runtime-and-composition-boundary.md),
 [Product surface and bootstrap boundary](../product-surface-and-bootstrap-boundary.md),

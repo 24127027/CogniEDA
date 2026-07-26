@@ -6,6 +6,11 @@
 > canonical introduction to CogniEDA, and source code remains authoritative for
 > what currently exists.
 
+Canonical reader-facing maturity and comparison now belong to
+[CogniEDA current state](../current-state.md) and the
+[capability and maturity map](../capability-and-maturity-map.md). Future
+sequencing and exit criteria belong to the [roadmap](../roadmap.md).
+
 Reader-facing ownership for the operational gaps belongs to
 [Planner boundary and operation model](../planner-boundary-and-operation-model.md),
 [Retrieval strategy and scaling](../retrieval-strategy-and-scaling.md),
