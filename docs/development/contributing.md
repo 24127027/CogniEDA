@@ -10,10 +10,10 @@
 
 ## Before Changing Code
 
-1. Inspect existing schema, repository, and planner patterns.
-2. Classify the feature using the target architecture.
-3. Check [Implementation Gap Analysis](../architecture/implementation-gap-analysis.md).
-4. Decide whether the change converges toward the target architecture or belongs in provenance/cache/runtime infrastructure.
+1. Start at the [contributor hub](index.md), then read the canonical concept and current-state owner.
+2. Use the [change-boundary guide](change-boundary-guide.md) before selecting schema, repository, model, or application layers.
+3. Inspect existing source and focused tests before changing a boundary.
+4. Decide whether the change belongs to an FCO, workflow state, provenance, cache, filesystem artifact, or generated view.
 5. Add or update tests for each invariant touched.
 
 ## Before Changing Docs

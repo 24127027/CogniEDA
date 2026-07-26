@@ -1,4 +1,10 @@
-# Development Setup
+# Development setup
+
+This is a repository-development setup, not a product quickstart. CogniEDA has
+no supported CLI, HTTP API, worker, daemon, or bootstrap package. Start at the
+[contributor hub](index.md) and read the
+[runtime and composition boundary](../runtime-and-composition-boundary.md)
+before wiring an adapter.
 
 ## Prerequisites
 
@@ -14,7 +20,7 @@ uv sync
 copy .env.example .env
 ```
 
-## Environment
+## Environment and SQLite development boundary
 
 Current `.env.example` contains:
 
@@ -38,35 +44,37 @@ Database behavior:
 See [Database initialization and migrations](../database-initialization-and-migrations.md)
 for the supported fresh and existing-database boundary.
 
+The tested persistence and concurrency boundary is SQLite. Do not infer
+PostgreSQL, cross-database, or multi-host support from the SQLModel interfaces.
+
+## In-process runtime composition
+
+`CogniEDARuntime` is a library composition root. Its constructor requires an
+authenticated-principal resolver, an explicit Hypothesis Analyst model, a Data
+Explorer identifier/factory, and an execution-context factory. The
+`runtime_loader` helper accepts an explicit environment-named `module:factory`;
+it never invents missing adapters. These are integration seams, not a supported
+product process.
+
 Agent LLM behavior:
 
 - `src/agents/llm.py` reads `COGNIEDA_MODEL_NAME`, `COGNIEDA_OPENAI_BASE_URL`, and `COGNIEDA_OPENAI_API_KEY`.
 - `COGNIEDA_MODEL_NAME` and `COGNIEDA_OPENAI_API_KEY` are required by `create_agent()`.
 - These agent variables are not currently listed in `.env.example`.
 
-## Commands
-
-Product Surface:
-
-CogniEDA exposes no supported CLI product surface.
-The codebase is structured as an in-process library and runtime composition root (`src/application/runtime.py`).
-
-See [Runtime and composition boundary](../runtime-and-composition-boundary.md)
-for the deployment-supplied factory seam and unsupported product surfaces.
-
-Verification commands:
+## Verification commands
 
 ```powershell
-uv run pytest
+uv run pytest -q tests/architecture
 uv run ruff check .
-uv run mypy src
+uv run pytest -q
 ```
 
 Markdown structure, canonical index coverage, relative links, and local heading
 anchors are checked by
 `tests/architecture/test_documentation_integrity.py`.
 
-## Tool And MCP Config
+## Unresolved tools, skills, and MCP configuration
 
 `config/agents.toml` and `config/skills.toml` contain worker/skill
 configuration. `config/mcp.toml` contains only commented examples, so the MCP
@@ -79,7 +87,7 @@ exported graph/dataset built-ins remain placeholders.
 
 ## Current verification note
 
-Verification counts are checkout-specific. The current S4 command evidence and
-known strict-mypy debt are recorded in the ignored local audit referenced by the
-[Structural Exit Status](../architecture/structural-exit-status.md); rerun the
-commands before making a release claim.
+Verification counts are checkout-specific and must not be copied into a release
+claim. `uv run mypy src` is useful for diagnosis but has known baseline debt;
+do not call it a clean gate without a current result. Select focused commands
+from the [testing strategy](testing.md) before running the full suite.

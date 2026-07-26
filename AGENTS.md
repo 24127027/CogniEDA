@@ -12,6 +12,20 @@ Your highest priority is epistemic correctness: every conclusion must remain tra
 - Use `src/agents/planner/nodes.py` and `src/agents/planner/graph.py` for current planner scaffolding and intended node names.
 - If design docs and code conflict, document the conflict. Do not silently resolve it.
 
+## Documentation Navigation
+
+- Read [docs/index.md](docs/index.md) for the canonical conceptual journey.
+- Use [docs/current-state.md](docs/current-state.md),
+  [docs/capability-and-maturity-map.md](docs/capability-and-maturity-map.md),
+  and [docs/roadmap.md](docs/roadmap.md) for current support, deviations, and
+  dependencies.
+- Use [docs/development/index.md](docs/development/index.md) for source
+  orientation, change boundaries, testing, and setup. It is contributor
+  navigation, not a replacement for the canonical concepts.
+- Review local package READMEs only for package mechanics, then confirm the
+  current source and focused tests. The documented product boundary remains an
+  in-process foundation, not a CLI/API/worker deployment.
+
 ## Current Implementation Warning
 
 The local schema and persistence layer use the target FCO names. Durable

@@ -121,6 +121,13 @@ CANONICAL_READER_JOURNEY = (
     PHASE_3B1_CANONICAL_PAGES[4],
     PHASE_3A_CANONICAL_PAGES[0],
 )
+CONTRIBUTOR_DOCUMENTATION_PAGES = (
+    DOCS_ROOT / "development" / "index.md",
+    DOCS_ROOT / "development" / "code-orientation.md",
+    DOCS_ROOT / "development" / "change-boundary-guide.md",
+    DOCS_ROOT / "development" / "testing.md",
+    DOCS_ROOT / "development" / "setup.md",
+)
 CANONICAL_FOUNDATION = (ROOT_README, DOCS_ROOT / "index.md", *CANONICAL_READER_PAGES)
 READER_FACING_CURRENT_STATE_PAGES = (
     DOCS_ROOT / "project-purpose.md",
@@ -255,11 +262,73 @@ def test_docs_index_exposes_exact_canonical_journey() -> None:
         linked_markdown.append((index_file.parent / path_text).resolve())
 
     expected = [page.resolve() for page in CANONICAL_READER_JOURNEY]
-    assert linked_markdown == expected, (
+    contributor = [page.resolve() for page in CONTRIBUTOR_DOCUMENTATION_PAGES]
+    canonical_links = [link for link in linked_markdown if link in expected]
+    contributor_links = [link for link in linked_markdown if link in contributor]
+    unexpected = [
+        link for link in linked_markdown if link not in expected and link not in contributor
+    ]
+
+    assert canonical_links == expected, (
         "docs/index.md must link every canonical page exactly once in the "
         f"intended journey; expected={list(map(str, expected))}, "
-        f"actual={list(map(str, linked_markdown))}"
+        f"actual={list(map(str, canonical_links))}"
     )
+    assert contributor_links == contributor, (
+        "docs/index.md must expose the separate contributor navigation pages "
+        f"in order; expected={list(map(str, contributor))}, "
+        f"actual={list(map(str, contributor_links))}"
+    )
+    assert not unexpected, f"docs/index.md has unclassified Markdown links: {unexpected}"
+
+
+def test_contributor_docs_are_separate_and_preserve_core_boundaries() -> None:
+    """Contributor navigation must not join the conceptual journey or weaken ownership."""
+
+    canonical = set(CANONICAL_READER_PAGES)
+    contributors = set(CONTRIBUTOR_DOCUMENTATION_PAGES)
+    assert not canonical.intersection(contributors)
+    assert all(page.exists() for page in contributors)
+
+    combined = "\n".join(page.read_text(encoding="utf-8") for page in contributors)
+    assert "Package 7 entry paths" in combined
+    assert "Historical migrations are not" in combined
+    assert "no supported CLI" in combined
+    assert "semantic indexing and Graph Miner are deferred" in combined
+
+    forbidden_patterns = {
+        "Planner scientific authorship": re.compile(
+            r"\bPlanner(?: nodes?)? (?:authors?|creates?|materializes?) "
+            r"(?:`?Evidence`?|`?Discovery`?)\b",
+            re.IGNORECASE,
+        ),
+        "repository transaction ownership": re.compile(
+            r"\brepositories? (?:are|act as|serve as) (?:the )?"
+            r"(?:application )?transaction owners?\b",
+            re.IGNORECASE,
+        ),
+        "editable migration guidance": re.compile(
+            r"\bhistorical migrations? (?:may|can|should|must) be "
+            r"(?:edited|rewritten|reordered)\b",
+            re.IGNORECASE,
+        ),
+        "runnable default configuration": re.compile(
+            r"\b(?:checked-in|default) (?:MCP|skill|capability) configuration\b"
+            r".{0,100}\b(?:is|are) runnable\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "fixed test total": re.compile(
+            r"\b\d+\s+(?:passed|failed|skipped)\b", re.IGNORECASE
+        ),
+        "physical database-object count": re.compile(
+            r"\b\d+\s+(?:(?:SQLModel|database)\s+)?(?:tables?|triggers?)\b",
+            re.IGNORECASE,
+        ),
+    }
+    violations = [
+        label for label, pattern in forbidden_patterns.items() if pattern.search(combined)
+    ]
+    assert not violations, f"Contributor-boundary overclaims found: {violations}"
 
 
 def test_reader_facing_docs_exclude_checkout_audit_evidence() -> None:
@@ -320,6 +389,19 @@ def test_canonical_source_references_exist() -> None:
                 violations.append(f"{doc.as_posix()}: {reference}")
 
     assert not violations, f"Missing canonical source references: {violations}"
+
+
+def test_contributor_source_references_exist() -> None:
+    """Contributor navigation may cite current source and test paths only when they resolve."""
+
+    violations: list[str] = []
+    for doc in CONTRIBUTOR_DOCUMENTATION_PAGES:
+        content = doc.read_text(encoding="utf-8")
+        for reference in re.findall(r"`((?:src|tests|config|skills)/[^`\n]+)`", content):
+            if not Path(reference).exists():
+                violations.append(f"{doc.as_posix()}: {reference}")
+
+    assert not violations, f"Missing contributor source references: {violations}"
 
 
 def test_phase_2a_canonical_pages_reject_authority_overclaims() -> None:

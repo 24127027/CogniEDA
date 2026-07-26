@@ -125,6 +125,18 @@ explanation. Problem, mental model, authority, context, and validity precede
 runtime and persistence detail; repository symbols remain optional
 implementation orientation.
 
+## Contributor documentation
+
+The canonical journey above explains what CogniEDA means. The separate
+contributor layer explains where the current implementation lives and which
+tests protect a change; it is not part of the thirty-page conceptual journey.
+
+- [Contributor hub](development/index.md)
+- [Code orientation](development/code-orientation.md)
+- [Change-boundary guide](development/change-boundary-guide.md)
+- [Testing strategy](development/testing.md)
+- [Development setup](development/setup.md)
+
 ## Project understanding and source orientation
 
 The thirty documents above are the recommended path for understanding CogniEDA.
@@ -155,16 +167,17 @@ Every implementation claim in the canonical narrative uses these meanings:
 A schema, protocol, directory, injected interface, or test fixture is not enough
 by itself to make a feature **Implemented**.
 
-## Phase 4B, Phase 4C, and Phase 5 remain pending
+## Documentation follow-up boundaries
 
-- **Deferred to Phase 4B:** contributor code orientation, package navigation,
-  transaction-owner maps, focused-test locations, and package README
-  simplification.
+- **Phase 4B:** contributor code orientation, package navigation,
+  transaction-owner maps, focused-test locations, and change guidance are now
+  provided in the separate contributor layer.
 - **Deferred to Phase 4C:** technical-reference consolidation, duplicate
   removal, redirects, file relocation, and link migration after unique content
   and inbound links are accounted for.
-- **Deferred to Phase 5:** product work only through the dependency and
-  invariant boundaries in the roadmap.
+- **Deferred to Phase 5:** final documentation-system review follows Phase 4C;
+  product work remains governed by the dependency and invariant boundaries in
+  the roadmap.
 
 These are future documentation or product responsibilities, not claims that
 the corresponding workflows are implemented.

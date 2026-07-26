@@ -50,4 +50,5 @@ uv sync
 See [development setup](docs/development/setup.md),
 [testing](docs/development/testing.md), and
 [contributing](docs/development/contributing.md) for the current repository
-commands and guardrails.
+commands and guardrails. Start source-oriented work at the
+[contributor documentation hub](docs/development/index.md).
