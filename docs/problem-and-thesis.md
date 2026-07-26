@@ -151,16 +151,21 @@ authority boundary?”
 
 CogniEDA applies type and lifecycle policy before relevance scoring. Planning,
 answer, conclusion, and Discovery synthesis are distinct context modes. Bounded
-Discovery retrieval filters invalid and excluded state, respects profile scope,
-and separates items eligible to motivate work from items that are merely
-relevant for review. The current scorer is deterministic lexical overlap, not a
-persistent semantic index.
+Discovery retrieval filters invalid and explicitly excluded state, marks
+wrong-profile results context-only, and separates items eligible to motivate
+work from items that are merely relevant for review. The current scorer is
+deterministic lexical overlap, not a persistent semantic index. Strict
+operation-scope filtering and removal of wrong-profile state before ranking
+remain **Known deviations** from the stronger target.
 
 The tradeoff is lower recall and more policy code at the current scale.
 Deterministic lexical retrieval is a reasonable local optimum while the
 candidate pool is small and inspectable. A richer index should be revisited
 when candidate volume or vocabulary variation makes bounded lexical retrieval
 insufficient, but it must remain downstream of structural eligibility.
+
+The complete current pipeline and its limits are owned by
+[Retrieval and context type safety](retrieval-and-context-type-safety.md).
 
 ## Parent-task summaries mistaken for scientific claims
 
@@ -183,6 +188,9 @@ for a particular question.
 workflow. The tradeoff is that parent-level answers may need regeneration and
 cannot serve as authoritative scientific knowledge. That cost protects the
 lineage of the underlying claims.
+
+See [Context reconstruction and continuity](context-reconstruction-and-continuity.md)
+for the current parent-task boundary.
 
 ## Retries producing duplicate or conflicting durable state
 
@@ -232,6 +240,9 @@ The complete session-resume and item-governance product experience is
 supersession, and scope policy. The redesign trigger is a multi-user or
 multi-branch product in which “latest active frame” is no longer an adequate
 cardinality rule.
+
+The full reconstruction boundary is owned by
+[Context reconstruction and continuity](context-reconstruction-and-continuity.md).
 
 ## Why Evidence and Discovery remain separate
 

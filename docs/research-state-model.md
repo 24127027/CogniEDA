@@ -260,8 +260,10 @@ bundle from authoritative repositories.
 conclusion frames, and validity supersession are **Implemented**. The complete
 user-governed experience is **Partially implemented**.
 
-The distinction between a SessionFrame projection and protected evaluation is
-owned by [Protected evaluation context](protected-evaluation-context.md).
+SessionFrame purpose and user governance are owned by
+[SessionFrame and active context](session-frame-and-active-context.md). Its
+distinction from scientific evaluation remains owned by
+[Protected evaluation context](protected-evaluation-context.md).
 
 ## Important non-FCO records and artifacts
 

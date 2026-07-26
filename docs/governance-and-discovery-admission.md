@@ -164,7 +164,8 @@ belong to one SQLite transaction and must either all commit or all roll back.
 
 The conclusion SessionFrame is appended for continuity and points to the
 admitted Discovery and supporting Evidence. It is not an evaluation input and
-does not author the claim.
+does not author the claim. Its later context role is explained in
+[SessionFrame and active context](session-frame-and-active-context.md).
 
 ## Why partial commits would corrupt research state
 

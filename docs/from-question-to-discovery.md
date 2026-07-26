@@ -347,21 +347,30 @@ is not yet present.
 projections are **Implemented**; the user-facing experience is
 **Partially implemented**.
 
+See [SessionFrame and active context](session-frame-and-active-context.md) for
+snapshot, pin, exclusion, and authority semantics.
+
 ## 12. Active retrieval uses validity before relevance
 
-The new Discovery may be retrieved for planning or answering when its lifecycle
-is active and its DataProfile scope is appropriate. Structural relations,
-explicit pins and exclusions, and bounded lexical relevance affect ranking.
+The new Discovery may be retrieved for planning when its lifecycle is active.
+Structural relations, explicit pins and exclusions, DataProfile compatibility,
+and bounded lexical relevance affect ranking. Current answer policy exists, but
+the Planner answer path remains **Partially implemented**.
 
 Invalidated or deprecated Discoveries are excluded even when pinned. A flagged
 or cross-profile Discovery may be relevant for review but cannot silently
-motivate new work.
+motivate new work. Cross-profile state is currently ranked as warned
+context-only material rather than removed before ranking, and independent
+operation-scope filtering is a **Known deviation**.
 
 **Durable state:** retrieval itself creates none.
 
 **Current status:** bounded relational candidate selection and deterministic
 lexical scoring are **Implemented**. Graph Miner and a persistent
 semantic/vector index are **Deferred**.
+
+See [Retrieval and context type safety](retrieval-and-context-type-safety.md)
+for the source-grounded pipeline and invariant classifications.
 
 ## 13. Validity propagation keeps history but removes authority
 
@@ -425,6 +434,9 @@ Discovery. This is the price of preserving the lineage of each underlying
 claim. `GeneratedView` and the complete Planner answer path remain a
 **Design target** / **Partially implemented** area; current source does not
 provide a complete user-facing generated-view workflow.
+
+The reconstruction and parent-answer boundary is owned by
+[Context reconstruction and continuity](context-reconstruction-and-continuity.md).
 
 ### Implementation orientation
 

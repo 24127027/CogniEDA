@@ -339,6 +339,102 @@ def test_retrieval_respects_session_frame_pins_and_exclusions(
     ]
 
 
+def test_pinned_invalidated_discovery_remains_excluded(
+    db_session: Session, create_validity
+) -> None:
+    validity = create_validity()
+    discovery = Discovery(
+        discovery_id=uuid4(),
+        hypothesis_id=validity.hypothesis_id,
+        evidence_ids=validity.evidence_ids,
+        claim=DiscoveryClaim(statement="Pinned invalid claim", scope="Global"),
+        epistemic_status=DiscoveryEpistemicStatus.CONTRADICTED,
+        scope="Global",
+        validity_basis=validity,
+        lifecycle_state=DiscoveryLifecycleState.INVALIDATED,
+    )
+    seed_historical_discovery(db_session, discovery)
+    frame = SessionFrame(
+        frame_topic="Pinned history",
+        objective_snapshot="Keep invalid state historical, not active.",
+        user_pins=[str(discovery.discovery_id)],
+    )
+
+    result = DiscoveryRetrievalEngine(db_session).retrieve(
+        RetrievalRequest(
+            objective_id=uuid4(),
+            active_data_profile_id=validity.data_profile_id,
+            query_text="Pinned invalid claim",
+        ),
+        frame,
+    )
+
+    assert result.motivation_candidates == []
+    assert result.other_relevant_discoveries == []
+    assert result.exclusion_notes == [
+        f"Pinned Discovery {discovery.discovery_id} is invalidated and excluded."
+    ]
+
+
+def test_wrong_profile_discovery_is_context_only_and_cannot_motivate(
+    db_session: Session, create_validity
+) -> None:
+    current_validity = create_validity()
+    historical_validity = create_validity()
+    current = Discovery(
+        discovery_id=uuid4(),
+        hypothesis_id=current_validity.hypothesis_id,
+        evidence_ids=current_validity.evidence_ids,
+        claim=DiscoveryClaim(statement="Current churn signal", scope="Global"),
+        epistemic_status=DiscoveryEpistemicStatus.SUPPORTED,
+        scope="Global",
+        validity_basis=current_validity,
+    )
+    historical = Discovery(
+        discovery_id=uuid4(),
+        hypothesis_id=historical_validity.hypothesis_id,
+        evidence_ids=historical_validity.evidence_ids,
+        claim=DiscoveryClaim(statement="Historical churn signal", scope="Global"),
+        epistemic_status=DiscoveryEpistemicStatus.SUPPORTED,
+        scope="Global",
+        validity_basis=historical_validity,
+    )
+    seed_historical_discovery(db_session, current)
+    seed_historical_discovery(db_session, historical)
+
+    from repositories.research import TaskRepository
+
+    parent = TaskRepository(db_session).create(
+        Task(
+            title="Compare churn signals",
+            description="Keep the active DataProfile boundary explicit.",
+            profile_id=current_validity.data_profile_id,
+            motivated_by_discovery_ids=[current.discovery_id, historical.discovery_id],
+        )
+    )
+
+    result = DiscoveryRetrievalEngine(db_session).retrieve(
+        RetrievalRequest(
+            objective_id=uuid4(),
+            active_data_profile_id=current_validity.data_profile_id,
+            parent_task_id=parent.task_id,
+            query_text="churn signal",
+        )
+    )
+
+    assert [item.discovery_id for item in result.motivation_candidates] == [
+        current.discovery_id
+    ]
+    assert [item.discovery_id for item in result.other_relevant_discoveries] == [
+        historical.discovery_id
+    ]
+    historical_result = result.other_relevant_discoveries[0]
+    assert historical_result.eligible_for_motivation is False
+    assert historical_result.flags == [
+        "Historically scoped to a different DataProfile."
+    ]
+
+
 def test_lexical_scorer() -> None:
     scorer = LexicalScorer()
 

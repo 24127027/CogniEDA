@@ -4,6 +4,12 @@
 > and bounded SQL retrieval. No production workspace-open or UI resume bootstrap
 > exists.
 
+The canonical owner is
+[Context reconstruction and continuity](../context-reconstruction-and-continuity.md);
+[Retrieval and context type safety](../retrieval-and-context-type-safety.md)
+owns admissibility and ranking. This page retains the compact technical
+sequence.
+
 ## SessionFrame snapshots
 
 `SessionFrameRepository` provides append, read, list, latest, and latest-active
@@ -20,18 +26,20 @@ Analyst.
 ## Discovery retrieval
 
 `DiscoveryRetrievalEngine` in `src/memory/retrieval_engine.py` performs bounded
-SQLite structural filtering followed by deterministic lexical scoring. Filters
-cover lifecycle/validity state, profile scope, pinning, exclusions, and
-motivation eligibility.
+repository-backed candidate loading followed by in-memory lifecycle policy,
+structural scoring, and deterministic lexical scoring.
 
 - Invalidated or deprecated Discoveries are excluded even when pinned.
 - Flagged or cross-profile Discoveries are not eligible to motivate new work.
+- Cross-profile Discoveries may remain warned context-only candidates.
+- No independent operation-scope or Objective query filter exists.
 - Retrieval does not mutate research state.
 - Graph Miner and a persistent semantic/vector index are deferred.
 
 ## Resume boundary
 
-A caller can reconstruct an active projection by loading the latest active frame
-for a session and invoking the context builder. The repository does not yet ship
-a CLI, API, or process bootstrap that maps a filesystem workspace open into this
-sequence automatically.
+A caller can reconstruct an active projection by loading the latest active
+frame in the workspace database and invoking the context builder. Current lookup
+does not filter by application session, Objective, or branch. The repository
+does not yet ship a CLI, API, or process bootstrap that maps a filesystem
+workspace open into this sequence automatically.

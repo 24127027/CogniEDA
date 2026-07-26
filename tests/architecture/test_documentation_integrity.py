@@ -21,7 +21,17 @@ PHASE_2A_CANONICAL_PAGES = (
     DOCS_ROOT / "governance-and-discovery-admission.md",
     DOCS_ROOT / "from-execution-to-discovery.md",
 )
-CANONICAL_READER_PAGES = (*PHASE_1_CANONICAL_PAGES, *PHASE_2A_CANONICAL_PAGES)
+PHASE_2B1_CANONICAL_PAGES = (
+    DOCS_ROOT / "session-frame-and-active-context.md",
+    DOCS_ROOT / "retrieval-and-context-type-safety.md",
+    DOCS_ROOT / "context-reconstruction-and-continuity.md",
+    DOCS_ROOT / "from-research-state-to-active-context.md",
+)
+CANONICAL_READER_PAGES = (
+    *PHASE_1_CANONICAL_PAGES,
+    *PHASE_2A_CANONICAL_PAGES,
+    *PHASE_2B1_CANONICAL_PAGES,
+)
 CANONICAL_FOUNDATION = (ROOT_README, DOCS_ROOT / "index.md", *CANONICAL_READER_PAGES)
 READER_FACING_CURRENT_STATE_PAGES = (
     DOCS_ROOT / "project-purpose.md",
@@ -259,6 +269,84 @@ def test_phase_2a_canonical_pages_reject_authority_overclaims() -> None:
                 violations.append(f"{doc.as_posix()}: {label}")
 
     assert not violations, f"Scientific-authority overclaims found: {violations}"
+
+
+def test_phase_2b1_canonical_pages_reject_active_context_overclaims() -> None:
+    """Active-context prose must preserve authority, type, and product boundaries."""
+
+    forbidden_patterns = {
+        "SessionFrame scientific authority": re.compile(
+            r"\bSessionFrame (?:is|acts as|becomes) (?:an? |the )?"
+            r"(?:scientific|evaluation|conclusion) authority\b",
+            re.IGNORECASE,
+        ),
+        "pin overrides validity": re.compile(
+            r"\b(?:a |user )?pins? (?:overrides?|bypasses?|restores?|reactivates?) "
+            r"(?:scientific )?(?:validity|invalidated|deprecated|lifecycle)\b",
+            re.IGNORECASE,
+        ),
+        "raw chat as research memory": re.compile(
+            r"\braw chat (?:is|becomes|serves as|functions as) "
+            r"(?:durable )?research (?:memory|state)\b",
+            re.IGNORECASE,
+        ),
+        "deferred retrieval overclaim": re.compile(
+            r"\b(?:Graph Miner|semantic (?:indexing|retrieval)|"
+            r"vector (?:index|retrieval|search)) (?:is|are) "
+            r"(?:implemented|supported|available)\b",
+            re.IGNORECASE,
+        ),
+        "SessionFrame-derived protected evaluation": re.compile(
+            r"\bprotected (?:conclusion|evaluation|scientific|discovery|synthesis)"
+            r"(?: context| bundle)? (?:is|are) "
+            r"(?:derived|built|constructed|reconstructed) from "
+            r"(?:a |the )?SessionFrame\b",
+            re.IGNORECASE,
+        ),
+        "pinned invalid state active": re.compile(
+            r"\b(?:invalidated|deprecated) Discovery "
+            r"(?:is|becomes|remains) active (?:because|when|if)[^.]*\bpinn",
+            re.IGNORECASE,
+        ),
+    }
+    violations: list[str] = []
+    for doc in PHASE_2B1_CANONICAL_PAGES:
+        content = doc.read_text(encoding="utf-8")
+        for label, pattern in forbidden_patterns.items():
+            if pattern.search(content):
+                violations.append(f"{doc.as_posix()}: {label}")
+
+    assert not violations, f"Active-context authority overclaims found: {violations}"
+
+
+def test_phase_2b1_canonical_pages_use_canonical_status_labels() -> None:
+    """Status-like bold labels on the new canonical pages must use the shared vocabulary."""
+
+    allowed = {
+        "Implemented",
+        "Verified on SQLite",
+        "Partially implemented",
+        "Design target",
+        "Deferred",
+        "Known deviation",
+        "Unsupported",
+    }
+    status_terms = re.compile(
+        r"implemented|verified on sqlite|design target|deferred|"
+        r"known deviation|unsupported",
+        re.IGNORECASE,
+    )
+    violations: list[str] = []
+    for doc in PHASE_2B1_CANONICAL_PAGES:
+        content = doc.read_text(encoding="utf-8")
+        emphasized = re.findall(r"\*\*([^*\n]+)\*\*", content)
+        violations.extend(
+            f"{doc.as_posix()}: {label!r}"
+            for label in emphasized
+            if status_terms.search(label) and label.removesuffix(":") not in allowed
+        )
+
+    assert not violations, f"Non-canonical implementation-status labels found: {violations}"
 
 
 def test_unsupported_cli_or_service_claims_are_absent_from_canonical_docs() -> None:

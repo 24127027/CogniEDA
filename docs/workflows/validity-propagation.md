@@ -34,5 +34,10 @@ then inserts the immutable `ValidityEvent`.
 - Missing, stale, wrong-principal, or wrong-action authority fails closed.
 
 There is no retrieval-index notification. Invalidated/deprecated Discoveries are
-excluded by persisted lifecycle/validity state and query policy; they remain in
-SQLite for provenance and audit.
+excluded by persisted lifecycle state and repository-backed retrieval policy;
+they remain in SQLite for provenance and audit.
+
+The active-context consequence is summarized in
+[Retrieval and context type safety](../retrieval-and-context-type-safety.md).
+The complete validity-over-time narrative remains **Deferred** to its own
+canonical owner.

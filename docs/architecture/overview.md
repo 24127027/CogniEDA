@@ -6,7 +6,10 @@
 Reader-first concept owners:
 [Scientific authority](../scientific-authority.md),
 [Protected evaluation context](../protected-evaluation-context.md), and
-[Governance and Discovery admission](../governance-and-discovery-admission.md).
+[Governance and Discovery admission](../governance-and-discovery-admission.md),
+[SessionFrame and active context](../session-frame-and-active-context.md),
+[Retrieval and context type safety](../retrieval-and-context-type-safety.md),
+and [Context reconstruction and continuity](../context-reconstruction-and-continuity.md).
 This page remains a source-oriented architecture summary.
 
 CogniEDA is validity-preserving research-state infrastructure for governed analytical

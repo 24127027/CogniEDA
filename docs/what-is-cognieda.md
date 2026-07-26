@@ -215,6 +215,9 @@ The tradeoff is that context construction becomes explicit and mode-specific.
 The benefit is that “remember this” cannot silently become “use this as
 scientific evidence.”
 
+The full concept is owned by
+[SessionFrame and active context](session-frame-and-active-context.md).
+
 ## Current maturity
 
 The current repository is an in-process Python foundation, not a deployed
@@ -252,7 +255,13 @@ conceptual investigation. The authority chain continues in
 [Protected evaluation context](protected-evaluation-context.md), and
 [Governance and Discovery admission](governance-and-discovery-admission.md).
 The focused workflow is
-[From execution to Discovery](from-execution-to-discovery.md).
+[From execution to Discovery](from-execution-to-discovery.md). Active-context
+continuity continues in
+[SessionFrame and active context](session-frame-and-active-context.md),
+[Retrieval and context type safety](retrieval-and-context-type-safety.md), and
+[Context reconstruction and continuity](context-reconstruction-and-continuity.md).
+The running example continues in
+[From research state to active context](from-research-state-to-active-context.md).
 
 ### Implementation orientation
 

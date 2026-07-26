@@ -4,9 +4,12 @@
 > generic SessionFrame projections **Partially implemented**; broader product
 > context assembly **Deferred**.
 
-The canonical reader explanation is
-[Protected evaluation context](../protected-evaluation-context.md). This page
-retains the concise implementer reference.
+Canonical reader explanations are
+[Protected evaluation context](../protected-evaluation-context.md) for
+scientific evaluation and
+[Retrieval and context type safety](../retrieval-and-context-type-safety.md)
+for ordinary active context. This page retains the concise implementer
+reference.
 
 ## Structurally enforced protected evaluation
 
@@ -41,8 +44,10 @@ protected Analyst, evaluation, governance, and Discovery packages from consuming
 
 `DiscoveryRetrievalEngine` performs bounded SQL-backed Discovery retrieval for planning. It excludes
 invalidated and deprecated Discoveries even when pinned; flagged or cross-profile results cannot
-motivate a Task. `AtomicValidityPropagationService` invalidates dependent state and marks affected
-SessionFrames superseded. `SessionFrameRepository.get_latest_active` excludes superseded frames.
+motivate a Task. Cross-profile results may remain warned context-only candidates, and an independent
+operation-scope filter is not implemented. `AtomicValidityPropagationService` invalidates dependent
+state and marks affected SessionFrames superseded. `SessionFrameRepository.get_latest_active`
+excludes superseded frames.
 
 ## Known limitations
 

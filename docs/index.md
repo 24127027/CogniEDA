@@ -34,14 +34,26 @@ Read the canonical narrative in this order:
 8. [From execution to Discovery](from-execution-to-discovery.md) applies those
    three mechanisms to the running example from an approved analytical Task
    through durable Discovery.
+9. [SessionFrame and active context](session-frame-and-active-context.md)
+   explains user-governed context selection, append-oriented snapshots, pins,
+   exclusions, and the limits of frame authority.
+10. [Retrieval and context type safety](retrieval-and-context-type-safety.md)
+    reconstructs the validity-first retrieval boundary, current deterministic
+    ranking, context modes, and known scope limitations.
+11. [Context reconstruction and continuity](context-reconstruction-and-continuity.md)
+    separates durable research-state continuity from complete product-level
+    session resume.
+12. [From research state to active context](from-research-state-to-active-context.md)
+    applies those mechanisms to the running churn example.
 
 Together these pages form the current canonical project explanation. They are
 concept-first: problem, mental model, investigation, authority, protected
-context, governance, and admission come before packages or symbols.
+context, governance, admission, active context, retrieval, and continuity come
+before packages or symbols.
 
 ## Project understanding and source orientation
 
-The eight documents above are the recommended path for understanding CogniEDA.
+The twelve documents above are the recommended path for understanding CogniEDA.
 They use implementation references only as optional verification aids.
 
 The repository also retains architecture pages, workflow pages, decision
@@ -73,9 +85,9 @@ by itself to make a feature **Implemented**.
 
 The following narrative areas are intentionally not complete here:
 
-- **Deferred:** SessionFrame reconstruction and governance, retrieval policy,
-  active-context reconstruction, validity propagation, active exclusion, and
-  multi-session continuity;
+- **Deferred:** the complete validity-over-time narrative, including source
+  fingerprints, affected-object planning, atomic propagation, replay,
+  concurrency, and long-term continuity after authority changes;
 - **Deferred:** broader architectural decisions, alternatives, risks, scaling
   boundaries, and redesign triggers;
 - **Deferred:** current-state detail, roadmap, package-level code orientation,

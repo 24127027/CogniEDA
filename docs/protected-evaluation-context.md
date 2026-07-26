@@ -288,8 +288,10 @@ failure.
 - Cross-database transaction behavior is **Unsupported**. Current race and
   binding behavior is **Verified on SQLite**.
 - SessionFrame reconstruction, active retrieval policy, user pin/exclusion
-  semantics, and multi-session resume belong to a separate documentation area
-  and are **Deferred** here.
+  semantics, and continuity are owned by
+  [SessionFrame and active context](session-frame-and-active-context.md),
+  [Retrieval and context type safety](retrieval-and-context-type-safety.md),
+  and [Context reconstruction and continuity](context-reconstruction-and-continuity.md).
 
 ## Implementation orientation
 

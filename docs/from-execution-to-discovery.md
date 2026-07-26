@@ -288,9 +288,11 @@ the repository-built bundle. The frame exists so later work can inspect and
 resume from the committed conclusion without treating conversation or generic
 context as scientific authority.
 
-Full SessionFrame reconstruction, retrieval, validity propagation, active
-exclusion, and multi-session continuity are **Deferred** to their own
-documentation.
+SessionFrame reconstruction and active retrieval continue in
+[SessionFrame and active context](session-frame-and-active-context.md),
+[Retrieval and context type safety](retrieval-and-context-type-safety.md), and
+[Context reconstruction and continuity](context-reconstruction-and-continuity.md).
+The complete validity-over-time narrative remains **Deferred**.
 
 ## Where the workflow stops
 
