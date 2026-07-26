@@ -1,5 +1,10 @@
 # Module responsibility matrix
 
+> **Role:** Technical reference. **Canonical concept owner:**
+> [Persistence and transaction ownership](../persistence-and-transaction-ownership.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
 > **Implementation status:** **Implemented** for the checked-in modules; missing
 > deployment adapters are **Deferred**.
 

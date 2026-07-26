@@ -1,5 +1,10 @@
 # Context Type Safety
 
+> **Role:** Technical reference. **Canonical concept owner:**
+> [Protected evaluation context](../protected-evaluation-context.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
 > **Implementation status:** protected Hypothesis evaluation **Implemented**;
 > generic SessionFrame projections **Partially implemented**; broader product
 > context assembly **Deferred**.

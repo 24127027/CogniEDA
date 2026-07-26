@@ -1,5 +1,10 @@
 # Validity Application Package
 
+> **Role:** Package technical reference. **Canonical concept owner:**
+> [Atomic validity propagation](../../../docs/atomic-validity-propagation.md).
+> **Contributor entry:** [Contributor documentation](../../../docs/development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
+
 Canonical references:
 [Validity over time](../../../docs/validity-over-time.md),
 [Atomic validity propagation](../../../docs/atomic-validity-propagation.md),

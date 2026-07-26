@@ -1,5 +1,10 @@
 # Validity Propagation Workflow
 
+> **Role:** Technical reference. **Canonical concept owner:**
+> [Atomic validity propagation](../atomic-validity-propagation.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
 > **Implementation status:** **Implemented** and **Verified on SQLite** for the
 > supported source/event matrix, exact replay, changed-command conflict,
 > compare-and-set guards, and dependent-state propagation.

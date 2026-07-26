@@ -1,5 +1,10 @@
 # Persistence and Transactions
 
+> **Role:** Technical reference. **Canonical concept owner:**
+> [Persistence and transaction ownership](../persistence-and-transaction-ownership.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
 > **Implementation status:** normalized ownership **Implemented**; transaction
 > and trigger guarantees **Verified on SQLite**.
 

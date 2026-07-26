@@ -1,5 +1,10 @@
 # Migrations and schema evolution
 
+> **Role:** Technical reference. **Canonical concept owner:**
+> [Database initialization and migrations](../database-initialization-and-migrations.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
 > **Implementation status:** current upgrade chain **Implemented** and
 > **Verified on SQLite**.
 

@@ -1,5 +1,10 @@
 # Evidence-to-Discovery Workflow
 
+> **Role:** Technical reference. **Canonical concept owner:**
+> [Governance and Discovery admission](../governance-and-discovery-admission.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
 > **Implementation status:** **Implemented** and **Verified on SQLite** for protected
 > evaluation, governance, replay fencing, and atomic admission.
 

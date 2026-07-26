@@ -1,5 +1,11 @@
 # Context Memory Manager Agent
 
+> **Role:** Agent instruction. The conceptual owner for `SessionFrame` is
+> [SessionFrame and active context](../docs/session-frame-and-active-context.md);
+> current limitations belong to [CogniEDA current state](../docs/current-state.md),
+> and change navigation begins at
+> [Contributor documentation](../docs/development/index.md).
+
 ## Purpose
 
 Manage long-running analytical context as explicit artifact state instead of passive chat history.

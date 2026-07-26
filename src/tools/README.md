@@ -1,5 +1,10 @@
 # Tools
 
+> **Role:** Package technical reference. **Canonical concept owner:**
+> [Product surface and bootstrap boundary](../../docs/product-surface-and-bootstrap-boundary.md).
+> **Contributor entry:** [Contributor documentation](../../docs/development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../docs/current-state.md).
+
 This package manages the capabilities available to LLM agents.
 
 CogniEDA supports three capability types:

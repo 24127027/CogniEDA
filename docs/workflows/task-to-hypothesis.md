@@ -1,5 +1,10 @@
 # Task-to-Hypothesis Workflow
 
+> **Role:** Technical reference. **Canonical concept owner:**
+> [Planner boundary and operation model](../planner-boundary-and-operation-model.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
 > **Implementation status:** **Partially implemented** and **Verified on
 > SQLite** for the fresh execution-contract path. Natural-language planning
 > branches and existing-Hypothesis reuse remain incomplete.

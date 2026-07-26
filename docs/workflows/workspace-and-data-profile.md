@@ -1,5 +1,10 @@
 # Workspace and DataProfile Workflow
 
+> **Role:** Technical reference. **Canonical concept owner:**
+> [Research-state model](../research-state-model.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
 > **Implementation status:** Partial. Dataset loading and profiling plus immutable
 > `DataProfile` persistence are implemented library surfaces. A governed
 > workspace-import/acceptance workflow, executable DVC integration, and automatic

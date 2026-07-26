@@ -1,5 +1,10 @@
 # Runtime composition
 
+> **Role:** Technical reference. **Canonical concept owner:**
+> [Runtime and composition boundary](../runtime-and-composition-boundary.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
 > **Implementation status:** in-process composition **Implemented**; production
 > bootstrap **Unsupported**; database semantics **Verified on SQLite**.
 

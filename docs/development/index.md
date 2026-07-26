@@ -71,6 +71,31 @@ library foundation with explicit dependency injection; see
 - **Local audits** under `.local/` are ignored checkout evidence. They are not
   reader or contributor documentation and must not become product claims.
 
+## Technical-reference navigation
+
+Use a technical reference only after its canonical owner and this contributor
+hub establish the concept and safe change boundary. The retained references are
+grouped by the implementation question they answer:
+
+- [Architecture references](../architecture/overview.md) cover module,
+  persistence, migration, runtime, specialist, retrieval, and validity
+  mechanics. Their source-oriented gaps remain in the
+  [implementation-gap analysis](../architecture/implementation-gap-analysis.md).
+- [Workflow references](../workflows/task-to-hypothesis.md),
+  [execution to Evidence](../workflows/execution-to-evidence.md),
+  [governance and admission](../workflows/governance-and-admission.md), and
+  [validity propagation](../workflows/validity-propagation.md) preserve exact
+  preconditions, transitions, replay, and failure sequencing.
+- Local package contracts begin at [application](../../src/application/README.md),
+  [Data Explorer adapters](../../src/agents/executor/README.md),
+  [SQLModel models](../../src/db/models/README.md), and
+  [tools/configuration](../../src/tools/README.md). They are implementation
+  mechanics, not current-state or conceptual owners.
+
+The [configuration reference](../../config/README.md) and
+[skills reference](../../skills/README.md) document the known unresolved
+MCP/skill configuration gap; neither makes the checked-in defaults runnable.
+
 ## Common change paths
 
 Use the [change-boundary guide](change-boundary-guide.md) for the detailed path

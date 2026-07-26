@@ -1,7 +1,13 @@
 # System Architecture Overview
 
-> **Implementation status:** **Partially implemented**; persistence and guarded
-> transactions are **Verified on SQLite**.
+> **Role:** Technical reference. **Canonical concept owner:**
+> [Runtime and composition boundary](../runtime-and-composition-boundary.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
+> **Local implementation qualification:** the source-oriented mechanics below
+> are in-process and their guarded persistence behavior is **Verified on SQLite**.
+> The project-wide maturity account belongs to the current-state owner below.
 
 The canonical maturity summary is
 [CogniEDA current state](../current-state.md), and future dependencies belong

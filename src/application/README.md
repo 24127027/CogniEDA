@@ -1,5 +1,10 @@
 # Application Layer Package (`src/application/`)
 
+> **Role:** Package technical reference. **Canonical concept owner:**
+> [Persistence and transaction ownership](../../docs/persistence-and-transaction-ownership.md).
+> **Contributor entry:** [Contributor documentation](../../docs/development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../docs/current-state.md).
+
 > Canonical documentation:
 > [Runtime and composition boundary](../../docs/runtime-and-composition-boundary.md)
 > and
@@ -8,9 +13,7 @@
 > [Planner boundary and operation model](../../docs/planner-boundary-and-operation-model.md)
 > and
 > [Product surface and bootstrap boundary](../../docs/product-surface-and-bootstrap-boundary.md).
-> Contributor maps:
-> [Bounded Contexts](../../docs/architecture/bounded-contexts.md) and
-> [Architecture Overview](../../docs/architecture/overview.md).
+> Contributor map: [Contributor documentation](../../docs/development/index.md).
 
 ## Purpose
 The `application` layer coordinates domain transactions, execution transitions, governance decisions, scientific admissions, and validity propagation across CogniEDA bounded contexts.

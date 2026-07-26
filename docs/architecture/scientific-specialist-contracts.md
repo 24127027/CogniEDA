@@ -1,5 +1,10 @@
 # Scientific Specialist Contracts
 
+> **Role:** Technical reference. **Canonical concept owner:**
+> [Scientific authority](../scientific-authority.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
 > **Implementation status:** protected specialist boundaries **Implemented**;
 > concrete production adapters **Unsupported**.
 

@@ -1,6 +1,12 @@
 # Data Layout
 
-CogniEDA keeps physical datasets under `data/`. Durable research state is stored in the workspace-local graph database.
+> **Role:** Filesystem technical reference. **Canonical concept owner:**
+> [Research-state model](../docs/research-state-model.md).
+> **Contributor entry:** [Contributor documentation](../docs/development/index.md).
+> **Current-state owner:** [CogniEDA current state](../docs/current-state.md).
+
+CogniEDA keeps physical datasets under `data/`. Durable research state is stored
+in the workspace-local SQLite persistence layer.
 
 ## Directory Conventions
 

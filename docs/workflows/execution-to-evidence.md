@@ -1,5 +1,10 @@
 # Execution-to-Evidence Workflow
 
+> **Role:** Technical reference. **Canonical concept owner:**
+> [From execution to Discovery](../from-execution-to-discovery.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
 > **Implementation status:** **Implemented** and **Verified on SQLite** for the
 > library/runtime path. No production worker or concrete Data Explorer adapter is
 > shipped.

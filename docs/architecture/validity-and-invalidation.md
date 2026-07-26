@@ -1,5 +1,10 @@
 # Validity and Invalidation
 
+> **Role:** Technical reference. **Canonical concept owner:**
+> [Validity over time](../validity-over-time.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
 > **Implementation status:** supported propagation commands are
 > **Implemented** and **Verified on SQLite**. The in-process runtime facade is
 > **Implemented**; a general production validity-authority issuer and

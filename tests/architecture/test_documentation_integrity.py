@@ -128,6 +128,32 @@ CONTRIBUTOR_DOCUMENTATION_PAGES = (
     DOCS_ROOT / "development" / "testing.md",
     DOCS_ROOT / "development" / "setup.md",
 )
+PHASE_4C_TECHNICAL_REFERENCE_PAGES = (
+    *(DOCS_ROOT / "architecture" / name for name in (
+        "bounded-contexts.md",
+        "context-type-safety.md",
+        "implementation-gap-analysis.md",
+        "migrations.md",
+        "module-responsibilities.md",
+        "overview.md",
+        "persistence-and-transactions.md",
+        "research-state-model.md",
+        "retrieval-and-session-frame.md",
+        "runtime-composition.md",
+        "scientific-specialist-contracts.md",
+        "structural-exit-status.md",
+        "validity-and-invalidation.md",
+    )),
+    *(DOCS_ROOT / "workflows" / name for name in (
+        "evidence-to-discovery.md",
+        "execution-to-evidence.md",
+        "governance-and-admission.md",
+        "session-resume-and-retrieval.md",
+        "task-to-hypothesis.md",
+        "validity-propagation.md",
+        "workspace-and-data-profile.md",
+    )),
+)
 CANONICAL_FOUNDATION = (ROOT_README, DOCS_ROOT / "index.md", *CANONICAL_READER_PAGES)
 READER_FACING_CURRENT_STATE_PAGES = (
     DOCS_ROOT / "project-purpose.md",
@@ -246,6 +272,59 @@ def test_all_tracked_markdown_relative_links_and_anchors_resolve() -> None:
                     )
 
     assert not failures, "Broken local Markdown links or anchors:\n" + "\n".join(failures)
+
+
+def test_phase_4c_technical_references_identify_their_owners() -> None:
+    """Retained architecture and workflow references must not compete with reader docs."""
+
+    required_markers = (
+        "**Role:** Technical reference.",
+        "**Canonical concept owner:**",
+        "**Contributor entry:**",
+        "**Current-state owner:**",
+    )
+    missing = [
+        f"{document.as_posix()}: {marker}"
+        for document in PHASE_4C_TECHNICAL_REFERENCE_PAGES
+        for marker in required_markers
+        if marker not in document.read_text(encoding="utf-8")
+    ]
+    assert not missing, "Phase 4C technical-reference ownership is incomplete:\n" + "\n".join(
+        missing
+    )
+
+
+def test_phase_4c_technical_reference_source_paths_exist() -> None:
+    """Retained low-level references must not keep stale source-path citations."""
+
+    failures: list[str] = []
+    source_reference_pattern = re.compile(r"`((?:src|tests)/[^`\n]+?)`")
+    for document in PHASE_4C_TECHNICAL_REFERENCE_PAGES:
+        content = document.read_text(encoding="utf-8")
+        for raw_path in source_reference_pattern.findall(content):
+            path_text = raw_path.strip().rstrip(".,:;)")
+            path_text = path_text.split("::", maxsplit=1)[0].split(":", maxsplit=1)[0]
+            source_path = Path(path_text)
+            if not source_path.exists():
+                failures.append(f"{document.as_posix()}: missing {source_path.as_posix()}")
+    assert not failures, "Stale Phase 4C technical source paths:\n" + "\n".join(failures)
+
+
+def test_phase_4c_project_purpose_is_a_transition_surface() -> None:
+    """A legacy project-purpose page must direct readers to its canonical owners."""
+
+    transition_page = DOCS_ROOT / "project-purpose.md"
+    content = transition_page.read_text(encoding="utf-8")
+    required_terms = (
+        "**Role:** Transition page.",
+        "What is CogniEDA?",
+        "Problem and thesis",
+        "CogniEDA current state",
+        "Phase 4C-2",
+    )
+    missing = [term for term in required_terms if term not in content]
+    assert not missing, f"Project-purpose transition is incomplete: {missing}"
+    assert "**Implementation status:**" not in content
 
 
 def test_docs_index_exposes_exact_canonical_journey() -> None:

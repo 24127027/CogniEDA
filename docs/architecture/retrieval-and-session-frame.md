@@ -1,5 +1,10 @@
 # Retrieval and SessionFrame
 
+> **Role:** Technical reference. **Canonical concept owner:**
+> [Retrieval and context type safety](../retrieval-and-context-type-safety.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
 > **Implementation status:** bounded Discovery retrieval and typed projections
 > are **Implemented**; the general session-resume product workflow is
 > **Partially implemented**.

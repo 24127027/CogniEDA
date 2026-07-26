@@ -1,6 +1,12 @@
 # Artifact Mirrors
 
-This directory contains reviewable metadata mirror templates. Runtime truth is the workspace-local graph database, not these files.
+> **Role:** Filesystem technical reference. **Canonical concept owner:**
+> [Research-state model](../docs/research-state-model.md).
+> **Contributor entry:** [Contributor documentation](../docs/development/index.md).
+> **Current-state owner:** [CogniEDA current state](../docs/current-state.md).
+
+This directory contains reviewable metadata mirror templates. Runtime truth is
+the workspace-local SQLite persistence layer, not these files.
 
 Current mirror surface:
 

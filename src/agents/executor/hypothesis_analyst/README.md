@@ -1,5 +1,10 @@
 # Hypothesis Analyst Specialist (`agents.executor.hypothesis_analyst`)
 
+> **Role:** Package technical reference. **Canonical concept owner:**
+> [Protected evaluation context](../../../../docs/protected-evaluation-context.md).
+> **Contributor entry:** [Contributor documentation](../../../../docs/development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../../../docs/current-state.md).
+
 ## 1. Purpose
 Hypothesis Analyst is the sole specialist authorized to evaluate a protected scientific `DiscoverySynthesisBundle` and author a structured `DiscoveryProposal` or `EvaluationFailure`.
 

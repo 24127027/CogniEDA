@@ -1,5 +1,10 @@
 # CogniEDA SQLModel Persistence Models (`db.models`)
 
+> **Role:** Package technical reference. **Canonical concept owner:**
+> [Persistence and transaction ownership](../../../docs/persistence-and-transaction-ownership.md).
+> **Contributor entry:** [Contributor documentation](../../../docs/development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
+
 ## 1. Purpose
 
 This package owns SQLModel table definitions for all persisted CogniEDA research-state and provenance records.

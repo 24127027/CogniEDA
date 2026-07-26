@@ -1,5 +1,10 @@
 # Session Resume and Retrieval Workflow
 
+> **Role:** Technical reference. **Canonical concept owner:**
+> [Context reconstruction and continuity](../context-reconstruction-and-continuity.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
 > **Implementation status:** **Partially implemented**. Library-level
 > append/read/projection, bounded SQL retrieval, and narrow durable approval
 > resume exist; no production workspace-open, durable graph checkpoint, or UI

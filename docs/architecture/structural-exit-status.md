@@ -1,12 +1,17 @@
 # Structural foundation status
 
-> **Implementation status:** **Partially implemented** overall.
->
-> The guarded scientific path described below is **Implemented** and
-> **Verified on SQLite**. A supported end-user product surface is
-> **Unsupported**.
+> **Role:** Technical reference. **Canonical concept owner:**
+> [CogniEDA current state](../current-state.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
 
-This page retains the durable structural boundary that contributors need.
+> **Technical-scope qualification:** this reference maps the current in-process
+> structural boundaries. Guarded persistence behavior is **Verified on SQLite**;
+> project-wide maturity and product support remain owned by the current-state
+> pages linked below.
+
+This page retains the current implementation structural boundary that
+contributors need.
 Checkout-specific baselines, command output, object counts, and implementation
 history belong in ignored local audit records rather than canonical
 documentation.

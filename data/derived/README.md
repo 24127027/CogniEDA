@@ -1,5 +1,10 @@
 # Derived Data
 
+> **Role:** Filesystem technical reference. **Canonical concept owner:**
+> [Research-state model](../../docs/research-state-model.md).
+> **Contributor entry:** [Contributor documentation](../../docs/development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../docs/current-state.md).
+
 Place reproducible outputs here when they are material analytical inputs or outputs.
 
 Every derived dataset should have:

@@ -1,5 +1,10 @@
 # Orchestrator Application Package
 
+> **Role:** Package technical reference. **Canonical concept owner:**
+> [Planner boundary and operation model](../../../docs/planner-boundary-and-operation-model.md).
+> **Contributor entry:** [Contributor documentation](../../../docs/development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
+
 Canonical references:
 [Persistence and transaction ownership](../../../docs/persistence-and-transaction-ownership.md),
 [Planner boundary and operation model](../../../docs/planner-boundary-and-operation-model.md),

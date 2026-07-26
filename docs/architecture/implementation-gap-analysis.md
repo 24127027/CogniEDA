@@ -1,10 +1,13 @@
 # Implementation gap analysis
 
-> **Implementation status:** **Partially implemented**.
->
-> This page is a source-oriented current-versus-target reference. It is not the
-> canonical introduction to CogniEDA, and source code remains authoritative for
-> what currently exists.
+> **Role:** Technical reference. **Canonical concept owner:**
+> [CogniEDA current state](../current-state.md).
+> **Contributor entry:** [Contributor documentation](../development/index.md).
+> **Current-state owner:** [CogniEDA current state](../current-state.md).
+
+> **Scope:** This is a source-oriented current-versus-target reference, not a
+> project maturity scorecard. Source code remains authoritative for the local
+> mechanics and limitations recorded here.
 
 Canonical reader-facing maturity and comparison now belong to
 [CogniEDA current state](../current-state.md) and the
@@ -19,7 +22,7 @@ and [Product surface and bootstrap boundary](../product-surface-and-bootstrap-bo
 
 ## Current implementation versus target
 
-| Area | Target design | Current implementation | Status and principal gap |
+| Area | Target design | Current implementation | Source boundary and limitation |
 | --- | --- | --- | --- |
 | FCO ontology | Exactly Objective, DataProfile, Assumption, Task, Hypothesis, Evidence, Discovery, and SessionFrame | Pydantic schemas, persistence models, and repositories use this set | **Implemented**; there is no production graph abstraction |
 | Runtime composition | One explicit, fail-closed composition boundary independent of deployment topology | `CogniEDARuntime` and an external factory loader assemble injected dependencies in process and initialize persistence | **Implemented**; a production deployment factory, product process, and automatic recovery loop are **Unsupported** |

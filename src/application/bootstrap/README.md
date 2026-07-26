@@ -1,5 +1,10 @@
 # Bootstrap — Target Design
 
+> **Role:** Package technical reference. **Canonical concept owner:**
+> [Product surface and bootstrap boundary](../../../docs/product-surface-and-bootstrap-boundary.md).
+> **Contributor entry:** [Contributor documentation](../../../docs/development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
+
 ## Current implementation
 
 This directory contains no Python bootstrap implementation. The current

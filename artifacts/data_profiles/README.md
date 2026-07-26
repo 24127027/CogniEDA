@@ -1,8 +1,15 @@
 # DataProfile Mirrors
 
+> **Role:** Filesystem technical reference. **Canonical concept owner:**
+> [Research-state model](../../docs/research-state-model.md).
+> **Contributor entry:** [Contributor documentation](../../docs/development/index.md).
+> **Current-state owner:** [CogniEDA current state](../../docs/current-state.md).
+
 This directory is a reviewable mirror/template surface for `DataProfile` records.
 
-Runtime truth is the workspace-local graph database. Files here should not be treated as a second source of truth unless an explicit import/export workflow is added.
+Runtime truth is the workspace-local SQLite persistence layer. Files here should
+not be treated as a second source of truth unless an explicit import/export
+workflow is added.
 
 Each mirror should align with
 `src/schemas/research/data_profile.py::DataProfile` and store dataset-version
