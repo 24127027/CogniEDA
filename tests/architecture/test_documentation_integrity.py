@@ -315,16 +315,54 @@ def test_phase_4c_project_purpose_is_a_transition_surface() -> None:
 
     transition_page = DOCS_ROOT / "project-purpose.md"
     content = transition_page.read_text(encoding="utf-8")
-    required_terms = (
-        "**Role:** Transition page.",
-        "What is CogniEDA?",
-        "Problem and thesis",
-        "CogniEDA current state",
-        "Phase 4C-2",
+    required_links = {
+        "What is CogniEDA?": "what-is-cognieda.md",
+        "Problem and thesis": "problem-and-thesis.md",
+        "Current state": "current-state.md",
+        "Capability and maturity map": "capability-and-maturity-map.md",
+        "Roadmap": "roadmap.md",
+        "Documentation index": "index.md",
+    }
+    links = _extract_markdown_links(transition_page)
+
+    assert content.startswith("# Project purpose\n")
+    assert "This legacy entry point is retained" in content
+    assert links == list(required_links.items())
+    assert transition_page not in CANONICAL_READER_PAGES
+    assert transition_page not in CONTRIBUTOR_DOCUMENTATION_PAGES
+
+    forbidden_terms = (
+        "First-Class Object",
+        "DataProfile",
+        "Assumption quarantine",
+        "**Implementation status:**",
+        "Verified on SQLite",
+        "Package 7A",
     )
-    missing = [term for term in required_terms if term not in content]
-    assert not missing, f"Project-purpose transition is incomplete: {missing}"
-    assert "**Implementation status:**" not in content
+    violations = [term for term in forbidden_terms if term in content]
+    assert not violations, f"Project-purpose regained content ownership: {violations}"
+
+    repository_root = Path.cwd().resolve()
+    inbound_sources = []
+    for markdown_file in _tracked_markdown_files():
+        if markdown_file == transition_page:
+            continue
+        for _, target in _extract_markdown_links(markdown_file):
+            path_text, _ = _split_link_target(target)
+            if not path_text:
+                continue
+            target_path = (
+                repository_root / path_text.lstrip("/")
+                if path_text.startswith("/")
+                else markdown_file.parent / path_text
+            ).resolve()
+            if target_path == transition_page.resolve():
+                inbound_sources.append(markdown_file.as_posix())
+
+    assert not inbound_sources, (
+        "Tracked Markdown must not present the legacy project-purpose page as "
+        f"a current owner: {inbound_sources}"
+    )
 
 
 def test_docs_index_exposes_exact_canonical_journey() -> None:
@@ -1402,7 +1440,6 @@ def test_major_documents_distinguish_implementation_status() -> None:
     major_docs = [
         DOCS_ROOT / "index.md",
         *CANONICAL_READER_PAGES,
-        DOCS_ROOT / "project-purpose.md",
         DOCS_ROOT / "roadmap.md",
         DOCS_ROOT / "architecture" / "overview.md",
         DOCS_ROOT / "architecture" / "research-state-model.md",
