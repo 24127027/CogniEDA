@@ -292,7 +292,9 @@ SessionFrame reconstruction and active retrieval continue in
 [SessionFrame and active context](session-frame-and-active-context.md),
 [Retrieval and context type safety](retrieval-and-context-type-safety.md), and
 [Context reconstruction and continuity](context-reconstruction-and-continuity.md).
-The complete validity-over-time narrative remains **Deferred**.
+Later authority changes continue in
+[Validity over time](validity-over-time.md) and
+[From validity change to reconstructed context](from-validity-change-to-reconstructed-context.md).
 
 ## Where the workflow stops
 

@@ -45,15 +45,26 @@ Read the canonical narrative in this order:
     session resume.
 12. [From research state to active context](from-research-state-to-active-context.md)
     applies those mechanisms to the running churn example.
+13. [Validity over time](validity-over-time.md) explains why historical
+    truth-to-record and current scientific authority must remain distinct.
+14. [Atomic validity propagation](atomic-validity-propagation.md) reconstructs
+    the authorized command, fingerprints, deterministic plan, atomic write set,
+    replay, conflicts, and SQLite concurrency boundary.
+15. [Invalidation and active retrieval](invalidation-and-active-retrieval.md)
+    connects committed lifecycle changes to active exclusion, historical reads,
+    pins, stale frames, and context-freshness limits.
+16. [From validity change to reconstructed context](from-validity-change-to-reconstructed-context.md)
+    follows the running churn example from an Evidence defect through later
+    repository-current context.
 
 Together these pages form the current canonical project explanation. They are
 concept-first: problem, mental model, investigation, authority, protected
-context, governance, admission, active context, retrieval, and continuity come
-before packages or symbols.
+context, governance, admission, active context, retrieval, temporal validity,
+and continuity come before packages or symbols.
 
 ## Project understanding and source orientation
 
-The twelve documents above are the recommended path for understanding CogniEDA.
+The sixteen documents above are the recommended path for understanding CogniEDA.
 They use implementation references only as optional verification aids.
 
 The repository also retains architecture pages, workflow pages, decision
@@ -85,9 +96,6 @@ by itself to make a feature **Implemented**.
 
 The following narrative areas are intentionally not complete here:
 
-- **Deferred:** the complete validity-over-time narrative, including source
-  fingerprints, affected-object planning, atomic propagation, replay,
-  concurrency, and long-term continuity after authority changes;
 - **Deferred:** broader architectural decisions, alternatives, risks, scaling
   boundaries, and redesign triggers;
 - **Deferred:** current-state detail, roadmap, package-level code orientation,

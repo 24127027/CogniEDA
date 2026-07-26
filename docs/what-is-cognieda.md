@@ -262,6 +262,12 @@ continuity continues in
 [Context reconstruction and continuity](context-reconstruction-and-continuity.md).
 The running example continues in
 [From research state to active context](from-research-state-to-active-context.md).
+Temporal authority and its transaction continue in
+[Validity over time](validity-over-time.md),
+[Atomic validity propagation](atomic-validity-propagation.md), and
+[Invalidation and active retrieval](invalidation-and-active-retrieval.md), with
+the workflow in
+[From validity change to reconstructed context](from-validity-change-to-reconstructed-context.md).
 
 ### Implementation orientation
 

@@ -86,8 +86,9 @@ Planner frame that led to the work.
 Validity propagation can supersede affected frames and add a stale marker. A
 later caller must re-read lifecycle authority; it must not trust a cached
 SessionFrame summary as proof that the referenced object remains current.
-Complete affected-object planning, replay, concurrency, and authority-change
-continuity belong to the **Deferred** validity-over-time narrative.
+Affected-object planning, replay, concurrency, and authority-change continuity
+are reconstructed in [Validity over time](validity-over-time.md) and
+[Atomic validity propagation](atomic-validity-propagation.md).
 
 ## What survives process interruption
 
@@ -170,7 +171,7 @@ no single Hypothesis or Evidence set would justify the combined claim.
 | SessionFrame create/read/list/latest/latest-active | **Implemented** | latest selection is database-local and recency-based |
 | Planner successor snapshots | **Implemented** | selected paths only; previous frames usually remain active-status |
 | conclusion SessionFrame append | **Implemented** and **Verified on SQLite** | owned by atomic Discovery admission |
-| lifecycle exclusion after validity change | **Implemented** and **Verified on SQLite** | complete validity-over-time UX is deferred |
+| lifecycle exclusion after validity change | **Implemented** and **Verified on SQLite** | durable review signals are **Partially implemented**; notification delivery and automatic context refresh are **Unsupported** |
 | execution reconciliation and durable claim recovery | **Implemented** for selected workflows | no automatic worker or daemon |
 | automatic workspace or project reopening | **Unsupported** | no product bootstrap |
 | restored chat or persistent Planner checkpoint | **Unsupported** | default checkpointing is in memory |
@@ -210,9 +211,10 @@ and latency. None may bypass lifecycle, profile, scope, epistemic-type, or
 protected-evaluation boundaries.
 
 The current technical validity sequence is described in
-[Validity propagation workflow](workflows/validity-propagation.md). Its full
-canonical validity-over-time and long-term authority-change narrative remains
-**Deferred**.
+[Validity propagation workflow](workflows/validity-propagation.md). Its
+canonical temporal-authority and active-context consequences are
+[Validity over time](validity-over-time.md) and
+[Invalidation and active retrieval](invalidation-and-active-retrieval.md).
 
 ## Implementation orientation
 

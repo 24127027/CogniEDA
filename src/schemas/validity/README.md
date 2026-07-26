@@ -1,5 +1,8 @@
 # Validity Schemas (`schemas.validity`)
 
+Canonical transaction explanation:
+[Atomic validity propagation](../../../docs/atomic-validity-propagation.md).
+
 ## Current implementation
 
 This package owns canonical typed contracts for validity propagation commands, target transitions, plans, and result envelopes.

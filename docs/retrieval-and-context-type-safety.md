@@ -187,9 +187,10 @@ Evidence loses authority.
    repository-backed retrieval still re-reads lifecycle state, so a stale frame
    cannot restore the invalid Discovery.
 7. No successor frame or user-facing conflict notice is created automatically.
-8. The validity transaction owns the scientific lifecycle change; complete
-   propagation and recovery semantics belong to the deferred validity-over-time
-   narrative.
+8. The validity transaction owns the scientific lifecycle change; its complete
+   propagation and recovery semantics are described in
+   [Atomic validity propagation](atomic-validity-propagation.md) and
+   [Invalidation and active retrieval](invalidation-and-active-retrieval.md).
 
 Classification:
 

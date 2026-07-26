@@ -7,7 +7,8 @@
 Canonical reader explanations:
 [SessionFrame and active context](../session-frame-and-active-context.md),
 [Retrieval and context type safety](../retrieval-and-context-type-safety.md),
-and [Context reconstruction and continuity](../context-reconstruction-and-continuity.md).
+[Context reconstruction and continuity](../context-reconstruction-and-continuity.md), and
+[Invalidation and active retrieval](../invalidation-and-active-retrieval.md).
 This page retains the concise source-oriented reference.
 
 ## Current SessionFrame behavior

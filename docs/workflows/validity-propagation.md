@@ -1,8 +1,13 @@
 # Validity Propagation Workflow
 
-> **Implementation status:** Implemented and verified on SQLite for the supported
-> source/event matrix, exact replay, conflict fencing, and dependent-state
-> propagation.
+> **Implementation status:** **Implemented** and **Verified on SQLite** for the
+> supported source/event matrix, exact replay, changed-command conflict,
+> compare-and-set guards, and dependent-state propagation.
+
+Canonical rationale and mechanics:
+[Validity over time](../validity-over-time.md) and
+[Atomic validity propagation](../atomic-validity-propagation.md). This page
+retains the compact technical sequence.
 
 ## Atomic path
 
@@ -11,14 +16,15 @@ authorized validity command
   -> AtomicValidityPropagationService
   -> validate authority, source type/state/fingerprint, event type, replacement
   -> derive versioned ValidityPropagationPlan
-  -> acquire SQLite writer lock and revalidate
+  -> apply source/dependent compare-and-set transitions in one SQLite transaction
   -> commit source/dependent transitions + immutable ValidityEvent
 ```
 
 `src/application/validity/propagation_service.py` owns this path. Supported
-events cover invalidation/supersession of `DataProfile`, `Evidence`,
-`AnalysisFrame`, and `ExecutionRun`. The plan records stable fingerprints and
-the full intended effect set.
+events cover DataProfile invalidation/supersession, Evidence
+invalidation/supersession/conflict, AnalysisFrame invalidity or provenance
+corruption, and ExecutionRun conflict or provenance corruption. The plan
+records stable fingerprints and the full intended effect set.
 
 Depending on the source and event, one transaction can update the source plus
 affected Evidence, EvaluationControls, active admission claims, Discoveries,
@@ -38,6 +44,5 @@ excluded by persisted lifecycle state and repository-backed retrieval policy;
 they remain in SQLite for provenance and audit.
 
 The active-context consequence is summarized in
-[Retrieval and context type safety](../retrieval-and-context-type-safety.md).
-The complete validity-over-time narrative remains **Deferred** to its own
-canonical owner.
+[Retrieval and context type safety](../retrieval-and-context-type-safety.md) and
+[Invalidation and active retrieval](../invalidation-and-active-retrieval.md).

@@ -1,5 +1,8 @@
 # Validity Repositories (`repositories.validity`)
 
+Canonical transaction explanation:
+[Atomic validity propagation](../../../docs/atomic-validity-propagation.md).
+
 ## Current implementation
 
 This package owns stage-only persistence and dependency graph traversal for immutable `ValidityEventRecord`s.

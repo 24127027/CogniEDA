@@ -15,9 +15,11 @@ validity source transitions, dependent effects, and immutable event insertion.
 
 ## Consequences
 
-Authority and source fingerprints are revalidated under the writer lock. Exact
-replay requires the complete persisted effect set; incompatible commands
-conflict.
+Authority and source fingerprints are verified while the deterministic
+execution plan is built. Source and dependent writes then use compare-and-set
+guards in the SQLite transaction. Exact replay requires the complete persisted
+effect set; incompatible commands conflict. Validity has no separate
+claim/lease/fencing protocol.
 
 ## Rejected alternatives
 
@@ -30,3 +32,6 @@ retrieval notifications.
 authority, all supported source types, replay, races, and retrieval exclusion.
 Dependency direction is checked by
 `tests/architecture/test_architecture_enforcement.py`.
+
+The current canonical explanation is
+[Atomic validity propagation](../atomic-validity-propagation.md).

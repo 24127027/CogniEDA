@@ -397,6 +397,10 @@ allow-listed.
 **Verified on SQLite**. Production authority issuance and cross-database or
 distributed propagation are **Unsupported**.
 
+The full temporal-authority rationale and transaction mechanics are
+[Validity over time](validity-over-time.md) and
+[Atomic validity propagation](atomic-validity-propagation.md).
+
 ## Where assumptions are allowed
 
 | Stage | Assumptions allowed? | Reason |

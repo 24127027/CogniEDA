@@ -367,6 +367,9 @@ provenance. Active retrieval excludes them. This is how the system can answer
 both “what did we conclude then?” and “what may we rely on now?” without making
 either answer overwrite the other.
 
+The complete lifecycle distinction is owned by
+[Validity over time](validity-over-time.md).
+
 ### Implementation orientation
 
 The FCO schemas live under `src/schemas/research/`,

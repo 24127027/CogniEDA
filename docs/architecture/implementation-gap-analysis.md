@@ -24,7 +24,7 @@
 | Evidence admission | Deterministic AnalysisFrame and immutable Evidence materialization from observation-only output | The in-process finalizer admits provenance and Evidence, advances the run and Hypothesis, and consumes the inbox atomically without creating Discovery | **Implemented** and **Verified on SQLite** |
 | Context type safety | Assumptions only in planning; protected Discovery synthesis uses scientific inputs only | Evaluation uses an immutable repository-authoritative bundle with a closed provenance manifest | **Implemented** for protected evaluation; broader generated-view and Graph Miner context is **Deferred** |
 | Discovery governance | Exact proposal plus independent authority precede atomic admission | An injected principal resolver, expiring authority grant, durable decision, and separate exact-copy admission path exist | **Implemented** and **Verified on SQLite**; production authentication is **Unsupported** |
-| Validity propagation | One authorized event updates every applicable dependent atomically | Typed validity events propagate across DataProfile, AnalysisFrame, Evidence, and ExecutionRun state through a fenced transaction | **Implemented** and **Verified on SQLite**; production authority workflow is **Unsupported** |
+| Validity propagation | One authorized event updates every applicable dependent atomically | Typed validity commands propagate across supported DataProfile, AnalysisFrame, Evidence, and ExecutionRun sources through a CAS-guarded atomic transaction | **Implemented** and **Verified on SQLite**; a general production validity-authority issuer is **Unsupported** and validity has no separate claim/lease/fencing protocol |
 | SessionFrame | User-governed current context with auditable inclusion | Append-only snapshots, latest-active lookup, bounded projections, conclusion frames, and validity supersession exist | **Partially implemented**; complete resume and item-governance UX is **Unsupported** |
 | Provenance | Reproducible data view, method, code, environment, seed, and artifacts | AnalysisFrame, ExecutionRun, and Evidence capture the minimum implemented chain | **Partially implemented**; the general reproducibility envelope is a **Design target** |
 | Dataset versioning and cleaning | Approved physical transformations create new versions and DataProfiles | CSV/Parquet profiling and a DVC interface exist | **Partially implemented**; executable DVC and governed cleaning are **Deferred** |
@@ -65,7 +65,8 @@ executor, and memory packages identified in the
    adapters, but no supported deployment supplies them.
 4. Validity and scientific-transaction guarantees are verified only on SQLite.
 5. SessionFrame governance, project resume, and user-facing invalidation
-   recovery are incomplete.
+   recovery are incomplete; a pin-only affected Discovery reference may leave
+   frame status active even though repository-current retrieval remains safe.
 6. Provenance is not yet sufficient for broad reproducibility claims.
 7. Strict static typing and tracked CI remain repository-level quality debt.
 8. Changed-contract successor creation is outside the current retry path.

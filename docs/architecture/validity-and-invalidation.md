@@ -1,7 +1,15 @@
 # Validity and Invalidation
 
-> **Implementation status:** supported propagation commands `[Implemented]` and
-> `[Verified on SQLite]`; production authority workflows `[Partially Implemented]`.
+> **Implementation status:** supported propagation commands are
+> **Implemented** and **Verified on SQLite**. The in-process runtime facade is
+> **Implemented**; a general production validity-authority issuer and
+> production identity provider are **Unsupported**.
+
+Canonical reader explanations are
+[Validity over time](../validity-over-time.md),
+[Atomic validity propagation](../atomic-validity-propagation.md), and
+[Invalidation and active retrieval](../invalidation-and-active-retrieval.md).
+This page retains the concise source-oriented reference.
 
 ## Command and authority
 
@@ -36,7 +44,8 @@ The immutable ValidityEvent records the request fingerprint, plan fingerprint, c
 manifest, authority, and committed state. Exact replay verifies the complete persisted effects and
 returns the original event. A changed command under the same idempotency key conflicts.
 Concurrent exact commands produce one commit and one verified replay; incompatible commands have
-one winner. Failure at any staged transition rolls back the source and event.
+one winner. Source and dependent writes use compare-and-set guards; validity has no separate
+claim, lease, or fencing token. Failure at any staged transition rolls back the source and event.
 
 ## Retrieval and history
 
@@ -46,5 +55,8 @@ notified; exclusion is enforced by persisted state and query policy.
 
 ## Limitations
 
-`[Known Deviation]` The runtime can execute a supplied authority but no general production validity
-authority issuer/workflow is checked in. All transaction and trigger guarantees are SQLite-only.
+**Known deviation:** a SessionFrame containing an affected Discovery only in `user_pins` may remain
+active-status, although repository-current retrieval still excludes the invalid Discovery.
+
+**Unsupported:** no general production validity-authority issuer or identity provider is checked
+in. All transaction and trigger guarantees are SQLite-only.

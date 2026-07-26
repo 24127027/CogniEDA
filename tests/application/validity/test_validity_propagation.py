@@ -609,6 +609,11 @@ def test_user_invalidation_requires_exact_authenticated_principal(db_session) ->
         db_session.get(EvidenceRecord, seed["evidence_id"]).lifecycle_state
         == EvidenceLifecycleState.INVALIDATED
     )
+    with pytest.raises(PermissionError, match="authenticated principal"):
+        AtomicValidityPropagationService(
+            db_session,
+            principal_id="user:other",
+        ).execute_propagation(command)
 
 
 def test_validity_plan_is_deterministic_versioned_and_read_only(db_session) -> None:
@@ -672,6 +677,82 @@ def test_exact_replay_requires_complete_committed_effects(db_session) -> None:
     db_session.commit()
     with pytest.raises(PartialValidityPropagationError):
         service.execute_propagation(command)
+
+
+def test_changed_validity_command_identity_is_not_exact_replay(db_session) -> None:
+    seed = _seed_validity_lineage(db_session, with_discovery=False)
+    original_grant = _validity_grant(
+        db_session,
+        ValidityEventType.EVIDENCE_INVALIDATION,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=seed["evidence_id"],
+    )
+    command = _command(
+        db_session,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=seed["evidence_id"],
+        event_type=ValidityEventType.EVIDENCE_INVALIDATION,
+        authority_id=original_grant.authority_id,
+        key="changed-command-identity",
+    )
+    AtomicValidityPropagationService(db_session).execute_propagation(command)
+
+    with pytest.raises(ValidationError, match="validity-propagation/v1"):
+        ValidityPropagationCommand(
+            **command.model_dump(exclude={"contract_version"}),
+            contract_version="validity-propagation/v2",
+        )
+
+    alternate_grant = _validity_grant(
+        db_session,
+        ValidityEventType.EVIDENCE_INVALIDATION,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=seed["evidence_id"],
+    )
+    conflict_grant = _validity_grant(
+        db_session,
+        ValidityEventType.EVIDENCE_CONFLICT,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=seed["evidence_id"],
+    )
+    other_evidence_id = _replacement_evidence(db_session, seed["evidence_id"])
+    other_source_grant = _validity_grant(
+        db_session,
+        ValidityEventType.EVIDENCE_INVALIDATION,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=other_evidence_id,
+    )
+    other_source_command = _command(
+        db_session,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=other_evidence_id,
+        event_type=ValidityEventType.EVIDENCE_INVALIDATION,
+        authority_id=other_source_grant.authority_id,
+        key=command.idempotency_key,
+    )
+
+    changed_commands = (
+        command.model_copy(
+            update={
+                "authority_id": alternate_grant.authority_id,
+            }
+        ),
+        command.model_copy(
+            update={
+                "event_type": ValidityEventType.EVIDENCE_CONFLICT,
+                "authority_id": conflict_grant.authority_id,
+            }
+        ),
+        command.model_copy(
+            update={
+                "expected_source_fingerprint": "changed-source-fingerprint",
+            }
+        ),
+        other_source_command,
+    )
+    for changed in changed_commands:
+        with pytest.raises(ValueError, match="another event"):
+            AtomicValidityPropagationService(db_session).execute_propagation(changed)
 
 
 @pytest.mark.parametrize("fail_after_write", range(1, 8))
@@ -836,6 +917,60 @@ def test_active_retrieval_excludes_invalidated_scientific_state(db_session) -> N
     )
     assert result.motivation_candidates == []
     assert result.other_relevant_discoveries == []
+
+
+def test_pin_only_frame_remains_active_but_cannot_restore_invalid_discovery(
+    db_session,
+) -> None:
+    seed = _seed_validity_lineage(db_session)
+    pin_only_frame = SessionFrameRecord(
+        session_frame_id=uuid4(),
+        frame_topic="Historical pin only",
+        frame_status=SessionFrameStatus.ACTIVE,
+        objective_snapshot="Keep the user's historical selection visible.",
+        user_pins=[str(seed["discovery_id"])],
+    )
+    db_session.add(pin_only_frame)
+    db_session.commit()
+    grant = _validity_grant(
+        db_session,
+        ValidityEventType.EVIDENCE_INVALIDATION,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=seed["evidence_id"],
+    )
+    command = _command(
+        db_session,
+        source_type=ValiditySourceType.EVIDENCE,
+        source_id=seed["evidence_id"],
+        event_type=ValidityEventType.EVIDENCE_INVALIDATION,
+        authority_id=grant.authority_id,
+        key="pin-only-frame-invalidation",
+    )
+
+    AtomicValidityPropagationService(db_session).execute_propagation(command)
+
+    frames = SessionFrameRepository(db_session)
+    persisted_pin_only = frames.get_by_id(pin_only_frame.session_frame_id)
+    assert persisted_pin_only is not None
+    assert persisted_pin_only.frame_status == SessionFrameStatus.ACTIVE
+    assert persisted_pin_only.stale_context == []
+    assert {frame.session_frame_id for frame in frames.list()} == {
+        seed["session_frame_id"],
+        pin_only_frame.session_frame_id,
+    }
+    result = DiscoveryRetrievalEngine(db_session).retrieve(
+        RetrievalRequest(
+            objective_id=uuid4(),
+            query_text="Pinned churn claim",
+            active_data_profile_id=seed["profile_id"],
+        ),
+        frame=persisted_pin_only,
+    )
+    assert result.motivation_candidates == []
+    assert result.other_relevant_discoveries == []
+    assert result.exclusion_notes == [
+        f"Pinned Discovery {seed['discovery_id']} is invalidated and excluded."
+    ]
 
 
 def test_pre_discovery_source_loss_is_operational_review_not_outcome(db_session) -> None:

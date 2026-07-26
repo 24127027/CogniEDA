@@ -5,6 +5,8 @@
 
 The reader-first Discovery transaction explanation is
 [Governance and Discovery admission](../governance-and-discovery-admission.md).
+The validity transaction explanation is
+[Atomic validity propagation](../atomic-validity-propagation.md).
 This page retains package-level commit ownership and write sets.
 
 ## Layer separation

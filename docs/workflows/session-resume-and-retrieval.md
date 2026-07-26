@@ -7,7 +7,9 @@
 The canonical owner is
 [Context reconstruction and continuity](../context-reconstruction-and-continuity.md);
 [Retrieval and context type safety](../retrieval-and-context-type-safety.md)
-owns admissibility and ranking. This page retains the compact technical
+owns admissibility and ranking; and
+[Invalidation and active retrieval](../invalidation-and-active-retrieval.md)
+owns validity-change consequences. This page retains the compact technical
 sequence.
 
 ## SessionFrame snapshots

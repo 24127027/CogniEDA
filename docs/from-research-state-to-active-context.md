@@ -245,10 +245,13 @@ answer product are a **Design target**.
   candidates; independent operation-scope filtering is absent.
 - **Design target:** parent-task GeneratedViews and explicit cross-profile
   comparison.
-- **Deferred:** semantic or vector retrieval, persistent indexing, Graph Miner,
-  and the complete validity-over-time narrative.
+- **Deferred:** semantic or vector retrieval, persistent indexing, and Graph
+  Miner.
 - **Unsupported:** automatic workspace reopening, restored chat, distributed
   retrieval, and multi-user context governance.
+
+The validity-change continuation is
+[From validity change to reconstructed context](from-validity-change-to-reconstructed-context.md).
 
 ## Implementation orientation
 

@@ -8,8 +8,10 @@ Canonical reader explanations are
 [Protected evaluation context](../protected-evaluation-context.md) for
 scientific evaluation and
 [Retrieval and context type safety](../retrieval-and-context-type-safety.md)
-for ordinary active context. This page retains the concise implementer
-reference.
+for ordinary active context.
+[Invalidation and active retrieval](../invalidation-and-active-retrieval.md)
+owns authority changes at the read boundary. This page retains the concise
+implementer reference.
 
 ## Structurally enforced protected evaluation
 

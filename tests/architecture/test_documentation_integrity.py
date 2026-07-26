@@ -27,10 +27,20 @@ PHASE_2B1_CANONICAL_PAGES = (
     DOCS_ROOT / "context-reconstruction-and-continuity.md",
     DOCS_ROOT / "from-research-state-to-active-context.md",
 )
+PHASE_2B2_CANONICAL_PAGES = (
+    DOCS_ROOT / "validity-over-time.md",
+    DOCS_ROOT / "atomic-validity-propagation.md",
+    DOCS_ROOT / "invalidation-and-active-retrieval.md",
+    DOCS_ROOT / "from-validity-change-to-reconstructed-context.md",
+)
+PHASE_2B_CANONICAL_PAGES = (
+    *PHASE_2B1_CANONICAL_PAGES,
+    *PHASE_2B2_CANONICAL_PAGES,
+)
 CANONICAL_READER_PAGES = (
     *PHASE_1_CANONICAL_PAGES,
     *PHASE_2A_CANONICAL_PAGES,
-    *PHASE_2B1_CANONICAL_PAGES,
+    *PHASE_2B_CANONICAL_PAGES,
 )
 CANONICAL_FOUNDATION = (ROOT_README, DOCS_ROOT / "index.md", *CANONICAL_READER_PAGES)
 READER_FACING_CURRENT_STATE_PAGES = (
@@ -319,7 +329,75 @@ def test_phase_2b1_canonical_pages_reject_active_context_overclaims() -> None:
     assert not violations, f"Active-context authority overclaims found: {violations}"
 
 
-def test_phase_2b1_canonical_pages_use_canonical_status_labels() -> None:
+def test_phase_2b2_canonical_pages_reject_validity_overclaims() -> None:
+    """Validity prose must preserve history, authority, and product boundaries."""
+
+    forbidden_patterns = {
+        "invalidation as deletion": re.compile(
+            r"\binvalidation (?:deletes?|erases?)\b",
+            re.IGNORECASE,
+        ),
+        "ValidityEvent as scientific object": re.compile(
+            r"\bValidityEvent (?:is|becomes|acts as) (?:an? |the )?"
+            r"(?:scientific )?(?:FCO|First-Class Object|Discovery|Evidence)\b",
+            re.IGNORECASE,
+        ),
+        "pin overrides validity": re.compile(
+            r"\b(?:a |user )?pins? (?:overrides?|bypasses?|restores?|reactivates?) "
+            r"(?:scientific )?(?:validity|invalidated|deprecated|lifecycle)\b",
+            re.IGNORECASE,
+        ),
+        "Assumption replacement invalidates Discovery": re.compile(
+            r"\breplac(?:ing|ement of|ed) (?:an? )?Assumption "
+            r"(?:automatically |directly )?invalidates? (?:an? )?Discovery\b",
+            re.IGNORECASE,
+        ),
+        "validity authors replacement claim": re.compile(
+            r"\bvalidity propagation (?:automatically )?"
+            r"(?:authors?|creates?|materializes?) (?:an? |the )?"
+            r"(?:replacement )?(?:scientific )?(?:claim|Discovery)\b",
+            re.IGNORECASE,
+        ),
+        "changed command as exact replay": re.compile(
+            r"\bchanged (?:command|request)[^.\n]{0,60}"
+            r"\b(?:is|becomes|counts as) (?:an? )?exact replay\b",
+            re.IGNORECASE,
+        ),
+        "automatic refresh overclaim": re.compile(
+            r"\b(?:notification|successor SessionFrame|context refresh) "
+            r"(?:is|are) automatically "
+            r"(?:created|delivered|performed|implemented)\b",
+            re.IGNORECASE,
+        ),
+        "semantic-index invalidation overclaim": re.compile(
+            r"\bsemantic(?:-index| index) invalidation (?:is|are) "
+            r"(?:implemented|supported)\b",
+            re.IGNORECASE,
+        ),
+        "validity-owned lease overclaim": re.compile(
+            r"\bvalidity (?:uses|has|owns) (?:an? )?"
+            r"(?:claim|lease|fencing token)\b",
+            re.IGNORECASE,
+        ),
+        "cross-database guarantee": re.compile(
+            r"\b(?:cross-database|database-independent|all-database) "
+            r"(?:validity |transaction |concurrency )?"
+            r"(?:guarantees?|behavior|atomicity) (?:is|are) "
+            r"(?:implemented|supported|verified|guaranteed)\b",
+            re.IGNORECASE,
+        ),
+    }
+    violations: list[str] = []
+    for doc in PHASE_2B2_CANONICAL_PAGES:
+        content = doc.read_text(encoding="utf-8")
+        for label, pattern in forbidden_patterns.items():
+            if pattern.search(content):
+                violations.append(f"{doc.as_posix()}: {label}")
+
+    assert not violations, f"Validity-over-time overclaims found: {violations}"
+
+
+def test_phase_2b_canonical_pages_use_canonical_status_labels() -> None:
     """Status-like bold labels on the new canonical pages must use the shared vocabulary."""
 
     allowed = {
@@ -337,7 +415,7 @@ def test_phase_2b1_canonical_pages_use_canonical_status_labels() -> None:
         re.IGNORECASE,
     )
     violations: list[str] = []
-    for doc in PHASE_2B1_CANONICAL_PAGES:
+    for doc in PHASE_2B_CANONICAL_PAGES:
         content = doc.read_text(encoding="utf-8")
         emphasized = re.findall(r"\*\*([^*\n]+)\*\*", content)
         violations.extend(

@@ -138,6 +138,10 @@ compare-and-set transitions, immutable event records, replay verification, and
 more complicated retrieval policy. Cross-database and distributed guarantees
 are **Unsupported**.
 
+The temporal-validity decision is expanded in
+[Validity over time](validity-over-time.md); the transaction is expanded in
+[Atomic validity propagation](atomic-validity-propagation.md).
+
 ## Indiscriminate retrieval contaminating reasoning
 
 Textual relevance is not scientific eligibility. A rejected Task, a stale

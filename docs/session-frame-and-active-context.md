@@ -97,8 +97,10 @@ complete branch or session-selection policy exists.
 Validity propagation is the deliberate exception to append-only selected
 content. Its transaction may change lifecycle metadata on an affected frame to
 superseded and append a stale marker. That removes the frame from
-latest-active selection without deleting its historical snapshot. The complete
-validity-over-time narrative is **Deferred** to its own canonical owner.
+latest-active selection without deleting its historical snapshot. The
+transaction and temporal-authority model are owned by
+[Validity over time](validity-over-time.md) and
+[Atomic validity propagation](atomic-validity-propagation.md).
 
 ## How frames are assembled today
 
@@ -158,8 +160,11 @@ scan. It can therefore remain active-status with a historical pin, although the
 pin still cannot reintroduce the invalid Discovery through current retrieval.
 
 This scenario is classified **safe but under-enforced**: active scientific
-authority is protected, but frame refresh, successor creation, and user-facing
-notification are **Partially implemented**.
+authority is protected, while direct-reference stale marking is **Implemented**,
+pin-only frame freshness is a **Known deviation**, and automatic successor
+creation and user-facing notification are **Unsupported**. See
+[Invalidation and active retrieval](invalidation-and-active-retrieval.md) for
+the complete authority-versus-freshness review.
 
 ## One frame, several context modes
 
@@ -238,3 +243,5 @@ Focused verification is under `tests/memory/`, `tests/agents/planner/`,
 Continue with
 [Retrieval and context type safety](retrieval-and-context-type-safety.md), then
 [Context reconstruction and continuity](context-reconstruction-and-continuity.md).
+Validity-change consequences continue in
+[Invalidation and active retrieval](invalidation-and-active-retrieval.md).
