@@ -274,6 +274,13 @@ fingerprint, replay, and concurrency mechanics, then
 [Invalidation and active retrieval](invalidation-and-active-retrieval.md) for
 the authority boundary at read time.
 
+## Related decision rationale
+
+The tradeoff between retained history and active exclusion is summarized in
+[Design decisions and tradeoffs](design-decisions-and-tradeoffs.md#15-historical-retention-and-active-exclusion).
+[ADR-005](decisions/ADR-005-atomic-validity-propagation.md) records the atomic
+validity decision and its redesign constraints.
+
 ## Implementation orientation
 
 The primary implementation boundaries are `src/application/validity/`,

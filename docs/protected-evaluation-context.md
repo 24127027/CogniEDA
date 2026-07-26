@@ -293,6 +293,16 @@ failure.
   [Retrieval and context type safety](retrieval-and-context-type-safety.md),
   and [Context reconstruction and continuity](context-reconstruction-and-continuity.md).
 
+## Related decision rationale
+
+The broader tradeoff between useful planning context and admissible scientific
+premises is summarized in
+[Design decisions and tradeoffs](design-decisions-and-tradeoffs.md).
+[ADR-002](decisions/ADR-002-assumption-quarantine.md) records the Assumption
+quarantine decision, and
+[ADR-003](decisions/ADR-003-specialist-scientific-authority.md) records the
+closed specialist-authority boundary.
+
 ## Implementation orientation
 
 The closed contracts are under `src/schemas/evaluation/`. Repository

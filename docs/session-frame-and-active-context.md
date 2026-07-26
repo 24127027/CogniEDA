@@ -228,6 +228,14 @@ DataProfiles require explicit comparison, or users need explainable context
 governance at product scale. Any replacement must keep invalid authority and
 wrong epistemic types outside the operation before relevance is considered.
 
+## Related decision rationale
+
+Why user-governed active context remains separate from scientific authority is
+summarized in
+[Design decisions and tradeoffs](design-decisions-and-tradeoffs.md#17-user-governed-active-context).
+The historical-retention consequences of stale frames are preserved in
+[ADR-005](decisions/ADR-005-atomic-validity-propagation.md).
+
 ## Implementation orientation
 
 The SessionFrame contract and persistence boundary are under

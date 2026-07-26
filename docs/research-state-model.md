@@ -370,6 +370,12 @@ either answer overwrite the other.
 The complete lifecycle distinction is owned by
 [Validity over time](validity-over-time.md).
 
+The rationale for typed research state, the exact FCO boundary, bounded
+cardinality, and historical retention is summarized in
+[Design decisions and tradeoffs](design-decisions-and-tradeoffs.md) and
+preserved in
+[ADR-001: First-Class research state](decisions/ADR-001-first-class-research-state.md).
+
 ### Implementation orientation
 
 The FCO schemas live under `src/schemas/research/`,

@@ -314,6 +314,13 @@ Continue with
 [Invalidation and active retrieval](invalidation-and-active-retrieval.md) to see
 how committed validity state is enforced at read time.
 
+## Related decision rationale
+
+The invariant-versus-mechanism classification is summarized in
+[Design decisions and tradeoffs](design-decisions-and-tradeoffs.md#16-atomic-validity-propagation).
+[ADR-005](decisions/ADR-005-atomic-validity-propagation.md) preserves the
+decision, rejected alternatives, limitations, and revisit triggers.
+
 ## Implementation orientation
 
 The transaction owner is `AtomicValidityPropagationService` under

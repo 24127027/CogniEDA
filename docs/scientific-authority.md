@@ -337,6 +337,15 @@ These are local optima, not timeless implementation forms. Their protected
 invariants—traceable scientific authorship, context type safety, exact
 authorization, and all-or-nothing admission—must survive any redesign.
 
+## Related decision rationale
+
+[Design decisions and tradeoffs](design-decisions-and-tradeoffs.md) classifies
+which authority boundaries must survive a redesign.
+[ADR-003](decisions/ADR-003-specialist-scientific-authority.md) preserves the
+specialist-authority decision, and
+[ADR-004](decisions/ADR-004-atomic-discovery-admission.md) preserves the
+all-or-nothing admission decision.
+
 ## Implementation orientation
 
 The main source boundaries are:

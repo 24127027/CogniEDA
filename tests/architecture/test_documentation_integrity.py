@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import re
 import subprocess
 from pathlib import Path
@@ -15,6 +16,7 @@ PHASE_1_CANONICAL_PAGES = (
     DOCS_ROOT / "research-state-model.md",
     DOCS_ROOT / "from-question-to-discovery.md",
 )
+PHASE_3A_CANONICAL_PAGES = (DOCS_ROOT / "design-decisions-and-tradeoffs.md",)
 PHASE_2A_CANONICAL_PAGES = (
     DOCS_ROOT / "scientific-authority.md",
     DOCS_ROOT / "protected-evaluation-context.md",
@@ -37,8 +39,17 @@ PHASE_2B_CANONICAL_PAGES = (
     *PHASE_2B1_CANONICAL_PAGES,
     *PHASE_2B2_CANONICAL_PAGES,
 )
+CORE_EPISTEMIC_ADRS = (
+    DOCS_ROOT / "decisions" / "ADR-001-first-class-research-state.md",
+    DOCS_ROOT / "decisions" / "ADR-002-assumption-quarantine.md",
+    DOCS_ROOT / "decisions" / "ADR-003-specialist-scientific-authority.md",
+    DOCS_ROOT / "decisions" / "ADR-004-atomic-discovery-admission.md",
+    DOCS_ROOT / "decisions" / "ADR-005-atomic-validity-propagation.md",
+)
+PHASE_3A_DECISION_PAGES = (*PHASE_3A_CANONICAL_PAGES, *CORE_EPISTEMIC_ADRS)
 CANONICAL_READER_PAGES = (
     *PHASE_1_CANONICAL_PAGES,
+    *PHASE_3A_CANONICAL_PAGES,
     *PHASE_2A_CANONICAL_PAGES,
     *PHASE_2B_CANONICAL_PAGES,
 )
@@ -53,6 +64,7 @@ READER_FACING_CURRENT_STATE_PAGES = (
 )
 CHECKOUT_EVIDENCE_GUARDED_PAGES = (
     *CANONICAL_FOUNDATION,
+    *CORE_EPISTEMIC_ADRS,
     *READER_FACING_CURRENT_STATE_PAGES,
 )
 
@@ -231,7 +243,7 @@ def test_canonical_source_references_exist() -> None:
     """Inline source and test orientation paths on canonical pages must resolve."""
 
     violations: list[str] = []
-    for doc in CANONICAL_READER_PAGES:
+    for doc in (*CANONICAL_READER_PAGES, *CORE_EPISTEMIC_ADRS):
         content = doc.read_text(encoding="utf-8")
         for reference in re.findall(r"`((?:src|tests)/[^`\n]+)`", content):
             if not Path(reference).exists():
@@ -397,7 +409,7 @@ def test_phase_2b2_canonical_pages_reject_validity_overclaims() -> None:
     assert not violations, f"Validity-over-time overclaims found: {violations}"
 
 
-def test_phase_2b_canonical_pages_use_canonical_status_labels() -> None:
+def test_recent_canonical_pages_use_canonical_status_labels() -> None:
     """Status-like bold labels on the new canonical pages must use the shared vocabulary."""
 
     allowed = {
@@ -415,7 +427,7 @@ def test_phase_2b_canonical_pages_use_canonical_status_labels() -> None:
         re.IGNORECASE,
     )
     violations: list[str] = []
-    for doc in PHASE_2B_CANONICAL_PAGES:
+    for doc in (*PHASE_2B_CANONICAL_PAGES, *PHASE_3A_DECISION_PAGES):
         content = doc.read_text(encoding="utf-8")
         emphasized = re.findall(r"\*\*([^*\n]+)\*\*", content)
         violations.extend(
@@ -425,6 +437,140 @@ def test_phase_2b_canonical_pages_use_canonical_status_labels() -> None:
         )
 
     assert not violations, f"Non-canonical implementation-status labels found: {violations}"
+
+
+def test_phase_3a_docs_and_source_define_exactly_eight_fcos() -> None:
+    """The source enumeration and the core decision record must expose the same eight FCOs."""
+
+    source = Path("src/schemas/enums.py").read_text(encoding="utf-8")
+    syntax_tree = ast.parse(source)
+    fco_class = next(
+        node
+        for node in syntax_tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "FirstClassObjectType"
+    )
+    source_values = {
+        statement.value.value
+        for statement in fco_class.body
+        if isinstance(statement, ast.Assign)
+        and isinstance(statement.value, ast.Constant)
+        and isinstance(statement.value.value, str)
+    }
+    expected_values = {
+        "objective",
+        "data_profile",
+        "assumption",
+        "task",
+        "hypothesis",
+        "evidence",
+        "discovery",
+        "session_frame",
+    }
+    assert source_values == expected_values
+
+    adr = CORE_EPISTEMIC_ADRS[0].read_text(encoding="utf-8")
+    documented_names = set(
+        re.findall(r"^\d+\. `([A-Z][A-Za-z]+)`", adr, flags=re.MULTILINE)
+    )
+    expected_names = {
+        "Objective",
+        "DataProfile",
+        "Assumption",
+        "Task",
+        "Hypothesis",
+        "Evidence",
+        "Discovery",
+        "SessionFrame",
+    }
+    assert documented_names == expected_names
+
+
+def test_phase_3a_core_adrs_expose_complete_decision_anatomy() -> None:
+    """Core ADRs must preserve rationale, alternatives, limits, and redesign guidance."""
+
+    required_headings = {
+        "context",
+        "problem",
+        "failure mode",
+        "tempting alternatives",
+        "decision",
+        "invariant protected",
+        "current implementation",
+        "tradeoffs",
+        "known limitations",
+        "risks",
+        "revisit triggers",
+        "consequences for future work",
+        "related canonical concepts",
+        "implementation orientation",
+    }
+    failures: list[str] = []
+    for adr in CORE_EPISTEMIC_ADRS:
+        content = adr.read_text(encoding="utf-8")
+        headings = {
+            match.group(1).strip().lower()
+            for match in re.finditer(r"^##\s+(.+?)\s*$", content, flags=re.MULTILINE)
+        }
+        missing = sorted(required_headings - headings)
+        if missing:
+            failures.append(f"{adr.as_posix()}: missing headings {missing}")
+        if re.search(r"^\*\*Status:\*\*\s*Accepted\b", content, flags=re.MULTILINE):
+            failures.append(f"{adr.as_posix()}: uses Accepted as implementation proof")
+
+    assert not failures, "Incomplete core decision records:\n" + "\n".join(failures)
+
+
+def test_phase_3a_decisions_preserve_core_epistemic_boundaries() -> None:
+    """Decision prose must state the core anti-laundering boundaries explicitly."""
+
+    content = "\n".join(
+        page.read_text(encoding="utf-8") for page in PHASE_3A_DECISION_PAGES
+    )
+    required_patterns = {
+        "Assumptions excluded from conclusions": re.compile(
+            r"\bAssumptions?\b.{0,120}\b(?:must not|cannot)\b.{0,120}"
+            r"\b(?:conclusions?|concludes?|inference premises?)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "Evidence stops before interpretation": re.compile(
+            r"\bEvidence without interpretation\b|"
+            r"\bEvidence admission\b.{0,160}\bstops? before interpretation\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "GeneratedView is not Discovery": re.compile(
+            r"\bGeneratedView\b.{0,120}\bnot Discovery\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "parent Tasks produce no Discovery": re.compile(
+            r"\bParent Tasks?\b.{0,120}\b(?:do not|cannot)\b.{0,80}"
+            r"\b(?:Hypotheses|Hypothesis|Discoveries|Discovery)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "governance does not author claims": re.compile(
+            r"\bGovernance\b.{0,160}\b(?:does not|cannot|must not|not)\b.{0,80}"
+            r"\b(?:author|revise|rewrite)\w*\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "application copies the exact proposal": re.compile(
+            r"\bapplication\b.{0,160}\b(?:copies|materializes)\b.{0,120}\bexact\w*\b|"
+            r"\bexact proposal-copy\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "invalidation retains history": re.compile(
+            r"\bInvalidation\b.{0,120}\b(?:never|does not|must not)\b.{0,60}"
+            r"\bdelet\w*\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "SessionFrame cannot override validity": re.compile(
+            r"\b(?:SessionFrame|pin)\b.{0,160}\b(?:cannot|does not|must not)\b"
+            r".{0,100}\b(?:validity|scientific authority|inactive object)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+    }
+    missing = [
+        label for label, pattern in required_patterns.items() if not pattern.search(content)
+    ]
+    assert not missing, f"Core epistemic boundaries are not explicit: {missing}"
 
 
 def test_unsupported_cli_or_service_claims_are_absent_from_canonical_docs() -> None:

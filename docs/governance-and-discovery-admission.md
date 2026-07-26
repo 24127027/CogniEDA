@@ -372,6 +372,16 @@ boundary.
   **Deferred** to their own documentation; this page covers only the atomic
   append.
 
+## Related decision rationale
+
+The epistemic reason for independent governance, exact proposal-copy, and one
+admission transaction is summarized in
+[Design decisions and tradeoffs](design-decisions-and-tradeoffs.md).
+[ADR-003](decisions/ADR-003-specialist-scientific-authority.md) owns authority
+separation, and
+[ADR-004](decisions/ADR-004-atomic-discovery-admission.md) owns atomic
+materialization.
+
 ## Implementation orientation
 
 Authority issuance, proposal reconstruction, decision fingerprints, and
