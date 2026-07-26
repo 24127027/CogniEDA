@@ -1,7 +1,7 @@
 # Discovery Schemas (`schemas.discovery`)
 
 > **Role:** Package technical reference. **Canonical concept owner:**
-> [Governance and Discovery admission](../../../docs/governance-and-discovery-admission.md).
+> [Discovery governance and admission](../../../docs/concepts/scientific-lifecycle/discovery-governance-and-admission.md).
 > **Contributor entry:** [Contributor documentation](../../../docs/development/index.md).
 > **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
 

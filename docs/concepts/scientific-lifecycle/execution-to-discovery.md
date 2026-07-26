@@ -1,9 +1,9 @@
-# From execution to Discovery
+# Execution to Discovery
 
 This workflow follows one approved terminal analytical Task through observation,
 evaluation, governance, and durable scientific admission. It begins after
 planning and Task activation; the earlier path is covered in
-[From question to Discovery](from-question-to-discovery.md).
+[Investigation lifecycle](../research-state/investigation-lifecycle.md).
 
 The running Task asks:
 
@@ -179,7 +179,7 @@ DiscoveryProposal | EvaluationFailure
 
 The closed input, Assumption quarantine, digest binding, generic-context
 distinction, and tool isolation are owned by
-[Protected evaluation context](protected-evaluation-context.md).
+[Protected evaluation](protected-evaluation.md).
 
 ### DiscoveryProposal
 
@@ -273,7 +273,7 @@ commit rolls back every staged scientific and lifecycle effect.
 
 The full authority, exact-copy, replay, claim/lease/fence, compare-and-set, and
 SQLite transaction reasoning is owned by
-[Governance and Discovery admission](governance-and-discovery-admission.md).
+[Discovery governance and admission](discovery-governance-and-admission.md).
 
 **Current status:** Atomic Discovery admission is **Implemented** and
 **Verified on SQLite**. Cross-database and distributed cutover guarantees are
@@ -291,12 +291,12 @@ resume from the committed conclusion without treating conversation or generic
 context as scientific authority.
 
 SessionFrame reconstruction and active retrieval continue in
-[SessionFrame and active context](session-frame-and-active-context.md),
-[Retrieval and context type safety](retrieval-and-context-type-safety.md), and
-[Context reconstruction and continuity](context-reconstruction-and-continuity.md).
+[SessionFrame and active context](../context/session-frame.md),
+[Context type safety and retrieval](../context/context-type-safety.md), and
+[Context continuity and resume](../context/continuity-and-resume.md).
 Later authority changes continue in
-[Validity over time](validity-over-time.md) and
-[From validity change to reconstructed context](from-validity-change-to-reconstructed-context.md).
+[Validity over time](../validity/validity-over-time.md) and
+[From validity change to active context](../validity/validity-change-to-active-context.md).
 
 ## Where the workflow stops
 

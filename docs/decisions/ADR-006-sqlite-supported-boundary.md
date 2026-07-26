@@ -179,12 +179,12 @@ evidence.
 
 ## Related canonical concepts
 
-- [SQLite boundary and portability](../sqlite-boundary-and-portability.md)
-- [Persistence and transaction ownership](../persistence-and-transaction-ownership.md)
-- [Database initialization and migrations](../database-initialization-and-migrations.md)
-- [From runtime composition to atomic persistence](../from-runtime-composition-to-atomic-persistence.md)
-- [Governance and Discovery admission](../governance-and-discovery-admission.md)
-- [Atomic validity propagation](../atomic-validity-propagation.md)
+- [SQLite and portability](../operations/sqlite-and-portability.md)
+- [Persistence and transactions](../operations/persistence-and-transactions.md)
+- [SQLite initialization and migrations](../operations/sqlite-and-migrations.md)
+- [Atomic persistence workflow](../operations/atomic-persistence-workflow.md)
+- [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md)
+- [Atomic validity propagation](../concepts/validity/validity-propagation.md)
 
 ## Implementation orientation
 

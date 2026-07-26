@@ -135,11 +135,11 @@ than hiding or deleting it.
 
 ## Related canonical concepts
 
-- [Design decisions and tradeoffs](../design-decisions-and-tradeoffs.md)
-- [Validity over time](../validity-over-time.md)
-- [Atomic validity propagation](../atomic-validity-propagation.md)
-- [SessionFrame and active context](../session-frame-and-active-context.md)
-- [Governance and Discovery admission](../governance-and-discovery-admission.md)
+- [Design decisions and tradeoffs](../design-decisions/index.md)
+- [Validity over time](../concepts/validity/validity-over-time.md)
+- [Atomic validity propagation](../concepts/validity/validity-propagation.md)
+- [SessionFrame and active context](../concepts/context/session-frame.md)
+- [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md)
 
 ## Implementation orientation
 

@@ -3,7 +3,7 @@
 This is a repository-development setup, not a product quickstart. CogniEDA has
 no supported CLI, HTTP API, worker, daemon, or bootstrap package. Start at the
 [contributor hub](index.md) and read the
-[runtime and composition boundary](../runtime-and-composition-boundary.md)
+[runtime composition](../operations/runtime-composition.md)
 before wiring an adapter.
 
 ## Prerequisites
@@ -41,7 +41,7 @@ Database behavior:
 - `init_db()` applies ordered targeted upgrades, creates missing current
   SQLModel tables, installs selected guards, and runs legacy quarantine.
 
-See [Database initialization and migrations](../database-initialization-and-migrations.md)
+See [SQLite initialization and migrations](../operations/sqlite-and-migrations.md)
 for the supported fresh and existing-database boundary.
 
 The tested persistence and concurrency boundary is SQLite. Do not infer

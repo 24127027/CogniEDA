@@ -1,7 +1,7 @@
 # Validity and Invalidation
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Validity over time](../validity-over-time.md).
+> [Validity over time](../concepts/validity/validity-over-time.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
@@ -11,9 +11,9 @@
 > production identity provider are **Unsupported**.
 
 Canonical reader explanations are
-[Validity over time](../validity-over-time.md),
-[Atomic validity propagation](../atomic-validity-propagation.md), and
-[Invalidation and active retrieval](../invalidation-and-active-retrieval.md).
+[Validity over time](../concepts/validity/validity-over-time.md),
+[Atomic validity propagation](../concepts/validity/validity-propagation.md), and
+[Active retrieval after invalidation](../concepts/validity/active-retrieval-after-invalidation.md).
 This page retains the concise source-oriented reference.
 
 ## Command and authority

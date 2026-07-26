@@ -1,4 +1,4 @@
-# SQLite boundary and portability
+# SQLite and portability
 
 SQLite is CogniEDA's current supported persistence backend. That is a deliberate
 current-stage choice for a local-first research-state system, not a claim that
@@ -171,11 +171,11 @@ and explicit failure semantics on the supported backend.
 
 ## Related canonical concepts
 
-- [Persistence and transaction ownership](persistence-and-transaction-ownership.md)
-- [Database initialization and migrations](database-initialization-and-migrations.md)
-- [Governance and Discovery admission](governance-and-discovery-admission.md)
-- [Atomic validity propagation](atomic-validity-propagation.md)
-- [ADR-006: SQLite as the supported persistence boundary](decisions/ADR-006-sqlite-supported-boundary.md)
+- [Persistence and transactions](persistence-and-transactions.md)
+- [SQLite initialization and migrations](sqlite-and-migrations.md)
+- [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md)
+- [Atomic validity propagation](../concepts/validity/validity-propagation.md)
+- [ADR-006: SQLite as the supported persistence boundary](../decisions/ADR-006-sqlite-supported-boundary.md)
 
 ## Implementation orientation
 

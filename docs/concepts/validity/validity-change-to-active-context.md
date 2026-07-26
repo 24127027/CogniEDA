@@ -1,4 +1,4 @@
-# From validity change to reconstructed context
+# From validity change to active context
 
 This workflow follows the running churn investigation after a scientific result
 has already been admitted.

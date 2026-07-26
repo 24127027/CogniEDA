@@ -21,7 +21,7 @@ The tracked default configuration is not a runnable product deployment. There
 is no supported CLI, HTTP API, worker, daemon, concrete Data Explorer, or
 default production Analyst adapter. The supported surface is an in-process
 library foundation with explicit dependency injection; see
-[product surface and bootstrap boundary](../product-surface-and-bootstrap-boundary.md).
+[product bootstrap](../operations/product-bootstrap.md).
 
 ## What to read
 
@@ -29,7 +29,7 @@ library foundation with explicit dependency injection; see
 | --- | --- | --- |
 | Meaning and invariant | [Canonical reader journey](../index.md) | relevant schema, owner, and focused test |
 | Current maturity or known deviation | [Current state](../current-state.md), [capability map](../capability-and-maturity-map.md), and [roadmap](../roadmap.md) | source only after the status boundary is clear |
-| Durable architectural rationale | [Design decisions and tradeoffs](../design-decisions-and-tradeoffs.md) and the linked ADR | owner and architecture tests |
+| Durable architectural rationale | [Design decisions and tradeoffs](../design-decisions/index.md) and the linked ADR | owner and architecture tests |
 | Source responsibility and transaction owner | [Code orientation](code-orientation.md) | local package README and focused tests |
 | Where a change belongs | [Change-boundary guide](change-boundary-guide.md) | schema, repository, model, migration, and application owner |
 | Test selection and commands | [Testing strategy](testing.md) | nearest focused test and `tests/architecture/` |
@@ -39,27 +39,27 @@ library foundation with explicit dependency injection; see
 
 ### Research-state change
 
-[Research-state model](../research-state-model.md) -> [change guide](change-boundary-guide.md#research-state-and-lifecycle-change) -> relevant `src/schemas/` contract -> repository and `src/db/models/` mapping -> application owner -> focused schema, repository, and architecture tests.
+[Research-state objects and roles](../concepts/research-state/objects-and-roles.md) -> [change guide](change-boundary-guide.md#research-state-and-lifecycle-change) -> relevant `src/schemas/` contract -> repository and `src/db/models/` mapping -> application owner -> focused schema, repository, and architecture tests.
 
 ### Scientific lifecycle change
 
-[Scientific authority](../scientific-authority.md) -> [protected evaluation](../protected-evaluation-context.md) -> [governance and admission](../governance-and-discovery-admission.md) -> transaction owner -> race, replay, rollback, and architecture tests.
+[Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md) -> [protected evaluation](../concepts/scientific-lifecycle/protected-evaluation.md) -> [governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md) -> transaction owner -> race, replay, rollback, and architecture tests.
 
 ### Planner change
 
-[Planner boundary](../planner-boundary-and-operation-model.md) -> `PlannerOperation` schema -> `src/application/orchestrator/planner_commit.py` -> delegated transaction owner -> `tests/agents/planner/`, `tests/application/orchestrator/`, and architecture tests.
+[Planner boundary](../operations/planner-and-approvals.md) -> `PlannerOperation` schema -> `src/application/orchestrator/planner_commit.py` -> delegated transaction owner -> `tests/agents/planner/`, `tests/application/orchestrator/`, and architecture tests.
 
 ### Retrieval or SessionFrame change
 
-[Retrieval and context type safety](../retrieval-and-context-type-safety.md) -> [SessionFrame scaling boundary](../session-frame-scaling-and-resume-boundary.md) -> `src/memory/` -> `tests/memory/` and validity/architecture tests.
+[Context type safety and retrieval](../concepts/context/context-type-safety.md) -> [SessionFrame scaling boundary](../concepts/context/session-frame-scaling.md) -> `src/memory/` -> `tests/memory/` and validity/architecture tests.
 
 ### Persistence or migration change
 
-[Persistence and transaction ownership](../persistence-and-transaction-ownership.md) -> [SQLite boundary](../sqlite-boundary-and-portability.md) -> [database initialization and migrations](../database-initialization-and-migrations.md) -> schema, model, repository, migration code -> `tests/db/`, `tests/repositories/`, and architecture tests.
+[Persistence and transactions](../operations/persistence-and-transactions.md) -> [SQLite boundary](../operations/sqlite-and-portability.md) -> [SQLite initialization and migrations](../operations/sqlite-and-migrations.md) -> schema, model, repository, migration code -> `tests/db/`, `tests/repositories/`, and architecture tests.
 
 ### Product integration change
 
-[Current state](../current-state.md) -> [roadmap](../roadmap.md) -> [product bootstrap boundary](../product-surface-and-bootstrap-boundary.md) -> runtime and adapter seams. Package 7 work begins only at the prerequisite named in the roadmap; this guide does not make a product surface supported.
+[Current state](../current-state.md) -> [roadmap](../roadmap.md) -> [product bootstrap boundary](../operations/product-bootstrap.md) -> runtime and adapter seams. Package 7 work begins only at the prerequisite named in the roadmap; this guide does not make a product surface supported.
 
 ## Documentation audiences
 

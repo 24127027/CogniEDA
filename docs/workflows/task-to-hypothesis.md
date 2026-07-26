@@ -1,7 +1,7 @@
 # Task-to-Hypothesis Workflow
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Planner boundary and operation model](../planner-boundary-and-operation-model.md).
+> [Planner operations and approvals](../operations/planner-and-approvals.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
@@ -10,9 +10,9 @@
 > branches and existing-Hypothesis reuse remain incomplete.
 
 The canonical Planner owner is
-[Planner boundary and operation model](../planner-boundary-and-operation-model.md);
+[Planner operations and approvals](../operations/planner-and-approvals.md);
 the request-to-approval narrative is
-[From user request to approved operation](../from-user-request-to-approved-operation.md).
+[Operation approval workflows](../operations/operation-approval-workflows.md).
 
 ## Implemented path
 

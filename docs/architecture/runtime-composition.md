@@ -1,7 +1,7 @@
 # Runtime composition
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Runtime and composition boundary](../runtime-and-composition-boundary.md).
+> [Runtime composition](../operations/runtime-composition.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
@@ -9,9 +9,9 @@
 > bootstrap **Unsupported**; database semantics **Verified on SQLite**.
 
 The reader-facing rationale and deployment boundary are owned by
-[Runtime and composition boundary](../runtime-and-composition-boundary.md).
+[Runtime composition](../operations/runtime-composition.md).
 Unsupported product processes and bootstrap prerequisites are owned by
-[Product surface and bootstrap boundary](../product-surface-and-bootstrap-boundary.md).
+[Product bootstrap](../operations/product-bootstrap.md).
 This page retains source-level composition orientation.
 
 ## Current implementation

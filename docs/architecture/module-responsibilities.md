@@ -1,7 +1,7 @@
 # Module responsibility matrix
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Persistence and transaction ownership](../persistence-and-transaction-ownership.md).
+> [Persistence and transactions](../operations/persistence-and-transactions.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
@@ -9,12 +9,12 @@
 > deployment adapters are **Deferred**.
 
 The operational rationale is owned by
-[Runtime and composition boundary](../runtime-and-composition-boundary.md) and
-[Persistence and transaction ownership](../persistence-and-transaction-ownership.md).
+[Runtime composition](../operations/runtime-composition.md) and
+[Persistence and transactions](../operations/persistence-and-transactions.md).
 Planner coordination is owned by
-[Planner boundary and operation model](../planner-boundary-and-operation-model.md);
+[Planner operations and approvals](../operations/planner-and-approvals.md);
 retrieval ranking and scale are owned by
-[Retrieval strategy and scaling](../retrieval-strategy-and-scaling.md).
+[Retrieval strategy](../concepts/context/retrieval-strategy.md).
 This page remains a contributor-facing package map.
 
 | Module | Owns | Must not own | Runtime entry |

@@ -1,7 +1,7 @@
 # Bootstrap — Target Design
 
 > **Role:** Package technical reference. **Canonical concept owner:**
-> [Product surface and bootstrap boundary](../../../docs/product-surface-and-bootstrap-boundary.md).
+> [Product bootstrap](../../../docs/operations/product-bootstrap.md).
 > **Contributor entry:** [Contributor documentation](../../../docs/development/index.md).
 > **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
 
@@ -13,9 +13,9 @@ factory loading in `src/application/runtime_loader.py`. There is no
 `dependency_container.py`, worker bootstrap, or startup lifecycle here.
 
 The canonical current boundary is
-[Runtime and composition boundary](../../../docs/runtime-and-composition-boundary.md).
+[Runtime composition](../../../docs/operations/runtime-composition.md).
 The product-process inventory and minimum coherent bootstrap are owned by
-[Product surface and bootstrap boundary](../../../docs/product-surface-and-bootstrap-boundary.md).
+[Product bootstrap](../../../docs/operations/product-bootstrap.md).
 
 ## Target design
 

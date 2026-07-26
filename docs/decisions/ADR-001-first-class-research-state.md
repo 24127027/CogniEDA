@@ -138,10 +138,10 @@ must preserve existing object identity rather than silently reinterpret it.
 
 ## Related canonical concepts
 
-- [Design decisions and tradeoffs](../design-decisions-and-tradeoffs.md)
-- [Research-state model](../research-state-model.md)
-- [From question to Discovery](../from-question-to-discovery.md)
-- [Context reconstruction and continuity](../context-reconstruction-and-continuity.md)
+- [Design decisions and tradeoffs](../design-decisions/index.md)
+- [Research-state objects and roles](../concepts/research-state/objects-and-roles.md)
+- [Investigation lifecycle](../concepts/research-state/investigation-lifecycle.md)
+- [Context continuity and resume](../concepts/context/continuity-and-resume.md)
 
 ## Implementation orientation
 

@@ -1,7 +1,7 @@
 # Validity Propagation Workflow
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Atomic validity propagation](../atomic-validity-propagation.md).
+> [Atomic validity propagation](../concepts/validity/validity-propagation.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
@@ -10,8 +10,8 @@
 > compare-and-set guards, and dependent-state propagation.
 
 Canonical rationale and mechanics:
-[Validity over time](../validity-over-time.md) and
-[Atomic validity propagation](../atomic-validity-propagation.md). This page
+[Validity over time](../concepts/validity/validity-over-time.md) and
+[Atomic validity propagation](../concepts/validity/validity-propagation.md). This page
 retains the compact technical sequence.
 
 ## Atomic path
@@ -49,5 +49,5 @@ excluded by persisted lifecycle state and repository-backed retrieval policy;
 they remain in SQLite for provenance and audit.
 
 The active-context consequence is summarized in
-[Retrieval and context type safety](../retrieval-and-context-type-safety.md) and
-[Invalidation and active retrieval](../invalidation-and-active-retrieval.md).
+[Context type safety and retrieval](../concepts/context/context-type-safety.md) and
+[Active retrieval after invalidation](../concepts/validity/active-retrieval-after-invalidation.md).

@@ -1,4 +1,4 @@
-# Research-state model
+# Research-state objects and roles
 
 CogniEDA gives durable identity only to concepts that must remain independently
 addressable across an investigation. Durable identity is not the same as
@@ -225,8 +225,8 @@ admission, and validity interaction are **Implemented** and
 **Verified on SQLite**.
 
 For the authority rationale and transaction boundary, see
-[Scientific authority](scientific-authority.md) and
-[Governance and Discovery admission](governance-and-discovery-admission.md).
+[Scientific authority](../scientific-lifecycle/scientific-authority.md) and
+[Discovery governance and admission](../scientific-lifecycle/discovery-governance-and-admission.md).
 
 ## SessionFrame: user-governed active-context projection
 
@@ -263,9 +263,9 @@ conclusion frames, and validity supersession are **Implemented**. The complete
 user-governed experience is **Partially implemented**.
 
 SessionFrame purpose and user governance are owned by
-[SessionFrame and active context](session-frame-and-active-context.md). Its
+[SessionFrame and active context](../context/session-frame.md). Its
 distinction from scientific evaluation remains owned by
-[Protected evaluation context](protected-evaluation-context.md).
+[Protected evaluation](../scientific-lifecycle/protected-evaluation.md).
 
 ## Important non-FCO records and artifacts
 
@@ -371,13 +371,13 @@ both “what did we conclude then?” and “what may we rely on now?” without
 either answer overwrite the other.
 
 The complete lifecycle distinction is owned by
-[Validity over time](validity-over-time.md).
+[Validity over time](../validity/validity-over-time.md).
 
 The rationale for typed research state, the exact FCO boundary, bounded
 cardinality, and historical retention is summarized in
-[Design decisions and tradeoffs](design-decisions-and-tradeoffs.md) and
+[Design decisions and tradeoffs](../../design-decisions/index.md) and
 preserved in
-[ADR-001: First-Class research state](decisions/ADR-001-first-class-research-state.md).
+[ADR-001: First-Class research state](../../decisions/ADR-001-first-class-research-state.md).
 
 ### Implementation orientation
 

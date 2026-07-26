@@ -1,4 +1,4 @@
-# Retrieval strategy and scaling
+# Retrieval strategy
 
 Retrieval in CogniEDA is a bounded planning aid. It may rank among candidates
 that are allowed to appear, but ranking must never decide scientific
@@ -11,7 +11,7 @@ admissibility.
 > **Partially implemented**. Semantic or vector retrieval, a persistent
 > semantic index, and Graph Miner are **Deferred** or **Unsupported**.
 
-[Retrieval and context type safety](retrieval-and-context-type-safety.md) owns
+[Context type safety and retrieval](context-type-safety.md) owns
 which object types and lifecycle states may enter each context mode. This page
 owns the current operational candidate, ranking, budget, and scaling decisions.
 
@@ -172,10 +172,10 @@ equivalence, and commit-time revalidation against repository-current state.
 
 ## Related canonical concepts
 
-- [Retrieval and context type safety](retrieval-and-context-type-safety.md)
-- [Invalidation and active retrieval](invalidation-and-active-retrieval.md)
-- [SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md)
-- [Planner boundary and operation model](planner-boundary-and-operation-model.md)
+- [Context type safety and retrieval](context-type-safety.md)
+- [Active retrieval after invalidation](../validity/active-retrieval-after-invalidation.md)
+- [SessionFrame scaling and resume limits](session-frame-scaling.md)
+- [Planner operations and approvals](../../operations/planner-and-approvals.md)
 
 ## Implementation orientation
 

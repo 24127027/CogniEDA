@@ -124,10 +124,10 @@ documented.
 
 ## Related canonical concepts
 
-- [Design decisions and tradeoffs](../design-decisions-and-tradeoffs.md)
-- [Governance and Discovery admission](../governance-and-discovery-admission.md)
-- [Scientific authority](../scientific-authority.md)
-- [From question to Discovery](../from-question-to-discovery.md)
+- [Design decisions and tradeoffs](../design-decisions/index.md)
+- [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md)
+- [Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md)
+- [Investigation lifecycle](../concepts/research-state/investigation-lifecycle.md)
 - [ADR-003: Separated scientific authority](ADR-003-specialist-scientific-authority.md)
 
 ## Implementation orientation

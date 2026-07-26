@@ -65,8 +65,8 @@ External analytical/model work uses injected fakes; passing tests do not prove a
 live provider, worker, or production adapter.
 
 The claims supported by these suites are summarized in
-[Persistence and transaction ownership](../persistence-and-transaction-ownership.md)
-and [SQLite boundary and portability](../sqlite-boundary-and-portability.md).
+[Persistence and transactions](../operations/persistence-and-transactions.md)
+and [SQLite and portability](../operations/sqlite-and-portability.md).
 
 ## Important limitations
 

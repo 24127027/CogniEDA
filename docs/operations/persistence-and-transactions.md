@@ -1,4 +1,4 @@
-# Persistence and transaction ownership
+# Persistence and transactions
 
 CogniEDA's scientific lifecycle transitions are larger than individual table
 writes. A physically valid row can still create epistemically contradictory
@@ -211,13 +211,13 @@ replay identity, and no physically valid but epistemically contradictory state.
 
 ## Related canonical concepts
 
-- [Planner boundary and operation model](planner-boundary-and-operation-model.md)
-- [From user request to approved operation](from-user-request-to-approved-operation.md)
-- [SQLite boundary and portability](sqlite-boundary-and-portability.md)
-- [Database initialization and migrations](database-initialization-and-migrations.md)
-- [From runtime composition to atomic persistence](from-runtime-composition-to-atomic-persistence.md)
-- [Scientific authority](scientific-authority.md)
-- [Atomic validity propagation](atomic-validity-propagation.md)
+- [Planner operations and approvals](planner-and-approvals.md)
+- [Operation approval workflows](operation-approval-workflows.md)
+- [SQLite and portability](sqlite-and-portability.md)
+- [SQLite initialization and migrations](sqlite-and-migrations.md)
+- [Atomic persistence workflow](atomic-persistence-workflow.md)
+- [Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md)
+- [Atomic validity propagation](../concepts/validity/validity-propagation.md)
 
 ## Implementation orientation
 

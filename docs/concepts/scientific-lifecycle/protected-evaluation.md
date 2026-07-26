@@ -1,4 +1,4 @@
-# Protected evaluation context
+# Protected evaluation
 
 CogniEDA uses different inputs for deciding what to investigate and for deciding
 what admitted Evidence justifies. Planning benefits from hypotheses, priorities,
@@ -289,18 +289,18 @@ failure.
   binding behavior is **Verified on SQLite**.
 - SessionFrame reconstruction, active retrieval policy, user pin/exclusion
   semantics, and continuity are owned by
-  [SessionFrame and active context](session-frame-and-active-context.md),
-  [Retrieval and context type safety](retrieval-and-context-type-safety.md),
-  and [Context reconstruction and continuity](context-reconstruction-and-continuity.md).
+  [SessionFrame and active context](../context/session-frame.md),
+  [Context type safety and retrieval](../context/context-type-safety.md),
+  and [Context continuity and resume](../context/continuity-and-resume.md).
 
 ## Related decision rationale
 
 The broader tradeoff between useful planning context and admissible scientific
 premises is summarized in
-[Design decisions and tradeoffs](design-decisions-and-tradeoffs.md).
-[ADR-002](decisions/ADR-002-assumption-quarantine.md) records the Assumption
+[Design decisions and tradeoffs](../../design-decisions/index.md).
+[ADR-002](../../decisions/ADR-002-assumption-quarantine.md) records the Assumption
 quarantine decision, and
-[ADR-003](decisions/ADR-003-specialist-scientific-authority.md) records the
+[ADR-003](../../decisions/ADR-003-specialist-scientific-authority.md) records the
 closed specialist-authority boundary.
 
 ## Implementation orientation
@@ -314,4 +314,4 @@ Focused verification is under `tests/application/evaluation/`,
 `tests/agents/`, and `tests/architecture/`.
 
 Return to [Scientific authority](scientific-authority.md), or continue to
-[Governance and Discovery admission](governance-and-discovery-admission.md).
+[Discovery governance and admission](discovery-governance-and-admission.md).

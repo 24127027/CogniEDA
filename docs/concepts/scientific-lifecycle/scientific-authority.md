@@ -132,7 +132,7 @@ The Analyst alone chooses the proposal's scientific wording and one of the
 bounded epistemic outcomes: supported, contradicted, inconclusive, or
 insufficient evidence. The input contract, its exclusions, and its repository
 construction are explained in
-[Protected evaluation context](protected-evaluation-context.md).
+[Protected evaluation](protected-evaluation.md).
 
 The tempting alternative is to let an application service assemble a prompt,
 call a model, and then clean up the response. That makes apparently harmless
@@ -248,7 +248,7 @@ edited during admission. Focused tests compare the persisted Discovery with the
 proposal across every scientific field.
 
 Atomicity, replay, and changed-binding behavior for this copy are explained in
-[Governance and Discovery admission](governance-and-discovery-admission.md).
+[Discovery governance and admission](discovery-governance-and-admission.md).
 
 ## Stopping paths and epistemic outcomes
 
@@ -339,11 +339,11 @@ authorization, and all-or-nothing admission—must survive any redesign.
 
 ## Related decision rationale
 
-[Design decisions and tradeoffs](design-decisions-and-tradeoffs.md) classifies
+[Design decisions and tradeoffs](../../design-decisions/index.md) classifies
 which authority boundaries must survive a redesign.
-[ADR-003](decisions/ADR-003-specialist-scientific-authority.md) preserves the
+[ADR-003](../../decisions/ADR-003-specialist-scientific-authority.md) preserves the
 specialist-authority decision, and
-[ADR-004](decisions/ADR-004-atomic-discovery-admission.md) preserves the
+[ADR-004](../../decisions/ADR-004-atomic-discovery-admission.md) preserves the
 all-or-nothing admission decision.
 
 ## Implementation orientation
@@ -361,5 +361,5 @@ Focused behavioral verification is under
 `tests/application/evidence/`, `tests/application/evaluation/`,
 `tests/application/governance/`, and `tests/application/discovery/`.
 
-Continue with [Protected evaluation context](protected-evaluation-context.md),
-then [Governance and Discovery admission](governance-and-discovery-admission.md).
+Continue with [Protected evaluation](protected-evaluation.md),
+then [Discovery governance and admission](discovery-governance-and-admission.md).

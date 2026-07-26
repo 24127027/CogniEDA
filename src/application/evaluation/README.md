@@ -1,7 +1,7 @@
 # Evaluation Application Package
 
 > **Role:** Package technical reference. **Canonical concept owner:**
-> [Protected evaluation context](../../../docs/protected-evaluation-context.md).
+> [Protected evaluation](../../../docs/concepts/scientific-lifecycle/protected-evaluation.md).
 > **Contributor entry:** [Contributor documentation](../../../docs/development/index.md).
 > **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
 

@@ -1,7 +1,7 @@
 # Session Resume and Retrieval Workflow
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Context reconstruction and continuity](../context-reconstruction-and-continuity.md).
+> [Context continuity and resume](../concepts/context/continuity-and-resume.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
@@ -11,14 +11,14 @@
 > resume bootstrap exists.
 
 The canonical owner is
-[Context reconstruction and continuity](../context-reconstruction-and-continuity.md);
-[Retrieval and context type safety](../retrieval-and-context-type-safety.md)
+[Context continuity and resume](../concepts/context/continuity-and-resume.md);
+[Context type safety and retrieval](../concepts/context/context-type-safety.md)
 owns admissibility;
-[Retrieval strategy and scaling](../retrieval-strategy-and-scaling.md)
+[Retrieval strategy](../concepts/context/retrieval-strategy.md)
 owns ranking and budget decisions;
-[SessionFrame scaling and resume boundary](../session-frame-scaling-and-resume-boundary.md)
+[SessionFrame scaling and resume limits](../concepts/context/session-frame-scaling.md)
 owns selection and checkpoint limits; and
-[Invalidation and active retrieval](../invalidation-and-active-retrieval.md)
+[Active retrieval after invalidation](../concepts/validity/active-retrieval-after-invalidation.md)
 owns validity-change consequences. This page retains the compact technical
 sequence.
 

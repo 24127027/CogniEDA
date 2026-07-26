@@ -1,7 +1,7 @@
 # Retrieval and SessionFrame
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Retrieval and context type safety](../retrieval-and-context-type-safety.md).
+> [Context type safety and retrieval](../concepts/context/context-type-safety.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
@@ -10,12 +10,12 @@
 > **Partially implemented**.
 
 Canonical reader explanations:
-[SessionFrame and active context](../session-frame-and-active-context.md),
-[Retrieval and context type safety](../retrieval-and-context-type-safety.md),
-[Retrieval strategy and scaling](../retrieval-strategy-and-scaling.md),
-[Context reconstruction and continuity](../context-reconstruction-and-continuity.md),
-[SessionFrame scaling and resume boundary](../session-frame-scaling-and-resume-boundary.md), and
-[Invalidation and active retrieval](../invalidation-and-active-retrieval.md).
+[SessionFrame and active context](../concepts/context/session-frame.md),
+[Context type safety and retrieval](../concepts/context/context-type-safety.md),
+[Retrieval strategy](../concepts/context/retrieval-strategy.md),
+[Context continuity and resume](../concepts/context/continuity-and-resume.md),
+[SessionFrame scaling and resume limits](../concepts/context/session-frame-scaling.md), and
+[Active retrieval after invalidation](../concepts/validity/active-retrieval-after-invalidation.md).
 This page retains the concise source-oriented reference.
 
 ## Current SessionFrame behavior
@@ -38,7 +38,7 @@ Evidence, stale caches, and superseded frames are excluded as defined by `retrie
 
 The protected Hypothesis Analyst path does not consume SessionFrame projections; it uses the
 closed repository-built bundle described in
-[Protected evaluation context](../protected-evaluation-context.md). Current production
+[Protected evaluation](../concepts/scientific-lifecycle/protected-evaluation.md). Current production
 `SessionContextBuilder` call sites request Planning Context only.
 
 ## Discovery retrieval

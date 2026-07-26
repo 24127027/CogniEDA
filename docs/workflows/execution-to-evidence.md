@@ -1,7 +1,7 @@
 # Execution-to-Evidence Workflow
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [From execution to Discovery](../from-execution-to-discovery.md).
+> [Execution to Discovery](../concepts/scientific-lifecycle/execution-to-discovery.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
@@ -10,10 +10,10 @@
 > shipped.
 
 The reader-first workflow is
-[From execution to Discovery](../from-execution-to-discovery.md), and the
-authority rationale is [Scientific authority](../scientific-authority.md).
+[Execution to Discovery](../concepts/scientific-lifecycle/execution-to-discovery.md), and the
+authority rationale is [Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md).
 The preceding approval boundary is
-[From user request to approved operation](../from-user-request-to-approved-operation.md).
+[Operation approval workflows](../operations/operation-approval-workflows.md).
 This page retains the technical execution-to-Evidence sequence.
 
 ## Transaction sequence

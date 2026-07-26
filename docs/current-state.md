@@ -272,4 +272,4 @@ exit criteria.
 For technical detail, continue with the
 [architecture overview](architecture/overview.md), the
 [implementation gap analysis](architecture/implementation-gap-analysis.md),
-and the [product surface boundary](product-surface-and-bootstrap-boundary.md).
+and the [product surface boundary](operations/product-bootstrap.md).

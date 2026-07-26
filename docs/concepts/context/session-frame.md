@@ -99,8 +99,8 @@ content. Its transaction may change lifecycle metadata on an affected frame to
 superseded and append a stale marker. That removes the frame from
 latest-active selection without deleting its historical snapshot. The
 transaction and temporal-authority model are owned by
-[Validity over time](validity-over-time.md) and
-[Atomic validity propagation](atomic-validity-propagation.md).
+[Validity over time](../validity/validity-over-time.md) and
+[Atomic validity propagation](../validity/validity-propagation.md).
 
 ## How frames are assembled today
 
@@ -163,7 +163,7 @@ This scenario is classified **safe but under-enforced**: active scientific
 authority is protected, while direct-reference stale marking is **Implemented**,
 pin-only frame freshness is a **Known deviation**, and automatic successor
 creation and user-facing notification are **Unsupported**. See
-[Invalidation and active retrieval](invalidation-and-active-retrieval.md) for
+[Active retrieval after invalidation](../validity/active-retrieval-after-invalidation.md) for
 the complete authority-versus-freshness review.
 
 ## One frame, several context modes
@@ -184,7 +184,7 @@ exercised as policy helpers and tests; the answer Planner nodes remain
 scaffold-level, and the generic scientific-sounding projections must never be
 passed to the Hypothesis Analyst.
 
-[Protected evaluation context](protected-evaluation-context.md) owns the closed
+[Protected evaluation](../scientific-lifecycle/protected-evaluation.md) owns the closed
 scientific boundary. It rebuilds canonical state from repositories and excludes
 SessionFrames, pins, Assumptions, prior Discoveries, chat, and generic context
 bags.
@@ -232,9 +232,9 @@ wrong epistemic types outside the operation before relevance is considered.
 
 Why user-governed active context remains separate from scientific authority is
 summarized in
-[Design decisions and tradeoffs](design-decisions-and-tradeoffs.md#17-user-governed-active-context).
+[Design decisions and tradeoffs](../../design-decisions/index.md#17-user-governed-active-context).
 The historical-retention consequences of stale frames are preserved in
-[ADR-005](decisions/ADR-005-atomic-validity-propagation.md).
+[ADR-005](../../decisions/ADR-005-atomic-validity-propagation.md).
 
 ## Implementation orientation
 
@@ -249,9 +249,9 @@ Focused verification is under `tests/memory/`, `tests/agents/planner/`,
 `tests/application/`, and `tests/repositories/`.
 
 Continue with
-[Retrieval and context type safety](retrieval-and-context-type-safety.md), then
-[Context reconstruction and continuity](context-reconstruction-and-continuity.md).
+[Context type safety and retrieval](context-type-safety.md), then
+[Context continuity and resume](continuity-and-resume.md).
 Selection, succession, checkpoint, and scaling limits are owned by
-[SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md).
+[SessionFrame scaling and resume limits](session-frame-scaling.md).
 Validity-change consequences continue in
-[Invalidation and active retrieval](invalidation-and-active-retrieval.md).
+[Active retrieval after invalidation](../validity/active-retrieval-after-invalidation.md).

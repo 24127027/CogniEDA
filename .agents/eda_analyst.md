@@ -1,7 +1,7 @@
 # EDA Analyst Agent
 
 > **Role:** Agent instruction. The governed analytical lifecycle is explained
-> by [From question to Discovery](../docs/from-question-to-discovery.md), its
+> by [Investigation lifecycle](../docs/concepts/research-state/investigation-lifecycle.md), its
 > current product boundary by [CogniEDA current state](../docs/current-state.md),
 > and its source-change guidance by
 > [Contributor documentation](../docs/development/index.md).

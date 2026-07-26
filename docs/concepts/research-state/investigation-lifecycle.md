@@ -1,4 +1,4 @@
-# From question to Discovery
+# Investigation lifecycle
 
 This page follows one investigation from research intent to durable,
 evidence-bound knowledge. It distinguishes the conceptual architecture from the
@@ -12,11 +12,11 @@ The running question is:
 > time associated with 90-day churn?
 
 The execution-through-admission portion is expanded in
-[From execution to Discovery](from-execution-to-discovery.md). Its three
+[Execution to Discovery](../scientific-lifecycle/execution-to-discovery.md). Its three
 load-bearing mechanisms are owned by
-[Scientific authority](scientific-authority.md),
-[Protected evaluation context](protected-evaluation-context.md), and
-[Governance and Discovery admission](governance-and-discovery-admission.md).
+[Scientific authority](../scientific-lifecycle/scientific-authority.md),
+[Protected evaluation](../scientific-lifecycle/protected-evaluation.md), and
+[Discovery governance and admission](../scientific-lifecycle/discovery-governance-and-admission.md).
 
 ## The whole path
 
@@ -349,7 +349,7 @@ is not yet present.
 projections are **Implemented**; the user-facing experience is
 **Partially implemented**.
 
-See [SessionFrame and active context](session-frame-and-active-context.md) for
+See [SessionFrame and active context](../context/session-frame.md) for
 snapshot, pin, exclusion, and authority semantics.
 
 ## 12. Active retrieval uses validity before relevance
@@ -371,7 +371,7 @@ operation-scope filtering is a **Known deviation**.
 lexical scoring are **Implemented**. Graph Miner and a persistent
 semantic/vector index are **Deferred**.
 
-See [Retrieval and context type safety](retrieval-and-context-type-safety.md)
+See [Context type safety and retrieval](../context/context-type-safety.md)
 for the source-grounded pipeline and invariant classifications.
 
 ## 13. Validity propagation keeps history but removes authority
@@ -400,8 +400,8 @@ allow-listed.
 distributed propagation are **Unsupported**.
 
 The full temporal-authority rationale and transaction mechanics are
-[Validity over time](validity-over-time.md) and
-[Atomic validity propagation](atomic-validity-propagation.md).
+[Validity over time](../validity/validity-over-time.md) and
+[Atomic validity propagation](../validity/validity-propagation.md).
 
 ## Where assumptions are allowed
 
@@ -442,7 +442,7 @@ claim. `GeneratedView` and the complete Planner answer path remain a
 provide a complete user-facing generated-view workflow.
 
 The reconstruction and parent-answer boundary is owned by
-[Context reconstruction and continuity](context-reconstruction-and-continuity.md).
+[Context continuity and resume](../context/continuity-and-resume.md).
 
 ### Implementation orientation
 

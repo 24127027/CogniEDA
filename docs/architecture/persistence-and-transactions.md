@@ -1,7 +1,7 @@
 # Persistence and Transactions
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Persistence and transaction ownership](../persistence-and-transaction-ownership.md).
+> [Persistence and transactions](../operations/persistence-and-transactions.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
@@ -9,11 +9,11 @@
 > and trigger guarantees **Verified on SQLite**.
 
 The reader-first Discovery transaction explanation is
-[Governance and Discovery admission](../governance-and-discovery-admission.md).
+[Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md).
 The validity transaction explanation is
-[Atomic validity propagation](../atomic-validity-propagation.md).
+[Atomic validity propagation](../concepts/validity/validity-propagation.md).
 The canonical operational ownership explanation is
-[Persistence and transaction ownership](../persistence-and-transaction-ownership.md).
+[Persistence and transactions](../operations/persistence-and-transactions.md).
 This page retains package-level commit ownership and write sets.
 
 ## Layer separation

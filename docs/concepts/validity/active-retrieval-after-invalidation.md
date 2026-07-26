@@ -1,4 +1,4 @@
-# Invalidation and active retrieval
+# Active retrieval after invalidation
 
 Validity propagation and retrieval solve different halves of the same safety
 problem:
@@ -239,12 +239,12 @@ opening, restored chat, durable Planner checkpoints, user-specific latest-frame
 selection, and guided remediation remain incomplete or unsupported.
 
 Continue with
-[From validity change to reconstructed context](from-validity-change-to-reconstructed-context.md)
+[From validity change to active context](validity-change-to-active-context.md)
 for the running churn workflow. The broader SessionFrame and ranking contracts
 remain owned by
-[SessionFrame and active context](session-frame-and-active-context.md),
-[Retrieval and context type safety](retrieval-and-context-type-safety.md), and
-[Context reconstruction and continuity](context-reconstruction-and-continuity.md).
+[SessionFrame and active context](../context/session-frame.md),
+[Context type safety and retrieval](../context/context-type-safety.md), and
+[Context continuity and resume](../context/continuity-and-resume.md).
 
 ## Implementation orientation
 

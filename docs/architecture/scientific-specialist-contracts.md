@@ -1,16 +1,16 @@
 # Scientific Specialist Contracts
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Scientific authority](../scientific-authority.md).
+> [Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
 > **Implementation status:** protected specialist boundaries **Implemented**;
 > concrete production adapters **Unsupported**.
 
-The canonical rationale is [Scientific authority](../scientific-authority.md);
+The canonical rationale is [Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md);
 the closed-input explanation is
-[Protected evaluation context](../protected-evaluation-context.md). This page
+[Protected evaluation](../concepts/scientific-lifecycle/protected-evaluation.md). This page
 retains the compact contract matrix for implementers.
 
 ## Authority matrix

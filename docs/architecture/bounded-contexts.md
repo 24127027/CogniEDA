@@ -1,7 +1,7 @@
 # Bounded Contexts
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Runtime and composition boundary](../runtime-and-composition-boundary.md).
+> [Runtime composition](../operations/runtime-composition.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
@@ -10,14 +10,14 @@
 > **Verified on SQLite**.
 
 The canonical authority explanation is
-[Scientific authority](../scientific-authority.md). Runtime and persistence
+[Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md). Runtime and persistence
 ownership are explained by
-[Runtime and composition boundary](../runtime-and-composition-boundary.md) and
-[Persistence and transaction ownership](../persistence-and-transaction-ownership.md).
+[Runtime composition](../operations/runtime-composition.md) and
+[Persistence and transactions](../operations/persistence-and-transactions.md).
 Planner coordination is owned by
-[Planner boundary and operation model](../planner-boundary-and-operation-model.md);
+[Planner operations and approvals](../operations/planner-and-approvals.md);
 product-process absence is owned by
-[Product surface and bootstrap boundary](../product-surface-and-bootstrap-boundary.md).
+[Product bootstrap](../operations/product-bootstrap.md).
 This page retains the package and dependency map for contributors.
 
 ## Current package map

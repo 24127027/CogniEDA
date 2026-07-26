@@ -1,4 +1,4 @@
-# Governance and Discovery admission
+# Discovery governance and admission
 
 A valid `DiscoveryProposal` is still not durable scientific knowledge.
 CogniEDA requires an independently authorized decision and one all-or-nothing
@@ -165,7 +165,7 @@ belong to one SQLite transaction and must either all commit or all roll back.
 The conclusion SessionFrame is appended for continuity and points to the
 admitted Discovery and supporting Evidence. It is not an evaluation input and
 does not author the claim. Its later context role is explained in
-[SessionFrame and active context](session-frame-and-active-context.md).
+[SessionFrame and active context](../context/session-frame.md).
 
 ## Why partial commits would corrupt research state
 
@@ -376,10 +376,10 @@ boundary.
 
 The epistemic reason for independent governance, exact proposal-copy, and one
 admission transaction is summarized in
-[Design decisions and tradeoffs](design-decisions-and-tradeoffs.md).
-[ADR-003](decisions/ADR-003-specialist-scientific-authority.md) owns authority
+[Design decisions and tradeoffs](../../design-decisions/index.md).
+[ADR-003](../../decisions/ADR-003-specialist-scientific-authority.md) owns authority
 separation, and
-[ADR-004](decisions/ADR-004-atomic-discovery-admission.md) owns atomic
+[ADR-004](../../decisions/ADR-004-atomic-discovery-admission.md) owns atomic
 materialization.
 
 ## Implementation orientation
@@ -396,4 +396,4 @@ Focused verification is under `tests/application/governance/` and
 `tests/application/discovery/`.
 
 For the full scientific handoff, read
-[From execution to Discovery](from-execution-to-discovery.md).
+[Execution to Discovery](execution-to-discovery.md).

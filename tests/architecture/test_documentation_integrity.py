@@ -14,50 +14,59 @@ ROOT_README = Path("README.md")
 PHASE_1_CANONICAL_PAGES = (
     DOCS_ROOT / "what-is-cognieda.md",
     DOCS_ROOT / "problem-and-thesis.md",
-    DOCS_ROOT / "research-state-model.md",
-    DOCS_ROOT / "from-question-to-discovery.md",
+    DOCS_ROOT / "concepts" / "research-state" / "objects-and-roles.md",
+    DOCS_ROOT / "concepts" / "research-state" / "investigation-lifecycle.md",
 )
 PHASE_4A_CANONICAL_PAGES = (
     DOCS_ROOT / "current-state.md",
     DOCS_ROOT / "capability-and-maturity-map.md",
     DOCS_ROOT / "roadmap.md",
 )
-PHASE_3A_CANONICAL_PAGES = (DOCS_ROOT / "design-decisions-and-tradeoffs.md",)
+PHASE_3A_CANONICAL_PAGES = (DOCS_ROOT / "design-decisions" / "index.md",)
 PHASE_2A_CANONICAL_PAGES = (
-    DOCS_ROOT / "scientific-authority.md",
-    DOCS_ROOT / "protected-evaluation-context.md",
-    DOCS_ROOT / "governance-and-discovery-admission.md",
-    DOCS_ROOT / "from-execution-to-discovery.md",
+    DOCS_ROOT / "concepts" / "scientific-lifecycle" / "scientific-authority.md",
+    DOCS_ROOT / "concepts" / "scientific-lifecycle" / "protected-evaluation.md",
+    DOCS_ROOT
+    / "concepts"
+    / "scientific-lifecycle"
+    / "discovery-governance-and-admission.md",
+    DOCS_ROOT
+    / "concepts"
+    / "scientific-lifecycle"
+    / "execution-to-discovery.md",
 )
 PHASE_2B1_CANONICAL_PAGES = (
-    DOCS_ROOT / "session-frame-and-active-context.md",
-    DOCS_ROOT / "retrieval-and-context-type-safety.md",
-    DOCS_ROOT / "context-reconstruction-and-continuity.md",
-    DOCS_ROOT / "from-research-state-to-active-context.md",
+    DOCS_ROOT / "concepts" / "context" / "session-frame.md",
+    DOCS_ROOT / "concepts" / "context" / "context-type-safety.md",
+    DOCS_ROOT / "concepts" / "context" / "continuity-and-resume.md",
+    DOCS_ROOT / "concepts" / "context" / "building-active-context.md",
 )
 PHASE_2B2_CANONICAL_PAGES = (
-    DOCS_ROOT / "validity-over-time.md",
-    DOCS_ROOT / "atomic-validity-propagation.md",
-    DOCS_ROOT / "invalidation-and-active-retrieval.md",
-    DOCS_ROOT / "from-validity-change-to-reconstructed-context.md",
+    DOCS_ROOT / "concepts" / "validity" / "validity-over-time.md",
+    DOCS_ROOT / "concepts" / "validity" / "validity-propagation.md",
+    DOCS_ROOT
+    / "concepts"
+    / "validity"
+    / "active-retrieval-after-invalidation.md",
+    DOCS_ROOT / "concepts" / "validity" / "validity-change-to-active-context.md",
 )
 PHASE_2B_CANONICAL_PAGES = (
     *PHASE_2B1_CANONICAL_PAGES,
     *PHASE_2B2_CANONICAL_PAGES,
 )
 PHASE_3B1_CANONICAL_PAGES = (
-    DOCS_ROOT / "runtime-and-composition-boundary.md",
-    DOCS_ROOT / "persistence-and-transaction-ownership.md",
-    DOCS_ROOT / "sqlite-boundary-and-portability.md",
-    DOCS_ROOT / "database-initialization-and-migrations.md",
-    DOCS_ROOT / "from-runtime-composition-to-atomic-persistence.md",
+    DOCS_ROOT / "operations" / "runtime-composition.md",
+    DOCS_ROOT / "operations" / "persistence-and-transactions.md",
+    DOCS_ROOT / "operations" / "sqlite-and-portability.md",
+    DOCS_ROOT / "operations" / "sqlite-and-migrations.md",
+    DOCS_ROOT / "operations" / "atomic-persistence-workflow.md",
 )
 PHASE_3B2_CANONICAL_PAGES = (
-    DOCS_ROOT / "planner-boundary-and-operation-model.md",
-    DOCS_ROOT / "from-user-request-to-approved-operation.md",
-    DOCS_ROOT / "retrieval-strategy-and-scaling.md",
-    DOCS_ROOT / "session-frame-scaling-and-resume-boundary.md",
-    DOCS_ROOT / "product-surface-and-bootstrap-boundary.md",
+    DOCS_ROOT / "operations" / "planner-and-approvals.md",
+    DOCS_ROOT / "operations" / "operation-approval-workflows.md",
+    DOCS_ROOT / "concepts" / "context" / "retrieval-strategy.md",
+    DOCS_ROOT / "concepts" / "context" / "session-frame-scaling.md",
+    DOCS_ROOT / "operations" / "product-bootstrap.md",
 )
 CORE_EPISTEMIC_ADRS = (
     DOCS_ROOT / "decisions" / "ADR-001-first-class-research-state.md",
@@ -128,6 +137,12 @@ CONTRIBUTOR_DOCUMENTATION_PAGES = (
     DOCS_ROOT / "development" / "testing.md",
     DOCS_ROOT / "development" / "setup.md",
 )
+ALL_CONTRIBUTOR_DOCUMENTATION_PAGES = (
+    *CONTRIBUTOR_DOCUMENTATION_PAGES,
+    DOCS_ROOT / "development" / "contributing.md",
+    DOCS_ROOT / "development" / "guideline.md",
+    DOCS_ROOT / "development" / "pull_request_template.md",
+)
 PHASE_4C_TECHNICAL_REFERENCE_PAGES = (
     *(DOCS_ROOT / "architecture" / name for name in (
         "bounded-contexts.md",
@@ -154,6 +169,123 @@ PHASE_4C_TECHNICAL_REFERENCE_PAGES = (
         "workspace-and-data-profile.md",
     )),
 )
+S4_2B_STABLE_CANONICAL_ENTRY_PATHS = (
+    DOCS_ROOT / "index.md",
+    DOCS_ROOT / "what-is-cognieda.md",
+    DOCS_ROOT / "problem-and-thesis.md",
+    DOCS_ROOT / "current-state.md",
+    DOCS_ROOT / "capability-and-maturity-map.md",
+    DOCS_ROOT / "roadmap.md",
+)
+S4_2B_OLD_CANONICAL_PATHS = (
+    DOCS_ROOT / "research-state-model.md",
+    DOCS_ROOT / "from-question-to-discovery.md",
+    DOCS_ROOT / "scientific-authority.md",
+    DOCS_ROOT / "protected-evaluation-context.md",
+    DOCS_ROOT / "governance-and-discovery-admission.md",
+    DOCS_ROOT / "from-execution-to-discovery.md",
+    DOCS_ROOT / "validity-over-time.md",
+    DOCS_ROOT / "atomic-validity-propagation.md",
+    DOCS_ROOT / "invalidation-and-active-retrieval.md",
+    DOCS_ROOT / "from-validity-change-to-reconstructed-context.md",
+    DOCS_ROOT / "session-frame-and-active-context.md",
+    DOCS_ROOT / "retrieval-and-context-type-safety.md",
+    DOCS_ROOT / "retrieval-strategy-and-scaling.md",
+    DOCS_ROOT / "context-reconstruction-and-continuity.md",
+    DOCS_ROOT / "session-frame-scaling-and-resume-boundary.md",
+    DOCS_ROOT / "from-research-state-to-active-context.md",
+    DOCS_ROOT / "planner-boundary-and-operation-model.md",
+    DOCS_ROOT / "from-user-request-to-approved-operation.md",
+    DOCS_ROOT / "runtime-and-composition-boundary.md",
+    DOCS_ROOT / "product-surface-and-bootstrap-boundary.md",
+    DOCS_ROOT / "persistence-and-transaction-ownership.md",
+    DOCS_ROOT / "sqlite-boundary-and-portability.md",
+    DOCS_ROOT / "database-initialization-and-migrations.md",
+    DOCS_ROOT / "from-runtime-composition-to-atomic-persistence.md",
+    DOCS_ROOT / "design-decisions-and-tradeoffs.md",
+)
+S4_2B_MOVED_CANONICAL_H1 = {
+    DOCS_ROOT
+    / "concepts"
+    / "research-state"
+    / "objects-and-roles.md": "Research-state objects and roles",
+    DOCS_ROOT
+    / "concepts"
+    / "research-state"
+    / "investigation-lifecycle.md": "Investigation lifecycle",
+    DOCS_ROOT
+    / "concepts"
+    / "scientific-lifecycle"
+    / "scientific-authority.md": "Scientific authority",
+    DOCS_ROOT
+    / "concepts"
+    / "scientific-lifecycle"
+    / "protected-evaluation.md": "Protected evaluation",
+    DOCS_ROOT
+    / "concepts"
+    / "scientific-lifecycle"
+    / "discovery-governance-and-admission.md": "Discovery governance and admission",
+    DOCS_ROOT
+    / "concepts"
+    / "scientific-lifecycle"
+    / "execution-to-discovery.md": "Execution to Discovery",
+    DOCS_ROOT / "concepts" / "validity" / "validity-over-time.md": "Validity over time",
+    DOCS_ROOT
+    / "concepts"
+    / "validity"
+    / "validity-propagation.md": "Atomic validity propagation",
+    DOCS_ROOT
+    / "concepts"
+    / "validity"
+    / "active-retrieval-after-invalidation.md": "Active retrieval after invalidation",
+    DOCS_ROOT
+    / "concepts"
+    / "validity"
+    / "validity-change-to-active-context.md": "From validity change to active context",
+    DOCS_ROOT
+    / "concepts"
+    / "context"
+    / "session-frame.md": "SessionFrame and active context",
+    DOCS_ROOT
+    / "concepts"
+    / "context"
+    / "context-type-safety.md": "Context type safety and retrieval",
+    DOCS_ROOT
+    / "concepts"
+    / "context"
+    / "retrieval-strategy.md": "Retrieval strategy",
+    DOCS_ROOT
+    / "concepts"
+    / "context"
+    / "continuity-and-resume.md": "Context continuity and resume",
+    DOCS_ROOT
+    / "concepts"
+    / "context"
+    / "session-frame-scaling.md": "SessionFrame scaling and resume limits",
+    DOCS_ROOT
+    / "concepts"
+    / "context"
+    / "building-active-context.md": "Building active context from research state",
+    DOCS_ROOT
+    / "operations"
+    / "planner-and-approvals.md": "Planner operations and approvals",
+    DOCS_ROOT
+    / "operations"
+    / "operation-approval-workflows.md": "Operation approval workflows",
+    DOCS_ROOT / "operations" / "runtime-composition.md": "Runtime composition",
+    DOCS_ROOT / "operations" / "product-bootstrap.md": "Product bootstrap",
+    DOCS_ROOT
+    / "operations"
+    / "persistence-and-transactions.md": "Persistence and transactions",
+    DOCS_ROOT / "operations" / "sqlite-and-portability.md": "SQLite and portability",
+    DOCS_ROOT
+    / "operations"
+    / "sqlite-and-migrations.md": "SQLite initialization and migrations",
+    DOCS_ROOT
+    / "operations"
+    / "atomic-persistence-workflow.md": "Atomic persistence workflow",
+    DOCS_ROOT / "design-decisions" / "index.md": "Design decisions and tradeoffs",
+}
 CANONICAL_FOUNDATION = (ROOT_README, DOCS_ROOT / "index.md", *CANONICAL_READER_PAGES)
 READER_FACING_CURRENT_STATE_PAGES = (
     DOCS_ROOT / "project-purpose.md",
@@ -399,6 +531,84 @@ def test_docs_index_exposes_exact_canonical_journey() -> None:
     assert not unexpected, f"docs/index.md has unclassified Markdown links: {unexpected}"
 
 
+def test_s4_2b_canonical_structure_matches_approved_intermediate_state() -> None:
+    """S4.2B must move only canonical pages and classify every docs page once."""
+
+    transition_page = DOCS_ROOT / "project-purpose.md"
+    expected_docs = {
+        *S4_2B_STABLE_CANONICAL_ENTRY_PATHS,
+        *CANONICAL_READER_PAGES,
+        *ALL_CONTRIBUTOR_DOCUMENTATION_PAGES,
+        *COMPLETE_DECISION_ANATOMY_ADRS,
+        *PHASE_4C_TECHNICAL_REFERENCE_PAGES,
+        transition_page,
+    }
+    actual_docs = set(DOCS_ROOT.rglob("*.md"))
+
+    assert len(S4_2B_STABLE_CANONICAL_ENTRY_PATHS) == 6
+    assert all(path.parent == DOCS_ROOT for path in S4_2B_STABLE_CANONICAL_ENTRY_PATHS)
+    assert all(path.exists() for path in S4_2B_STABLE_CANONICAL_ENTRY_PATHS)
+    assert len(CANONICAL_READER_PAGES) == 30
+    assert len(set(CANONICAL_READER_PAGES)) == 30
+    assert set(S4_2B_MOVED_CANONICAL_H1) == (
+        set(CANONICAL_READER_PAGES)
+        - set(S4_2B_STABLE_CANONICAL_ENTRY_PATHS[1:])
+    )
+    assert not [path for path in S4_2B_OLD_CANONICAL_PATHS if path.exists()]
+    assert actual_docs == expected_docs, (
+        "S4.2B docs classification drifted; "
+        f"missing={sorted(expected_docs - actual_docs)}; "
+        f"unexpected={sorted(actual_docs - expected_docs)}"
+    )
+
+
+def test_s4_2b_moved_canonical_titles_match_manifest() -> None:
+    """Every moved canonical page must expose its approved S4.2A H1."""
+
+    mismatches = []
+    for path, expected_h1 in S4_2B_MOVED_CANONICAL_H1.items():
+        first_line = path.read_text(encoding="utf-8").splitlines()[0]
+        if first_line != f"# {expected_h1}":
+            mismatches.append(
+                f"{path.as_posix()}: expected '# {expected_h1}', got {first_line!r}"
+            )
+    assert not mismatches, "S4.2B canonical H1 drift:\n" + "\n".join(mismatches)
+
+
+def test_s4_2b_preserves_deferred_documentation_classifications() -> None:
+    """Decision, contributor, and reference moves remain deferred to S4.2C."""
+
+    transition_page = DOCS_ROOT / "project-purpose.md"
+    legacy_pages = {
+        path
+        for path in DOCS_ROOT.rglob("*.md")
+        if "This legacy entry point is retained" in path.read_text(encoding="utf-8")
+    }
+    decision_guide_files = set((DOCS_ROOT / "design-decisions").glob("*.md"))
+    decision_record_files = set((DOCS_ROOT / "decisions").glob("*.md"))
+    architecture_files = set((DOCS_ROOT / "architecture").glob("*.md"))
+    workflow_files = set((DOCS_ROOT / "workflows").glob("*.md"))
+
+    assert legacy_pages == {transition_page}
+    assert decision_guide_files == {PHASE_3A_CANONICAL_PAGES[0]}
+    assert decision_record_files == set(COMPLETE_DECISION_ANATOMY_ADRS)
+    assert all(
+        path.parent == DOCS_ROOT / "development"
+        for path in ALL_CONTRIBUTOR_DOCUMENTATION_PAGES
+    )
+    assert set(ALL_CONTRIBUTOR_DOCUMENTATION_PAGES) <= set(DOCS_ROOT.rglob("*.md"))
+    assert architecture_files == {
+        path
+        for path in PHASE_4C_TECHNICAL_REFERENCE_PAGES
+        if path.parent == DOCS_ROOT / "architecture"
+    }
+    assert workflow_files == {
+        path
+        for path in PHASE_4C_TECHNICAL_REFERENCE_PAGES
+        if path.parent == DOCS_ROOT / "workflows"
+    }
+
+
 def test_contributor_docs_are_separate_and_preserve_core_boundaries() -> None:
     """Contributor navigation must not join the conceptual journey or weaken ownership."""
 
@@ -468,9 +678,9 @@ def test_current_execution_docs_do_not_claim_supported_hypothesis_reuse() -> Non
     """The documented supported path must stop at the current reuse failure."""
 
     execution_pages = (
-        DOCS_ROOT / "research-state-model.md",
-        DOCS_ROOT / "from-question-to-discovery.md",
-        DOCS_ROOT / "from-execution-to-discovery.md",
+        PHASE_1_CANONICAL_PAGES[2],
+        PHASE_1_CANONICAL_PAGES[3],
+        PHASE_2A_CANONICAL_PAGES[3],
     )
     reuse_overclaim = re.compile(
         r"\bcreat(?:e|es|ed|ing)\s+or\s+reus(?:e|es|ed|ing)\b",
@@ -832,9 +1042,7 @@ def test_tracked_docs_preserve_at_most_one_scientific_cardinality() -> None:
     workflow = (DOCS_ROOT / "workflows" / "task-to-hypothesis.md").read_text(
         encoding="utf-8"
     )
-    canonical_model = (DOCS_ROOT / "research-state-model.md").read_text(
-        encoding="utf-8"
-    )
+    canonical_model = PHASE_1_CANONICAL_PAGES[2].read_text(encoding="utf-8")
     assert "generates at most one `Hypothesis`" in agent_guide
     assert "produces at most one `Discovery`" in agent_guide
     assert "has at most one Hypothesis" in workflow
@@ -926,9 +1134,7 @@ def test_checked_in_agent_capability_gap_is_documented_from_configuration() -> N
     has_gap = bool(missing_mcp or missing_skill_definitions)
 
     config_doc = Path("config/README.md").read_text(encoding="utf-8")
-    product_doc = PRODUCT_BOOTSTRAP_ADR.parent.parent.joinpath(
-        "product-surface-and-bootstrap-boundary.md"
-    ).read_text(encoding="utf-8")
+    product_doc = PHASE_3B2_CANONICAL_PAGES[4].read_text(encoding="utf-8")
     tools_doc = Path("src/tools/README.md").read_text(encoding="utf-8")
     phase_4a_docs = [
         page.read_text(encoding="utf-8") for page in PHASE_4A_CANONICAL_PAGES

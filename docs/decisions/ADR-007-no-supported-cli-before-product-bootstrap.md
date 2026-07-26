@@ -169,11 +169,11 @@ evaluation, historical retention, or active validity exclusion.
 
 ## Related canonical concepts
 
-- [Product surface and bootstrap boundary](../product-surface-and-bootstrap-boundary.md)
-- [Runtime and composition boundary](../runtime-and-composition-boundary.md)
-- [Planner boundary and operation model](../planner-boundary-and-operation-model.md)
-- [SessionFrame scaling and resume boundary](../session-frame-scaling-and-resume-boundary.md)
-- [Persistence and transaction ownership](../persistence-and-transaction-ownership.md)
+- [Product bootstrap](../operations/product-bootstrap.md)
+- [Runtime composition](../operations/runtime-composition.md)
+- [Planner operations and approvals](../operations/planner-and-approvals.md)
+- [SessionFrame scaling and resume limits](../concepts/context/session-frame-scaling.md)
+- [Persistence and transactions](../operations/persistence-and-transactions.md)
 
 ## Implementation orientation
 

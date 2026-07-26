@@ -1,4 +1,4 @@
-# Product surface and bootstrap boundary
+# Product bootstrap
 
 CogniEDA has an in-process application runtime. It does not yet have a supported
 product process.
@@ -10,7 +10,7 @@ product process.
 > restart-safe coordination are **Unsupported**. The seam toward a coherent
 > product slice is **Partially implemented**.
 
-[Runtime and composition boundary](runtime-and-composition-boundary.md) remains
+[Runtime composition](runtime-composition.md) remains
 the owner of runtime construction and injected dependencies. This page owns the
 difference between that library boundary and an operable product surface.
 
@@ -155,7 +155,7 @@ already exist. It becomes a product risk when service separation, multiple
 sessions or users, repeated approval types, or restart coordination make direct
 Planner repository composition hard to govern. That is the extraction trigger
 for the application facade described in
-[Planner boundary and operation model](planner-boundary-and-operation-model.md).
+[Planner operations and approvals](planner-and-approvals.md).
 
 The current documentation boundary is therefore non-blocking, while the absent
 adapters and bootstrap coordination remain product blockers.
@@ -180,11 +180,11 @@ governance.
 
 ## Related canonical concepts
 
-- [Runtime and composition boundary](runtime-and-composition-boundary.md)
-- [Planner boundary and operation model](planner-boundary-and-operation-model.md)
-- [SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md)
-- [Persistence and transaction ownership](persistence-and-transaction-ownership.md)
-- [ADR-007: no supported CLI before coherent product bootstrap](decisions/ADR-007-no-supported-cli-before-product-bootstrap.md)
+- [Runtime composition](runtime-composition.md)
+- [Planner operations and approvals](planner-and-approvals.md)
+- [SessionFrame scaling and resume limits](../concepts/context/session-frame-scaling.md)
+- [Persistence and transactions](persistence-and-transactions.md)
+- [ADR-007: no supported CLI before coherent product bootstrap](../decisions/ADR-007-no-supported-cli-before-product-bootstrap.md)
 
 ## Implementation orientation
 

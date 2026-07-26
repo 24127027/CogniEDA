@@ -1,12 +1,12 @@
 # Validity Schemas (`schemas.validity`)
 
 > **Role:** Package technical reference. **Canonical concept owner:**
-> [Atomic validity propagation](../../../docs/atomic-validity-propagation.md).
+> [Atomic validity propagation](../../../docs/concepts/validity/validity-propagation.md).
 > **Contributor entry:** [Contributor documentation](../../../docs/development/index.md).
 > **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
 
 Canonical transaction explanation:
-[Atomic validity propagation](../../../docs/atomic-validity-propagation.md).
+[Atomic validity propagation](../../../docs/concepts/validity/validity-propagation.md).
 
 ## Current implementation
 

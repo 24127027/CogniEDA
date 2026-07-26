@@ -1,4 +1,4 @@
-# SessionFrame scaling and resume boundary
+# SessionFrame scaling and resume limits
 
 A `SessionFrame` is an append-oriented projection of active research context.
 It helps a user or Planner reconstruct what should be visible next; it is not a
@@ -12,7 +12,7 @@ checkpoint.
 > Fully user-, session-, Objective-, and branch-scoped continuity is a **Design
 > target**.
 
-[SessionFrame and active context](session-frame-and-active-context.md) owns the
+[SessionFrame and active context](session-frame.md) owns the
 frame's epistemic role and user-governance rules. This page owns selection,
 succession, checkpoint, resume, freshness, and scaling limits.
 
@@ -181,11 +181,11 @@ scientific authority.
 
 ## Related canonical concepts
 
-- [SessionFrame and active context](session-frame-and-active-context.md)
-- [Context reconstruction and continuity](context-reconstruction-and-continuity.md)
-- [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md)
-- [From research state to active context](from-research-state-to-active-context.md)
-- [Product surface and bootstrap boundary](product-surface-and-bootstrap-boundary.md)
+- [SessionFrame and active context](session-frame.md)
+- [Context continuity and resume](continuity-and-resume.md)
+- [Retrieval strategy](retrieval-strategy.md)
+- [Building active context from research state](building-active-context.md)
+- [Product bootstrap](../../operations/product-bootstrap.md)
 
 ## Implementation orientation
 

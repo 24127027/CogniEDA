@@ -269,16 +269,16 @@ planning, all-or-nothing propagation, immutable provenance, historical
 retention, and active exclusion.
 
 Continue with
-[Atomic validity propagation](atomic-validity-propagation.md) for transaction,
+[Atomic validity propagation](validity-propagation.md) for transaction,
 fingerprint, replay, and concurrency mechanics, then
-[Invalidation and active retrieval](invalidation-and-active-retrieval.md) for
+[Active retrieval after invalidation](active-retrieval-after-invalidation.md) for
 the authority boundary at read time.
 
 ## Related decision rationale
 
 The tradeoff between retained history and active exclusion is summarized in
-[Design decisions and tradeoffs](design-decisions-and-tradeoffs.md#15-historical-retention-and-active-exclusion).
-[ADR-005](decisions/ADR-005-atomic-validity-propagation.md) records the atomic
+[Design decisions and tradeoffs](../../design-decisions/index.md#15-historical-retention-and-active-exclusion).
+[ADR-005](../../decisions/ADR-005-atomic-validity-propagation.md) records the atomic
 validity decision and its redesign constraints.
 
 ## Implementation orientation

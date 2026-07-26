@@ -1,4 +1,4 @@
-# Retrieval and context type safety
+# Context type safety and retrieval
 
 Retrieval in CogniEDA is not “find similar text and inject it into a prompt.”
 It is the governed selection of typed research state that is currently allowed
@@ -189,8 +189,8 @@ Evidence loses authority.
 7. No successor frame or user-facing conflict notice is created automatically.
 8. The validity transaction owns the scientific lifecycle change; its complete
    propagation and recovery semantics are described in
-   [Atomic validity propagation](atomic-validity-propagation.md) and
-   [Invalidation and active retrieval](invalidation-and-active-retrieval.md).
+   [Atomic validity propagation](../validity/validity-propagation.md) and
+   [Active retrieval after invalidation](../validity/active-retrieval-after-invalidation.md).
 
 Classification:
 
@@ -268,7 +268,7 @@ repositories; current Planner call sites are under `src/agents/planner/`.
 Focused verification is under `tests/memory/`, `tests/architecture/`,
 `tests/application/`, and `tests/e2e/`.
 
-Return to [SessionFrame and active context](session-frame-and-active-context.md),
-continue to [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md)
+Return to [SessionFrame and active context](session-frame.md),
+continue to [Retrieval strategy](retrieval-strategy.md)
 for ranking, budget, and scaling decisions, or continue to
-[Context reconstruction and continuity](context-reconstruction-and-continuity.md).
+[Context continuity and resume](continuity-and-resume.md).

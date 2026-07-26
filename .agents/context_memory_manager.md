@@ -1,7 +1,7 @@
 # Context Memory Manager Agent
 
 > **Role:** Agent instruction. The conceptual owner for `SessionFrame` is
-> [SessionFrame and active context](../docs/session-frame-and-active-context.md);
+> [SessionFrame and active context](../docs/concepts/context/session-frame.md);
 > current limitations belong to [CogniEDA current state](../docs/current-state.md),
 > and change navigation begins at
 > [Contributor documentation](../docs/development/index.md).

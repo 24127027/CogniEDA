@@ -1,10 +1,10 @@
-# From research state to active context
+# Building active context from research state
 
 This workflow follows the running churn investigation from durable research
 state to one bounded reasoning context. It applies the concepts owned by
-[SessionFrame and active context](session-frame-and-active-context.md),
-[Retrieval and context type safety](retrieval-and-context-type-safety.md), and
-[Context reconstruction and continuity](context-reconstruction-and-continuity.md).
+[SessionFrame and active context](session-frame.md),
+[Context type safety and retrieval](context-type-safety.md), and
+[Context continuity and resume](continuity-and-resume.md).
 
 > **Implementation status:** the Planning Context, bounded Discovery retrieval,
 > lifecycle exclusion, profile-aware motivation eligibility, pins, exclusions,
@@ -70,7 +70,7 @@ Current answer policy exists, but the Planner answer path is
 If the operation is protected scientific evaluation, SessionFrame context is
 not used at all. The application rebuilds Protected Conclusion Context from
 authoritative repositories as described in
-[Protected evaluation context](protected-evaluation-context.md).
+[Protected evaluation](../scientific-lifecycle/protected-evaluation.md).
 
 ## 2. The selected SessionFrame is checked
 
@@ -251,7 +251,7 @@ answer product are a **Design target**.
   retrieval, and multi-user context governance.
 
 The validity-change continuation is
-[From validity change to reconstructed context](from-validity-change-to-reconstructed-context.md).
+[From validity change to active context](../validity/validity-change-to-active-context.md).
 
 ## Implementation orientation
 

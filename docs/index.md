@@ -20,108 +20,108 @@ Follow the tracks in order. Within a track, read top to bottom.
    the project thesis, the running example, and the current maturity boundary.
 2. [Problem and thesis](problem-and-thesis.md) examines the failure modes that
    motivate governed research state and the tradeoffs of the design response.
-
-### Current state and roadmap
-
-1. [CogniEDA current state](current-state.md) states the canonical maturity
+3. [CogniEDA current state](current-state.md) states the canonical maturity
    boundary: what works in process, what remains partial, and what is
    unsupported.
-2. [Capability and maturity map](capability-and-maturity-map.md) compares the
+4. [Capability and maturity map](capability-and-maturity-map.md) compares the
    implemented infrastructure, incomplete workflows, known deviations, and
    product consequences by domain.
-3. [Dependency-driven roadmap](roadmap.md) classifies the blockers and
+5. [Dependency-driven roadmap](roadmap.md) classifies the blockers and
    observable exit criteria for one coherent product slice and later
    trigger-based work.
 
 ### Research-state model
 
-1. [Research-state model](research-state-model.md) explains the durable objects,
+1. [Research-state objects and roles](concepts/research-state/objects-and-roles.md) explains the durable objects,
    non-FCO records, epistemic roles, lifecycle rules, and cardinality limits.
-2. [From question to Discovery](from-question-to-discovery.md) follows one
+2. [Investigation lifecycle](concepts/research-state/investigation-lifecycle.md) follows one
    investigation end to end, showing where authority changes hands, where the
    user governs, and when state becomes durable.
 
-### Scientific validity and authority
+### Scientific lifecycle
 
-1. [Scientific authority](scientific-authority.md) explains why observation,
+1. [Scientific authority](concepts/scientific-lifecycle/scientific-authority.md) explains why observation,
    evaluation, governance, and materialization must remain separate.
-2. [Protected evaluation context](protected-evaluation-context.md) distinguishes
+2. [Protected evaluation](concepts/scientific-lifecycle/protected-evaluation.md) distinguishes
    planning context from the closed repository-built input allowed to support a
    scientific proposal.
-3. [Governance and Discovery admission](governance-and-discovery-admission.md)
+3. [Discovery governance and admission](concepts/scientific-lifecycle/discovery-governance-and-admission.md)
    explains exact authorization, proposal-copy, atomic admission, replay,
    fencing, conflict, and the SQLite verification boundary.
-4. [From execution to Discovery](from-execution-to-discovery.md) applies those
+4. [Execution to Discovery](concepts/scientific-lifecycle/execution-to-discovery.md) applies those
    mechanisms to the running example from an approved analytical Task through
    durable Discovery.
-5. [Validity over time](validity-over-time.md) explains why historical
+
+### Validity over time
+
+1. [Validity over time](concepts/validity/validity-over-time.md) explains why historical
    truth-to-record and current scientific authority must remain distinct.
-6. [Atomic validity propagation](atomic-validity-propagation.md) reconstructs
+2. [Atomic validity propagation](concepts/validity/validity-propagation.md) reconstructs
    the authorized command, fingerprints, deterministic plan, atomic write set,
    replay, conflicts, and SQLite concurrency boundary.
-7. [Invalidation and active retrieval](invalidation-and-active-retrieval.md)
+3. [Active retrieval after invalidation](concepts/validity/active-retrieval-after-invalidation.md)
    connects committed lifecycle changes to active exclusion, historical reads,
    pins, stale frames, and context-freshness limits.
-8. [From validity change to reconstructed context](from-validity-change-to-reconstructed-context.md)
+4. [From validity change to active context](concepts/validity/validity-change-to-active-context.md)
    follows the running example from an Evidence defect through later
    repository-current context.
 
 ### Context, retrieval, and continuity
 
-1. [SessionFrame and active context](session-frame-and-active-context.md)
+1. [SessionFrame and active context](concepts/context/session-frame.md)
    explains user-governed context selection, append-oriented snapshots, pins,
    exclusions, and the limits of frame authority.
-2. [Retrieval and context type safety](retrieval-and-context-type-safety.md)
+2. [Context type safety and retrieval](concepts/context/context-type-safety.md)
    reconstructs the validity-first retrieval boundary, current deterministic
    ranking, context modes, and known scope limitations.
-3. [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md) explains
+3. [Retrieval strategy](concepts/context/retrieval-strategy.md) explains
    the structural candidate pipeline, lexical ranking, result budget,
    revalidation limits, semantic deferral, and scaling triggers.
-4. [Context reconstruction and continuity](context-reconstruction-and-continuity.md)
+4. [Context continuity and resume](concepts/context/continuity-and-resume.md)
    separates durable research-state continuity from complete product-level
    session resume.
-5. [SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md)
+5. [SessionFrame scaling and resume limits](concepts/context/session-frame-scaling.md)
    distinguishes frame succession and durable workflow records from
    database-global selection and in-memory graph checkpointing.
-6. [From research state to active context](from-research-state-to-active-context.md)
+6. [Building active context from research state](concepts/context/building-active-context.md)
    applies those mechanisms to the running example.
 
 ### Operational architecture
 
-1. [Planner boundary and operation model](planner-boundary-and-operation-model.md)
+1. [Planner operations and approvals](operations/planner-and-approvals.md)
    separates request coordination, durable proposals, approval, resume, and
    commit delegation from scientific authority.
-2. [From user request to approved operation](from-user-request-to-approved-operation.md)
+2. [Operation approval workflows](operations/operation-approval-workflows.md)
    follows ordinary Task management and fresh execution-contract approval from
    raw request through commit or fail-closed revalidation.
-3. [Runtime and composition boundary](runtime-and-composition-boundary.md)
+3. [Runtime composition](operations/runtime-composition.md)
    explains the in-process composition root, deployment-supplied dependencies,
    runtime loader, and absent product surfaces.
-4. [Product surface and bootstrap boundary](product-surface-and-bootstrap-boundary.md)
+4. [Product bootstrap](operations/product-bootstrap.md)
    separates the in-process library runtime from unsupported product processes
    and defines the minimum coherent integration slice.
-5. [Persistence and transaction ownership](persistence-and-transaction-ownership.md)
+5. [Persistence and transactions](operations/persistence-and-transactions.md)
    separates schemas, repositories, physical models, and migrations while
    identifying the application owners of atomic durable changes.
-6. [SQLite boundary and portability](sqlite-boundary-and-portability.md) states
+6. [SQLite and portability](operations/sqlite-and-portability.md) states
    what is verified today, which mechanisms are SQLite-specific, and what
    another backend would need to prove.
-7. [Database initialization and migrations](database-initialization-and-migrations.md)
+7. [SQLite initialization and migrations](operations/sqlite-and-migrations.md)
    follows fresh initialization, existing-database upgrade, trigger
    installation, migration-history policy, and legacy quarantine.
-8. [From runtime composition to atomic persistence](from-runtime-composition-to-atomic-persistence.md)
+8. [Atomic persistence workflow](operations/atomic-persistence-workflow.md)
    applies those operational boundaries to one exact-copy Discovery-admission
    transaction.
 
 ### Design decisions
 
-1. [Design decisions and tradeoffs](design-decisions-and-tradeoffs.md) explains
+1. [Design decisions and tradeoffs](design-decisions/index.md) explains
    which boundaries are foundational or durable, which mechanisms are
    temporary, what they cost, and what future redesigns must preserve. Its ADR
    links provide decision detail without interrupting the conceptual tracks.
 
 Together these thirty pages form the current canonical project
-explanation. Problem, mental model, authority, context, and validity precede
+explanation. Problem, mental model, authority, validity, and context precede
 runtime and persistence detail; repository symbols remain optional
 implementation orientation.
 

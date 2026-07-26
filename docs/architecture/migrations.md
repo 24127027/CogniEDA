@@ -1,7 +1,7 @@
 # Migrations and schema evolution
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Database initialization and migrations](../database-initialization-and-migrations.md).
+> [SQLite initialization and migrations](../operations/sqlite-and-migrations.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
@@ -9,7 +9,7 @@
 > **Verified on SQLite**.
 
 The reader-facing initialization, history, and quarantine rationale is owned by
-[Database initialization and migrations](../database-initialization-and-migrations.md).
+[SQLite initialization and migrations](../operations/sqlite-and-migrations.md).
 This page retains the exact contributor-oriented call order.
 
 ## Initialization order

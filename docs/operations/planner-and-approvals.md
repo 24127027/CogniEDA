@@ -1,4 +1,4 @@
-# Planner boundary and operation model
+# Planner operations and approvals
 
 CogniEDA's Planner coordinates intent, bounded context, typed proposals, user
 approval, and delegation. It does not own scientific truth.
@@ -58,8 +58,8 @@ The Planner must not:
 `CREATE_ANALYSIS_FRAME`, `CREATE_EVIDENCE`, and `CREATE_DISCOVERY` operations.
 It also rejects protected terminal Task and Hypothesis transitions. Scientific
 authority remains with the application services described in
-[scientific authority](scientific-authority.md) and
-[persistence and transaction ownership](persistence-and-transaction-ownership.md).
+[scientific authority](../concepts/scientific-lifecycle/scientific-authority.md) and
+[persistence and transactions](persistence-and-transactions.md).
 
 ## PlannerOperation is pending workflow state
 
@@ -207,11 +207,11 @@ different class.
 
 ## Related canonical concepts
 
-- [From user request to approved operation](from-user-request-to-approved-operation.md)
-- [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md)
-- [SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md)
-- [Governance and Discovery admission](governance-and-discovery-admission.md)
-- [Runtime and composition boundary](runtime-and-composition-boundary.md)
+- [Operation approval workflows](operation-approval-workflows.md)
+- [Retrieval strategy](../concepts/context/retrieval-strategy.md)
+- [SessionFrame scaling and resume limits](../concepts/context/session-frame-scaling.md)
+- [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md)
+- [Runtime composition](runtime-composition.md)
 
 ## Implementation orientation
 

@@ -1,4 +1,4 @@
-# From user request to approved operation
+# Operation approval workflows
 
 This workflow follows two currently supported Planner coordination paths:
 ordinary Task management and a new execution contract. In both, a model may
@@ -209,11 +209,11 @@ without making the complete behavior **Implemented**.
 
 ## Related canonical concepts
 
-- [Planner boundary and operation model](planner-boundary-and-operation-model.md)
-- [Retrieval strategy and scaling](retrieval-strategy-and-scaling.md)
-- [Governance and Discovery admission](governance-and-discovery-admission.md)
-- [From execution to Discovery](from-execution-to-discovery.md)
-- [Persistence and transaction ownership](persistence-and-transaction-ownership.md)
+- [Planner operations and approvals](planner-and-approvals.md)
+- [Retrieval strategy](../concepts/context/retrieval-strategy.md)
+- [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md)
+- [Execution to Discovery](../concepts/scientific-lifecycle/execution-to-discovery.md)
+- [Persistence and transactions](persistence-and-transactions.md)
 
 ## Implementation orientation
 

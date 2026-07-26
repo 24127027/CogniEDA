@@ -120,10 +120,10 @@ the approved scientific content in flight.
 
 ## Related canonical concepts
 
-- [Design decisions and tradeoffs](../design-decisions-and-tradeoffs.md)
-- [Scientific authority](../scientific-authority.md)
-- [Protected evaluation context](../protected-evaluation-context.md)
-- [Governance and Discovery admission](../governance-and-discovery-admission.md)
+- [Design decisions and tradeoffs](../design-decisions/index.md)
+- [Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md)
+- [Protected evaluation](../concepts/scientific-lifecycle/protected-evaluation.md)
+- [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md)
 - [ADR-004: Atomic Discovery admission](ADR-004-atomic-discovery-admission.md)
 
 ## Implementation orientation

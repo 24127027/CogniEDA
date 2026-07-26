@@ -1,18 +1,18 @@
 # Application Layer Package (`src/application/`)
 
 > **Role:** Package technical reference. **Canonical concept owner:**
-> [Persistence and transaction ownership](../../docs/persistence-and-transaction-ownership.md).
+> [Persistence and transactions](../../docs/operations/persistence-and-transactions.md).
 > **Contributor entry:** [Contributor documentation](../../docs/development/index.md).
 > **Current-state owner:** [CogniEDA current state](../../docs/current-state.md).
 
 > Canonical documentation:
-> [Runtime and composition boundary](../../docs/runtime-and-composition-boundary.md)
+> [Runtime composition](../../docs/operations/runtime-composition.md)
 > and
-> [Persistence and transaction ownership](../../docs/persistence-and-transaction-ownership.md).
+> [Persistence and transactions](../../docs/operations/persistence-and-transactions.md).
 > Planner and product-process boundaries:
-> [Planner boundary and operation model](../../docs/planner-boundary-and-operation-model.md)
+> [Planner operations and approvals](../../docs/operations/planner-and-approvals.md)
 > and
-> [Product surface and bootstrap boundary](../../docs/product-surface-and-bootstrap-boundary.md).
+> [Product bootstrap](../../docs/operations/product-bootstrap.md).
 > Contributor map: [Contributor documentation](../../docs/development/index.md).
 
 ## Purpose

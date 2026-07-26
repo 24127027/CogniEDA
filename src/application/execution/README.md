@@ -1,7 +1,7 @@
 # Execution Application Package
 
 > **Role:** Package technical reference. **Canonical concept owner:**
-> [From execution to Discovery](../../../docs/from-execution-to-discovery.md).
+> [Execution to Discovery](../../../docs/concepts/scientific-lifecycle/execution-to-discovery.md).
 > **Contributor entry:** [Contributor documentation](../../../docs/development/index.md).
 > **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
 

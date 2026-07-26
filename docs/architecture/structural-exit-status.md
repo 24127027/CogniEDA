@@ -22,13 +22,13 @@ the [capability and maturity map](../capability-and-maturity-map.md), and future
 dependencies belong to the [roadmap](../roadmap.md).
 
 Canonical operational ownership is explained in
-[Runtime and composition boundary](../runtime-and-composition-boundary.md),
-[Product surface and bootstrap boundary](../product-surface-and-bootstrap-boundary.md),
-[Planner boundary and operation model](../planner-boundary-and-operation-model.md),
-[Retrieval strategy and scaling](../retrieval-strategy-and-scaling.md),
-[SessionFrame scaling and resume boundary](../session-frame-scaling-and-resume-boundary.md),
-[Persistence and transaction ownership](../persistence-and-transaction-ownership.md),
-and [SQLite boundary and portability](../sqlite-boundary-and-portability.md).
+[Runtime composition](../operations/runtime-composition.md),
+[Product bootstrap](../operations/product-bootstrap.md),
+[Planner operations and approvals](../operations/planner-and-approvals.md),
+[Retrieval strategy](../concepts/context/retrieval-strategy.md),
+[SessionFrame scaling and resume limits](../concepts/context/session-frame-scaling.md),
+[Persistence and transactions](../operations/persistence-and-transactions.md),
+and [SQLite and portability](../operations/sqlite-and-portability.md).
 
 ## Current authority map
 

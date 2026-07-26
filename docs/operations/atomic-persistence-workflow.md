@@ -1,4 +1,4 @@
-# From runtime composition to atomic persistence
+# Atomic persistence workflow
 
 This workflow follows one approved scientific proposal from deployment-supplied
 runtime dependencies to atomic Discovery admission. It illustrates operational
@@ -192,12 +192,12 @@ admission guarantee. Those are **Unsupported** deployment possibilities or
 
 ## Related canonical concepts
 
-- [Runtime and composition boundary](runtime-and-composition-boundary.md)
-- [Product surface and bootstrap boundary](product-surface-and-bootstrap-boundary.md)
-- [Persistence and transaction ownership](persistence-and-transaction-ownership.md)
-- [SQLite boundary and portability](sqlite-boundary-and-portability.md)
-- [Database initialization and migrations](database-initialization-and-migrations.md)
-- [Governance and Discovery admission](governance-and-discovery-admission.md)
+- [Runtime composition](runtime-composition.md)
+- [Product bootstrap](product-bootstrap.md)
+- [Persistence and transactions](persistence-and-transactions.md)
+- [SQLite and portability](sqlite-and-portability.md)
+- [SQLite initialization and migrations](sqlite-and-migrations.md)
+- [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md)
 
 ## Implementation orientation
 

@@ -1,7 +1,7 @@
 # Data Explorer Runtime Adapter
 
 > **Role:** Package technical reference. **Canonical concept owner:**
-> [Scientific authority](../../../docs/scientific-authority.md).
+> [Scientific authority](../../../docs/concepts/scientific-lifecycle/scientific-authority.md).
 > **Contributor entry:** [Contributor documentation](../../../docs/development/index.md).
 > **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
 

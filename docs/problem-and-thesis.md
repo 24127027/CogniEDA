@@ -139,8 +139,8 @@ more complicated retrieval policy. Cross-database and distributed guarantees
 are **Unsupported**.
 
 The temporal-validity decision is expanded in
-[Validity over time](validity-over-time.md); the transaction is expanded in
-[Atomic validity propagation](atomic-validity-propagation.md).
+[Validity over time](concepts/validity/validity-over-time.md); the transaction is expanded in
+[Atomic validity propagation](concepts/validity/validity-propagation.md).
 
 ## Indiscriminate retrieval contaminating reasoning
 
@@ -169,7 +169,7 @@ when candidate volume or vocabulary variation makes bounded lexical retrieval
 insufficient, but it must remain downstream of structural eligibility.
 
 The complete current pipeline and its limits are owned by
-[Retrieval and context type safety](retrieval-and-context-type-safety.md).
+[Context type safety and retrieval](concepts/context/context-type-safety.md).
 
 ## Parent-task summaries mistaken for scientific claims
 
@@ -193,7 +193,7 @@ workflow. The tradeoff is that parent-level answers may need regeneration and
 cannot serve as authoritative scientific knowledge. That cost protects the
 lineage of the underlying claims.
 
-See [Context reconstruction and continuity](context-reconstruction-and-continuity.md)
+See [Context continuity and resume](concepts/context/continuity-and-resume.md)
 for the current parent-task boundary.
 
 ## Retries producing duplicate or conflicting durable state
@@ -246,7 +246,7 @@ multi-branch product in which “latest active frame” is no longer an adequate
 cardinality rule.
 
 The full reconstruction boundary is owned by
-[Context reconstruction and continuity](context-reconstruction-and-continuity.md).
+[Context continuity and resume](concepts/context/continuity-and-resume.md).
 
 ## Why Evidence and Discovery remain separate
 
@@ -264,9 +264,9 @@ also where CogniEDA can preserve exact wording, reject stale authority, and
 atomically complete the terminal scientific chain.
 
 The reader-first explanation is split across
-[Scientific authority](scientific-authority.md),
-[Protected evaluation context](protected-evaluation-context.md), and
-[Governance and Discovery admission](governance-and-discovery-admission.md).
+[Scientific authority](concepts/scientific-lifecycle/scientific-authority.md),
+[Protected evaluation](concepts/scientific-lifecycle/protected-evaluation.md), and
+[Discovery governance and admission](concepts/scientific-lifecycle/discovery-governance-and-admission.md).
 
 ## Why immutable data and Evidence state matter
 

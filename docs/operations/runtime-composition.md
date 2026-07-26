@@ -1,4 +1,4 @@
-# Runtime and composition boundary
+# Runtime composition
 
 CogniEDA needs one visible place where persistence, transaction services,
 specialists, identity resolution, and deployment adapters are assembled. The
@@ -158,18 +158,18 @@ authority.
 
 ## Related canonical concepts
 
-- [Product surface and bootstrap boundary](product-surface-and-bootstrap-boundary.md)
+- [Product bootstrap](product-bootstrap.md)
   owns the unsupported product-process inventory and coherent bootstrap
   prerequisites.
-- [Planner boundary and operation model](planner-boundary-and-operation-model.md)
+- [Planner operations and approvals](planner-and-approvals.md)
   owns proposal, approval, resume, and commit delegation after composition.
-- [Persistence and transaction ownership](persistence-and-transaction-ownership.md)
+- [Persistence and transactions](persistence-and-transactions.md)
   explains the writers composed behind the runtime.
-- [SQLite boundary and portability](sqlite-boundary-and-portability.md) defines
+- [SQLite and portability](sqlite-and-portability.md) defines
   the database qualification that runtime initialization currently enforces.
-- [From runtime composition to atomic persistence](from-runtime-composition-to-atomic-persistence.md)
+- [Atomic persistence workflow](atomic-persistence-workflow.md)
   follows one delegated operation through commit or rollback.
-- [Design decisions and tradeoffs](design-decisions-and-tradeoffs.md) classifies
+- [Design decisions and tradeoffs](../design-decisions/index.md) classifies
   the operational choices without promoting package names into invariants.
 
 ## Implementation orientation

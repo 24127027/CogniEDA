@@ -1,7 +1,7 @@
 # CogniEDA SQLModel Persistence Models (`db.models`)
 
 > **Role:** Package technical reference. **Canonical concept owner:**
-> [Persistence and transaction ownership](../../../docs/persistence-and-transaction-ownership.md).
+> [Persistence and transactions](../../../docs/operations/persistence-and-transactions.md).
 > **Contributor entry:** [Contributor documentation](../../../docs/development/index.md).
 > **Current-state owner:** [CogniEDA current state](../../../docs/current-state.md).
 
@@ -14,7 +14,7 @@ Importing it registers all currently defined table models in
 `SQLModel.metadata`. It does not own domain ontology or transaction semantics.
 
 The canonical boundary is
-[Persistence and transaction ownership](../../../docs/persistence-and-transaction-ownership.md#sqlmodel-and-the-dbmodels-facade).
+[Persistence and transactions](../../../docs/operations/persistence-and-transactions.md#sqlmodel-and-the-dbmodels-facade).
 
 ## 2. Model Ownership by Bounded Context
 

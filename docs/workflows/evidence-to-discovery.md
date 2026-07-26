@@ -1,7 +1,7 @@
 # Evidence-to-Discovery Workflow
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Governance and Discovery admission](../governance-and-discovery-admission.md).
+> [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
@@ -9,9 +9,9 @@
 > evaluation, governance, replay fencing, and atomic admission.
 
 Canonical explanations:
-[Protected evaluation context](../protected-evaluation-context.md),
-[Governance and Discovery admission](../governance-and-discovery-admission.md),
-and [From execution to Discovery](../from-execution-to-discovery.md). This page
+[Protected evaluation](../concepts/scientific-lifecycle/protected-evaluation.md),
+[Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md),
+and [Execution to Discovery](../concepts/scientific-lifecycle/execution-to-discovery.md). This page
 retains the compact technical sequence.
 
 ## Protected evaluation

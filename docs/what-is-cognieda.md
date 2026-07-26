@@ -216,7 +216,7 @@ The benefit is that “remember this” cannot silently become “use this as
 scientific evidence.”
 
 The full concept is owned by
-[SessionFrame and active context](session-frame-and-active-context.md).
+[SessionFrame and active context](concepts/context/session-frame.md).
 
 ## Current maturity
 
@@ -247,27 +247,27 @@ enough to claim a complete product workflow.
 ## Where to go next
 
 Read [Problem and thesis](problem-and-thesis.md) for the failure modes behind the
-design. Then read [Research-state model](research-state-model.md) for the
+design. Then read [Research-state objects and roles](concepts/research-state/objects-and-roles.md) for the
 objects and lifecycle boundaries, followed by
-[From question to Discovery](from-question-to-discovery.md) for the complete
+[Investigation lifecycle](concepts/research-state/investigation-lifecycle.md) for the complete
 conceptual investigation. The authority chain continues in
-[Scientific authority](scientific-authority.md),
-[Protected evaluation context](protected-evaluation-context.md), and
-[Governance and Discovery admission](governance-and-discovery-admission.md).
+[Scientific authority](concepts/scientific-lifecycle/scientific-authority.md),
+[Protected evaluation](concepts/scientific-lifecycle/protected-evaluation.md), and
+[Discovery governance and admission](concepts/scientific-lifecycle/discovery-governance-and-admission.md).
 The focused workflow is
-[From execution to Discovery](from-execution-to-discovery.md). Active-context
+[Execution to Discovery](concepts/scientific-lifecycle/execution-to-discovery.md). Active-context
 continuity continues in
-[SessionFrame and active context](session-frame-and-active-context.md),
-[Retrieval and context type safety](retrieval-and-context-type-safety.md), and
-[Context reconstruction and continuity](context-reconstruction-and-continuity.md).
+[SessionFrame and active context](concepts/context/session-frame.md),
+[Context type safety and retrieval](concepts/context/context-type-safety.md), and
+[Context continuity and resume](concepts/context/continuity-and-resume.md).
 The running example continues in
-[From research state to active context](from-research-state-to-active-context.md).
+[Building active context from research state](concepts/context/building-active-context.md).
 Temporal authority and its transaction continue in
-[Validity over time](validity-over-time.md),
-[Atomic validity propagation](atomic-validity-propagation.md), and
-[Invalidation and active retrieval](invalidation-and-active-retrieval.md), with
+[Validity over time](concepts/validity/validity-over-time.md),
+[Atomic validity propagation](concepts/validity/validity-propagation.md), and
+[Active retrieval after invalidation](concepts/validity/active-retrieval-after-invalidation.md), with
 the workflow in
-[From validity change to reconstructed context](from-validity-change-to-reconstructed-context.md).
+[From validity change to active context](concepts/validity/validity-change-to-active-context.md).
 
 ### Implementation orientation
 

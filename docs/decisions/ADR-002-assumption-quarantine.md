@@ -115,11 +115,11 @@ signal and require an explicit user decision before changing planning state.
 
 ## Related canonical concepts
 
-- [Design decisions and tradeoffs](../design-decisions-and-tradeoffs.md)
-- [Protected evaluation context](../protected-evaluation-context.md)
-- [Scientific authority](../scientific-authority.md)
-- [Governance and Discovery admission](../governance-and-discovery-admission.md)
-- [Validity over time](../validity-over-time.md)
+- [Design decisions and tradeoffs](../design-decisions/index.md)
+- [Protected evaluation](../concepts/scientific-lifecycle/protected-evaluation.md)
+- [Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md)
+- [Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md)
+- [Validity over time](../concepts/validity/validity-over-time.md)
 
 ## Implementation orientation
 

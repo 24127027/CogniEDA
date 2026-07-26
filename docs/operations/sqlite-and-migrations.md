@@ -1,4 +1,4 @@
-# Database initialization and migrations
+# SQLite initialization and migrations
 
 Runtime construction opens the configured persistence boundary and invokes one
 canonical initialization sequence. That sequence serves both a fresh SQLite
@@ -208,10 +208,10 @@ provenance, and transaction rollback.
 
 ## Related canonical concepts
 
-- [SQLite boundary and portability](sqlite-boundary-and-portability.md)
-- [Persistence and transaction ownership](persistence-and-transaction-ownership.md)
-- [From runtime composition to atomic persistence](from-runtime-composition-to-atomic-persistence.md)
-- [Validity over time](validity-over-time.md)
+- [SQLite and portability](sqlite-and-portability.md)
+- [Persistence and transactions](persistence-and-transactions.md)
+- [Atomic persistence workflow](atomic-persistence-workflow.md)
+- [Validity over time](../concepts/validity/validity-over-time.md)
 
 ## Implementation orientation
 

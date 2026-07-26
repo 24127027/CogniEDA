@@ -1,7 +1,7 @@
 # Context Type Safety
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Protected evaluation context](../protected-evaluation-context.md).
+> [Protected evaluation](../concepts/scientific-lifecycle/protected-evaluation.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
@@ -10,11 +10,11 @@
 > context assembly **Deferred**.
 
 Canonical reader explanations are
-[Protected evaluation context](../protected-evaluation-context.md) for
+[Protected evaluation](../concepts/scientific-lifecycle/protected-evaluation.md) for
 scientific evaluation and
-[Retrieval and context type safety](../retrieval-and-context-type-safety.md)
+[Context type safety and retrieval](../concepts/context/context-type-safety.md)
 for ordinary active context.
-[Invalidation and active retrieval](../invalidation-and-active-retrieval.md)
+[Active retrieval after invalidation](../concepts/validity/active-retrieval-after-invalidation.md)
 owns authority changes at the read boundary. This page retains the concise
 implementer reference.
 

@@ -15,10 +15,10 @@ Canonical reader-facing maturity and comparison now belong to
 sequencing and exit criteria belong to the [roadmap](../roadmap.md).
 
 Reader-facing ownership for the operational gaps belongs to
-[Planner boundary and operation model](../planner-boundary-and-operation-model.md),
-[Retrieval strategy and scaling](../retrieval-strategy-and-scaling.md),
-[SessionFrame scaling and resume boundary](../session-frame-scaling-and-resume-boundary.md),
-and [Product surface and bootstrap boundary](../product-surface-and-bootstrap-boundary.md).
+[Planner operations and approvals](../operations/planner-and-approvals.md),
+[Retrieval strategy](../concepts/context/retrieval-strategy.md),
+[SessionFrame scaling and resume limits](../concepts/context/session-frame-scaling.md),
+and [Product bootstrap](../operations/product-bootstrap.md).
 
 ## Current implementation versus target
 

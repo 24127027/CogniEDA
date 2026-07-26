@@ -1,7 +1,7 @@
 # System Architecture Overview
 
 > **Role:** Technical reference. **Canonical concept owner:**
-> [Runtime and composition boundary](../runtime-and-composition-boundary.md).
+> [Runtime composition](../operations/runtime-composition.md).
 > **Contributor entry:** [Contributor documentation](../development/index.md).
 > **Current-state owner:** [CogniEDA current state](../current-state.md).
 
@@ -15,21 +15,21 @@ to the [dependency-driven roadmap](../roadmap.md). This page owns the compact
 technical architecture view.
 
 Reader-first concept owners:
-[Scientific authority](../scientific-authority.md),
-[Protected evaluation context](../protected-evaluation-context.md), and
-[Governance and Discovery admission](../governance-and-discovery-admission.md),
-[Planner boundary and operation model](../planner-boundary-and-operation-model.md),
-[SessionFrame and active context](../session-frame-and-active-context.md),
-[Retrieval and context type safety](../retrieval-and-context-type-safety.md),
-[Retrieval strategy and scaling](../retrieval-strategy-and-scaling.md),
-[Context reconstruction and continuity](../context-reconstruction-and-continuity.md),
-[SessionFrame scaling and resume boundary](../session-frame-scaling-and-resume-boundary.md),
-[Validity over time](../validity-over-time.md),
-[Atomic validity propagation](../atomic-validity-propagation.md),
-[Runtime and composition boundary](../runtime-and-composition-boundary.md),
-[Product surface and bootstrap boundary](../product-surface-and-bootstrap-boundary.md),
-[Persistence and transaction ownership](../persistence-and-transaction-ownership.md),
-and [SQLite boundary and portability](../sqlite-boundary-and-portability.md).
+[Scientific authority](../concepts/scientific-lifecycle/scientific-authority.md),
+[Protected evaluation](../concepts/scientific-lifecycle/protected-evaluation.md), and
+[Discovery governance and admission](../concepts/scientific-lifecycle/discovery-governance-and-admission.md),
+[Planner operations and approvals](../operations/planner-and-approvals.md),
+[SessionFrame and active context](../concepts/context/session-frame.md),
+[Context type safety and retrieval](../concepts/context/context-type-safety.md),
+[Retrieval strategy](../concepts/context/retrieval-strategy.md),
+[Context continuity and resume](../concepts/context/continuity-and-resume.md),
+[SessionFrame scaling and resume limits](../concepts/context/session-frame-scaling.md),
+[Validity over time](../concepts/validity/validity-over-time.md),
+[Atomic validity propagation](../concepts/validity/validity-propagation.md),
+[Runtime composition](../operations/runtime-composition.md),
+[Product bootstrap](../operations/product-bootstrap.md),
+[Persistence and transactions](../operations/persistence-and-transactions.md),
+and [SQLite and portability](../operations/sqlite-and-portability.md).
 This page remains a source-oriented architecture summary.
 
 CogniEDA is validity-preserving research-state infrastructure for governed analytical

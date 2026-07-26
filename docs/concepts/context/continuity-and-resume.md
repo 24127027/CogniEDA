@@ -1,4 +1,4 @@
-# Context reconstruction and continuity
+# Context continuity and resume
 
 CogniEDA can preserve an investigation across interactions because its research
 state is durable and typed. That is different from restoring an application
@@ -87,8 +87,8 @@ Validity propagation can supersede affected frames and add a stale marker. A
 later caller must re-read lifecycle authority; it must not trust a cached
 SessionFrame summary as proof that the referenced object remains current.
 Affected-object planning, replay, concurrency, and authority-change continuity
-are reconstructed in [Validity over time](validity-over-time.md) and
-[Atomic validity propagation](atomic-validity-propagation.md).
+are reconstructed in [Validity over time](../validity/validity-over-time.md) and
+[Atomic validity propagation](../validity/validity-propagation.md).
 
 ## What survives process interruption
 
@@ -211,10 +211,10 @@ and latency. None may bypass lifecycle, profile, scope, epistemic-type, or
 protected-evaluation boundaries.
 
 The current technical validity sequence is described in
-[Validity propagation workflow](workflows/validity-propagation.md). Its
+[Validity propagation workflow](../../workflows/validity-propagation.md). Its
 canonical temporal-authority and active-context consequences are
-[Validity over time](validity-over-time.md) and
-[Invalidation and active retrieval](invalidation-and-active-retrieval.md).
+[Validity over time](../validity/validity-over-time.md) and
+[Active retrieval after invalidation](../validity/active-retrieval-after-invalidation.md).
 
 ## Implementation orientation
 
@@ -228,9 +228,9 @@ Focused verification is under `tests/memory/`, `tests/agents/planner/`,
 `tests/application/`, `tests/repositories/`, and `tests/e2e/`.
 
 Selection and checkpoint limits continue in
-[SessionFrame scaling and resume boundary](session-frame-scaling-and-resume-boundary.md).
+[SessionFrame scaling and resume limits](session-frame-scaling.md).
 The product-process gap continues in
-[Product surface and bootstrap boundary](product-surface-and-bootstrap-boundary.md).
+[Product bootstrap](../../operations/product-bootstrap.md).
 
 Continue with the running example in
-[From research state to active context](from-research-state-to-active-context.md).
+[Building active context from research state](building-active-context.md).
