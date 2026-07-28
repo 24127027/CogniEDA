@@ -10,6 +10,7 @@ from .nodes import (
     interpret_results,
     log_mismatch_and_exit,
     request_data_exploration,
+    route_after_data_exploration,
     route_after_formalize,
     route_after_assumptions,
     route_after_method,
@@ -39,8 +40,8 @@ def build_graph() -> CompiledStateGraph[State, ExecutorContext, ExecutorInput, E
         "formalize_hypothesis",
         route_after_formalize,
         {
-            "choose_statistical_method": "choose_statistical_method",
-            "log_mismatch_and_exit": "log_mismatch_and_exit",
+            "not_testable": "log_mismatch_and_exit",
+            "is_testable": "choose_statistical_method",
         },
     )
 
@@ -48,8 +49,8 @@ def build_graph() -> CompiledStateGraph[State, ExecutorContext, ExecutorInput, E
         "choose_statistical_method",
         route_after_method,
         {
-            "verify_statistical_assumptions": "verify_statistical_assumptions",
-            "log_mismatch_and_exit": "log_mismatch_and_exit",
+            "no_candidates_left": "log_mismatch_and_exit",
+            "has_candidates": "verify_statistical_assumptions",
         },
     )
 
@@ -57,14 +58,20 @@ def build_graph() -> CompiledStateGraph[State, ExecutorContext, ExecutorInput, E
         "verify_statistical_assumptions",
         route_after_assumptions,
         {
-            "request_data_exploration": "request_data_exploration",
-            "execute_statistical_test": "execute_statistical_test",
-            "choose_statistical_method": "choose_statistical_method",
+            "assumption_failed": "choose_statistical_method",
+            "needs_empirical_metrics": "request_data_exploration",
+            "passed": "execute_statistical_test",
             "log_mismatch_and_exit": "log_mismatch_and_exit",
         },
     )
 
-    builder.add_edge("request_data_exploration", "verify_statistical_assumptions")
+    builder.add_conditional_edges(
+        "request_data_exploration",
+        route_after_data_exploration,
+        {
+            "dispatcher_data_exploration": "verify_statistical_assumptions",
+        },
+    )
     builder.add_edge("execute_statistical_test", "interpret_results")
 
     builder.add_conditional_edges(

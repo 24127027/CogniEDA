@@ -19,10 +19,10 @@ def formalize_hypothesis(state: State, runtime: Runtime[ExecutorContext]) -> Sta
 def route_after_formalize(
     state: State,
     runtime: Runtime[ExecutorContext],
-) -> Literal["choose_statistical_method", "log_mismatch_and_exit"]:
+) -> Literal["not_testable", "is_testable"]:
     if state.error_message is not None:
-        return "log_mismatch_and_exit"
-    return "choose_statistical_method"
+        return "not_testable"
+    return "is_testable"
 
 
 def choose_statistical_method(state: State, runtime: Runtime[ExecutorContext]) -> State:
@@ -42,10 +42,10 @@ def choose_statistical_method(state: State, runtime: Runtime[ExecutorContext]) -
 def route_after_method(
     state: State,
     runtime: Runtime[ExecutorContext],
-) -> Literal["verify_statistical_assumptions", "log_mismatch_and_exit"]:
+) -> Literal["no_candidates_left", "has_candidates"]:
     if state.error_message is not None:
-        return "log_mismatch_and_exit"
-    return "verify_statistical_assumptions"
+        return "no_candidates_left"
+    return "has_candidates"
 
 
 def verify_statistical_assumptions(state: State, runtime: Runtime[ExecutorContext]) -> State:
@@ -76,6 +76,13 @@ def request_data_exploration(state: State, runtime: Runtime[ExecutorContext]) ->
     state.supporting_metrics_ready = True
     state.needs_data_exploration = False
     return state
+
+
+def route_after_data_exploration(
+    state: State,
+    runtime: Runtime[ExecutorContext],
+) -> Literal["dispatcher_data_exploration"]:
+    return "dispatcher_data_exploration"
 
 
 def execute_statistical_test(state: State, runtime: Runtime[ExecutorContext]) -> State:
@@ -136,18 +143,18 @@ def route_after_assumptions(
     state: State,
     runtime: Runtime[ExecutorContext],
 ) -> Literal[
-    "request_data_exploration",
-    "execute_statistical_test",
-    "choose_statistical_method",
+    "assumption_failed",
+    "needs_empirical_metrics",
+    "passed",
     "log_mismatch_and_exit",
 ]:
     if state.error_message is not None:
         return "log_mismatch_and_exit"
     if state.needs_data_exploration:
-        return "request_data_exploration"
+        return "needs_empirical_metrics"
     if state.assumption_failed:
-        return "choose_statistical_method"
-    return "execute_statistical_test"
+        return "assumption_failed"
+    return "passed"
 
 
 def route_after_results(
