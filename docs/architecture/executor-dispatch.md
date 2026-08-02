@@ -110,14 +110,14 @@ The dispatcher is passed to planner nodes via LangGraph's `Runtime[Context]` mec
 
 ## Current Implementation
 
-The executor dispatch layer does not yet exist. Current state:
+The dispatch layer exists, but parts of the target design remain scaffold-level. Current state:
 
-- `ExecutionRequest` exists but uses `executor_name: str` (names an executor directly) instead of `capability: str` (declares a need).
-- `ExecutionResult` is an empty stub (`...`).
-- `prepare_execution` and `dispatch_executor` planner nodes are `pass` stubs.
-- `GraphMiner` and `HypothesisAnalyst` exist as `Executor` subclasses but are not registered anywhere.
-- No `ExecutorRegistry` or `ExecutorDispatcher` exists.
-- The planner has no mechanism to discover or invoke executors.
+- `ExecutionRequest` exists with capability-based routing and validates capability ids at the Pydantic boundary.
+- `ExecutionResult` carries draft, evidence reference, log, and final-result fields.
+- `prepare_execution` and `dispatch_executor` planner nodes are still scaffold-level.
+- `GraphMiner` remains scaffold-level, while `HypothesisAnalyst` is registered and has an implemented LangGraph workflow.
+- `ExecutorRegistry` and `ExecutorDispatcher` exist.
+- The planner still has no production mechanism to discover or invoke executors end to end.
 
 ## Implementation Status
 
@@ -125,7 +125,7 @@ The executor dispatch layer does not yet exist. Current state:
 |---|---|---|
 | `Capability` enum | Not implemented | Will be added to `src/agents/executor/types.py` |
 | `ExecutionRequest` (capability-based) | Not implemented | Currently uses `executor_name` |
-| `ExecutionResult` (structured) | Not implemented | Currently empty stub |
+| `ExecutionResult` (structured) | Partially implemented | Carries draft, evidence reference, log, and final-result fields |
 | `ExecutorRegistry` | Not implemented | New file needed |
 | `ExecutorDispatcher` | Not implemented | New file needed |
 | `prepare_execution` node | Stub | `pass` in `src/agents/planner/nodes.py` |
@@ -136,7 +136,7 @@ The executor dispatch layer does not yet exist. Current state:
 
 - The current `ExecutionRequest.executor_name` field reflects the older "name the executor" model. This will be replaced by `capability`.
 - No `PlannerOperation` schema exists yet, so `prepare_execution` cannot produce a proper operation record — it will directly construct the `ExecutionRequest` in planner state for now.
-- `review_execution` cannot persist `Evidence` or `Discovery` because those persistence paths are not yet implemented. The `ExecutionResult` will carry drafts that `review_execution` can inspect but not yet commit.
+- `review_execution` cannot persist `Evidence` or `Discovery` because those persistence paths are not yet implemented. The `ExecutionResult` carries drafts that `review_execution` can inspect but not yet commit.
 
 ## Related Documents
 

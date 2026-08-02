@@ -1,18 +1,24 @@
-"""Internal state for HypothesisAnalyst executor.
+"""Internal state for the Hypothesis Analyst executor."""
 
-This state NEVER leaves the executor.
-It's converted from ExecutionRequest on entry and to ExecutionResult on exit.
-"""
+from __future__ import annotations
 
-from ..types import BaseState
+from typing import TypedDict
+
+from schemas.artifacts import Discovery, Evidence, Hypothesis
+
+from ..types import ExecutionRequest, ExecutionResult
 
 
-# TODO: Put whatever agent need here
-class State(BaseState):
-    """State for the Hypothesis Analyst agent.
+class HAState(TypedDict):
+    request: ExecutionRequest
+    hypothesis_draft: Hypothesis | None
+    de_capability_requests: list[ExecutionRequest]
+    collected_evidence: list[Evidence]
+    evaluation_outcome: str | None
+    scientific_value: str | None
+    discovery_draft: Discovery | None
+    execution_logs: list[str]
+    final_result: ExecutionResult | None
 
-    Internal state fields for hypothesis analysis workflow.
-    This will expand as graph implementation progresses.
-    """
 
-    ...
+State = HAState
