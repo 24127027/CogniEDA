@@ -6,16 +6,11 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_ai.messages import ModelMessage
 
-from schemas.artifacts import Discovery, Evidence, Hypothesis, Task
+from schemas.artifacts import DataProfile, Discovery, Evidence, Hypothesis, Task as ResearchTask
+
+Task = ResearchTask
 
 from .capabilities import CAPABILITY_IDS
-
-
-class Task(BaseModel):
-    """Placeholder for a Task object.
-
-    # TODO: Import the actual Task class later
-    """
 
 
 class ExecutorInput(BaseModel):
@@ -79,9 +74,17 @@ class ExecutorOutput(BaseModel):
         default_factory=list,
         description="Evidence draft payloads proposed by the executor for planner review.",
     )
+    evidence_draft: Evidence | None = Field(
+        default=None,
+        description="Single Evidence draft produced by bounded executor workflows.",
+    )
     discovery_drafts: list[dict[str, Any] | Discovery] = Field(
         default_factory=list,
         description="Discovery draft payloads proposed by the executor for planner review.",
+    )
+    data_profile_draft: DataProfile | None = Field(
+        default=None,
+        description="Single DataProfile draft produced by bounded executor workflows.",
     )
     evidence_refs: list[str] = Field(
         default_factory=list,
