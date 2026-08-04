@@ -27,7 +27,7 @@ The current capability catalog and registration status are:
 
 | Capability id | Catalog status | Registered executor |
 | --- | --- | --- |
-| `data_exploration` | Catalogued | Not registered |
+| `data_exploration` | Catalogued | `DataExplorer` |
 | `graph_mining` | Catalogued | `GraphMiner` |
 | `hypothesis_testing` | Catalogued | `HypothesisAnalyst` |
 
@@ -152,7 +152,7 @@ result = await dispatcher.dispatch(request)
 
 In this example, `executor_registry.list_specs()` limits selection to registered
 capability specs. With the default registry, that excludes catalogued but
-unregistered capabilities such as `data_exploration`.
+unimported executors.
 
 ## What is not implemented yet
 
@@ -170,7 +170,7 @@ The following behavior is not live in the current code:
 - Retry policy.
 - Cycle/depth protection.
 - Runnable default graphs for `GraphMiner` and `HypothesisAnalyst`.
-- Registered executor for `data_exploration`.
+- Registered executor for `data_exploration` with a runnable LangGraph workflow.
 - Concrete `ExecutionResult` fields for Evidence drafts, Discovery drafts, or
   execution-run provenance.
 

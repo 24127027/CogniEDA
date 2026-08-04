@@ -24,7 +24,7 @@ flowchart TD
 
     E1[GraphMiner] -.->|@register GRAPH_MINING| REG
     E2[HypothesisAnalyst] -.->|@register HYPOTHESIS_TESTING| REG
-    E3[Future: DataExplorer] -.->|@register DATA_EXPLORATION| REG
+   E3[DataExplorer] -.->|@register DATA_EXPLORATION| REG
 ```
 
 ### Component Responsibilities
@@ -33,7 +33,7 @@ flowchart TD
 |---|---|---|
 | `Capability` (StrEnum) | Shared vocabulary of analytical needs | `src/agents/executor/types.py` |
 | `ExecutionRequest` | Input contract: capability + task + context | `src/agents/executor/types.py` |
-| `ExecutionResult` | Output contract: evidence drafts, discovery drafts, execution run ref | `src/agents/executor/types.py` |
+| `ExecutionResult` | Output contract: evidence drafts, discovery drafts, DataProfile drafts, execution run ref | `src/agents/executor/types.py` |
 | `ExecutorRegistry` | Decorator-based registry mapping capability → executor instance | `src/agents/executor/registry.py` |
 | `ExecutorDispatcher` | Resolves capability to executor, invokes `executor.run()`, returns result | `src/agents/executor/dispatcher.py` |
 | `Executor` (ABC) | Base class all executors inherit; provides `run(input, context) → ExecutionResult` | `src/agents/executor/executor.py` |
@@ -44,7 +44,7 @@ flowchart TD
 |---|---|---|
 | `graph_mining` | Search and traverse the knowledge graph | `GraphMiner` |
 | `hypothesis_testing` | Execute statistical tests, produce Evidence and Discovery drafts | `HypothesisAnalyst` |
-| `data_exploration` | Profile, visualize, and summarize datasets | *(future executor)* |
+| `data_exploration` | Profile, visualize, and summarize datasets | `DataExplorer` |
 
 Capabilities use a `StrEnum` for type safety while remaining extensible without schema migration — the same pattern used by `FirstClassObjectType` and `TaskKind` in `src/schemas/enums.py`.
 
@@ -113,9 +113,9 @@ The dispatcher is passed to planner nodes via LangGraph's `Runtime[Context]` mec
 The dispatch layer exists, but parts of the target design remain scaffold-level. Current state:
 
 - `ExecutionRequest` exists with capability-based routing and validates capability ids at the Pydantic boundary.
-- `ExecutionResult` carries draft, evidence reference, log, and final-result fields.
+- `ExecutionResult` carries draft, evidence reference, log, DataProfile draft, and final-result fields.
 - `prepare_execution` and `dispatch_executor` planner nodes are still scaffold-level.
-- `GraphMiner` remains scaffold-level, while `HypothesisAnalyst` is registered and has an implemented LangGraph workflow.
+- `GraphMiner` remains scaffold-level, while `HypothesisAnalyst` and `DataExplorer` are registered and have implemented LangGraph workflows.
 - `ExecutorRegistry` and `ExecutorDispatcher` exist.
 - The planner still has no production mechanism to discover or invoke executors end to end.
 
@@ -123,18 +123,18 @@ The dispatch layer exists, but parts of the target design remain scaffold-level.
 
 | Component | Status | Note |
 |---|---|---|
-| `Capability` enum | Not implemented | Will be added to `src/agents/executor/types.py` |
-| `ExecutionRequest` (capability-based) | Not implemented | Currently uses `executor_name` |
-| `ExecutionResult` (structured) | Partially implemented | Carries draft, evidence reference, log, and final-result fields |
-| `ExecutorRegistry` | Not implemented | New file needed |
-| `ExecutorDispatcher` | Not implemented | New file needed |
-| `prepare_execution` node | Stub | `pass` in `src/agents/planner/nodes.py` |
-| `dispatch_executor` node | Stub | `pass` in `src/agents/planner/nodes.py` |
-| Executor registration | Not implemented | Executors exist but are undiscoverable |
+| `Capability` enum | Implemented | Capability ids are defined in `src/agents/executor/capabilities.py` |
+| `ExecutionRequest` (capability-based) | Implemented | Validates `capability`, `input`, and `context` |
+| `ExecutionResult` (structured) | Implemented | Carries evidence, DataProfile, logs, and final-result fields |
+| `ExecutorRegistry` | Implemented | Decorator-based registry with lazy singleton resolution |
+| `ExecutorDispatcher` | Implemented | Resolves capability ids and invokes executor `run()` |
+| `prepare_execution` node | Not implemented | Planner execution bridge remains scaffold-level |
+| `dispatch_executor` node | Not implemented | Planner execution bridge remains scaffold-level |
+| Executor registration | Implemented | `GraphMiner`, `HypothesisAnalyst`, and `DataExplorer` self-register on import |
 
 ## Known Deviations
 
-- The current `ExecutionRequest.executor_name` field reflects the older "name the executor" model. This will be replaced by `capability`.
+- No planner-owned dispatcher wiring exists yet, so capability-based executor dispatch is still invoked directly from tests or executor wrappers.
 - No `PlannerOperation` schema exists yet, so `prepare_execution` cannot produce a proper operation record — it will directly construct the `ExecutionRequest` in planner state for now.
 - `review_execution` cannot persist `Evidence` or `Discovery` because those persistence paths are not yet implemented. The `ExecutionResult` carries drafts that `review_execution` can inspect but not yet commit.
 
