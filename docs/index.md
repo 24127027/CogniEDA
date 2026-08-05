@@ -27,7 +27,7 @@ Read the tracks in this order. Within each track, read from top to bottom.
 | How are objects classified across state layers? | [Objects and state layers](concepts/research-state/objects-and-state-layers.md) | **Available** |
 | How are planning and scientific state kept separate? | [Planning and scientific state](concepts/research-state/planning-and-scientific-state.md) | **Available** |
 | How do identity, scope, and lineage constrain reuse? | [Identity, scope, and lineage](concepts/research-state/identity-scope-and-lineage.md) | **Available** |
-| How does a scientific investigation progress? | `concepts/scientific-lifecycle/` | **Planned** |
+| How does a scientific investigation progress? | [Scientific lifecycle](concepts/scientific-lifecycle/index.md) | **Available** |
 | How is validity preserved over time? | `concepts/validity/` | **Planned** |
 | How are active context and continuity constructed? | `concepts/context/` | **Planned** |
 
@@ -51,8 +51,8 @@ Architecture pages may define implementation-neutral contracts and authority bou
 | Lookup need | Owner page | Availability |
 | --- | --- | --- |
 | FCO and non-FCO catalog | [Object catalog](reference/object-catalog.md) | **Available** |
-| Lifecycle states and scientific outcomes | `reference/lifecycle-and-outcome-catalog.md` | **Planned** |
-| Contracts and cardinalities | `reference/contract-and-cardinality-reference.md` | **Planned** |
+| Lifecycle states and scientific outcomes | [Lifecycle and outcome catalog](reference/lifecycle-and-outcome-catalog.md) | **Available** |
+| Contracts and cardinalities | [Contract and cardinality reference](reference/contract-and-cardinality-reference.md) | **Available** |
 | Canonical terminology | [Terminology](reference/terminology.md) | **Available** |
 
 Reference pages are concise lookup surfaces. They do not compete with concept pages for explanatory ownership.
