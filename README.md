@@ -92,12 +92,11 @@ config/          Agent and MCP config placeholders
 
 ## Documentation
 
-Start here:
+Start with the [reader-first documentation index](docs/index.md). It separates
+concepts, architecture, reference, design decisions, and current status, and it
+labels pages that are planned but not yet authored.
 
-- [Documentation Index](docs/index.md)
-- [Architecture Overview](docs/architecture/overview.md)
-- [First-Class Objects](docs/architecture/first-class-objects.md)
-- [Implementation Gap Analysis](docs/architecture/implementation-gap-analysis.md)
-- [User Research Workflow](docs/workflows/user-research-workflow.md)
-- [Development Setup](docs/development/setup.md)
-- [Testing](docs/development/testing.md)
+The documentation is being recovered in human-reviewed units. Existing tracked
+pages outside the canonical journey are transition inputs until they are
+reconciled; development-process material is intentionally kept outside the
+public reader journey.
