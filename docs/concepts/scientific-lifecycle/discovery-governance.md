@@ -92,7 +92,7 @@ acts preserve the original truth-to-record.
 
 ## Implementation status
 
-**Design target with partial repository guards.** Current source has immutable
+**Design target.** Current source has partial repository guards: immutable
 Discovery content, requires Evidence references and a validity basis, excludes
 Assumptions through a model guard, and enforces a repository-level one-
 Discovery-per-Hypothesis constraint. It does not implement DiscoveryProposal,

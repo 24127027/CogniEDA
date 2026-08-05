@@ -90,7 +90,7 @@ propose replanning without weakening the scientific boundary.
 
 ## Implementation status
 
-**Design target; not implemented end to end.** Current source has FCO schemas,
+**Design target.** The lifecycle is not implemented end to end. Current source has FCO schemas,
 minimal `ExecutionRun` and `AnalysisFrame` provenance, repository-level
 Hypothesis/Evidence/Discovery guards, a generic dispatcher seam, and protected
 context projection. It does not implement the canonical Task taxonomy,

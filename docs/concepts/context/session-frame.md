@@ -117,7 +117,7 @@ raw SessionFrame as a substitute.
 
 ## Implementation status
 
-**Partially implemented with a known target gap.** Current source defines and
+**Partially implemented.** A known target gap remains. Current source defines and
 persists append-only SessionFrame snapshots with compact DataProfile, Task,
 Assumption, Hypothesis, Discovery, Evidence, and user-decision summaries plus
 warnings, stale context, dead ends, cached-result summaries, invalidation

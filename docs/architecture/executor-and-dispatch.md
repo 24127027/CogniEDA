@@ -172,7 +172,7 @@ permitted next actions, and result digest.
 
 Normalization is projection, not authorship. It preserves authoritative
 references and limitations while excluding specialist-private or
-context-ineligible material. Unit B deliberately does not freeze field names,
+context-ineligible material. The target deliberately does not freeze field names,
 wire format, or serialization details.
 
 ## Implementation status

@@ -149,7 +149,7 @@ model to infer intent.
 
 ## Implementation status
 
-**Partially implemented at operational foundations.** Current source includes
+**Partially implemented.** Current operational foundations include
 append-only SessionFrame snapshots; durable PlannerOperation approval and
 resume checks; atomic commit for a bounded operation set; paired
 ExecutionRun/outbox admission; leases, fencing epochs, retry lineage, and

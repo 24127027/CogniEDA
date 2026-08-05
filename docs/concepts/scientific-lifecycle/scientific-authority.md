@@ -111,7 +111,7 @@ scientific contract schemas:
 8. claim scope.
 
 Hypothesis Analyst may propose typed candidates. Application authority
-validates and admits immutable canonical records. Unit C defines their semantic
+validates and admits immutable canonical records. This lifecycle defines their semantic
 roles and authority boundaries; it does not invent exact field layouts that
 have not been frozen.
 
@@ -164,7 +164,7 @@ observation and provenance boundary.
 
 ## Implementation status
 
-**Design target with partial legacy support.** Current source enforces a
+**Design target.** Current source has partial legacy support: it enforces a
 repository-level one-Hypothesis-per-leaf guard using the legacy `ANALYTICAL`
 Task kind and stores scientific fields directly on current Task/Hypothesis
 models. Canonical feasibility outcomes, `ScientificInvestigationRun`,

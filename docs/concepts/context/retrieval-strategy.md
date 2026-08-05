@@ -120,7 +120,7 @@ lineage, not a generic search result.
 
 ## Implementation status
 
-**Partially implemented with an important scope limitation.** Current source
+**Partially implemented.** An important scope limitation remains. Current source
 has a pure policy that filters known object and lifecycle combinations by four
 legacy modes. A bounded planning-only `DiscoveryRetrievalEngine` filters
 Discovery lifecycle before deterministic lexical ranking and can prioritize

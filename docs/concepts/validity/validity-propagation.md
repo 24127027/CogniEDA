@@ -119,7 +119,7 @@ unproven equality fails closed.
 
 ## Implementation status
 
-**Partially implemented at narrow repository boundaries.** Current source can
+**Partially implemented.** At narrow repository boundaries, current source can
 propagate DataProfile supersession to directly scoped Evidence and Discovery
 review state when repositories are supplied in the same database session. It
 can also propagate Evidence supersession or invalidation to directly dependent

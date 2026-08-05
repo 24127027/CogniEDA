@@ -131,7 +131,7 @@ Neither an agent nor application authority edits admitted Evidence in place.
 
 ## Implementation status
 
-**Design target with partial provenance support.** Current source provides
+**Design target.** Current source provides partial provenance support through
 minimal `ExecutionRun` and `AnalysisFrame` schemas and repositories, immutable
 Evidence models, optional strict dereferencing of AnalysisFrame and
 ExecutionRun references, and some profile/Hypothesis consistency checks. It

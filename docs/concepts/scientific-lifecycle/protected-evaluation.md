@@ -106,7 +106,7 @@ CANCELLED_BY_REPLAN
 Architectures may distinguish an epistemic outcome from a lifecycle or
 termination reason. For example, `INSUFFICIENT_EVIDENCE` describes why the
 available admitted observations cannot support an eligible claim, while
-`CANCELLED_BY_REPLAN` describes why the investigation stopped. Unit C does not
+`CANCELLED_BY_REPLAN` describes why the investigation stopped. This lifecycle does not
 force both categories into a single enum.
 
 A typed ending preserves the completed work, limitations, eligible Evidence,
@@ -115,7 +115,7 @@ cardinality expectation.
 
 ## Implementation status
 
-**Design target with a partial context-safety seam.** Current source can build a
+**Design target.** Current source has a partial context-safety seam that can build a
 discovery-synthesis context that excludes Assumptions, existing Discoveries,
 Tasks, decisions, stale context, dead ends, and caches. It does not implement
 the canonical EvaluationBundle, full admitted contract/digest binding,

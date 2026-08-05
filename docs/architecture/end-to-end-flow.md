@@ -224,7 +224,7 @@ agent's retained transcript or hidden memory.
 
 ## Implementation status
 
-**Not implemented end to end.** Current main contains partial Planner
+**Unsupported.** The target flow is not supported end to end. Current main contains partial Planner
 proposal, approval, and commit behavior; generic capability dispatch
 foundations; and several durable execution-safety transitions. The canonical
 PlanRevision, role-native contracts, full specialist implementations,
