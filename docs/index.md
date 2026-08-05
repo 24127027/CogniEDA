@@ -6,9 +6,10 @@ This documentation is for researchers evaluating the model, product and engineer
 
 ## Documentation availability
 
-The documentation set is being expanded. Entries marked **Planned** identify the intended owner page for a topic, but those paths are not yet available as canonical pages in the reading journey.
-
-Markdown files elsewhere in the repository may describe earlier designs or current implementation details. They should not be treated as canonical unless linked from this index or explicitly identified as a stable reference.
+All canonical tracks listed below are **Available**. Markdown files elsewhere
+in the repository may be supporting material, compatibility notices, package
+instructions, or internal development guidance. They do not compete with the
+owner pages linked here.
 
 Implementation-status claims must distinguish supported behavior from design
 targets.
@@ -59,15 +60,20 @@ Reference pages are concise lookup surfaces. They do not compete with concept pa
 
 ### 4. Design decisions
 
-Stable tradeoffs and owner decisions will be indexed at `design-decisions/index.md` when that page becomes available. Decision records explain why a boundary exists; they are not implementation logs. This track is **Planned**.
+| Reader question | Owner page | Availability |
+| --- | --- | --- |
+| Which architecture decisions and tradeoffs are stable? | [Design decisions](design-decisions/index.md) | **Available** |
+
+Decision records explain why a boundary exists; they are not implementation
+logs or proof of current support.
 
 ### 5. Current status
 
 | Reader question | Owner page | Availability |
 | --- | --- | --- |
-| What is currently supported? | `status/current-state.md` | **Planned** |
-| What currently blocks or limits use? | `status/limitations-and-bottlenecks.md` | **Planned** |
-| What improvements are being considered? | `status/future-improvements.md` | **Planned** |
+| What is currently supported? | [Current state](status/current-state.md) | **Available** |
+| What currently blocks or limits use? | [Limitations and bottlenecks](status/limitations-and-bottlenecks.md) | **Available** |
+| What improvements are established, deferred, exploratory, or unresolved? | [Future improvements](status/future-improvements.md) | **Available** |
 
 Status pages describe reader-relevant capability boundaries rather than
 implementation chronology.
