@@ -5,6 +5,8 @@ This directory holds task-specific agent specifications.
 Keep this separate from the repository root `AGENTS.md`:
 
 - `AGENTS.md` defines repository-wide guidance for coding agents working in this codebase.
+- `rules/guidelines.md` is the session bootstrap that requires the root guide
+  and defines the operational verification discipline.
 - `.agents/*.md` defines focused agents for specific analytical roles or workflows.
 
 Current repository instructions:
