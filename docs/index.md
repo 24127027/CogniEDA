@@ -28,8 +28,8 @@ Read the tracks in this order. Within each track, read from top to bottom.
 | How are planning and scientific state kept separate? | [Planning and scientific state](concepts/research-state/planning-and-scientific-state.md) | **Available** |
 | How do identity, scope, and lineage constrain reuse? | [Identity, scope, and lineage](concepts/research-state/identity-scope-and-lineage.md) | **Available** |
 | How does a scientific investigation progress? | [Scientific lifecycle](concepts/scientific-lifecycle/index.md) | **Available** |
-| How is validity preserved over time? | `concepts/validity/` | **Planned** |
-| How are active context and continuity constructed? | `concepts/context/` | **Planned** |
+| How is validity preserved over time? | [Validity](concepts/validity/index.md) | **Available** |
+| How are active context and continuity constructed? | [Context](concepts/context/index.md) | **Available** |
 
 Concept pages own meaning. They must explain epistemic roles and lifecycle consequences before describing implementation.
 

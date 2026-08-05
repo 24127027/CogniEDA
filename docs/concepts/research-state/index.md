@@ -125,6 +125,10 @@ The system does not need to rewrite history to protect present reasoning.
 4. [Identity, scope, and lineage](identity-scope-and-lineage.md) explains
    successor identity, cardinality, historical authority, and cross-Objective
    isolation.
+5. [Validity](../validity/index.md) separates historical truth from current-use
+   eligibility and defines typed propagation.
+6. [Context](../context/index.md) defines SessionFrame, context type safety,
+   retrieval, continuity, and resume.
 
 For lookup, use the [object catalog](../../reference/object-catalog.md) and
 [terminology reference](../../reference/terminology.md). For the motivating
