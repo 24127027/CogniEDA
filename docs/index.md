@@ -10,7 +10,8 @@ The documentation set is being expanded. Entries marked **Planned** identify the
 
 Markdown files elsewhere in the repository may describe earlier designs or current implementation details. They should not be treated as canonical unless linked from this index or explicitly identified as a stable reference.
 
-Implementation-status claims must reflect the supported behavior of the current `main` branch and must distinguish present behavior from design targets.
+Implementation-status claims must distinguish supported behavior from design
+targets.
 
 ## Recommended reading journey
 
@@ -20,9 +21,12 @@ Read the tracks in this order. Within each track, read from top to bottom.
 
 | Reader question | Owner page | Availability |
 | --- | --- | --- |
-| What is CogniEDA, and what is it not? | `what-is-cognieda.md` | **Planned** |
-| Which analytical failures motivate it? | `problem-and-thesis.md` | **Planned** |
-| What is governed research state? | `concepts/research-state/` | **Planned** |
+| What is CogniEDA, and what is it not? | [What is CogniEDA?](what-is-cognieda.md) | **Available** |
+| Which analytical failures motivate it? | [Problem and thesis](problem-and-thesis.md) | **Available** |
+| What is governed research state? | [Research-state foundation](concepts/research-state/index.md) | **Available** |
+| How are objects classified across state layers? | [Objects and state layers](concepts/research-state/objects-and-state-layers.md) | **Available** |
+| How are planning and scientific state kept separate? | [Planning and scientific state](concepts/research-state/planning-and-scientific-state.md) | **Available** |
+| How do identity, scope, and lineage constrain reuse? | [Identity, scope, and lineage](concepts/research-state/identity-scope-and-lineage.md) | **Available** |
 | How does a scientific investigation progress? | `concepts/scientific-lifecycle/` | **Planned** |
 | How is validity preserved over time? | `concepts/validity/` | **Planned** |
 | How are active context and continuity constructed? | `concepts/context/` | **Planned** |
@@ -46,10 +50,10 @@ Architecture pages may define implementation-neutral contracts and authority bou
 
 | Lookup need | Owner page | Availability |
 | --- | --- | --- |
-| FCO and non-FCO catalog | `reference/object-catalog.md` | **Planned** |
+| FCO and non-FCO catalog | [Object catalog](reference/object-catalog.md) | **Available** |
 | Lifecycle states and scientific outcomes | `reference/lifecycle-and-outcome-catalog.md` | **Planned** |
 | Contracts and cardinalities | `reference/contract-and-cardinality-reference.md` | **Planned** |
-| Canonical terminology | `reference/terminology.md` | **Planned** |
+| Canonical terminology | [Terminology](reference/terminology.md) | **Available** |
 
 Reference pages are concise lookup surfaces. They do not compete with concept pages for explanatory ownership.
 
@@ -61,17 +65,19 @@ Stable tradeoffs and owner decisions will be indexed at `design-decisions/index.
 
 | Reader question | Owner page | Availability |
 | --- | --- | --- |
-| What is supported on current `main`? | `status/current-state.md` | **Planned** |
+| What is currently supported? | `status/current-state.md` | **Planned** |
 | What currently blocks or limits use? | `status/limitations-and-bottlenecks.md` | **Planned** |
 | What improvements are being considered? | `status/future-improvements.md` | **Planned** |
 
-Status pages describe reader-relevant capability boundaries. They must not become sprint plans, migration ledgers, temporary process histories, or package-by-package development histories.
+Status pages describe reader-relevant capability boundaries rather than
+implementation chronology.
 
 ## Status vocabulary
 
 Reader-facing implementation claims use these terms:
 
-- **Implemented** — supported behavior exists on the current `main` path and is backed by source evidence. The claim must name its boundary.
+- **Implemented** — supported behavior exists and is backed by source evidence.
+  The claim must name its boundary.
 - **Verified on SQLite** — a qualifier for behavior exercised against SQLite; it is not a separate capability and does not imply another database is supported.
 - **Partially implemented** — a coherent subset exists, but the complete reader- or user-facing capability does not.
 - **Design target** — an established intended boundary that is not being described as current behavior.
@@ -79,10 +85,6 @@ Reader-facing implementation claims use these terms:
 - **Known limitation** — a verified constraint of the current supported boundary.
 - **Unsupported** — no supported current path exists, even if a seam or placeholder is present.
 
-A schema alone does not imply a supported capability. A stub, fixture, catalog entry, configuration key, interface, or directory alone does not imply implementation. Design targets must never be described as current behavior.
-
-## Public and local documentation boundary
-
-Public documentation contains stable concepts, architecture, references, design decisions, and reader-relevant current status.
-
-Local development material includes audits, prompts, recovery inventories, migration ledgers, temporary development reports, review packs, verification reports, source-level change planning, and pull-request process. It belongs under `.local/development/`, is excluded from the canonical reader journey, and is not linked from public pages.
+A schema alone does not imply a supported capability. A stub, fixture, catalog
+entry, configuration key, interface, or directory alone does not imply
+implementation. Design targets must never be described as current behavior.
