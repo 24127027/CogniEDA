@@ -70,8 +70,8 @@ boundaries before durable change occurs.
 ## Eligibility for scientific investigation
 
 Only an eligible feasible leaf `SCIENTIFIC` Task can produce a Hypothesis. A
-parent or organizing Task produces neither a Hypothesis nor a Discovery. A
-proposed Task cannot execute.
+parent Task produces neither a Hypothesis nor a Discovery. A proposed Task
+cannot execute.
 
 The Hypothesis Analyst owns feasibility and scientific operationalization. For
 an eligible feasible leaf Task, it may create at most one `Hypothesis` through

@@ -43,21 +43,24 @@ contradict the hypothesis, or may determine that the available Evidence is
 insufficient.
 
 Suppose the completed protocol produces a clearly valuable but inconclusive
-outcome. That outcome does not automatically become a Discovery or current
-scientific authority. It is eligible for a `VALUABLE_INCONCLUSIVE` Discovery
-only when the claim is narrowly scoped, a DiscoveryProposal is produced,
-governance approves it, and application authority admits it. Otherwise it
-remains a typed non-Discovery outcome. Either path can preserve the useful
-statement that the available Evidence does not justify the proposed
-association without converting it into the stronger claim that no relationship
-exists.
+outcome. This does not automatically create a Discovery. In this case, the
+scientific investigation produces a narrowly scoped `DiscoveryProposal`
+stating only that the available Evidence did not establish the proposed
+association under the admitted data, method, decision rule, and scope.
+Governance approves that exact proposal, and application authority admits it
+as a `VALUABLE_INCONCLUSIVE` Discovery.
+
+Had those conditions not been met, the investigation would instead have ended
+with a typed non-Discovery outcome. That path could still preserve the useful
+outcome without converting it into an admitted scientific claim or the
+stronger claim that no relationship exists.
 
 Months later, the cohort logic is found to have included trial accounts after
-all. The earlier result still belongs in the historical record: it truthfully
-describes what was observed and decided at the time. But it is no longer safe
-to reuse as current scientific authority for the intended cohort. The next
-session must see both facts—the history and the loss of current validity—rather
-than retrieving only the most fluent old summary.
+all. The admitted Discovery remains historical truth-to-record: it truthfully
+describes what was observed and admitted at the time. But it loses current-use
+eligibility for the intended cohort. The next session must see both facts—the
+history and the loss of current validity—rather than retrieving only the most
+fluent old summary.
 
 This is the continuity CogniEDA is designed to provide. It is not transcript
 replay. It is reconstruction of the governed state needed to answer: What were

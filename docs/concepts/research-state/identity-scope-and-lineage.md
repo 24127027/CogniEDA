@@ -60,7 +60,7 @@ Hypothesis
   -> admitted Evidence through investigation and provenance records
   -> at most one Discovery
 
-parent or organizing Task
+parent Task
   -> no Hypothesis
   -> no Discovery
 ```
