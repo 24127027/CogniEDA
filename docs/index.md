@@ -20,8 +20,8 @@ Read the tracks in this order. Within each track, read from top to bottom.
 
 | Reader question | Owner page | Availability |
 | --- | --- | --- |
-| What is CogniEDA, and what is it not? | `what-is-cognieda.md` | **Planned** |
-| Which analytical failures motivate it? | `problem-and-thesis.md` | **Planned** |
+| What is CogniEDA, and what is it not? | [What is CogniEDA?](what-is-cognieda.md) | **Available** |
+| Which analytical failures motivate it? | [Problem and thesis](problem-and-thesis.md) | **Available** |
 | What is governed research state? | `concepts/research-state/` | **Planned** |
 | How does a scientific investigation progress? | `concepts/scientific-lifecycle/` | **Planned** |
 | How is validity preserved over time? | `concepts/validity/` | **Planned** |
