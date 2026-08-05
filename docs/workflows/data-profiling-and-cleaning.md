@@ -31,7 +31,8 @@ Not implemented:
 - Cleaning execution service.
 - User-reviewed cleaning decision loop.
 - Automated derived dataset creation.
-- Propagation rules when a `DataProfile` is superseded.
+- Complete typed propagation through provenance, protected evaluation,
+  Discovery admission, active context, and GeneratedView eligibility.
 
 ## Implementation Status
 
@@ -40,6 +41,12 @@ Partially implemented.
 ## Known Deviation
 
 DVC identity is currently supplied by callers or left empty. The code does not run `dvc` commands, and `pyproject.toml` does not declare DVC as a runtime dependency.
+
+Current repositories provide only a narrow DataProfile-supersession path that
+can mark directly scoped Evidence as historical and flag dependent Discoveries
+when the related repositories share one database session. This is not the
+complete [validity propagation](../concepts/validity/validity-propagation.md)
+model.
 
 ## Development Guidance
 

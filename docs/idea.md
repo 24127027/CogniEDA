@@ -1,3 +1,11 @@
+# Legacy design exploration
+
+> This unversioned exploration is retained as historical input and is not a
+> canonical architecture owner. Its “memory system,” Context Frame, graph,
+> lifecycle, and conclusion terminology predates the governed research-state
+> model. Use the [documentation index](index.md), [Validity](concepts/validity/index.md),
+> and [Context](concepts/context/index.md) for current canonical ownership.
+
 You are working on a project called CogniEDA.
 
 CogniEDA is not just an exploratory data analysis tool. It is an agentic data investigation system designed for long-running, evidence-based analytical work.

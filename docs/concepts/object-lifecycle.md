@@ -6,8 +6,9 @@ with concise state and outcome lookup in the
 [Lifecycle and outcome catalog](../reference/lifecycle-and-outcome-catalog.md).
 
 Validity and current-use eligibility remain separate from scientific
-lifecycle. The existing [Validity envelope](validity-envelope.md) is not
-superseded by Unit C and remains pending later validity-track reconciliation.
+lifecycle. Canonical ownership now belongs to [Validity](validity/index.md),
+with typed downstream consequences in
+[Validity propagation](validity/validity-propagation.md).
 
 For current implementation gaps, use the status track when Unit E makes it
 available; this compatibility page does not claim runtime support.

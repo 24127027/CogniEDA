@@ -75,7 +75,9 @@ Current implementation:
 - `Assumption` stores source, testability, scope, scoped DataProfile ids, contradiction Discovery refs, and replacement refs.
 - Schema admission rejects claims marked as testable so they can be converted into Task/Hypothesis candidates instead of Assumptions.
 - `SessionContextBuilder` excludes assumptions from conclusion/discovery-synthesis context.
-- No planner warning flow or graph retrieval policy exists.
+- No planner warning flow or complete Objective-bound retrieval strategy
+  exists. Current local policy covers only a subset of context modes and
+  lifecycle/type checks.
 
 Status: Partially implemented.
 
@@ -101,18 +103,24 @@ Status: Partially implemented.
 
 Target design:
 
-- `SessionFrame` is visible active context.
-- User can inspect, pin, remove, reorder, or exclude items.
-- Every item has an inclusion reason and audit note.
+- `SessionFrame` is a governed active-context FCO outside the semantic
+  Knowledge Graph.
+- It is bound to an Objective, purpose, reasoning mode, scope, lifecycle point,
+  and validity basis.
+- It selects bounded references without transferring authority or replacing a
+  protected EvaluationBundle.
 
 Current implementation:
 
 - `SessionFrame` snapshots store compact profile, task, assumption, hypothesis, discovery, evidence, decision-provenance, stale-context, dead-end, cache, and warning summaries.
 - Planning, answer, and discovery-synthesis projection is implemented locally.
 - Existing Discoveries are available for planning and answer context but excluded from discovery-synthesis context.
-- No UI or per-item user governance exists.
+- Current frames are not explicitly bound by Objective identifier, purpose,
+  reasoning mode, or the complete target eligibility record.
 
 Status: Partially implemented.
+
+The canonical owner is [SessionFrame](../concepts/context/session-frame.md).
 
 ### 7. Execution, Evidence, And Discovery
 
