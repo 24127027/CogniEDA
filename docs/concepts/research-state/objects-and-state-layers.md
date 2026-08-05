@@ -95,5 +95,7 @@ objects retain the authority and eligibility rules of their own types.
 Read [Planning and scientific state](planning-and-scientific-state.md) for the
 handoffs that prevent planning material from becoming scientific support.
 Read [Identity, scope, and lineage](identity-scope-and-lineage.md) for successor
-semantics and cardinalities. Use the
+semantics and cardinalities. Continue to the
+[System overview](../../architecture/system-overview.md) before the
+[Scientific lifecycle](../scientific-lifecycle/index.md). Use the
 [object catalog](../../reference/object-catalog.md) for compact lookup.

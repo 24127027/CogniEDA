@@ -1,24 +1,39 @@
 # CogniEDA Agent Guide
 
-CogniEDA is a governed research-state system for analytical investigation. Do not treat this project as a generic chat-memory, notebook, or vector-retrieval app.
+CogniEDA is validity-preserving research-state infrastructure for analytical
+investigation. Do not treat it as generic chat memory, a notebook, or a vector
+retrieval application.
 
-Your highest priority is epistemic correctness: every conclusion must remain traceable, valid within scope, and protected from the wrong kind of memory entering reasoning.
+Epistemic correctness is the highest priority: every claim must remain
+traceable, scope-valid, and protected from the wrong state entering reasoning.
 
-## Source Of Truth
+## Source of truth
 
-- Use source code as the source of truth for what currently exists.
-- Use `first-class-object.txt` as the canonical target architecture when available.
-- Use `user-agent-workflow.txt` as the target user-facing workflow when available.
-- Use `src/agents/planner/nodes.py` and `src/agents/planner/graph.py` for current planner scaffolding and intended node names.
-- If design docs and code conflict, document the conflict. Do not silently resolve it.
+- Source code and tests are authoritative for what currently exists.
+- [docs/index.md](docs/index.md) links the canonical target owners.
+- [docs/design-decisions/index.md](docs/design-decisions/index.md) records stable
+  decisions and tradeoffs.
+- [docs/status/current-state.md](docs/status/current-state.md) records the dated,
+  evidence-qualified implementation boundary. Reverify source before changing
+  a current claim.
+- If target documentation and code differ, report the difference. Do not
+  silently reinterpret either one.
+- Verify the active branch and ancestry. Do not infer current branch topology
+  from docs, reports, or prior work.
 
-## Current Implementation Warning
+## Current implementation warning
 
-The local schema and persistence layer now use the target FCO names, but several runtime pieces remain scaffold-level: planner nodes are mostly stubs, executable DVC integration is not implemented, and full `PlannerOperation`, `AnalysisFrame`, `ExecutionRun`, and cache persistence records are still missing.
+All eight FCO names have schemas and SQLModel records. `PlannerOperation`,
+`AnalysisFrame`, `ExecutionRun`, and other provenance/operational records also
+exist. This does not establish the canonical workflow. Current Tasks use legacy
+kinds and scientific fields; PlanRevision and scientific-investigation
+contracts are absent; Planner execution nodes and specialist graphs are stubs;
+DVC and product CLI support are absent; database behavior is verified only on
+SQLite. Keep detailed claims in the status track.
 
-## Target FCO Set
+## Exact FCO and graph boundaries
 
-Only these are target First-Class Objects:
+The target FCO set is exactly:
 
 - `Objective`
 - `DataProfile`
@@ -29,80 +44,90 @@ Only these are target First-Class Objects:
 - `Discovery`
 - `SessionFrame`
 
-Do not introduce these as FCOs unless explicitly instructed by the project owner:
+The semantic Knowledge Graph contains exactly `Objective`, `Hypothesis`,
+`Evidence`, and `Discovery`. `SessionFrame` is an FCO outside that graph.
 
-- `Workspace`
-- `Question`
-- `AnalysisFrame`
-- `GeneratedView`
-- `PlannerOperation`
-- `ExecutionRun`
-- `EvidenceCacheEntry`
+Do not promote `Workspace`, `Question`, `PlanRevision`, `AnalysisFrame`,
+`GeneratedView`, `PlannerOperation`, `ExecutionRun`, `EvidenceCacheEntry`, or
+other workflow/provenance/cache/presentation state into an FCO.
 
-## Target Non-FCO Boundaries
+## Canonical Task and plan rules
 
-- `Workspace` is a filesystem/runtime boundary, not an FCO.
-- `Question` is UI input that becomes a `Task`, not an FCO.
-- `AnalysisFrame` is provenance/data-view, not an FCO.
-- `GeneratedView` is runtime/provenance output, not `Discovery`.
-- `PlannerOperation` is pending mutation, not an FCO.
-- `ExecutionRun` is provenance, not an FCO.
-- `EvidenceCacheEntry` is cache, not an FCO.
+- Task kinds are exactly `DATA`, `SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`.
+- Do not add compatibility fallback from legacy `ANALYTICAL`, `ORGANIZING`, or
+  `REVIEW` to canonical new-write paths.
+- Task owns semantic work identity. PlanRevision and plan-version state own
+  membership, dependency, assignment, ordering, and approval metadata.
+- Semantic Task change creates a successor; coordination-only change belongs
+  in plan-version state.
+- Proposed Tasks cannot execute.
+- Only an eligible feasible leaf `SCIENTIFIC` Task may enter scientific
+  investigation and produce at most one Hypothesis.
+- A parent Task produces neither a Hypothesis nor a Discovery.
+- One Hypothesis produces at most one Discovery.
 
-## Target Invariants
+## Authority boundaries
 
-- `DataProfile` is immutable.
-- `Evidence` is immutable.
-- `Discovery` cannot exist without `Evidence`.
-- `Discovery` must have structured `claim`, `scope`, and `validity_basis`.
-- `Assumption` may guide planning but must be excluded from Conclusion/Discovery Synthesis Context.
-- Proposed `Task`s cannot execute.
-- Only active terminal analytical `Task`s can generate `Hypothesis` objects.
-- One terminal analytical `Task` generates exactly one `Hypothesis`.
-- One `Hypothesis` produces exactly one `Discovery`.
-- Parent `Task`s do not produce `Discovery` objects.
-- Planner nodes produce operations; `commit` persists approved operations atomically.
+- Human interaction is through Planner only.
+- Planner coordinates Objective and plan work, consultations, approvals,
+  routing, replanning, active context, and presentation. Planner does not
+  author scientific feasibility, Hypotheses, methods, parameters, decision
+  rules, protocols, Evidence obligations, protected evaluation, or
+  DiscoveryProposal content.
+- Data Explorer exclusively accesses datasets and performs bounded data work.
+  It returns observations and provenance material; it does not evaluate.
+- Hypothesis Analyst owns scientific feasibility, operationalization,
+  protocols, obligations, and protected evaluation. It never accesses datasets
+  directly.
+- Graph Miner is read-only. It cannot mutate state, access datasets, perform
+  governance, or create Evidence or Discovery.
+- Governance may approve, reject, hold, or request correction, more Evidence,
+  or conflict review. It does not rewrite scientific content or persist state.
+- Application authority owns identity, validation, admission, persistence,
+  atomic transitions, validity propagation, replay safety, and fail-closed
+  enforcement.
 
-## Epistemic Discipline
+## Epistemic and context discipline
 
-- Keep research intent, workflow state, data state, assumptions, hypothesis/test contracts, observed evidence, evidence-bound discoveries, active context, provenance, and cache separate.
-- A `Task` is workflow state, not scientific knowledge.
-- `Evidence` is observed analytical result, not interpretation.
-- `Discovery` is an evidence-bound claim, not a paragraph summary.
-- `Assumption` cannot be used as an inference premise.
-- Fail-to-reject and inconclusive results still produce knowledge, but phrase them correctly.
-- Do not write "there is no relationship" unless evidence supports that stronger claim.
-- Prefer: "available evidence is insufficient to reject independence within scope S using method M on DataProfile V."
+- Keep intent, workflow, data state, Assumptions, scientific contracts,
+  observations, claims, active context, provenance, and cache separate.
+- Assumptions guide planning only and cannot be inference premises.
+- Evidence is an admitted observation, not raw executor output or
+  interpretation.
+- Discovery is an evidence-bound admitted claim, not a summary or generated
+  view.
+- Conclusion and Discovery Synthesis Context exclude Assumptions, prior
+  Discoveries, Tasks, raw chat, failed reasoning, invalid state, unverified
+  views, and caches.
+- Eligibility precedes relevance. Similarity never grants authority.
+- Cross-Objective access and reuse fail closed unless an exact canonical
+  admission contract authorizes them.
+- Fail-to-reject and inconclusive outcomes must be phrased without claiming a
+  stronger absence of relationship. Prefer: “available evidence is
+  insufficient to reject independence within scope S using method M on
+  DataProfile V.”
 
-## Context Type Safety
+## Mutation, validity, and hard cutover
 
-Planning Context may include `Assumption` objects.
+- DataProfile and Evidence payloads are immutable. Changed data creates a new
+  dataset version and DataProfile; changed analytical output creates new
+  Evidence with a traceable lifecycle relation.
+- Evidence invalidation or supersession changes current-use eligibility without
+  deleting historical truth.
+- Discovery-to-Assumption contradiction creates a review signal and does not
+  rewrite or delete the Assumption.
+- Canonical new writes accept only canonical contracts. Legacy shapes may
+  remain historical provenance but never fallback authority.
+- Canonicalization is structural only; do not infer synonyms, units, semantic
+  equivalence, cross-Objective compatibility, or missing scientific meaning.
+- Missing identity, lineage, scope, authorization, or contract version fails
+  closed.
+- A supported product CLI is outside the current phase. Do not present the
+  placeholder entry point or internal DB initializer as one.
 
-Conclusion/Discovery Synthesis Context must exclude `Assumption` objects and existing `Discovery` objects, and rely only on:
+## Planner pipeline target
 
-- `Hypothesis`
-- `DataProfile`
-- `AnalysisFrame` provenance
-- `Evidence`
-- method metadata
-- parameters
-- decision rule
-- uncertainty
-- validity basis
-- necessary provenance
-
-Do not retrieve rejected `Task`s, completed `Hypothesis` objects, existing `Discovery` objects, raw chat history, failed reasoning chains, or unverified `GeneratedView`s into Conclusion/Discovery Synthesis Context by default.
-
-## Mutation And Lifecycle Rules
-
-- If cleaning or preprocessing changes data, create a new dataset version and a new `DataProfile`. Do not overwrite an existing `DataProfile`.
-- If analytical output is wrong, stale, or superseded, create new `Evidence` and mark old `Evidence` as superseded or invalidated. Do not manually edit `Evidence`.
-- After `Discovery` is created, it may be compared with `Assumption` objects to flag contradiction. Do not automatically rewrite or delete `Assumption` objects.
-- Flagging is not mutation of truth. It is a review signal.
-
-## Planner Pipeline Target
-
-Preserve this pipeline unless the project owner changes the design:
+Preserve this target pipeline unless an authoritative decision changes it:
 
 ```text
 understand_request
@@ -124,23 +149,31 @@ process_decision
 commit
 ```
 
-Planner nodes should produce operations rather than directly mutating persistent graph state. The commit step should atomically persist approved operations.
+Planner nodes produce operations; commit atomically persists only approved
+operations through application authority.
 
-## Documentation Rules
+## Documentation rules
 
-- Inspect code before editing docs.
-- Label `Current implementation`, `Target design`, `Implementation status`, `Known deviation`, and `Not yet implemented` explicitly.
-- Update [docs/architecture/implementation-gap-analysis.md](docs/architecture/implementation-gap-analysis.md) when drift is found.
-- Do not turn design targets into false implementation claims.
-- Do not treat generated summaries as architectural truth.
-- Update `README.md` only with verified commands and implemented features.
+- Inspect code before editing documentation.
+- Use only: `Implemented`, `Verified on SQLite`, `Partially implemented`,
+  `Design target`, `Deferred`, `Known limitation`, and `Unsupported` for
+  reader-facing implementation status.
+- Name the boundary of every current claim. A file, schema, interface, stub,
+  fixture, configuration key, or empty directory is not implementation proof.
+- Update the status track when verified current behavior or limitations change.
+- Do not turn a target, review report, owner decision, or generated summary into
+  an implementation claim.
+- Update README only with verified commands and supported boundaries.
 
-## Implementation Rules
+## Implementation rules
 
-- Classify new features before implementation: FCO, workflow state, provenance, cache, filesystem artifact, or generated view.
-- Default uncertain durable objects to provenance or generated view rather than promoting them into durable knowledge.
-- Prefer explicit schemas, validators, lifecycle guards, and tests over informal conventions.
-- Make the smallest coherent change that preserves the FCO model.
+- Classify a feature before implementation: FCO, workflow state, provenance,
+  cache, filesystem artifact, or generated view.
+- Default uncertain durable state to provenance or generated view, not durable
+  scientific knowledge.
+- Prefer explicit schemas, validators, lifecycle guards, and tests.
+- Make the smallest coherent change that preserves the canonical model.
 - Add or update tests for every invariant touched.
 
-After completing a task, report what changed, which invariant was protected, what tests were run, and any unresolved architectural risk.
+After a task, report what changed, the protected invariant, exact checks run,
+and unresolved architectural risk.

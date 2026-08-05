@@ -107,6 +107,9 @@ Detailed admission predicates belong to a later contract reference; the
 foundational rule is isolation unless exact typed obligations are satisfied and
 reuse is explicitly admitted.
 
+The [Contract and cardinality reference](../../reference/contract-and-cardinality-reference.md)
+owns the current scientific contract and cardinality lookup.
+
 ## Structural canonicalization preserves meaning
 
 Canonical construction makes structure deterministic. It may validate a finite

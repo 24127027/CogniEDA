@@ -119,10 +119,18 @@ The system does not need to rewrite history to protect present reasoning.
 1. [Objects and state layers](objects-and-state-layers.md) classifies the eight
    FCOs and the major non-FCO record families.
 2. [Planning and scientific state](planning-and-scientific-state.md) explains
-   the authority boundary from Objective and Task through Evidence and outcome.
+   why planning authority cannot become scientific authority.
 3. [Identity, scope, and lineage](identity-scope-and-lineage.md) explains
    successor identity, cardinality, historical authority, and cross-Objective
    isolation.
+4. [System overview](../../architecture/system-overview.md) introduces the
+   authority and system boundaries that govern the state transitions.
+5. [Scientific lifecycle](../scientific-lifecycle/index.md) defines the
+   investigation, Evidence, evaluation, outcome, and governance sequence.
+6. [Validity](../validity/index.md) separates historical truth from current-use
+   eligibility and defines typed propagation.
+7. [Context](../context/index.md) defines SessionFrame, context type safety,
+   retrieval, continuity, and resume.
 
 For lookup, use the [object catalog](../../reference/object-catalog.md) and
 [terminology reference](../../reference/terminology.md). For the motivating
