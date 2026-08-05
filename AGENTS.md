@@ -57,9 +57,11 @@ Do not introduce these as FCOs unless explicitly instructed by the project owner
 - `Discovery` must have structured `claim`, `scope`, and `validity_basis`.
 - `Assumption` may guide planning but must be excluded from Conclusion/Discovery Synthesis Context.
 - Proposed `Task`s cannot execute.
-- Only active terminal analytical `Task`s can generate `Hypothesis` objects.
-- One terminal analytical `Task` generates exactly one `Hypothesis`.
-- One `Hypothesis` produces exactly one `Discovery`.
+- Only an eligible feasible leaf `SCIENTIFIC` `Task` can enter scientific
+  investigation and generate a `Hypothesis` candidate.
+- One eligible feasible leaf `SCIENTIFIC` `Task` generates at most one
+  `Hypothesis`.
+- One `Hypothesis` produces at most one `Discovery`.
 - Parent `Task`s do not produce `Discovery` objects.
 - Planner nodes produce operations; `commit` persists approved operations atomically.
 

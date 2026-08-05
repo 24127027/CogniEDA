@@ -94,6 +94,8 @@ objects retain the authority and eligibility rules of their own types.
 
 Read [Planning and scientific state](planning-and-scientific-state.md) for the
 handoffs that prevent planning material from becoming scientific support.
+Read the [Scientific lifecycle](../scientific-lifecycle/index.md) for the full
+investigation and governance sequence.
 Read [Identity, scope, and lineage](identity-scope-and-lineage.md) for successor
 semantics and cardinalities. Use the
 [object catalog](../../reference/object-catalog.md) for compact lookup.
