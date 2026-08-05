@@ -24,8 +24,8 @@ Current tests cover:
 - DataProfile and Evidence immutability
 - Discovery requires Evidence and validity basis
 - Task admission guards before Hypothesis creation
-- database uniqueness/repository guards for one terminal Task to one Hypothesis
-- database uniqueness/repository guards for one Hypothesis to one Discovery
+- legacy database uniqueness/repository upper bounds for Task-to-Hypothesis and
+  Hypothesis-to-Discovery records
 - Assumption testability admission and contradiction flagging without statement rewrite
 - protected Discovery Synthesis Context excludes Assumptions, Tasks, existing Discoveries, stale context, and caches
 - baseline profiling semantic dtype behavior

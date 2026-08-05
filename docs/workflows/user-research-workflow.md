@@ -85,7 +85,8 @@ Target design:
 
 - Planner proposes task operations before durable Task creation.
 - Approved Tasks become active.
-- Broad Tasks are decomposed into child Tasks until terminal analytical Tasks are reached.
+- Broad work is decomposed into leaf Tasks of canonical kind `DATA`,
+  `SCIENTIFIC`, `GRAPH`, or `SYNTHESIS` as required by the deliverables.
 
 Current implementation:
 
@@ -117,20 +118,29 @@ Status: Partially implemented.
 
 Target design:
 
-- A terminal analytical Task compiles into exactly one `Hypothesis`.
-- Planner prepares execution and dispatches a specialist executor.
-- Executor creates or references AnalysisFrame provenance.
-- Executor produces immutable `Evidence`.
-- Executor authors a `Discovery` draft as an evidence-bound claim.
-- Commit persists approved executor outputs with execution provenance.
+- Only an eligible feasible leaf `SCIENTIFIC` Task can source at most one
+  `Hypothesis`; a parent Task sources none.
+- Hypothesis Analyst owns feasibility and scientific operationalization;
+  Planner does not author the Hypothesis or protocol.
+- Admitted EvidenceRequests are executed through Data Explorer under derived
+  DataWorkOrders and exact ExecutionRun/AnalysisFrame provenance.
+- Application authority, not an executor, admits immutable `Evidence`.
+- Protected evaluation may create a `DiscoveryProposal` or typed
+  non-completion.
+- Governance authorizes an exact proposal without rewriting it; application
+  authority atomically admits at most one Discovery for the Hypothesis.
+
+The [Scientific lifecycle](../concepts/scientific-lifecycle/index.md) owns this
+sequence and its contracts.
 
 Current implementation:
 
 - `Hypothesis`, `Evidence`, and `Discovery` schemas/tables/repositories exist.
 - Evidence requires `DataProfile`, `AnalysisFrame`, and `ExecutionRun` references.
 - Discovery requires Evidence and `validity_basis`.
-- Repository guards enforce one Task to one Hypothesis and one Hypothesis to one Discovery for fresh local stores.
-- Executor contracts can return Evidence/Discovery drafts.
+- Repository guards enforce legacy upper bounds for one Task to one Hypothesis
+  and one Hypothesis to one Discovery for fresh local stores.
+- Generic executor contracts predate the canonical role-native contracts.
 - Executor nodes are stubs.
 
 Status: Partially implemented.
@@ -157,7 +167,9 @@ Target design:
 
 - User reviews open Tasks, testing Hypotheses, and flagged Assumptions.
 - Planner traverses Objective, Tasks, Hypotheses, Evidence, Discoveries, Assumptions, DataProfiles, and provenance records to generate a research summary.
-- Summary output is a generated view unless new claims go through Task -> Hypothesis -> Evidence -> Discovery.
+- Summary output is a GeneratedView. A new claim must follow the complete
+  [scientific lifecycle](../concepts/scientific-lifecycle/index.md), including
+  protected evaluation, governance, and application-authority admission.
 
 Current implementation:
 
