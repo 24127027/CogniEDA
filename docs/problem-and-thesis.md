@@ -83,10 +83,17 @@ Agent-assisted investigation involves several distinct acts:
 
 1. A person expresses intent or makes a governance decision.
 2. A Planner interprets the request and proposes coordinated work.
-3. A specialist performs a bounded analytical role.
-4. An evaluator determines what the admitted Evidence supports.
-5. Governance accepts, rejects, revises, or cancels a proposed outcome.
-6. Application authority admits the resulting state and enforces its lifecycle.
+3. A specialist performs bounded, role-specific work.
+4. Protected evaluation determines what admitted Evidence supports. Final
+   scientific evaluation belongs to the Hypothesis Analyst or scientific
+   investigation controller; it is an authority-bounded act, not a peer
+   Evaluator agent.
+5. Governance may approve, reject, or hold an eligible proposal. It may request
+   correction, additional Evidence, or conflict review, but it does not revise
+   scientific content directly. The appropriate scientific authority must
+   create any revised proposal.
+6. Application authority validates and admits only the authorized resulting
+   state, then enforces its lifecycle.
 
 If all participants appear able to “create” the same scientific object, the
 system cannot explain where authority entered the record. The component that
@@ -195,10 +202,14 @@ to remain incomplete.
 
 An investigation may therefore end with insufficient Evidence, a not-testable
 status, protocol exhaustion, invalidation, cancellation, or another governed
-non-Discovery outcome. A selected inconclusive result may be valuable knowledge
-when stated precisely. For example, “the available Evidence was insufficient to
-establish the proposed association within this scope and method” is useful; it
-is not the same as “no association exists.”
+non-Discovery outcome. An inconclusive investigation is neither automatically
+a Discovery nor automatically current scientific authority. A
+`VALUABLE_INCONCLUSIVE` Discovery requires protocol completion, clear value, a
+narrowly bounded claim, a DiscoveryProposal, governance, and authoritative
+admission. Without those conditions the result remains a typed non-Discovery
+outcome. In either case, “the available Evidence was insufficient to establish
+the proposed association within this scope and method” can be useful; it is not
+the same as “no association exists.”
 
 Scientific restraint is not a lack of capability. It is the capability to
 preserve the strongest conclusion the Evidence permits—and no stronger one.
@@ -223,10 +234,12 @@ may admit it.
 
 ### Role and authority separation
 
-The human, Planner, specialist executors, evaluators, and application authority
-services have different responsibilities. Their outputs cross explicit
-boundaries. No role silently acquires observation, interpretation, governance,
-and persistence authority at once.
+The human, Planner, role-specific specialists, protected scientific evaluation,
+governance, and application authority have different responsibilities. Their
+outputs cross explicit boundaries. No role silently acquires observation,
+interpretation, governance, and persistence authority at once. Protected final
+evaluation belongs to the Hypothesis Analyst or scientific investigation
+controller rather than to a separate canonical Evaluator agent.
 
 ### Immutable or append-oriented scientific lineage
 

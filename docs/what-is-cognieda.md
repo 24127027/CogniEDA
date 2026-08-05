@@ -42,11 +42,15 @@ analytical contract. Protected evaluation may support a scoped finding, may
 contradict the hypothesis, or may determine that the available Evidence is
 insufficient.
 
-Suppose the result is selected as a valuable inconclusive outcome. The team has
-learned something useful: under the stated data, method, and scope, the
-available Evidence does not justify the proposed association. Scientific
-restraint preserves that result without converting it into the stronger claim
-that no relationship exists.
+Suppose the completed protocol produces a clearly valuable but inconclusive
+outcome. That outcome does not automatically become a Discovery or current
+scientific authority. It is eligible for a `VALUABLE_INCONCLUSIVE` Discovery
+only when the claim is narrowly scoped, a DiscoveryProposal is produced,
+governance approves it, and application authority admits it. Otherwise it
+remains a typed non-Discovery outcome. Either path can preserve the useful
+statement that the available Evidence does not justify the proposed
+association without converting it into the stronger claim that no relationship
+exists.
 
 Months later, the cohort logic is found to have included trial accounts after
 all. The earlier result still belongs in the historical record: it truthfully
@@ -95,9 +99,11 @@ reward for completing an analysis.
 
 Not every investigation produces a Discovery. Work may end with insufficient
 Evidence, a not-testable status, an exhausted protocol, invalidation,
-cancellation, or another typed non-Discovery outcome. A valuable inconclusive
-result can also be retained without manufacturing certainty. These outcomes
-are part of disciplined research state, not failures to generate content.
+cancellation, or another typed non-Discovery outcome. Even a valuable
+inconclusive result becomes a Discovery only after protocol completion,
+narrowly scoped proposal, governance, and authoritative admission. These
+outcomes are part of disciplined research state, not failures to generate
+content.
 
 ## What CogniEDA is not
 
@@ -194,5 +200,7 @@ Present capability and maturity belong in status documentation rather than in
 this conceptual entry point.
 
 Read [Problem and thesis](problem-and-thesis.md) for the failure modes that make
-this infrastructure necessary, or return to the
+this infrastructure necessary. Continue with the
+[research-state foundation](concepts/research-state/index.md), consult the
+[object catalog](reference/object-catalog.md), or return to the
 [documentation index](index.md).
