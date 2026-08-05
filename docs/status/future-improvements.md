@@ -67,4 +67,3 @@ These directions may be investigated but are not approved architecture:
   been established.
 - Any future CLI proposal must be separately approved; the current-phase
   decision is no supported product CLI.
-
