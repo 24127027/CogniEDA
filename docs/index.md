@@ -37,12 +37,12 @@ Concept pages own meaning. They must explain epistemic roles and lifecycle conse
 
 | Architecture concern | Owner page | Availability |
 | --- | --- | --- |
-| System boundaries and major flows | `architecture/system-overview.md` | **Planned** |
-| Human, agent, and application authority | `architecture/authority-boundaries.md` | **Planned** |
-| Planner coordination and mutation proposals | `architecture/planner-architecture.md` | **Planned** |
-| Specialist dispatch and execution boundaries | `architecture/executor-and-dispatch.md` | **Planned** |
-| Persistence, admission, and transaction ownership | `architecture/persistence-and-admission.md` | **Planned** |
-| End-to-end operational flow | `architecture/end-to-end-flow.md` | **Planned** |
+| System boundaries and major flows | [System overview](architecture/system-overview.md) | **Available** |
+| Human, agent, and application authority | [Authority boundaries](architecture/authority-boundaries.md) | **Available** |
+| Planner coordination and mutation proposals | [Planner architecture](architecture/planner-architecture.md) | **Available** |
+| Specialist dispatch and execution boundaries | [Executor and dispatch](architecture/executor-and-dispatch.md) | **Available** |
+| Persistence, admission, and transaction ownership | [Persistence and admission](architecture/persistence-and-admission.md) | **Available** |
+| End-to-end operational flow | [End-to-end flow](architecture/end-to-end-flow.md) | **Available** |
 
 Architecture pages may define implementation-neutral contracts and authority boundaries. They must not promote a current package layout into architectural meaning.
 
