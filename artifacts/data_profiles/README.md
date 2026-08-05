@@ -2,7 +2,10 @@
 
 This directory is a reviewable mirror/template surface for `DataProfile` records.
 
-Runtime truth is the workspace-local graph database. Files here should not be treated as a second source of truth unless an explicit import/export workflow is added.
+Current durable repository records use the configured SQLModel store, verified
+on SQLite. Files here should not be treated as a second source of truth unless
+an explicit import/export workflow is added. No graph-database integration or
+composed runtime is currently supported.
 
 Each mirror should align with `schemas.artifacts.DataProfile` and store dataset-version identity directly:
 

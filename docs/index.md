@@ -18,7 +18,7 @@ targets.
 
 Read the tracks in this order. Within each track, read from top to bottom.
 
-### 1. Conceptual reading
+### 1. Foundation
 
 | Reader question | Owner page | Availability |
 | --- | --- | --- |
@@ -28,9 +28,6 @@ Read the tracks in this order. Within each track, read from top to bottom.
 | How are objects classified across state layers? | [Objects and state layers](concepts/research-state/objects-and-state-layers.md) | **Available** |
 | How are planning and scientific state kept separate? | [Planning and scientific state](concepts/research-state/planning-and-scientific-state.md) | **Available** |
 | How do identity, scope, and lineage constrain reuse? | [Identity, scope, and lineage](concepts/research-state/identity-scope-and-lineage.md) | **Available** |
-| How does a scientific investigation progress? | [Scientific lifecycle](concepts/scientific-lifecycle/index.md) | **Available** |
-| How is validity preserved over time? | [Validity](concepts/validity/index.md) | **Available** |
-| How are active context and continuity constructed? | [Context](concepts/context/index.md) | **Available** |
 
 Concept pages own meaning. They must explain epistemic roles and lifecycle consequences before describing implementation.
 
@@ -47,7 +44,35 @@ Concept pages own meaning. They must explain epistemic roles and lifecycle conse
 
 Architecture pages may define implementation-neutral contracts and authority boundaries. They must not promote a current package layout into architectural meaning.
 
-### 3. Reference
+### 3. Scientific lifecycle
+
+| Reader question | Owner page | Availability |
+| --- | --- | --- |
+| How does a scientific investigation progress? | [Scientific lifecycle](concepts/scientific-lifecycle/index.md) | **Available** |
+| Who owns scientific feasibility and operationalization? | [Scientific authority](concepts/scientific-lifecycle/scientific-authority.md) | **Available** |
+| How do observations become Evidence? | [Evidence and AnalysisFrames](concepts/scientific-lifecycle/evidence-and-analysis-frames.md) | **Available** |
+| What may enter protected evaluation? | [Protected evaluation](concepts/scientific-lifecycle/protected-evaluation.md) | **Available** |
+| How are proposals governed and Discoveries admitted? | [Discovery governance](concepts/scientific-lifecycle/discovery-governance.md) | **Available** |
+
+### 4. Validity
+
+| Reader question | Owner page | Availability |
+| --- | --- | --- |
+| How is historical truth separated from current-use eligibility? | [Validity](concepts/validity/index.md) | **Available** |
+| How do validity states change over time? | [Validity over time](concepts/validity/validity-over-time.md) | **Available** |
+| How do typed validity consequences propagate? | [Validity propagation](concepts/validity/validity-propagation.md) | **Available** |
+
+### 5. Context and continuity
+
+| Reader question | Owner page | Availability |
+| --- | --- | --- |
+| How is active context constructed? | [Context](concepts/context/index.md) | **Available** |
+| What does SessionFrame govern? | [SessionFrame](concepts/context/session-frame.md) | **Available** |
+| Which records are eligible for each reasoning mode? | [Context type safety](concepts/context/context-type-safety.md) | **Available** |
+| Why must eligibility precede relevance? | [Retrieval strategy](concepts/context/retrieval-strategy.md) | **Available** |
+| How is governed state resumed across sessions? | [Continuity and resume](concepts/context/continuity-and-resume.md) | **Available** |
+
+### 6. Reference
 
 | Lookup need | Owner page | Availability |
 | --- | --- | --- |
@@ -58,7 +83,7 @@ Architecture pages may define implementation-neutral contracts and authority bou
 
 Reference pages are concise lookup surfaces. They do not compete with concept pages for explanatory ownership.
 
-### 4. Design decisions
+### 7. Design decisions
 
 | Reader question | Owner page | Availability |
 | --- | --- | --- |
@@ -67,7 +92,7 @@ Reference pages are concise lookup surfaces. They do not compete with concept pa
 Decision records explain why a boundary exists; they are not implementation
 logs or proof of current support.
 
-### 5. Current status
+### 8. Current status
 
 | Reader question | Owner page | Availability |
 | --- | --- | --- |

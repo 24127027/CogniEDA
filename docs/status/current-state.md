@@ -22,6 +22,7 @@ constraints.
 | `PlanRevision` | **Unsupported** | No canonical `PlanRevision`, plan binding, dependency, assignment, activation, or plan-version persistence is present. `ObjectiveRevision` is Objective-change provenance and is not a substitute. |
 | Task taxonomy | **Known limitation** | Current `TaskKind` is `ANALYTICAL`, `ORGANIZING`, and `REVIEW`, not canonical `DATA`, `SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`. Current Task records also carry `profile_id`, `variables`, and `evidence_expectation`, which the target assigns outside semantic Task identity. |
 | Executor registry and dispatch | **Partially implemented** | A capability catalog, registry, selection helpers, request validation, and thin dispatcher exist. Catalog membership does not prove registration or runnability, and Planner integration is absent. |
+| Tool and skill assembly | **Partially implemented** | `ToolManager` can assemble caller-selected built-ins and resolve configured MCP and skill entries. Built-ins are placeholders, configured skill directories are absent, MCP worker names do not resolve to enabled servers, and no composed runtime proves agent use. |
 | Data Explorer | **Unsupported** | Dataframe/file loading and deterministic profiling utilities exist, but no registered runnable Data Explorer or role-native `DataWorkOrder -> DataExplorerResult` boundary exists. `data_exploration` is only catalogued. |
 | Hypothesis Analyst | **Unsupported** | A wrapper and capability registration exist, but its default graph raises `NotImplementedError`. The wrapper currently selects a dataset tool, contrary to the canonical no-direct-dataset-access boundary; no supported scientific controller path uses it. |
 | Graph Miner | **Unsupported** | A wrapper and registration exist, but its default graph raises `NotImplementedError`. No supported read-only graph-inquiry workflow is composed. |
@@ -85,9 +86,13 @@ fail closed when implementation reaches those boundaries.
 
 ## Verification qualification
 
-The focused current-capability suite run during this audit produced **115
-passes and 2 failures**. Both failures expose existing contract drift:
-`PlannerOutput` lacks the expected executor-dispatch field, and the executor
-output contract lacks the expected scientific-result fields. Those failures
-are a verification gap, not documentation-change regressions, and are listed
-in [Limitations and bottlenecks](limitations-and-bottlenecks.md).
+The focused current-capability selection produced **115 passes and 2
+failures**; the full suite produced **127 passes and the same 2 failures**.
+Both failures expose existing contract drift: one stops at the missing
+`PlannerOutput.executor_dispatch_ref` field, and one shows that
+`PlannerOutput` has no nested execution-request field through which capability
+validation can run. Source inspection also confirms that `ExecutorOutput`
+lacks the scientific-result fields the first contract test would check next.
+These are verification gaps, not documentation-change regressions, and are
+listed in
+[Limitations and bottlenecks](limitations-and-bottlenecks.md).

@@ -1,6 +1,9 @@
 # Data Layout
 
-CogniEDA keeps physical datasets under `data/`. Durable research state is stored in the workspace-local graph database.
+CogniEDA keeps repository-local physical datasets under `data/`. Current
+durable repository records use the configured SQLModel store, verified on
+SQLite. Directory presence does not establish governed ingestion, and no
+graph-database integration or composed runtime is currently supported.
 
 ## Directory Conventions
 

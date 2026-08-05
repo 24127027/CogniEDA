@@ -28,8 +28,10 @@
 
 ## Architectural Guardrails
 
-- `Workspace` is a filesystem/runtime boundary, not an FCO.
-- `Question` is UI input that becomes a `Task`.
+- `Workspace` is a container boundary, not an FCO or scientific scope.
+- `Question` is human-facing input, not an FCO. Planner may answer it or
+  propose governed work; only an independently governed work unit becomes a
+  `Task`.
 - `AnalysisFrame`, `PlannerOperation`, and `ExecutionRun` are provenance/runtime records.
 - `GeneratedView` is runtime output, not `Discovery`.
 - `EvidenceCacheEntry` is cache.

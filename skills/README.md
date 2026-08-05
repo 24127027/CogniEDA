@@ -1,12 +1,19 @@
-# Skills Specification
+# Skills package guidance
 
-This directory contains the skill definitions used by CogniEDA agents.
+This directory is the intended location for CogniEDA skill definitions. It
+currently contains no `SKILL.md` implementations.
 
-Skills are written as `SKILL.md` files and loaded dynamically by `pydantic_ai_skills`. They provide reusable, context-aware instructions and domain-specific guidance to agents without requiring alterations to the core application prompts.
+The source includes a `pydantic_ai_skills` loader and `ToolManager` selection
+seam, while `config/skills.toml` points to skill directories that are absent
+from the current tree. This is **Partially implemented** assembly plumbing, not
+proof that a composed runtime loads or applies the configured skills.
 
 ## Directory Structure
 
-Skills are organized hierarchically. To prevent namespace collisions during discovery, **group directories must only contain subdirectories**. Broad or generic instructions should be isolated into a `core/` or `general/` folder.
+Future skills should be organized hierarchically. To prevent namespace
+collisions during discovery, **group directories must only contain
+subdirectories**. Broad or generic instructions should be isolated into a
+`core/` or `general/` folder.
 
 ```
 skills/
@@ -26,11 +33,14 @@ skills/
         └── SKILL.md
 ```
 
-Each leaf directory represents exactly one discrete skill and must contain a single `SKILL.md` file.
+Each future leaf directory represents exactly one discrete skill and must
+contain a single `SKILL.md` file.
 
 ## Frontmatter Requirements
 
-Every `SKILL.md` file **must** begin with a valid YAML frontmatter block. The registry indexes, discovers, and exposes skills to agents based entirely on this metadata block rather than file names or parent folder names.
+Every future `SKILL.md` file **must** begin with a valid YAML frontmatter block.
+The underlying skills library uses this metadata during discovery; repository
+configuration alone does not establish agent use.
 
 ```markdown
 ---
@@ -46,7 +56,10 @@ description: Guidelines for decomposing broad goals into chronologically sound m
 
 ## Skill Hierarchy & Inheritance
 
-Skills are loaded recursively. Enabling a top-level capability group directory automatically includes all nested descendant skills down the directory tree.
+The intended hierarchy relies on recursive loading by the skills library.
+Enabling a top-level capability group directory is expected to include nested
+descendant skills down the directory tree, subject to library validation and
+an actual composed caller.
 
 For example, initializing:
 
@@ -54,7 +67,7 @@ For example, initializing:
 directories = ["./skills/planner"]
 ```
 
-automatically registers and exposes the following skill set to the runtime capability layer:
+would expose the following skill set to that configured capability:
 
 - `planner/core`
 - `planner/task-planning`
@@ -64,4 +77,7 @@ This allows broad application capabilities to be cleanly composed from smaller, 
 
 ## Configuration
 
-Skills are configured in `config/skills.toml` and assigned to agents via `config/agents.toml`.
+Skills are declared in `config/skills.toml` and assigned by name in
+`config/agents.toml`. The referenced directories do not currently exist, and
+there is no supported end-to-end agent runtime. See
+[Current state](../docs/status/current-state.md) for the verified boundary.

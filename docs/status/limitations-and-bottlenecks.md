@@ -34,7 +34,8 @@ the consequences by limitation type.
 - Execution-attempt records and outbox controls cannot produce a result through
   a runnable default specialist.
 - Configuration mentions skills and MCP workers that do not establish a
-  working external integration by themselves.
+  working external integration by themselves. The configured skill directories
+  are absent from the current tree.
 
 ## Database limitation
 
@@ -74,10 +75,13 @@ the consequences by limitation type.
 
 ## Verification gap
 
-- The focused current-capability suite passed 115 tests and failed 2 existing
-  contract tests. One expects `PlannerOutput.executor_dispatch_ref`; the other
-  expects nested execution-request validation through `PlannerOutput`. Current
-  source provides neither field.
+- The focused current-capability selection passed 115 tests and failed 2
+  existing contract tests; the full suite passed 127 tests and failed the same
+  2 tests. One stops at the missing
+  `PlannerOutput.executor_dispatch_ref`; the other expects nested
+  execution-request capability validation through `PlannerOutput`, which has
+  no such field. `ExecutorOutput` also lacks the scientific-result fields that
+  the first contract test would check after the Planner assertion passes.
 - No non-SQLite database is tested.
 - No end-to-end user, specialist, governance, admission, recovery, CLI, or
   external-integration test exists.

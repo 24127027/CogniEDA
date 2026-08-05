@@ -120,14 +120,16 @@ The system does not need to rewrite history to protect present reasoning.
    FCOs and the major non-FCO record families.
 2. [Planning and scientific state](planning-and-scientific-state.md) explains
    why planning authority cannot become scientific authority.
-3. [Scientific lifecycle](../scientific-lifecycle/index.md) defines the
-   investigation, Evidence, evaluation, outcome, and governance sequence.
-4. [Identity, scope, and lineage](identity-scope-and-lineage.md) explains
+3. [Identity, scope, and lineage](identity-scope-and-lineage.md) explains
    successor identity, cardinality, historical authority, and cross-Objective
    isolation.
-5. [Validity](../validity/index.md) separates historical truth from current-use
+4. [System overview](../../architecture/system-overview.md) introduces the
+   authority and system boundaries that govern the state transitions.
+5. [Scientific lifecycle](../scientific-lifecycle/index.md) defines the
+   investigation, Evidence, evaluation, outcome, and governance sequence.
+6. [Validity](../validity/index.md) separates historical truth from current-use
    eligibility and defines typed propagation.
-6. [Context](../context/index.md) defines SessionFrame, context type safety,
+7. [Context](../context/index.md) defines SessionFrame, context type safety,
    retrieval, continuity, and resume.
 
 For lookup, use the [object catalog](../../reference/object-catalog.md) and
