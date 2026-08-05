@@ -10,5 +10,5 @@ lifecycle. Canonical ownership now belongs to [Validity](validity/index.md),
 with typed downstream consequences in
 [Validity propagation](validity/validity-propagation.md).
 
-For current implementation gaps, use the status track when Unit E makes it
-available; this compatibility page does not claim runtime support.
+For current implementation gaps, use [Current state](../status/current-state.md);
+this compatibility page does not claim runtime support.

@@ -13,7 +13,7 @@ not frozen here.
 
 ## Role-native boundary contracts
 
-Unit B's specialist boundary remains unchanged:
+The specialist boundary remains unchanged:
 
 ```text
 DataWorkOrder
@@ -27,7 +27,7 @@ GraphInquiryRequest
 ```
 
 The contracts are intentionally distinct. A universal optional-field envelope
-would create hidden authority channels. Unit C expands the scientific path
+would create hidden authority channels. The scientific lifecycle expands the path
 inside those boundaries without granting Data Explorer evaluation authority or
 Hypothesis Analyst dataset access.
 
