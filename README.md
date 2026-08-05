@@ -94,9 +94,4 @@ config/          Agent and MCP config placeholders
 
 Start with the [reader-first documentation index](docs/index.md). It separates
 concepts, architecture, reference, design decisions, and current status, and it
-labels pages that are planned but not yet authored.
-
-The documentation is being recovered in human-reviewed units. Existing tracked
-pages outside the canonical journey are transition inputs until they are
-reconciled; development-process material is intentionally kept outside the
-public reader journey.
+explicitly marks pages that are planned but not yet available.
