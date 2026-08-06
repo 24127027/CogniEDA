@@ -1,6 +1,9 @@
 # Artifact Mirrors
 
-This directory contains reviewable metadata mirror templates. Runtime truth is the workspace-local graph database, not these files.
+This directory contains reviewable metadata mirror templates. Current durable
+repository records use the configured SQLModel store, verified on SQLite;
+these files are not a second source of truth. No graph-database integration or
+composed runtime is currently supported.
 
 Current mirror surface:
 

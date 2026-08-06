@@ -22,6 +22,7 @@ Branches must start with a prefix indicating the reason for the branch:
 *   `feature/` - for developing a new feature (e.g., `feature/agent-definition`)
 *   `fix/` - for fixing a bug or issue
 *   `refactor/` - for restructuring code without changing external behavior
+*   `docs/` - for documentation-only changes
 
 ## 3. Code Naming Convention
 

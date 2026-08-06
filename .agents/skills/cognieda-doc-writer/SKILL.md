@@ -1,80 +1,65 @@
 ---
 name: cognieda-doc-writer
-description: Maintain CogniEDA repository documentation while preserving current-vs-target truth. Use when updating README, AGENTS.md, docs architecture/workflow/concept/development/reference pages, implementation gap analysis, or documentation that compares audited code with CogniEDA target design.
+description: Maintain CogniEDA documentation while preserving canonical target versus verified current implementation truth.
 ---
 
-# CogniEDA Doc Writer
+# CogniEDA documentation writer
 
-Use this skill to maintain CogniEDA documentation without overclaiming implementation status.
+## Required workflow
 
-## Required Workflow
+1. Inspect relevant source, tests, migrations, configuration, and repository
+   state before making current claims.
+2. Inspect canonical owner pages and legacy pages for the same topic.
+3. Use only: `Implemented`, `Verified on SQLite`, `Partially implemented`,
+   `Design target`, `Deferred`, `Known limitation`, and `Unsupported`.
+4. Name the supported boundary. A file, schema, interface, stub, fixture,
+   configuration key, or directory is insufficient evidence.
+5. Update `docs/status/current-state.md` and relevant limitations when verified
+   drift is found. The old implementation-gap path is a compatibility notice.
+6. Run documentation checks and targeted capability tests when needed.
 
-1. Inspect relevant source code before editing docs.
-2. Inspect existing docs that cover the same topic.
-3. Classify each concept as one of:
-   - `Implemented`
-   - `Partially implemented`
-   - `Design target`
-   - `Not implemented`
-   - `Implementation deviates from target`
-   - `Unclear from code`
-4. Separate these sections explicitly when useful:
-   - `Target design`
-   - `Current implementation`
-   - `Implementation status`
-   - `Known deviation`
-   - `Not yet implemented`
-   - `Architectural risk`
-5. Update `docs/architecture/implementation-gap-analysis.md` when drift is found.
-6. Run the repo's available verification commands after documentation edits when practical.
+## Source priority
 
-## Source Priority
+For current behavior, source and tests are authoritative. For target design:
 
-Use source code as the source of truth for current behavior.
+1. `docs/design-decisions/index.md`
+2. canonical owner pages linked as Available from `docs/index.md`
+3. Planner source only as current scaffold evidence, never target authority
 
-Use target-design documents as the source of truth for intended behavior, in this order when available:
+When target and source differ, document the difference without changing either
+meaning.
 
-1. `first-class-object.txt`
-2. `user-agent-workflow.txt`
-3. `src/agents/planner/nodes.py`
-4. `memory.txt`
-5. `src/agents/planner/graph.png`
-6. existing repo files for actual commands, modules, APIs, package names, and current behavior
+## Canonical guardrails
 
-If target design and code conflict, document the conflict. Do not silently reconcile it.
+- FCOs are exactly Objective, DataProfile, Assumption, Task, Hypothesis,
+  Evidence, Discovery, and SessionFrame.
+- The semantic graph contains exactly Objective, Hypothesis, Evidence, and
+  Discovery.
+- Task kinds are exactly `DATA`, `SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`; legacy
+  kinds are drift, not target compatibility.
+- Planner is the sole human facade and has no scientific operationalization or
+  evaluation authority.
+- Data Explorer exclusively accesses datasets and does not evaluate.
+- Hypothesis Analyst owns scientific work but has no dataset access.
+- Graph Miner is read-only.
+- Governance does not rewrite; application authority alone admits durable
+  state.
+- Assumptions are planning-only and excluded from protected evaluation.
+- Cross-Objective use, ambiguous lineage, and legacy fallback fail closed.
 
-## Documentation Guardrails
+## Documentation guardrails
 
-- Do not turn design documents into false implementation claims.
-- Do not turn generated summaries into architectural truth.
-- Do not invent setup commands, test commands, package managers, services, database choices, API endpoints, or directories.
-- Update `README.md` only with verified commands and implemented features.
-- Update `AGENTS.md` when target invariants change.
-- Preserve CogniEDA's epistemic boundaries: FCO, workflow state, provenance, cache, filesystem artifact, and generated view are different layers.
+- Keep concept, architecture, lifecycle, validity, context, reference,
+  decision, and status ownership distinct.
+- Convert superseded paths to concise compatibility notices when inbound links
+  still matter.
+- Do not expose review packs, prompt history, branch chronology, or owner-review
+  mechanics in public docs.
+- Do not invent commands, APIs, services, dependencies, database support,
+  integrations, or runtime composition.
+- Keep README concise and route through `docs/index.md`.
 
-## Target FCO Invariants
+## Completion report
 
-Only these are target FCOs:
-
-- `Objective`
-- `DataProfile`
-- `Assumption`
-- `Task`
-- `Hypothesis`
-- `Evidence`
-- `Discovery`
-- `SessionFrame`
-
-Do not describe `Workspace`, `Question`, `AnalysisFrame`, `GeneratedView`, `PlannerOperation`, `ExecutionRun`, or `EvidenceCacheEntry` as FCOs unless the project owner explicitly changes the design.
-
-## Completion Report
-
-When finishing a documentation task, report:
-
-- files created or changed
-- documentation structure produced
-- implementation gaps found
-- design/code mismatches found
-- commands run and results
-- docs requiring project-owner review
-- unresolved architectural decisions
+Report changed files, implementation boundaries and gaps, design/code drift,
+legacy dispositions, exact checks, unresolved risks, and special-review pages.

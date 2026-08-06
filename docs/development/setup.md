@@ -46,6 +46,7 @@ uv run cognieda
 ```
 
 Current result: the script runs `main.py`, which prints a placeholder message.
+This is **Unsupported** as a product CLI.
 
 Verification commands:
 
@@ -59,4 +60,7 @@ No docs build or docs link-check command was found in the current repo.
 
 ## Tool And MCP Config
 
-`config/agents.toml` and `config/mcp.toml` exist but are empty in the audited repo. `src/tools/manager.py` can load worker MCP config when populated. Built-in tool lists are placeholders.
+`config/agents.toml` contains worker references, while `config/mcp.toml`
+contains commented examples rather than enabled servers. These configuration
+entries do not establish a supported integration. See
+[Current state](../status/current-state.md).

@@ -1,44 +1,14 @@
-# Validity Basis
+# Discovery validity basis
 
-## Target Design
+This page is retained for link compatibility. Canonical validity ownership now
+belongs to [Validity](validity/index.md), [Validity over time](validity/validity-over-time.md),
+and [Validity propagation](validity/validity-propagation.md).
 
-Every `Discovery` must carry validity metadata. The implementation uses `validity_basis` to avoid confusing this metadata with the claim condition.
+The Discovery-specific scientific boundary remains in
+[Discovery governance](scientific-lifecycle/discovery-governance.md): a
+Discovery requires admitted eligible Evidence, an exact claim, scope, validity
+basis, governance, authoritative lineage, and application-authority admission.
 
-A Discovery claim answers: what can be concluded, under what scope or condition?
-
-A validity basis answers: what evidence, data profile, analysis frame, method, parameters, code version, decision rule, uncertainty, and invalidators make this claim valid or stale?
-
-Required metadata:
-
-- `data_profile_id`
-- `analysis_frame_refs`
-- `hypothesis_id`
-- `evidence_ids`
-- method identity
-- parameters
-- code/environment identity where available
-- decision rule
-- strength
-- uncertainty
-- `assumptions_excluded_from_inference`
-- invalidators
-
-## Current Implementation
-
-`Discovery` requires:
-
-- non-empty `evidence_ids`
-- structured `claim`
-- `epistemic_status`
-- `scope`
-- `validity_basis`
-
-`Discovery.claim` and `Discovery.scope` hold the claim condition/scope. `Discovery.validity_basis` holds dependency and invalidation metadata.
-
-## Implementation Status
-
-Implemented locally for schema and repository persistence. Full `AnalysisFrame` and `ExecutionRun` provenance records remain missing.
-
-## Development Guidance
-
-Do not create `Discovery` without Evidence or `validity_basis`. Natural-language summaries are convenience views only; structured claim and validity metadata are authoritative.
+Validity basis records why a claim was eligible under its admitted lineage. It
+does not replace current-use eligibility review, and a later validity change
+does not rewrite the Discovery payload.
