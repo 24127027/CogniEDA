@@ -5,9 +5,9 @@ from uuid import uuid4
 
 import pytest
 
-from application.orchestrator.execution_admission import build_execution_admission_operations
-from application.orchestrator.planner_commit import commit_planner_operations
-from application.orchestrator.transition_service import ExecutionAttemptTransitionService
+from runtime.orchestrator.execution_admission import build_execution_admission_operations
+from runtime.orchestrator.planner_commit import commit_planner_operations
+from runtime.orchestrator.transition_service import ExecutionAttemptTransitionService
 from repositories import (
     DataProfileRepository,
     ExecutionApprovalRepository,

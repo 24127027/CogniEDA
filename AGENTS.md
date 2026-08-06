@@ -2,7 +2,7 @@
 
 CogniEDA is validity-preserving research-state infrastructure for analytical
 investigation. Do not treat it as generic chat memory, a notebook, or a vector
-retrieval application.
+retrieval runtime.
 
 Epistemic correctness is the highest priority: every claim must remain
 traceable, scope-valid, and protected from the wrong state entering reasoning.

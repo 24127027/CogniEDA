@@ -6,7 +6,7 @@ from langgraph.runtime import Runtime
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlmodel import Session
 
-from application.orchestrator.planner_commit import commit_planner_operations
+from runtime.orchestrator.planner_commit import commit_planner_operations
 from db.session import get_session
 from memory.retrieval_engine import DiscoveryRetrievalEngine
 from repositories import PlannerOperationRepository, TaskRepository
