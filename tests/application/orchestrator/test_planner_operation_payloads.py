@@ -3,7 +3,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from application.orchestrator.planner_commit import commit_planner_operations
+from runtime.orchestrator.planner_commit import commit_planner_operations
 from repositories import PlannerOperationRepository, TaskRepository
 from schemas.artifacts import Task
 from schemas.enums import (
