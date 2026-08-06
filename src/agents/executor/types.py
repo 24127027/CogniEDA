@@ -66,22 +66,25 @@ class ExecutionRequest(BaseModel):
 
 class ExecutorOutput(BaseModel):
     """PydanticAI output schema for executor-authored drafts."""
-    
 
-    # model_config = ConfigDict(extra="forbid")
-
-    # evidence_drafts: list[dict[str, Any]] = Field(
-    #     default_factory=list,
-    #     description="Evidence draft payloads proposed by the executor for planner review.",
-    # )
-    # discovery_drafts: list[dict[str, Any]] = Field(
-    #     default_factory=list,
-    #     description="Discovery draft payloads proposed by the executor for planner review.",
-    # )
-    # execution_run_ref: str | None = Field(
-    #     default=None,
-    #     description="Optional provenance reference for the execution run that produced the drafts.",
-    # )
+    evidence_drafts: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Evidence draft payloads proposed by the executor for planner review.",
+    )
+    discovery_drafts: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Discovery draft payloads proposed by the executor for planner review.",
+    )
+    execution_run_ref: str | None = Field(
+        default=None,
+        description=(
+            "Optional provenance reference for the execution run that produced the drafts."
+        ),
+    )
+    error_message: str | None = Field(
+        default=None,
+        description="Optional execution failure message emitted by the executor graph.",
+    )
 
 
 class ExecutionResult(ExecutorOutput):
