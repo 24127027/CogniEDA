@@ -97,6 +97,3 @@ def build_capability_selection_instructions(
 
 
 executor_registry = ExecutorRegistry()
-
-# Backward-compatible module-level name while the planner scaffold is migrated.
-registry = executor_registry
