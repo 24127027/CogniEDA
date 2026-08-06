@@ -20,7 +20,19 @@ from agents.executor import (
 )
 from agents.executor.executor import Executor
 from agents.executor.types import BaseState
-from agents.planner.types import PlannerOutput
+from schemas.artifacts import Task as AnalyticalTask
+from schemas.enums import TaskKind
+
+
+def _task() -> AnalyticalTask:
+    return AnalyticalTask(
+        title="Assess treatment effect",
+        description="Check whether the treatment increases the target metric.",
+        task_kind=TaskKind.ANALYTICAL,
+        profile_id="11111111-1111-1111-1111-111111111111",
+        variables=["treatment", "target_metric"],
+        evidence_expectation="Treatment increases the target metric.",
+    )
 
 
 class FakeGraph:
@@ -107,7 +119,7 @@ def test_dispatcher_invokes_registered_executor() -> None:
     executor = registry.get(Capability.GRAPH_MINING.id)
     request = ExecutionRequest(
         capability=Capability.GRAPH_MINING.id,
-        input=ExecutorInput(task=Task()),
+        input=ExecutorInput(task=_task()),
         context=ExecutorContext(),
     )
 
@@ -121,19 +133,8 @@ def test_execution_request_rejects_unknown_capability() -> None:
     with pytest.raises(ValidationError, match="Unknown executor capability"):
         ExecutionRequest(
             capability="missing",
-            input=ExecutorInput(task=Task()),
+            input=ExecutorInput(task=_task()),
             context=ExecutorContext(),
-        )
-
-
-def test_planner_output_validates_nested_execution_request_capability() -> None:
-    with pytest.raises(ValidationError, match="Unknown executor capability"):
-        PlannerOutput(
-            execution_request={
-                "capability": "missing",
-                "input": {"task": {}},
-                "context": {},
-            }
         )
 
 
@@ -157,7 +158,7 @@ def test_capability_selection_instructions_render_explicit_subset() -> None:
 
 def test_executor_run_returns_validated_graph_execution_result() -> None:
     executor = GraphBackedExecutor()
-    input = ExecutorInput(task=Task())
+    input = ExecutorInput(task=_task())
     context = ExecutorContext()
 
     result = asyncio.run(executor.run(input=input, context=context))

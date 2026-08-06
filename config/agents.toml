@@ -21,3 +21,7 @@ skills = ["statistical_analysis"]
 mcp = [
     "filesystem",
 ]
+
+[data_explorer]
+skills = []
+mcp = []
