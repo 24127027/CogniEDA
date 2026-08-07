@@ -3,7 +3,7 @@ import os
 
 from .application import Application
 from .workspace import Workspace
-from agents import Planner, ExecutorDispatcher, executor_registry
+from ..agents import Planner, ExecutorDispatcher, executor_registry
 
 def bootstrap_application(workspace_path: Path) -> Application:
     workspace = Workspace.open(workspace_path)
