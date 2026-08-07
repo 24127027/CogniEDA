@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .workspace import Workspace
+from .messages import Message, MessageType
 
 
 class Application:
@@ -23,7 +24,7 @@ class Application:
         # Implementation for loading a session
         pass
 
-    async def submit_message(self, message: str) -> None:
-        """Submit a message to the session with the given session ID."""
-        # Implementation for submitting a message
-        pass
+    async def submit_message(self, message: str) -> Message:
+        """Submit a message to the application and get a response."""
+        # Implementation for submitting a message and getting a response
+        ...
