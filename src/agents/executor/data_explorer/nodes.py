@@ -14,7 +14,6 @@ from schemas.artifacts import DataProfile, Evidence, EvidenceProvenance, Evidenc
 from schemas.enums import DataProfileMethod, EvidenceType
 
 from ..types import ExecutionResult
-from .deps import AdmissionCall
 from .state import State
 
 _MAX_LOGICAL_RETRIES = 2
@@ -164,7 +163,7 @@ def _is_recoverable_mismatch(raw_data_results: Any) -> bool:
 
 def route_results(state: State, runtime: Any = None) -> str:
 	if _results_match_request(state):
-		return "draft_and_request_admission"
+		return "compile_result"
 	if _is_recoverable_mismatch(state["raw_data_results"]) and state["retry_count"] < _MAX_LOGICAL_RETRIES:
 		return "generate_and_execute_code"
 	return "handle_failure_and_logs"
@@ -262,7 +261,9 @@ def evaluate_results(state: State, runtime: Any = None) -> State:
 		return {**state, "execution_logs": logs}
 
 	if _results_match_request(state):
-		return {**state, "execution_logs": logs}
+		# Directly instantiate Evidence in RAM
+		evidence_draft = _build_evidence_draft(state)
+		return {**state, "evidence_draft": evidence_draft, "execution_logs": logs}
 
 	if _is_recoverable_mismatch(raw_data_results) and state["retry_count"] < _MAX_LOGICAL_RETRIES:
 		logs.append("Raw data output was close but did not satisfy the atomic request.")
@@ -276,22 +277,6 @@ def evaluate_results(state: State, runtime: Any = None) -> State:
 	return {**state, "execution_logs": logs}
 
 
-def draft_and_request_admission(
-	state: State,
-	runtime: Any = None,
-	*,
-	mock_admission_call: AdmissionCall,
-) -> State:
-	logs = list(state["execution_logs"])
-	evidence_draft = _build_evidence_draft(state)
-	admitted = mock_admission_call(evidence_draft)
-	if admitted:
-		return {**state, "evidence_draft": evidence_draft, "execution_logs": logs}
-
-	logs.append("Admission Authority rejected the evidence draft.")
-	return {**state, "evidence_draft": None, "execution_logs": logs}
-
-
 def execute_profiling_and_cleaning(
 	state: State,
 	runtime: Any = None,
@@ -303,6 +288,7 @@ def execute_profiling_and_cleaning(
 	try:
 		dataframe = _load_dataframe(state)
 		profile_draft = _build_profile_draft(state, dataframe)
+		# Directly instantiate DataProfile in RAM
 		return {
 			**state,
 			"data_profile_draft": profile_draft,
@@ -313,25 +299,6 @@ def execute_profiling_and_cleaning(
 		return {**state, "data_profile_draft": None, "execution_logs": logs}
 
 
-def request_profile_admission(
-	state: State,
-	runtime: Any = None,
-	*,
-	mock_admission_call: AdmissionCall,
-) -> State:
-	logs = list(state["execution_logs"])
-	profile_draft = state["data_profile_draft"]
-	if profile_draft is None:
-		return {**state, "execution_logs": logs}
-
-	admitted = mock_admission_call(profile_draft)
-	if admitted:
-		return {**state, "data_profile_draft": profile_draft, "execution_logs": logs}
-
-	logs.append("Admission Authority rejected the data profile draft.")
-	return {**state, "data_profile_draft": None, "execution_logs": logs}
-
-
 def handle_failure_and_logs(state: State, runtime: Any = None) -> State:
 	logs = list(state["execution_logs"])
 	if state["raw_data_results"] is None and not any(
@@ -340,8 +307,7 @@ def handle_failure_and_logs(state: State, runtime: Any = None) -> State:
 		logs.append("Data Explorer terminated before producing usable raw data results.")
 
 	if state["evidence_draft"] is None and state["data_profile_draft"] is None:
-		if not any("admission authority rejected" in log.lower() for log in logs):
-			logs.append("No admissible draft was produced for the caller.")
+		logs.append("No valid draft was produced for the caller.")
 
 	return {**state, "execution_logs": logs}
 

@@ -13,15 +13,8 @@ from ..capabilities import Capability
 from ..executor import Executor
 from ..registry import executor_registry
 from ..types import ExecutionRequest, ExecutionResult, ExecutorContext, ExecutorInput
-from .deps import AdmissionCall
 from .graph import build_graph
 from .state import State
-
-
-def _missing_admission_call(draft: object) -> bool:
-	raise RuntimeError(
-		"DataExplorer requires an admission callable for Evidence and DataProfile validation."
-	)
 
 
 def create_de_agent(config: ModelConfig) -> Agent[None]:
@@ -36,12 +29,11 @@ def create_de_agent(config: ModelConfig) -> Agent[None]:
 @dataclass(slots=True)
 class DataExplorerConfig:
 	model: ModelConfig = field(default_factory=ModelConfig)
-	mock_admission_call: AdmissionCall = _missing_admission_call
 
 
 @executor_registry.register(Capability.DATA_EXPLORATION)
 class DataExplorer(Executor[State]):
-	"""Executor that can produce Evidence or DataProfile drafts from raw data."""
+	"""Executor that can produce Evidence or DataProfile drafts directly from raw data in RAM."""
 
 	builtin_tools: tuple[AvailableBuiltinTools, ...] = ()
 
@@ -49,15 +41,12 @@ class DataExplorer(Executor[State]):
 		self,
 		*,
 		config: ModelConfig | None = None,
-		mock_admission_call: AdmissionCall | None = None,
 	) -> None:
 		self.config = config or ModelConfig()
-		self.mock_admission_call = mock_admission_call or _missing_admission_call
 
 		super().__init__(
 			lambda: build_graph(
 				config=self.config,
-				mock_admission_call=self.mock_admission_call,
 			)
 		)
 

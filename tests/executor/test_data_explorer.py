@@ -23,10 +23,8 @@ def _task(*, description: str, evidence_expectation: str) -> Task:
 
 
 def _executor() -> DataExplorer:
-	def admit(_: object) -> bool:
-		return True
-
-	return DataExplorer(mock_admission_call=admit)
+	# mock_admission_call is completely removed to match the new MVP design
+	return DataExplorer()
 
 
 def test_data_explorer_exploration_path_returns_evidence(tmp_path, monkeypatch) -> None:
