@@ -9,6 +9,7 @@ class MessageRole(str, Enum):
 
 class MessageType(str, Enum):
     TEXT = "text"
+    ERROR = "error"
 
 @dataclass
 class Message:

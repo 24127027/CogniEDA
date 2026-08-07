@@ -3,16 +3,17 @@ import os
 
 from .application import Application
 from .workspace import Workspace
-from ..agents import Planner, ExecutorDispatcher, executor_registry
+# from ..agents import Planner, ExecutorDispatcher, executor_registry
 
 def bootstrap_application(workspace_path: Path) -> Application:
     workspace = Workspace.open(workspace_path)
 
     _configure_environment(workspace)
 
-    planner = Planner()
-    executor_dispatcher = ExecutorDispatcher(registry=executor_registry)
-
+    # planner = Planner()
+    # executor_dispatcher = ExecutorDispatcher(registry=executor_registry)
+    planner = None
+    executor_dispatcher = None
     return Application(
         workspace=workspace,
         planner_agent=planner,
