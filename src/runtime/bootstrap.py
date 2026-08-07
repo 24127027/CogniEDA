@@ -3,6 +3,7 @@ from pathlib import Path
 
 from .application import Application
 from .workspace import Workspace
+from ..agents.planner.agent import Planner
 
 
 NINE_ROUTER_BASE_URL = "http://localhost:20128/v1"
@@ -16,7 +17,7 @@ def bootstrap_application(
     _configure_environment(workspace)
 
     # Add these when the MVP Planner is ready.
-    planner = None
+    planner = Planner()
     executor_dispatcher = None
 
     return Application(
