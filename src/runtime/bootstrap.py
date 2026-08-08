@@ -4,8 +4,9 @@ from pathlib import Path
 from .application import Application
 from .workspace import Workspace
 from ..agents.planner.agent import Planner
-
-
+from ..agents.planner.dependencies import PlannerDeps
+from ..agents.executor.dispatcher import ExecutorDispatcher
+from .terminal import RichTerminalPrinter
 NINE_ROUTER_BASE_URL = "http://localhost:20128/v1"
 
 
@@ -13,19 +14,24 @@ def bootstrap_application(
     workspace_path: Path,
 ) -> Application:
     workspace = Workspace.open(workspace_path)
-
     _configure_environment(workspace)
+    
+    terminal = RichTerminalPrinter()
+    dispatcher = None
 
-    # Add these when the MVP Planner is ready.
-    planner = Planner()
-    executor_dispatcher = None
+    planner_deps = PlannerDeps(
+        terminal=terminal,
+    )
+
+    planner = Planner(
+        deps=planner_deps,
+    )
 
     return Application(
         workspace=workspace,
         planner_agent=planner,
-        dispatcher=executor_dispatcher,
+        dispatcher=dispatcher,
     )
-
 
 def _configure_environment(
     workspace: Workspace,
