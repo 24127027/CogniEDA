@@ -207,5 +207,6 @@ Canonical `DataWorkOrder`, `ScientificInvestigationInput`,
 scaffolds. Full Planner-to-real-dataset-to-Evidence-to-Planner execution is
 also **Unsupported**.
 
-See [Persistence and admission](persistence-and-admission.md) for the durable
-boundary around attempts and results.
+See [MVP runtime subset](mvp-runtime-subset.md) for the deliberately smaller
+executable slice and [Persistence and admission](persistence-and-admission.md)
+for the canonical durable boundary around attempts and results.

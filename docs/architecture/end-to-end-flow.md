@@ -5,7 +5,9 @@ authority, Planner, specialist, dispatch, and admission boundaries together
 without forcing every Task through a Hypothesis-to-Discovery lifecycle.
 
 The sequence is target architecture. Current main does not yet implement the
-complete flow.
+complete flow. The [MVP runtime subset](mvp-runtime-subset.md) defines the
+smaller executable path and its explicit non-goals without superseding this
+canonical sequence.
 
 ## The authority sequence
 
@@ -241,6 +243,7 @@ validity-aware presentation sequence remain incomplete or absent. Data
 Explorer's current local donor paths are not the canonical DATA workflow;
 SCIENTIFIC and GRAPH providers are not registered as runnable.
 
-Use [System overview](system-overview.md) for the component map and
-[Authority boundaries](authority-boundaries.md) for the controlling authority
-rules.
+Use [MVP runtime subset](mvp-runtime-subset.md) for the first executable
+vertical slice, [System overview](system-overview.md) for the component map,
+and [Authority boundaries](authority-boundaries.md) for the controlling
+authority rules.

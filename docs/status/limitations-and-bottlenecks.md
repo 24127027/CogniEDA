@@ -25,6 +25,9 @@ the consequences by limitation type.
   and `GovernanceDecision` have no current supported implementation.
 - Planner execution nodes remain incomplete. Hypothesis Analyst and Graph Miner
   are import-safe scaffolds and are deliberately not registered as runnable.
+- The three pre-existing Planner donor/test mismatches belong to M1-B unless
+  they block M1-A test collection earlier; they do not establish an S0 executor
+  regression or a separate repair milestone.
 - Evidence and Discovery repository guards are not composed behind complete
   application-authority admission services.
 - There is no result-inbox or canonical result-to-Evidence workflow.
@@ -33,7 +36,9 @@ the consequences by limitation type.
 
 - Bootstrap composes the in-process S0 registry and dispatcher, but there is no
   supported end-to-end application runtime, worker process, or service API.
-- Planner can now invoke built-in tools (MVP milestone: tool calling validated as of 2026-08-08).
+- Planner is configured with built-in tool adapters, and the data-capability
+  adapter is tested through dispatcher to a registered fake provider. This is
+  an invocation-seam proof, not completed MVP Planner behavior.
 - The local Data Explorer donor provider can produce a typed result from a
   direct capability request, but it is not connected to execution-attempt
   records, outbox controls, or admission.
@@ -79,11 +84,14 @@ the consequences by limitation type.
 
 ## Verification gap
 
-- The focused S0 selection passes 24 tests. The full suite is interrupted by
-  three pre-existing PR #31 Planner collection mismatches: unchanged tests
+- The focused S0 selection recorded 24 passing tests. The full S0 suite was
+  interrupted by three pre-existing Planner collection mismatches: tests
   import `TaskManagementDraft`, `route_intent`, `understand_request`,
-  `ChildTaskProposalDraft`, and `manage_tasks`, which the unchanged starting
-  Planner source does not define. Excluding those three files, 111 tests pass.
+  `ChildTaskProposalDraft`, and `manage_tasks`, which the corresponding Planner
+  source does not define. Those files were unchanged by S0, so this is not an
+  S0 executor regression.
+  Excluding those three files, the S0 report recorded 111 passing tests.
+  Ownership is M1-B unless the collection failure blocks M1-A earlier.
 - PydanticAI delegation adapter to dispatcher to a registered fake provider is
   validated. This does not cover model-selected real Data Explorer work or
   specialist result admission.

@@ -1,13 +1,15 @@
 # Current state
 
 This page answers one question: **what is supported on current `main`?** It
-describes the S0 worktree based on `origin/main` commit
-`e666276ceb37b21a7b787dd162c96dce43f0db07`, inspected on 2026-08-09. A
+describes the post-S0 implementation inspected at commit
+`922d4ee593dcbacad3590adc74c72a28e85b838e`, inspected on 2026-08-09. A
 schema, interface, stub, fixture, configuration entry, or directory is not
 treated as a supported workflow by itself.
 
-The canonical architecture remains the target. Use the
-[documentation index](../index.md) for that model and
+The canonical architecture remains the target. The
+[MVP runtime subset](../architecture/mvp-runtime-subset.md) defines the smaller
+approved executable slice without redefining that target. Use the
+[documentation index](../index.md) for the full model and
 [Limitations and bottlenecks](limitations-and-bottlenecks.md) for present
 constraints.
 
@@ -86,14 +88,15 @@ fail closed when implementation reaches those boundaries.
 
 ## Verification qualification
 
-The focused S0 selection produced **24 passes**. The full `pytest -q` gate is
-interrupted during collection by three donor-state Planner test/source
-mismatches: tests import `TaskManagementDraft`, `route_intent`,
+The focused S0 selection produced **24 passes**. The full S0 `pytest -q` gate
+was interrupted during collection by three pre-existing donor-state Planner
+test/source mismatches: tests import `TaskManagementDraft`, `route_intent`,
 `understand_request`, `ChildTaskProposalDraft`, and `manage_tasks`, while the
-starting PR #31 merge contains none of those source symbols. The affected
-source and test files have byte-identical Git hashes to the starting
-`e666276` versions. With those three pre-existing files excluded, the remaining
-repository suite produces **111 passes**. This qualification is listed in
+Planner source defines none of those symbols. The affected source and tests
+were unchanged by S0, so this is not an S0 executor regression. With those
+three files excluded, the S0 report recorded **111 passes**. This debt belongs
+to M1-B unless it blocks M1-A test collection earlier. This qualification is
+listed in
 [Limitations and bottlenecks](limitations-and-bottlenecks.md).
 
 ## S0 executor stabilization (2026-08-09)

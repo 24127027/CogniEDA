@@ -22,7 +22,7 @@ copy .env.example .env
 The default database URL resolves to `.local/cognieda_graph.sqlite3` unless
 `COGNIEDA_DB_URL` is set. Current database behavior is verified on SQLite.
 
-To run the Planner agent (MVP with tool calling):
+To run the development-only Planner REPL scaffold:
 
 ```powershell
 uv run main.py
@@ -44,3 +44,7 @@ by their presence.
 Start with the [canonical documentation index](docs/index.md). It links the
 conceptual foundation, architecture, scientific lifecycle, validity, context,
 reference, design decisions, and current-status tracks.
+
+The [MVP runtime subset](docs/architecture/mvp-runtime-subset.md) defines the
+approved executable vertical slice and distinguishes it from the complete
+canonical architecture. The end-to-end MVP remains a design target.
