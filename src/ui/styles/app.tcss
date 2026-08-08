@@ -1,0 +1,529 @@
+/* CogniEDA Master Textual CSS */
+
+Screen {
+    background: #090D16;
+    color: #F1F5F9;
+}
+
+/* ==========================================================================
+   Header Styling
+   ========================================================================== */
+
+#app-header {
+    dock: top;
+    height: 3;
+    background: #0E1420;
+    border-bottom: #1E293B solid;
+    padding: 0 1;
+    align: left middle;
+}
+
+#app-header Horizontal {
+    width: 100%;
+    align: left middle;
+}
+
+#header-brand {
+    width: 1fr;
+}
+
+#header-mode {
+    width: auto;
+    margin-right: 2;
+}
+
+#header-console {
+    width: 1fr;
+    content-align: center middle;
+}
+
+#header-user {
+    width: auto;
+    dock: right;
+}
+
+.header-brand {
+    text-style: bold;
+    color: #00E5FF;
+}
+
+.header-title {
+    color: #F1F5F9;
+    text-style: bold;
+}
+
+.header-subtitle {
+    color: #94A3B8;
+}
+
+.header-mode-badge {
+    background: #162E44;
+    color: #00E5FF;
+    border: cyan solid;
+    padding: 0 1;
+    text-style: bold;
+}
+
+.header-mode-badge-research {
+    background: #1A3026;
+    color: #10B981;
+    border: green solid;
+    padding: 0 1;
+    text-style: bold;
+}
+
+.header-user {
+    color: #94A3B8;
+}
+
+
+/* ==========================================================================
+   Welcome Screen Layout & Overlay Panels
+   ========================================================================== */
+
+#welcome-root {
+    width: 100%;
+    height: 100%;
+    align: center middle;
+    layout: horizontal;
+}
+
+#welcome-center-container {
+    width: 80%;
+    max-width: 100;
+    height: auto;
+    align-horizontal: center;
+}
+
+.welcome-title {
+    text-style: bold;
+    color: #F1F5F9;
+    content-align: center middle;
+    margin-bottom: 1;
+}
+
+.welcome-subtitle {
+    color: #94A3B8;
+    content-align: center middle;
+    margin-bottom: 2;
+}
+
+#welcome-actions-grid {
+    width: 64;
+    height: auto;
+    margin-bottom: 2;
+}
+
+#welcome-command-input-row {
+    width: 64;
+    height: 3;
+    align: center middle;
+}
+
+.cli-command-hint {
+    width: 100%;
+    height: 3;
+    margin-bottom: 1;
+    background: #111726;
+    border: #1E293B solid;
+    color: #F1F5F9;
+    content-align: center middle;
+    padding: 0 2;
+}
+
+.command-tag {
+    color: #00E5FF;
+    text-style: bold;
+}
+
+/* Side Overlay Panels (Create, Open, AI, Help) */
+
+.overlay-panel {
+    dock: right;
+    width: 52;
+    height: 100%;
+    background: #0E1424;
+    border-left: #00E5FF solid;
+    padding: 1 2;
+}
+
+.overlay-header-bar {
+    height: 3;
+    border-bottom: #243049 solid;
+    margin-bottom: 1;
+}
+
+.overlay-title {
+    text-style: bold;
+    color: #00E5FF;
+}
+
+.close-panel-btn {
+    dock: right;
+    min-width: 3;
+    height: 1;
+    background: transparent;
+    color: #94A3B8;
+    border: none;
+}
+
+.close-panel-btn:hover {
+    color: #FF5555;
+}
+
+.field-label {
+    color: #94A3B8;
+    text-style: bold;
+    margin-top: 1;
+    margin-bottom: 0;
+}
+
+.panel-input {
+    background: #161F33;
+    border: #243049 solid;
+    color: #F1F5F9;
+    margin-bottom: 1;
+}
+
+.panel-input:focus {
+    border: #00E5FF solid;
+}
+
+.primary-action-btn {
+    background: #00E5FF;
+    color: #090D16;
+    text-style: bold;
+    margin-top: 2;
+    width: 100%;
+    height: 3;
+    min-height: 3;
+    border: none;
+}
+
+.primary-action-btn:hover {
+    background: #33ECFF;
+}
+
+/* Open Workspace Item List */
+.recent-item {
+    background: #141C2E;
+    border: #243049 solid;
+    padding: 1;
+    margin-bottom: 1;
+}
+
+.recent-item:hover {
+    border: #00E5FF solid;
+}
+
+.recent-item-title {
+    text-style: bold;
+    color: #F1F5F9;
+}
+
+.badge-active {
+    background: #064E3B;
+    color: #34D399;
+    padding: 0 1;
+}
+
+.badge-archived {
+    background: #374151;
+    color: #9CA3AF;
+    padding: 0 1;
+}
+
+
+/* ==========================================================================
+   Main Research Page 4-Region Layout
+   ========================================================================== */
+
+#main-workspace-root {
+    width: 100%;
+    height: 100%;
+    layout: grid;
+    grid-size: 3 1;
+    grid-columns: 3fr 4fr 3fr;
+    grid-rows: 1fr;
+}
+
+#left-panel-container {
+    background: #0E1422;
+    border-right: #1E293B solid;
+    padding: 1;
+    height: 100%;
+}
+
+#center-panel-container {
+    background: #090D16;
+    padding: 0;
+    height: 100%;
+    layout: vertical;
+}
+
+#conversation-panel {
+    height: 1fr;
+    padding: 1;
+}
+
+#right-panel-container {
+    background: #0E1422;
+    border-left: #1E293B solid;
+    padding: 1;
+    height: 100%;
+}
+
+#command-bar-container {
+    dock: bottom;
+    height: 3;
+    width: 100%;
+    background: #0E1420;
+    border-top: #1E293B solid;
+    padding: 0 1;
+    align: center middle;
+}
+
+
+/* ==========================================================================
+   Left Panel Content (Data Profile vs Investigation Tree)
+   ========================================================================== */
+
+.section-header {
+    text-style: bold;
+    color: #64748B;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+.profile-version-item {
+    background: #131A29;
+    border: #1E293B solid;
+    color: #94A3B8;
+    padding: 0 1;
+    margin-bottom: 1;
+    height: 3;
+}
+
+.profile-version-item:hover {
+    border: #00E5FF solid;
+    color: #F1F5F9;
+}
+
+.profile-version-item.active-version {
+    background: #162E44;
+    border: #00E5FF solid;
+    color: #00E5FF;
+    text-style: bold;
+}
+
+.file-item {
+    color: #94A3B8;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
+.file-item:hover {
+    color: #00E5FF;
+}
+
+/* Tree widget overrides */
+Tree {
+    background: transparent;
+    color: #CBD5E1;
+    padding: 0;
+}
+
+Tree > .tree--cursor {
+    background: #162E44;
+    color: #00E5FF;
+    text-style: bold;
+}
+
+.add-direction-btn {
+    width: 100%;
+    background: #131A29;
+    border: #243049 dashed;
+    color: #94A3B8;
+    margin-top: 2;
+}
+
+.add-direction-btn:hover {
+    border: #00E5FF solid;
+    color: #00E5FF;
+}
+
+
+/* ==========================================================================
+   Context Panel Content (Cleaning vs Research)
+   ========================================================================== */
+
+.panel-section-title {
+    text-style: bold;
+    color: #00E5FF;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+.stat-box {
+    background: #131A2B;
+    border: #1E293B solid;
+    padding: 1;
+    margin-bottom: 1;
+}
+
+.stat-label {
+    color: #64748B;
+    text-style: bold;
+}
+
+.stat-value {
+    color: #F1F5F9;
+    text-style: bold;
+}
+
+.stat-value-highlight {
+    color: #00E5FF;
+    text-style: bold;
+}
+
+/* Collapsible Pinned Artifacts */
+Collapsible {
+    background: #131A2B;
+    border: #1E293B solid;
+    margin-bottom: 1;
+    padding: 0 1;
+}
+
+Collapsible Title {
+    color: #CBD5E1;
+    text-style: bold;
+}
+
+Collapsible:hover {
+    border: #00E5FF solid;
+}
+
+
+/* ==========================================================================
+   Conversation Panel Content
+   ========================================================================== */
+
+#chat-scroll-area {
+    width: 100%;
+    height: 100%;
+    padding: 0 1;
+}
+
+.chat-message-user {
+    background: #141E33;
+    border: #1E3A5F solid;
+    color: #F1F5F9;
+    padding: 1;
+    margin-bottom: 2;
+    margin-left: 4;
+}
+
+.chat-message-agent {
+    background: #101625;
+    border: #243049 solid;
+    color: #E2E8F0;
+    padding: 1;
+    margin-bottom: 2;
+    margin-right: 4;
+}
+
+.action-chip-btn {
+    background: #162E44;
+    border: #00E5FF solid;
+    color: #00E5FF;
+    height: 3;
+    margin-top: 1;
+}
+
+.action-chip-btn:hover {
+    background: #00E5FF;
+    color: #090D16;
+}
+
+/* Summary Card for /finalize dataset */
+.summary-card {
+    background: #0F192C;
+    border: #00E5FF double;
+    padding: 1 2;
+    margin-bottom: 2;
+}
+
+.summary-card-title {
+    color: #00E5FF;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+
+/* ==========================================================================
+   Command Bar & Model Selector Overlay
+   ========================================================================== */
+
+#command-input-row {
+    width: 100%;
+    height: 3;
+    align: center middle;
+}
+
+#command-input {
+    width: 1fr;
+    background: #131A2B;
+    border: #243049 solid;
+    color: #F1F5F9;
+}
+
+#command-input:focus {
+    border: #00E5FF solid;
+}
+
+#model-selector-btn {
+    min-width: 14;
+    height: 3;
+    background: #10B981;
+    color: #090D16;
+    text-style: bold;
+    border: none;
+    margin-left: 1;
+}
+
+#model-selector-btn:hover {
+    background: #34D399;
+}
+
+/* Popup Menu for Model Selector */
+#model-menu-popup {
+    dock: right;
+    width: 32;
+    height: auto;
+    background: #0F172A;
+    border: #00E5FF solid;
+    padding: 1;
+    margin-right: 1;
+    margin-bottom: 4;
+}
+
+.model-option-btn {
+    width: 100%;
+    background: #1E293B;
+    color: #F1F5F9;
+    border: none;
+    margin-bottom: 1;
+    content-align: left middle;
+}
+
+.model-option-btn:hover {
+    background: #00E5FF;
+    color: #090D16;
+}
+
+.model-option-active {
+    background: #162E44;
+    color: #00E5FF;
+    border: cyan solid;
+    text-style: bold;
+}
