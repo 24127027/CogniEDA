@@ -177,10 +177,18 @@ wire format, or serialization details.
 
 ## Implementation status
 
-**Partially implemented.** Current main has a typed generic capability catalog,
-registry, lazy executor resolution, and dispatcher seam. Unknown or
-unregistered capability identifiers fail rather than selecting an arbitrary
-worker.
+**Partially implemented.** Current main has a lightweight capability registry
+using `Capability` `StrEnum` identifiers. Registry maps capabilities to
+executor factories, caches instances by provider for reuse, and supports one
+executor providing multiple capabilities. Unknown or unregistered capability
+identifiers fail rather than selecting an arbitrary worker.
+
+Recent MVP progress (2026-08-08):
+- Capability system simplified from metadata-heavy `CapabilitySpec` to lightweight `StrEnum`.
+- Registry now provides instance reuse across capabilities via factory caching.
+- Dispatcher dependency protocol (`HasExecutorDispatcher`) enables tools to dispatch work.
+- Executor types simplified: removed `ExecutorOutput` with extensive optional fields; `ExecutionResult` now contains only essential fields (`hypothesis`, `evidence`, `discoveries`, `data_profile`).
+- Tool-based dispatch path: Planner can now invoke executor dispatch through built-in tools (delegation pattern), with `ExecutionRequest` binding task, capability, and context.
 
 The current capability names and generic execution request and result contracts
 predate the canonical Task-kind and role-native model. Canonical
@@ -188,7 +196,7 @@ predate the canonical Task-kind and role-native model. Canonical
 `HypothesisAnalystResult`, `GraphInquiryRequest`, `GraphInquiryResult`, and
 `PlannerWorkOutcome` are not implemented. Default Graph Miner and Hypothesis
 Analyst graphs are not runnable, Data Explorer is not registered as a runnable
-default specialist, and Planner-to-dispatch integration remains incomplete.
+default specialist, and full Planner-to-dispatch integration remains in progress.
 
 See [Persistence and admission](persistence-and-admission.md) for the durable
 boundary around attempts and results.

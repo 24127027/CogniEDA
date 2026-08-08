@@ -2,7 +2,7 @@
 
 This page answers one question: **what is supported on current `main`?** It
 describes the source at `origin/main` commit
-`1ec4a67702043b41e10b4a9874c1ef6b389beed2`, inspected on 2026-08-05. A
+`711ab9bc7b1e7b209199c21cdf8ea8b1597d040f`, inspected on 2026-08-08. A
 schema, interface, stub, fixture, configuration entry, or directory is not
 treated as a supported workflow by itself.
 
@@ -18,11 +18,11 @@ constraints.
 | Runtime entry boundary | **Unsupported** | The installed `cognieda` script calls `main.py`, which only prints a placeholder message. There is no composed user-facing runtime, service, or application request pipeline. |
 | Workspace and Objective support | **Partially implemented** (**Verified on SQLite**) | A database URL can identify an isolated local store. `Objective` has schema, table, repository CRUD, and `ObjectiveRevision` provenance. Tasks and other state are not Objective-bound, and no Workspace initializer, registry, or active-session authority exists. |
 | Current FCO schemas and persistence | **Partially implemented** (**Verified on SQLite**) | All eight named FCOs have Pydantic schemas and SQLModel records. Repository surfaces exist, but the current shapes and relationships do not fully implement the canonical contracts described below. |
-| Planner support | **Partially implemented** (**Verified on SQLite**) | Request classification, explicit-command parsing, bounded Task creation and decomposition proposals, durable `PlannerOperation` approval/resume, and bounded atomic commit are exercised. Question answering, question proposal, task selection, execution preparation, dispatch, and execution review remain stubs. |
+| Planner support | **Partially implemented** (**Verified on SQLite**) | Request classification, explicit-command parsing, bounded Task creation and decomposition proposals, durable `PlannerOperation` approval/resume, and bounded atomic commit are exercised. Planner now accepts `PlannerDeps` (terminal printer), can invoke built-in tools (starting with terminal printer), and tool calling succeeds. Question answering, question proposal, task selection, execution preparation with executor dispatch, and execution review remain stubs. |
 | `PlanRevision` | **Unsupported** | No canonical `PlanRevision`, plan binding, dependency, assignment, activation, or plan-version persistence is present. `ObjectiveRevision` is Objective-change provenance and is not a substitute. |
 | Task taxonomy | **Known limitation** | Current `TaskKind` is `ANALYTICAL`, `ORGANIZING`, and `REVIEW`, not canonical `DATA`, `SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`. Current Task records also carry `profile_id`, `variables`, and `evidence_expectation`, which the target assigns outside semantic Task identity. |
-| Executor registry and dispatch | **Partially implemented** | A capability catalog, registry, selection helpers, request validation, and thin dispatcher exist. Catalog membership does not prove registration or runnability, and Planner integration is absent. |
-| Tool and skill assembly | **Partially implemented** | `ToolManager` can assemble caller-selected built-ins and resolve configured MCP and skill entries. Built-ins are placeholders, configured skill directories are absent, MCP worker names do not resolve to enabled servers, and no composed runtime proves agent use. |
+| Executor registry and dispatch | **Partially implemented** | Capability identifiers are now lightweight `StrEnum` values instead of metadata specs. Registry uses `Capability` enum to map to executor factories, caches executor instances by provider for reuse across capabilities, and supports one executor providing multiple capabilities. Dispatcher dependency protocol exists for delegation tools. Planner integration remains absent. |
+| Tool and skill assembly | **Partially implemented** | `ToolManager` can assemble caller-selected built-ins and resolve configured MCP and skill entries. Built-in tools now include a terminal printer (`print_to_terminal`) for testing. Dependency protocols exist (`HasExecutorDispatcher`, `HasTerminalPrinter`) enabling tool access to shared services. Configured skill directories are absent, MCP worker names do not resolve to enabled servers, and no complete composed runtime proves all agent use. |
 | Data Explorer | **Unsupported** | Dataframe/file loading and deterministic profiling utilities exist, but no registered runnable Data Explorer or role-native `DataWorkOrder -> DataExplorerResult` boundary exists. `data_exploration` is only catalogued. |
 | Hypothesis Analyst | **Unsupported** | A wrapper and capability registration exist, but its default graph raises `NotImplementedError`. The wrapper currently selects a dataset tool, contrary to the canonical no-direct-dataset-access boundary; no supported scientific controller path uses it. |
 | Graph Miner | **Unsupported** | A wrapper and registration exist, but its default graph raises `NotImplementedError`. No supported read-only graph-inquiry workflow is composed. |
@@ -96,3 +96,16 @@ lacks the scientific-result fields the first contract test would check next.
 These are verification gaps, not documentation-change regressions, and are
 listed in
 [Limitations and bottlenecks](limitations-and-bottlenecks.md).
+
+## Recent MVP progress (2026-08-08)
+
+The following refactors advance toward MVP tool-calling capability:
+
+- **Capability system simplification**: Replaced metadata-heavy `CapabilitySpec` dataclass with lightweight `Capability` `StrEnum`. Registry now maps capabilities to executor factories and caches instances by provider, allowing one executor to provide multiple capabilities.
+- **Executor types cleanup**: Removed planned-ahead schemas (`ExecutorOutput` with extensive optional fields). Simplified `ExecutionResult` to only essential fields (`hypothesis`, `evidence`, `discoveries`, `data_profile`). Placeholder schemas for `DataProfile`, `Discovery`, `Evidence`, `Hypothesis`, `Task` are in place pending canonical schema implementation.
+- **Built-in tools organization**: Renamed `builtin_tools/` → `builtin/` for clarity. Added `terminal.py` with `print_to_terminal` tool for MVP testing.
+- **Dependency protocols for tools**: Introduced `HasExecutorDispatcher` and `HasTerminalPrinter` protocols. Tools now access shared services via `RunContext.deps`, enabling delegation to executors and terminal output.
+- **Planner dependency injection**: `Planner` now accepts `PlannerDeps` (containing `RichTerminalPrinter`). `PlannerModel` receives dependencies and builtin tools, enabling tool invocation during planning.
+- **Tool calling validated**: Planner successfully invokes the terminal tool. This marks the first end-to-end MVP milestone for agent tool calling.
+
+Current boundary: Tool calling works for built-in tools. Executor dispatch remains a stub dependency; full executor integration and Evidence admission are next.

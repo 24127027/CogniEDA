@@ -224,13 +224,22 @@ agent's retained transcript or hidden memory.
 
 ## Implementation status
 
-**Unsupported.** The target flow is not supported end to end. Current main contains partial Planner
-proposal, approval, and commit behavior; generic capability dispatch
-foundations; and several durable execution-safety transitions. The canonical
-PlanRevision, role-native contracts, full specialist implementations,
-EvidenceRequest-to-Evidence admission, protected evaluation, governance,
-Discovery admission, PlannerWorkOutcome normalization, and validity-aware
-presentation sequence are incomplete or absent.
+**Unsupported end to end.** Current main contains partial Planner proposal,
+approval, and commit behavior; generic capability dispatch foundations; and
+several durable execution-safety transitions. 
+
+Recent MVP progress (2026-08-08):
+- **Tool calling validated**: Planner can now successfully invoke built-in tools, marking the first MVP milestone for agent tool calling.
+- **Dependency injection**: Planner accepts dependencies enabling tool access to shared services (terminal printer, and will include executor dispatcher).
+- **Capability system simplified**: Lightweight `Capability` `StrEnum` enables straightforward routing. Registry caches executor instances by provider.
+- **Tool-based dispatch path**: Planner can invoke executor dispatch through delegation tools, with `ExecutionRequest` binding task, capability, and context.
+
+The canonical PlanRevision, role-native contracts, full specialist
+implementations, EvidenceRequest-to-Evidence admission, protected evaluation,
+governance, Discovery admission, PlannerWorkOutcome normalization, and
+validity-aware presentation sequence remain incomplete or absent. Executor
+dispatch integration through tools is the immediate next step to enable the
+DATA, SCIENTIFIC, and GRAPH routing paths.
 
 Use [System overview](system-overview.md) for the component map and
 [Authority boundaries](authority-boundaries.md) for the controlling authority
