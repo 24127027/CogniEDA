@@ -11,35 +11,38 @@ Screen {
 
 #app-header {
     dock: top;
-    height: 3;
+    width: 100%;
+    height: 2;
     background: #0E1420;
     border-bottom: #1E293B solid;
     padding: 0 1;
-    align: left middle;
-}
 
-#app-header Horizontal {
-    width: 100%;
-    align: left middle;
+    layout: grid;
+    grid-size: 3;
+    grid-columns: 1fr 1fr 1fr;
 }
 
 #header-brand {
-    width: 1fr;
+    width: 100%;
+    height: 100%;
+    content-align: left middle;
 }
 
 #header-mode {
-    width: auto;
-    margin-right: 2;
+    width: 100%;
+    height: 100%;
+    content-align: center middle;
+}
+
+#header-user {
+    width: 100%;
+    height: 100%;
+    content-align: right middle;
 }
 
 #header-console {
     width: 1fr;
     content-align: center middle;
-}
-
-#header-user {
-    width: auto;
-    dock: right;
 }
 
 .header-brand {
@@ -77,6 +80,7 @@ Screen {
 }
 
 
+
 /* ==========================================================================
    Welcome Screen Layout & Overlay Panels
    ========================================================================== */
@@ -109,19 +113,15 @@ Screen {
 }
 
 #welcome-actions-grid {
-    width: 64;
+    width: 100%;
     height: auto;
+    align-horizontal: center;
     margin-bottom: 2;
 }
 
-#welcome-command-input-row {
-    width: 64;
-    height: 3;
-    align: center middle;
-}
 
 .cli-command-hint {
-    width: 100%;
+    width: 60%;
     height: 3;
     margin-bottom: 1;
     background: #111726;
@@ -130,6 +130,7 @@ Screen {
     content-align: center middle;
     padding: 0 2;
 }
+
 
 .command-tag {
     color: #00E5FF;

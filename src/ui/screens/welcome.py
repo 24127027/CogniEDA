@@ -13,7 +13,7 @@ class WelcomeScreen(Screen):
         self.active_overlay = None
 
     def compose(self) -> ComposeResult:
-        yield CogniEDAHeader(mode="WELCOME", project_name="Workspace Launcher")
+        yield CogniEDAHeader(mode="WELCOME", project_name="")
         
         with Container(id="welcome-root"):
             with Vertical(id="welcome-center-container"):
@@ -45,12 +45,10 @@ class WelcomeScreen(Screen):
                         classes="cli-command-hint"
                     )
 
-                with Horizontal(id="welcome-command-input-row"):
-                    yield Label("📎 ", classes="field-label")
-                    yield Input(
-                        placeholder="Type a command (\\create, \\open, \\ai, \\help)...",
-                        id="welcome-cmd-input"
-                    )
+                yield Input(
+                    placeholder="Type a command (\\create, \\open, \\ai, \\help)...",
+                    id="welcome-cmd-input"
+                )
 
     def show_overlay(self, overlay_name: str) -> None:
         """Shows specified side overlay panel, replacing any existing overlay."""
