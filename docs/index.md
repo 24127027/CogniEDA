@@ -36,6 +36,7 @@ Concept pages own meaning. They must explain epistemic roles and lifecycle conse
 | Architecture concern | Owner page | Availability |
 | --- | --- | --- |
 | System boundaries and major flows | [System overview](architecture/system-overview.md) | **Available** |
+| Canonical architecture versus the executable MVP | [MVP runtime subset](architecture/mvp-runtime-subset.md) | **Available** |
 | Human, agent, and application authority | [Authority boundaries](architecture/authority-boundaries.md) | **Available** |
 | Planner coordination and mutation proposals | [Planner architecture](architecture/planner-architecture.md) | **Available** |
 | Specialist dispatch and execution boundaries | [Executor and dispatch](architecture/executor-and-dispatch.md) | **Available** |

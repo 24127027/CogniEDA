@@ -9,6 +9,10 @@ component or flow is implemented today. Current implementation status is
 summarized near the end of the page and belongs in detail to the later status
 track.
 
+The [MVP runtime subset](mvp-runtime-subset.md) deliberately executes less than
+this canonical target. That delivery boundary defers canonical components; it
+does not remove or redefine them.
+
 ## Architectural priorities
 
 Every architectural choice follows this order:
@@ -175,5 +179,7 @@ providers, complete scientific investigation and governance flows, Planner
 consumption of normalized outcomes, and full Evidence and Discovery admission
 remain incomplete or absent.
 
-Continue with [Authority boundaries](authority-boundaries.md), or use
-[End-to-end flow](end-to-end-flow.md) for the operational sequence.
+Continue with [MVP runtime subset](mvp-runtime-subset.md) for the bounded
+delivery scope, [Authority boundaries](authority-boundaries.md) for ownership,
+or [End-to-end flow](end-to-end-flow.md) for the canonical operational
+sequence.

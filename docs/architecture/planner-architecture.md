@@ -178,24 +178,37 @@ scientific proposal.
 
 ## Implementation status
 
-**Partially implemented.** Current main implements typed request
-classification, bounded Task proposal and decomposition paths, durable
-PlannerOperation approval records, decision resume checks, and atomic commit
-for a bounded set of Planner operations. 
+**Partially implemented.** The active Planner graph contains one model-backed
+`create_plan` node and returns a `PlannerPlan` through `PlannerOutput`.
+Separate repository and application services provide durable
+`PlannerOperation` approval records, exact-ID resume checks, and atomic commit
+for a bounded set of operations; the active Planner graph does not compose
+those services.
 
-Recent MVP progress (2026-08-08):
-- Planner now accepts `PlannerDeps` dependency injection (terminal printer, and will include executor dispatcher).
-- Tool calling is validated: Planner can successfully invoke built-in tools via pydantic_ai tool registration.
-- Built-in tools are registered through `AvailableBuiltinTools` enum and passed to `PlannerModel`.
-- Dependency protocols enable tools to access shared services (`HasExecutorDispatcher`, `HasTerminalPrinter`).
+The bounded S0 infrastructure surface is **Implemented**:
 
-Several graph nodes, including answer, suggestion, Task selection, execution preparation with full executor dispatch, and execution review, remain stubs.
+- Planner accepts `PlannerDeps` dependency injection for the terminal printer
+  and executor dispatcher;
+- PydanticAI tool registration exposes terminal and data-capability adapters to
+  `PlannerModel`;
+- built-in tools are selected through `AvailableBuiltinTools`;
+- dependency protocols expose shared terminal and dispatcher services; and
+- focused tests validate the data-capability adapter through the dispatcher to
+  a registered provider without requiring a model endpoint.
+
+The canonical request-understanding, routing, question-answering, suggestion,
+Task-management, Task-selection, execution-preparation, execution-review, and
+commit nodes are absent from the active graph. Some pre-existing donor tests
+still import missing Planner symbols; that debt belongs to M1-B unless it
+blocks M1-A collection earlier.
 
 Canonical `PlanRevision` and plan-binding records are not implemented, and the
 current runtime Task-kind vocabulary does not yet implement `DATA`,
 `SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`. The full approval-policy model,
-capability-safe execution integration, SessionFrame and GeneratedView
-coordination, and end-to-end recovery model remain target design. Executor dispatch integration through tools is the next priority.
+capability-safe execution behavior, `PlannerWorkOutcome` consumption,
+SessionFrame and GeneratedView coordination, and the end-to-end recovery model
+remain target design. The [MVP runtime subset](mvp-runtime-subset.md) owns the
+delivery sequence and milestone boundary.
 
 Continue with [Executor and dispatch](executor-and-dispatch.md) or follow the
 complete sequence in [End-to-end flow](end-to-end-flow.md).
