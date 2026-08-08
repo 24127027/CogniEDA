@@ -1,99 +1,57 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Literal, cast
+from typing import Any, cast
 
-from pydantic import BaseModel, ConfigDict, Field, create_model
-
-from .capabilities import CAPABILITY_IDS, CapabilitySpec
+from .capabilities import Capability
 from .executor import Executor
+
 
 ExecutorFactory = Callable[[], Executor[Any]]
 
 
 class ExecutorRegistry:
     def __init__(self) -> None:
-        self._factories: dict[str, ExecutorFactory] = {}
-        self._instances: dict[str, Executor[Any]] = {}
-        self._specs: dict[str, CapabilitySpec] = {}
+        self._providers: dict[Capability, ExecutorFactory] = {}
+        self._instances: dict[ExecutorFactory, Executor[Any]] = {}
 
     def register(
         self,
-        capability: CapabilitySpec,
+        *capabilities: Capability,
     ) -> Callable[[type[Executor[Any]]], type[Executor[Any]]]:
-        def decorator(executor_type: type[Executor[Any]]) -> type[Executor[Any]]:
-            if capability.id in self._factories:
-                raise ValueError(f"Capability already registered: {capability.id}")
+        if not capabilities:
+            raise ValueError("At least one capability must be registered.")
 
-            self._specs[capability.id] = capability
-            self._factories[capability.id] = cast(ExecutorFactory, executor_type)
+        def decorator(
+            executor_type: type[Executor[Any]],
+        ) -> type[Executor[Any]]:
+            factory = cast(ExecutorFactory, executor_type)
+
+            for capability in capabilities:
+                if capability in self._providers:
+                    raise ValueError(
+                        f"Capability already registered: {capability}"
+                    )
+
+            for capability in capabilities:
+                self._providers[capability] = factory
+
             return executor_type
 
         return decorator
 
-    def get(self, capability_id: str) -> Executor[Any]:
-        if capability_id not in self._factories:
-            raise KeyError(f"No executor registered for capability: {capability_id}")
+    def get(self, capability: Capability) -> Executor[Any]:
+        try:
+            factory = self._providers[capability]
+        except KeyError:
+            raise KeyError(
+                f"No executor registered for capability: {capability}"
+            ) from None
 
-        if capability_id not in self._instances:
-            self._instances[capability_id] = self._factories[capability_id]()
+        if factory not in self._instances:
+            self._instances[factory] = factory()
 
-        return self._instances[capability_id]
-
-    def get_spec(self, capability_id: str) -> CapabilitySpec:
-        if capability_id not in self._specs:
-            raise KeyError(f"No capability registered: {capability_id}")
-
-        return self._specs[capability_id]
-
-    def list_specs(self) -> tuple[CapabilitySpec, ...]:
-        return tuple(self._specs.values())
-
-
-def render_capabilities(capabilities: tuple[CapabilitySpec, ...]) -> str:
-    return "\n".join(
-        f"- {capability.id}: {capability.description}" for capability in capabilities
-    )
-
-
-def build_capability_selection_model(
-    capabilities: tuple[CapabilitySpec, ...],
-) -> type[BaseModel]:
-    capability_ids = tuple(capability.id for capability in capabilities)
-
-    if not capability_ids:
-        raise ValueError("At least one capability is required to build a selection model.")
-
-    unknown_ids = tuple(
-        capability_id for capability_id in capability_ids if capability_id not in CAPABILITY_IDS
-    )
-    if unknown_ids:
-        raise ValueError(f"Unknown capability ids: {', '.join(unknown_ids)}")
-
-    capability_type = Literal[capability_ids]
-
-    return create_model(
-        "CapabilitySelection",
-        __config__=ConfigDict(extra="forbid"),
-        capability=(
-            capability_type,
-            Field(description="Selected executor capability id."),
-        ),
-    )
-
-
-def build_capability_selection_instructions(
-    capabilities: tuple[CapabilitySpec, ...],
-) -> str:
-    if not capabilities:
-        raise ValueError("At least one capability is required to build selection instructions.")
-
-    return (
-        "Choose exactly one executor capability for the task.\n"
-        "Use only these capability ids:\n\n"
-        f"{render_capabilities(capabilities)}\n\n"
-        "Return the selected id in the `capability` field. Do not invent capability ids."
-    )
+        return self._instances[factory]
 
 
 executor_registry = ExecutorRegistry()
