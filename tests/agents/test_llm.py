@@ -4,7 +4,7 @@ from agents import llm
 from agents.executor.graph_miner.agent import GraphMiner
 from agents.executor.hypothesis_analyst.agent import HypothesisAnalyst
 from agents.planner.agent import Planner
-from tools.builtin_tools import AvailableBuiltinTools
+from tools.builtin import AvailableBuiltinTools
 
 
 def test_create_agent_forwards_agent_owned_builtin_tools(
@@ -47,6 +47,9 @@ def test_create_agent_forwards_agent_owned_builtin_tools(
 
 
 def test_concrete_agent_classes_own_their_builtin_tool_selections() -> None:
-    assert Planner.builtin_tools == (AvailableBuiltinTools.GRAPH,)
+    assert Planner.builtin_tools == (
+        AvailableBuiltinTools.TERMINAL,
+        AvailableBuiltinTools.DATA_DELEGATION,
+    )
     assert GraphMiner.builtin_tools == (AvailableBuiltinTools.GRAPH,)
-    assert HypothesisAnalyst.builtin_tools == (AvailableBuiltinTools.DATASET,)
+    assert HypothesisAnalyst.builtin_tools == ()

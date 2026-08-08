@@ -162,19 +162,18 @@ and an atomic commit boundary for a bounded set of operations; a capability
 registry and dispatcher seam; and database-backed execution-attempt, outbox,
 lease, fencing, retry, and idempotency foundations.
 
-Recent MVP progress (2026-08-08):
-- **Tool calling validated**: Planner successfully invokes built-in tools through pydantic_ai tool registration. This marks the first end-to-end MVP milestone for agent tool calling.
-- **Dependency injection**: Planner accepts `PlannerDeps` containing shared services (terminal printer, and will include executor dispatcher).
-- **Capability system simplified**: Lightweight `Capability` `StrEnum` replaces metadata-heavy `CapabilitySpec`. Registry caches instances by provider, enabling executor reuse across capabilities.
-- **Executor types cleaned**: Removed `ExecutorOutput` with extensive optional fields; `ExecutionResult` now contains only essential fields.
-- **Delegation pattern**: Tools access dispatcher and other services via `RunContext.deps` and dependency protocols (`HasExecutorDispatcher`, `HasTerminalPrinter`).
+The S0 executor foundation is **Implemented** at its bounded infrastructure
+surface: explicit multi-capability provider registration, lazy provider reuse,
+typed async dispatch, protocol-based Planner dependencies, bootstrap
+composition, a tested PydanticAI delegation adapter, and a role-native
+`DataExplorerResult`. Shared `ExecutionResult` carries only transport metadata.
 
 The complete target architecture is not yet a supported end-to-end runtime.
-Canonical plan-version records, canonical Task kinds, role-native specialist
-contracts, runnable default specialist graphs, complete scientific
-investigation and governance flows, normalized `PlannerWorkOutcome` handling,
-and full Evidence and Discovery admission remain incomplete or absent. Executor
-dispatch integration through the delegation tool is the immediate next step.
+Canonical plan-version records, canonical Task kinds, complete role-native
+work-order and admission contracts, runnable Hypothesis Analyst and Graph Miner
+providers, complete scientific investigation and governance flows, Planner
+consumption of normalized outcomes, and full Evidence and Discovery admission
+remain incomplete or absent.
 
 Continue with [Authority boundaries](authority-boundaries.md), or use
 [End-to-end flow](end-to-end-flow.md) for the operational sequence.

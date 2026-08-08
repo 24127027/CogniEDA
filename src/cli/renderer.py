@@ -1,4 +1,4 @@
-from ..runtime.messages import Message, MessageType
+from runtime.messages import Message, MessageType
 
 
 class Renderer:

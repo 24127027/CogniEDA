@@ -13,8 +13,9 @@ the consequences by limitation type.
 - Current schemas do not bind most durable state to an Objective. Multiple
   Objectives can be stored, but exact Objective isolation cannot be enforced
   across Tasks, scientific state, retrieval, or SessionFrames.
-- Canonical role-native contracts among Planner, Data Explorer, Hypothesis
-  Analyst, Graph Miner, governance, and application authority are absent.
+- A bounded `DataExplorerResult` and Planner projection seam exist, but the
+  canonical work-order, specialist, governance, and admission contract family
+  is incomplete.
 
 ## Implementation gap
 
@@ -22,18 +23,23 @@ the consequences by limitation type.
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
   and `GovernanceDecision` have no current supported implementation.
-- Planner execution nodes and both registered specialist graphs are stubs.
+- Planner execution nodes remain incomplete. Hypothesis Analyst and Graph Miner
+  are import-safe scaffolds and are deliberately not registered as runnable.
 - Evidence and Discovery repository guards are not composed behind complete
   application-authority admission services.
 - There is no result-inbox or canonical result-to-Evidence workflow.
 
 ## Operational limitation
 
-- There is no composed application runtime, worker process, or service API.
+- Bootstrap composes the in-process S0 registry and dispatcher, but there is no
+  supported end-to-end application runtime, worker process, or service API.
 - Planner can now invoke built-in tools (MVP milestone: tool calling validated as of 2026-08-08).
-- Execution-attempt records and outbox controls cannot yet produce a result through a runnable default specialist.
+- The local Data Explorer donor provider can produce a typed result from a
+  direct capability request, but it is not connected to execution-attempt
+  records, outbox controls, or admission.
 - Configuration mentions skills and MCP workers that do not establish a working external integration by themselves. The configured skill directories are absent from the current tree.
-- Executor dispatch through delegation tools is the immediate next step; full specialist integration remains incomplete.
+- Delegation adapter dispatch is tested with a fake provider; real Planner to
+  Data Explorer to admission integration remains incomplete.
 
 ## Database limitation
 
@@ -54,8 +60,8 @@ the consequences by limitation type.
 
 ## Unsupported feature
 
-- Data Explorer, Hypothesis Analyst, and Graph Miner are not runnable through a
-  supported current workflow.
+- Data Explorer is runnable only through its bounded local donor path;
+  Hypothesis Analyst and Graph Miner have no registered runtime provider.
 - DVC execution, graph-database integration, external MCP services, service
   APIs, and the product CLI are unsupported.
 - Cross-Objective Evidence reuse and cross-Objective relation admission have no
@@ -73,16 +79,14 @@ the consequences by limitation type.
 
 ## Verification gap
 
-- The focused current-capability selection passed 115 tests and failed 2
-  existing contract tests; the full suite passed 127 tests and failed the same
-  2 tests. One stops at the missing
-  `PlannerOutput.executor_dispatch_ref`; the other expects nested
-  execution-request capability validation through `PlannerOutput`, which has
-  no such field. `ExecutorOutput` also lacks the scientific-result fields that
-  the first contract test would check after the Planner assertion passes.
-- MVP tool calling is now validated (2026-08-08): Planner successfully invokes
-  built-in tools through pydantic_ai tool registration. This does not yet cover
-  full executor dispatch through tools or specialist result admission.
+- The focused S0 selection passes 24 tests. The full suite is interrupted by
+  three pre-existing PR #31 Planner collection mismatches: unchanged tests
+  import `TaskManagementDraft`, `route_intent`, `understand_request`,
+  `ChildTaskProposalDraft`, and `manage_tasks`, which the unchanged starting
+  Planner source does not define. Excluding those three files, 111 tests pass.
+- PydanticAI delegation adapter to dispatcher to a registered fake provider is
+  validated. This does not cover model-selected real Data Explorer work or
+  specialist result admission.
 - No non-SQLite database is tested.
 - No end-to-end user, specialist, governance, admission, recovery, or
   external-integration test exists. CLI remains unsupported.

@@ -1,8 +1,8 @@
 # Current state
 
 This page answers one question: **what is supported on current `main`?** It
-describes the source at `origin/main` commit
-`711ab9bc7b1e7b209199c21cdf8ea8b1597d040f`, inspected on 2026-08-08. A
+describes the S0 worktree based on `origin/main` commit
+`e666276ceb37b21a7b787dd162c96dce43f0db07`, inspected on 2026-08-09. A
 schema, interface, stub, fixture, configuration entry, or directory is not
 treated as a supported workflow by itself.
 
@@ -15,17 +15,17 @@ constraints.
 
 | Reader-visible capability | Status | Current boundary |
 | --- | --- | --- |
-| Runtime entry boundary | **Unsupported** | The installed `cognieda` script calls `main.py`, which only prints a placeholder message. There is no composed user-facing runtime, service, or application request pipeline. |
+| Runtime entry boundary | **Unsupported** | The installed `cognieda` script opens a development REPL and bootstrap now composes the in-process S0 dispatcher. This is not a supported product CLI, service, or complete research-state request pipeline. |
 | Workspace and Objective support | **Partially implemented** (**Verified on SQLite**) | A database URL can identify an isolated local store. `Objective` has schema, table, repository CRUD, and `ObjectiveRevision` provenance. Tasks and other state are not Objective-bound, and no Workspace initializer, registry, or active-session authority exists. |
 | Current FCO schemas and persistence | **Partially implemented** (**Verified on SQLite**) | All eight named FCOs have Pydantic schemas and SQLModel records. Repository surfaces exist, but the current shapes and relationships do not fully implement the canonical contracts described below. |
-| Planner support | **Partially implemented** (**Verified on SQLite**) | Request classification, explicit-command parsing, bounded Task creation and decomposition proposals, durable `PlannerOperation` approval/resume, and bounded atomic commit are exercised. Planner now accepts `PlannerDeps` (terminal printer), can invoke built-in tools (starting with terminal printer), and tool calling succeeds. Current implementation depends on concrete adapter classes (`RichTerminalPrinter`); target design is dependency inversion via protocol types in `core/ports/` with wired concrete implementations at bootstrap (deferred post-MVP). Question answering, question proposal, task selection, execution preparation with executor dispatch, and execution review remain stubs. |
+| Planner support | **Partially implemented** | The active Planner graph has one model-backed `create_plan` node. `PlannerDeps` exposes terminal and dispatcher protocols, and the model receives terminal and data-delegation tools. The current graph does not implement the canonical Planner pipeline, consume `PlannerWorkOutcome`, or connect durable operation approval/commit services to execution. |
 | `PlanRevision` | **Unsupported** | No canonical `PlanRevision`, plan binding, dependency, assignment, activation, or plan-version persistence is present. `ObjectiveRevision` is Objective-change provenance and is not a substitute. |
 | Task taxonomy | **Known limitation** | Current `TaskKind` is `ANALYTICAL`, `ORGANIZING`, and `REVIEW`, not canonical `DATA`, `SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`. Current Task records also carry `profile_id`, `variables`, and `evidence_expectation`, which the target assigns outside semantic Task identity. |
-| Executor registry and dispatch | **Partially implemented** | Capability identifiers are now lightweight `StrEnum` values instead of metadata specs. Registry uses `Capability` enum to map to executor factories, caches executor instances by provider for reuse across capabilities, and supports one executor providing multiple capabilities. Dispatcher dependency protocol exists for delegation tools. Planner integration remains absent. |
-| Tool and skill assembly | **Partially implemented** | `ToolManager` can assemble caller-selected built-ins and resolve configured MCP and skill entries. Built-in tools now include a terminal printer (`print_to_terminal`) for testing. Dependency protocols exist (`HasExecutorDispatcher`, `HasTerminalPrinter`) enabling tool access to shared services. Configured skill directories are absent, MCP worker names do not resolve to enabled servers, and no complete composed runtime proves all agent use. |
-| Data Explorer | **Unsupported** | Dataframe/file loading and deterministic profiling utilities exist, but no registered runnable Data Explorer or role-native `DataWorkOrder -> DataExplorerResult` boundary exists. `data_exploration` is only catalogued. |
-| Hypothesis Analyst | **Unsupported** | A wrapper and capability registration exist, but its default graph raises `NotImplementedError`. The wrapper currently selects a dataset tool, contrary to the canonical no-direct-dataset-access boundary; no supported scientific controller path uses it. |
-| Graph Miner | **Unsupported** | A wrapper and registration exist, but its default graph raises `NotImplementedError`. No supported read-only graph-inquiry workflow is composed. |
+| Executor registry and dispatch | **Implemented** | The S0 library boundary uses one typed `Capability` enum, explicit dependency-aware provider factories, multi-capability mapping, lazy provider reuse, duplicate-registration rejection, typed async dispatch, fail-closed missing registration, and controlled provider errors. It does not implement admission, leases, retry, or distributed routing. |
+| Tool and skill assembly | **Partially implemented** | `ToolManager` can assemble caller-selected built-ins and resolve configured MCP and skill entries. Protocol dependencies expose terminal and dispatcher services. A PydanticAI data-delegation adapter is registered for Planner and is tested through dispatcher to a registered fake provider without a model endpoint. Configured skill directories and external MCP composition remain absent. |
+| Data Explorer | **Partially implemented** | Bootstrap explicitly maps `DATA_ANALYSIS`, `DATA_PROFILING`, and `DATA_TRANSFORMATION` to one reusable Data Explorer provider. Local analysis and profiling donor paths return typed `DataExplorerResult` observations or DataProfile candidates for the current legacy Task plus dataset-path boundary. They do not create Evidence. There is no canonical `DataWorkOrder`, application-authority admission, or end-to-end Planner workflow. Transformation is registered but returns a typed blocker until successor dataset/DataProfile semantics exist. |
+| Hypothesis Analyst | **Unsupported** | The donor wrapper imports but is deliberately not registered as a runnable provider. Its scientific workflow and application-authority contracts remain deferred. |
+| Graph Miner | **Unsupported** | The wrapper imports but is deliberately not registered; its graph runtime remains unimplemented. No supported read-only graph-inquiry workflow is composed. |
 | `ScientificInvestigationRun` | **Unsupported** | No schema, repository, lifecycle service, or runtime path exists. |
 | `InvestigationPlan` and `InvestigationProtocol` | **Unsupported** | No canonical plan, protocol, protocol revision, or scientific operationalization record exists. |
 | `EvidenceRequest` and `DataWorkOrder` | **Unsupported** | No role-native request/work-order schemas, admission path, or request-to-attempt workflow exists. |
@@ -78,43 +78,53 @@ The most consequential drift is structural:
 - direct repository calls can persist Evidence or Discovery without the full
   application-authority admission sequence;
 - context and retrieval records are not explicitly Objective-bound;
-- operational execution foundations are not connected to runnable specialists
-  or result admission.
+- the bounded dispatcher is connected to a local Data Explorer donor provider,
+  but no specialist result is connected to canonical admission.
 
 No legacy fallback is considered supported. Missing canonical contracts must
 fail closed when implementation reaches those boundaries.
 
 ## Verification qualification
 
-The focused current-capability selection produced **115 passes and 2
-failures**; the full suite produced **127 passes and the same 2 failures**.
-Both failures expose existing contract drift: one stops at the missing
-`PlannerOutput.executor_dispatch_ref` field, and one shows that
-`PlannerOutput` has no nested execution-request field through which capability
-validation can run. Source inspection also confirms that `ExecutorOutput`
-lacks the scientific-result fields the first contract test would check next.
-These are verification gaps, not documentation-change regressions, and are
-listed in
+The focused S0 selection produced **24 passes**. The full `pytest -q` gate is
+interrupted during collection by three donor-state Planner test/source
+mismatches: tests import `TaskManagementDraft`, `route_intent`,
+`understand_request`, `ChildTaskProposalDraft`, and `manage_tasks`, while the
+starting PR #31 merge contains none of those source symbols. The affected
+source and test files have byte-identical Git hashes to the starting
+`e666276` versions. With those three pre-existing files excluded, the remaining
+repository suite produces **111 passes**. This qualification is listed in
 [Limitations and bottlenecks](limitations-and-bottlenecks.md).
 
-## Recent MVP progress (2026-08-08)
+## S0 executor stabilization (2026-08-09)
 
-The following refactors advance toward MVP tool-calling capability:
+S0 replaced donor-state ambiguity with one executable foundation:
 
-- **Capability system simplification**: Replaced metadata-heavy `CapabilitySpec` dataclass with lightweight `Capability` `StrEnum`. Registry now maps capabilities to executor factories and caches instances by provider, allowing one executor to provide multiple capabilities.
-- **Executor types cleanup**: Removed planned-ahead schemas (`ExecutorOutput` with extensive optional fields). Simplified `ExecutionResult` to only essential fields (`hypothesis`, `evidence`, `discoveries`, `data_profile`). Placeholder schemas for `DataProfile`, `Discovery`, `Evidence`, `Hypothesis`, `Task` are in place pending canonical schema implementation.
-- **Built-in tools organization**: Renamed `builtin_tools/` → `builtin/` for clarity. Added `terminal.py` with `print_to_terminal` tool for MVP testing.
-- **Dependency protocols for tools**: Introduced `HasExecutorDispatcher` and `HasTerminalPrinter` protocols. Tools now access shared services via `RunContext.deps`, enabling delegation to executors and terminal output.
-- **Planner dependency injection**: `Planner` now accepts `PlannerDeps` (containing `RichTerminalPrinter`). `PlannerModel` receives dependencies and builtin tools, enabling tool invocation during planning. Current implementation uses concrete adapter classes; target design (post-MVP) is dependency inversion via protocol types in `core/ports/` with bootstrap-wired implementations.
-- **Tool calling validated**: Planner successfully invokes the terminal tool. This marks the first end-to-end MVP milestone for agent tool calling.
+- `Capability` is the only active capability identity and requests do not carry
+  redundant executor identity;
+- explicit composition owns provider registration; importing specialist
+  modules no longer mutates a global registry;
+- the dispatcher calls a role provider asynchronously and returns its
+  role-native result;
+- executor types use the real project Task contract and no longer redefine fake
+  FCO schemas;
+- shared `ExecutionResult` is non-semantic transport metadata;
+  `DataExplorerResult` owns Data Explorer fields;
+- a minimal `PlannerWorkOutcome` projection seam exists, while Planner
+  consumption remains **Deferred**;
+- transformation fails closed rather than mutating the active dataset state.
 
-Current boundary: Tool calling works for built-in tools. Executor dispatch remains a stub dependency; full executor integration and Evidence admission are next. Dependency inversion refactor is a deferred design improvement.
+Current boundary: the capability-to-provider infrastructure and deterministic
+tool-adapter proof are **Implemented**. Full Data Explorer MVP, canonical
+Evidence admission, scientific routing, Graph Miner runtime, and end-to-end
+Planner consumption remain **Unsupported** or **Deferred** as listed above.
 
 ## Design target: Dependency inversion
 
 The target architecture separates dependency contracts from implementations:
 
-- Core agents depend on protocols (e.g., `TerminalPrinter`, `ExecutorDispatcher`) defined in `core/ports/`, not concrete adapters.
+- Core agents depend on protocols such as `TerminalPrinter` and the dispatcher
+  port; the final target package placement remains unresolved.
 - Bootstrap wires concrete implementations with injected dependencies.
 - Agents remain testable and composable; tests can substitute mock implementations.
 - Adapter layer (`RichTerminalPrinter`, CLI adapters, integrations) lives in boundary packages, not core modules.

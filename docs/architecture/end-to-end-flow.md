@@ -228,18 +228,18 @@ agent's retained transcript or hidden memory.
 approval, and commit behavior; generic capability dispatch foundations; and
 several durable execution-safety transitions. 
 
-Recent MVP progress (2026-08-08):
-- **Tool calling validated**: Planner can now successfully invoke built-in tools, marking the first MVP milestone for agent tool calling.
-- **Dependency injection**: Planner accepts dependencies enabling tool access to shared services (terminal printer, and will include executor dispatcher).
-- **Capability system simplified**: Lightweight `Capability` `StrEnum` enables straightforward routing. Registry caches executor instances by provider.
-- **Tool-based dispatch path**: Planner can invoke executor dispatch through delegation tools, with `ExecutionRequest` binding task, capability, and context.
+The S0 infrastructure boundary is **Implemented**: bootstrap composes an
+explicit registry, dispatcher, Data Explorer provider factory, and Planner
+dependency; a PydanticAI adapter performs typed capability dispatch; and
+focused tests exercise that adapter through a registered provider. This proves
+the invocation seam, not the end-to-end research-state flow.
 
 The canonical PlanRevision, role-native contracts, full specialist
 implementations, EvidenceRequest-to-Evidence admission, protected evaluation,
-governance, Discovery admission, PlannerWorkOutcome normalization, and
-validity-aware presentation sequence remain incomplete or absent. Executor
-dispatch integration through tools is the immediate next step to enable the
-DATA, SCIENTIFIC, and GRAPH routing paths.
+governance, Discovery admission, full PlannerWorkOutcome consumption, and
+validity-aware presentation sequence remain incomplete or absent. Data
+Explorer's current local donor paths are not the canonical DATA workflow;
+SCIENTIFIC and GRAPH providers are not registered as runnable.
 
 Use [System overview](system-overview.md) for the component map and
 [Authority boundaries](authority-boundaries.md) for the controlling authority

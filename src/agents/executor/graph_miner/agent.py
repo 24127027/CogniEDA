@@ -1,24 +1,22 @@
-"""Graph-miner agent wrapper."""
+"""Deferred Graph Miner wrapper."""
 
 from __future__ import annotations
 
 from tools.builtin import AvailableBuiltinTools
 
 from ..capabilities import Capability
-from ..executor import Executor
-from ..registry import executor_registry
-from .graph import build_graph
-from .state import State
+from ..types import ExecutionRequest, ExecutionResult
 
 
-@executor_registry.register(Capability.GRAPH_MINING)
-class GraphMiner(Executor[State]):
-    """Infrastructure agent for graph search."""
+class GraphMiner:
+    """Import-safe scaffold; S0 does not register the unimplemented graph."""
 
     builtin_tools: tuple[AvailableBuiltinTools, ...] = (AvailableBuiltinTools.GRAPH,)
 
-    def __init__(self) -> None:
-        super().__init__(build_graph)
+    async def run(self, request: ExecutionRequest) -> ExecutionResult:
+        if request.capability != Capability.GRAPH_MINING:
+            raise ValueError(f"Graph Miner cannot provide {request.capability}.")
+        raise NotImplementedError("Graph Miner runtime is deferred beyond S0.")
 
 
 GraphMinerExecutor = GraphMiner

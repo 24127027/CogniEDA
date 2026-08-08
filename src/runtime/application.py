@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from .workspace import Workspace
-from .messages import Message, MessageType, MessageRole
+from agents.executor.dispatcher import ExecutorDispatcher
+from agents.planner.agent import Planner
+from agents.planner.types import PlannerOutput
 
-from ..agents.planner.agent import Planner
-from ..agents.planner.types import PlannerOutput
+from .messages import Message, MessageRole, MessageType
+from .workspace import Workspace
 
 
 class Application:
@@ -12,7 +13,7 @@ class Application:
         self,
         workspace: Workspace,
         planner_agent: Planner,
-        dispatcher: object | None = None,
+        dispatcher: ExecutorDispatcher,
     ) -> None:
         self.workspace = workspace
         self.planner_agent = planner_agent

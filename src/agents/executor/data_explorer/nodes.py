@@ -10,12 +10,13 @@ from pydantic import BaseModel, Field, ValidationError
 
 from agents.llm import ModelConfig
 from data import DatasetProfiler, load_dataset
-from schemas.artifacts import DataProfile, Evidence, EvidenceProvenance, EvidenceResultSummary
-from schemas.enums import DataProfileMethod, EvidenceType
+from schemas.artifacts import DataProfile, Task
+from schemas.enums import DataProfileMethod
 
-from ..types import ExecutionResult
-from .deps import AdmissionCall
+from ..capabilities import Capability
+from ..types import ExecutionFailure, ExecutionStatus
 from .state import State
+from .types import DataExplorerObservation, DataExplorerResult
 
 _MAX_LOGICAL_RETRIES = 2
 _MAX_CODE_RETRIES = 2
@@ -26,7 +27,7 @@ class _GeneratedCodeDraft(BaseModel):
     result_summary: str | None = None
 
 
-def _task(state: State):
+def _task(state: State) -> Task:
 	task = state["request"].input.task
 	return task
 
@@ -164,46 +165,28 @@ def _is_recoverable_mismatch(raw_data_results: Any) -> bool:
 
 def route_results(state: State, runtime: Any = None) -> str:
 	if _results_match_request(state):
-		return "draft_and_request_admission"
-	if _is_recoverable_mismatch(state["raw_data_results"]) and state["retry_count"] < _MAX_LOGICAL_RETRIES:
+		return "draft_observation"
+	if (
+		_is_recoverable_mismatch(state["raw_data_results"])
+		and state["retry_count"] < _MAX_LOGICAL_RETRIES
+	):
 		return "generate_and_execute_code"
 	return "handle_failure_and_logs"
 
 
-def _build_evidence_draft(state: State) -> Evidence:
-	task = _task(state)
-	profile_id = task.profile_id
-	if profile_id is None:
-		raise RuntimeError("Evidence drafting requires a Task with an associated DataProfile.")
-
+def _build_observation(state: State) -> DataExplorerObservation:
 	raw_data_results = state["raw_data_results"]
 	if isinstance(raw_data_results, Mapping):
 		summary_text = str(raw_data_results.get("summary") or raw_data_results)
-		key_findings = [
-			str(raw_data_results.get("summary") or "Data Explorer returned structured results."),
-		]
+		payload = dict(raw_data_results)
 	else:
 		summary_text = str(raw_data_results)
-		key_findings = [summary_text]
+		payload = {"value": raw_data_results}
 
-	execution_run_ref = f"de:{task.task_id}"
-	analysis_frame_ref = f"analysis-frame:{task.task_id}"
-	return Evidence(
-		hypothesis_id=task.task_id,
-		profile_id=profile_id,
-		analysis_frame_ref=analysis_frame_ref,
-		execution_run_ref=execution_run_ref,
-		evidence_type=EvidenceType.SUMMARY_STATISTIC,
-		method="data_exploration",
-		provenance=EvidenceProvenance(
-			analysis_frame_ref=analysis_frame_ref,
-			execution_run_ref=execution_run_ref,
-			code_reference="data_explorer.generate_and_execute_code",
-		),
-		result_summary=EvidenceResultSummary(
-			summary=summary_text,
-			key_findings=key_findings,
-		),
+	return DataExplorerObservation(
+		observation_type="bounded_data_analysis",
+		summary=summary_text,
+		payload=payload,
 	)
 
 
@@ -225,13 +208,14 @@ def _build_profile_draft(state: State, dataframe: pd.DataFrame) -> DataProfile:
 
 
 def route_request(state: State, runtime: Any = None) -> str:
-	text = _task_text(state).lower()
-	if any(token in text for token in ("profile", "profiling", "clean", "cleaning")):
+	if state["request"].capability == Capability.DATA_PROFILING:
 		return "execute_profiling_and_cleaning"
 	return "generate_and_execute_code"
 
 
-def generate_and_execute_code(state: State, runtime: Any = None, *, agent_config: ModelConfig) -> State:
+def generate_and_execute_code(
+	state: State, runtime: Any = None, *, agent_config: ModelConfig
+) -> State:
 	logs = list(state["execution_logs"])
 	dataframe = _load_dataframe(state)
 
@@ -276,20 +260,8 @@ def evaluate_results(state: State, runtime: Any = None) -> State:
 	return {**state, "execution_logs": logs}
 
 
-def draft_and_request_admission(
-	state: State,
-	runtime: Any = None,
-	*,
-	mock_admission_call: AdmissionCall,
-) -> State:
-	logs = list(state["execution_logs"])
-	evidence_draft = _build_evidence_draft(state)
-	admitted = mock_admission_call(evidence_draft)
-	if admitted:
-		return {**state, "evidence_draft": evidence_draft, "execution_logs": logs}
-
-	logs.append("Admission Authority rejected the evidence draft.")
-	return {**state, "evidence_draft": None, "execution_logs": logs}
+def draft_observation(state: State, runtime: Any = None) -> State:
+	return {**state, "observation": _build_observation(state)}
 
 
 def execute_profiling_and_cleaning(
@@ -313,23 +285,8 @@ def execute_profiling_and_cleaning(
 		return {**state, "data_profile_draft": None, "execution_logs": logs}
 
 
-def request_profile_admission(
-	state: State,
-	runtime: Any = None,
-	*,
-	mock_admission_call: AdmissionCall,
-) -> State:
-	logs = list(state["execution_logs"])
-	profile_draft = state["data_profile_draft"]
-	if profile_draft is None:
-		return {**state, "execution_logs": logs}
-
-	admitted = mock_admission_call(profile_draft)
-	if admitted:
-		return {**state, "data_profile_draft": profile_draft, "execution_logs": logs}
-
-	logs.append("Admission Authority rejected the data profile draft.")
-	return {**state, "data_profile_draft": None, "execution_logs": logs}
+def return_profile_draft(state: State, runtime: Any = None) -> State:
+	return state
 
 
 def handle_failure_and_logs(state: State, runtime: Any = None) -> State:
@@ -339,28 +296,35 @@ def handle_failure_and_logs(state: State, runtime: Any = None) -> State:
 	):
 		logs.append("Data Explorer terminated before producing usable raw data results.")
 
-	if state["evidence_draft"] is None and state["data_profile_draft"] is None:
-		if not any("admission authority rejected" in log.lower() for log in logs):
-			logs.append("No admissible draft was produced for the caller.")
+	if state["observation"] is None and state["data_profile_draft"] is None:
+		logs.append("No role-native output was produced for the caller.")
 
 	return {**state, "execution_logs": logs}
 
 
 def compile_result(state: State, runtime: Any = None) -> State:
-	evidence_drafts = [state["evidence_draft"]] if state["evidence_draft"] is not None else []
-	discovery_drafts: list[Any] = []
+	observations = [state["observation"]] if state["observation"] is not None else []
 	data_profile_draft = state["data_profile_draft"]
 
 	execution_run_ref = f"de:{_task(state).task_id}"
-	result = ExecutionResult(
-		evidence_drafts=evidence_drafts,
-		evidence_draft=state["evidence_draft"],
-		discovery_drafts=discovery_drafts,
-		data_profile_draft=data_profile_draft,
-		evidence_refs=[str(item.evidence_id) for item in evidence_drafts],
-		execution_logs=list(state["execution_logs"]),
-		execution_run_ref=execution_run_ref,
+	succeeded = bool(observations or data_profile_draft is not None)
+	result = DataExplorerResult(
+		source_role="data_explorer",
+		task_id=_task(state).task_id,
+		work_id=execution_run_ref,
+		status=ExecutionStatus.SUCCEEDED if succeeded else ExecutionStatus.FAILED,
+		failure=(
+			None
+			if succeeded
+			else ExecutionFailure(
+				code="no_role_native_output",
+				message="Data Explorer produced no role-native output.",
+			)
+		),
+		capability=state["request"].capability,
+		observations=observations,
+		produced_data_profile=data_profile_draft,
+		artifact_refs=[ref for item in observations for ref in item.artifact_refs],
+		execution_details=list(state["execution_logs"]),
 	)
-	final_result_snapshot = result.model_dump(mode="json", exclude={"final_result"})
-	result = result.model_copy(update={"final_result": final_result_snapshot})
 	return {**state, "final_result": result}

@@ -1,4 +1,4 @@
-"""Data Explorer executor wrapper."""
+"""Data Explorer capability provider."""
 
 from __future__ import annotations
 
@@ -10,83 +10,82 @@ from agents.llm import ModelConfig, create_agent
 from tools.builtin import AvailableBuiltinTools
 
 from ..capabilities import Capability
-from ..executor import Executor
-from ..registry import executor_registry
-from ..types import ExecutionRequest, ExecutionResult, ExecutorContext, ExecutorInput
-from .deps import AdmissionCall
+from ..types import ExecutionFailure, ExecutionRequest, ExecutionStatus
 from .graph import build_graph
 from .state import State
-
-
-def _missing_admission_call(draft: object) -> bool:
-	raise RuntimeError(
-		"DataExplorer requires an admission callable for Evidence and DataProfile validation."
-	)
+from .types import DataExplorerResult
 
 
 def create_de_agent(config: ModelConfig) -> Agent[None]:
-	return create_agent(
-		worker="data_explorer",
-		config=config,
-		deps_type=type(None),
-		builtin_tools=(),
-	)
+    return create_agent(
+        worker="data_explorer",
+        config=config,
+        deps_type=type(None),
+        builtin_tools=(),
+    )
 
 
 @dataclass(slots=True)
 class DataExplorerConfig:
-	model: ModelConfig = field(default_factory=ModelConfig)
-	mock_admission_call: AdmissionCall = _missing_admission_call
+    model: ModelConfig = field(default_factory=ModelConfig)
 
 
-@executor_registry.register(Capability.DATA_EXPLORATION)
-class DataExplorer(Executor[State]):
-	"""Executor that can produce Evidence or DataProfile drafts from raw data."""
+class DataExplorer:
+    """Provider for bounded data analysis and profiling capability requests."""
 
-	builtin_tools: tuple[AvailableBuiltinTools, ...] = ()
+    builtin_tools: tuple[AvailableBuiltinTools, ...] = ()
 
-	def __init__(
-		self,
-		*,
-		config: ModelConfig | None = None,
-		mock_admission_call: AdmissionCall | None = None,
-	) -> None:
-		self.config = config or ModelConfig()
-		self.mock_admission_call = mock_admission_call or _missing_admission_call
+    def __init__(self, *, config: ModelConfig | None = None) -> None:
+        self.config = config or ModelConfig()
+        self.graph = build_graph(config=self.config)
 
-		super().__init__(
-			lambda: build_graph(
-				config=self.config,
-				mock_admission_call=self.mock_admission_call,
-			)
-		)
+    async def run(self, request: ExecutionRequest) -> DataExplorerResult:
+        if request.capability == Capability.DATA_TRANSFORMATION:
+            return DataExplorerResult(
+                source_role="data_explorer",
+                task_id=request.input.task.task_id,
+                work_id=f"de:{request.input.task.task_id}",
+                status=ExecutionStatus.BLOCKED,
+                capability=request.capability,
+                limitations=[
+                    "Successor dataset and DataProfile creation are not implemented in S0."
+                ],
+                failure=ExecutionFailure(
+                    code="successor_data_profile_not_implemented",
+                    message=(
+                        "DATA_TRANSFORMATION is blocked because it cannot yet create a "
+                        "successor dataset state and DataProfile."
+                    ),
+                ),
+            )
+        if request.capability not in {
+            Capability.DATA_ANALYSIS,
+            Capability.DATA_PROFILING,
+        }:
+            raise ValueError(f"Data Explorer cannot provide {request.capability}.")
 
-	async def run(self, input: ExecutorInput, context: ExecutorContext) -> ExecutionResult:
-		initial_state: State = {
-			"request": self._build_request(input, context),
-			"raw_data_results": None,
-			"evidence_draft": None,
-			"data_profile_draft": None,
-			"execution_logs": [],
-			"retry_count": 0,
-			"final_result": None,
-		}
-
-		result_state = await self.graph.ainvoke(initial_state)
-		final_result = result_state.get("final_result")
-		if isinstance(final_result, ExecutionResult):
-			return final_result
-
-		return ExecutionResult.model_validate(result_state)
-
-	def _build_request(self, input: ExecutorInput, context: ExecutorContext) -> ExecutionRequest:
-		return ExecutionRequest(
-			capability=Capability.DATA_EXPLORATION.id,
-			input=input,
-			context=context,
-		)
+        initial_state: State = {
+            "request": request,
+            "raw_data_results": None,
+            "observation": None,
+            "data_profile_draft": None,
+            "execution_logs": [],
+            "retry_count": 0,
+            "final_result": None,
+        }
+        result_state = await self.graph.ainvoke(initial_state)
+        final_result = result_state.get("final_result")
+        if not isinstance(final_result, DataExplorerResult):
+            raise RuntimeError("Data Explorer graph did not return DataExplorerResult.")
+        return final_result
 
 
 DataExplorerExecutor = DataExplorer
 
-__all__ = ("DataExplorer", "DataExplorerConfig", "DataExplorerExecutor", "create_de_agent")
+__all__ = (
+    "DataExplorer",
+    "DataExplorerConfig",
+    "DataExplorerExecutor",
+    "DataExplorerResult",
+    "create_de_agent",
+)

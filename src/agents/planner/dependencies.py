@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 
-from src.runtime.terminal import RichTerminalPrinter
+from tools.dependencies.protocols import ExecutorDispatcherPort, TerminalPrinter
 
 
 @dataclass
 class PlannerDeps:
-    terminal: RichTerminalPrinter
+    terminal: TerminalPrinter
+    dispatcher: ExecutorDispatcherPort

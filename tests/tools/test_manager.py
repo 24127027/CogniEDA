@@ -1,7 +1,7 @@
 import pytest
 from pydantic_ai import FunctionToolset
 
-from tools.builtin_tools import AvailableBuiltinTools
+from tools.builtin import AvailableBuiltinTools
 from tools.manager import ToolManager
 
 

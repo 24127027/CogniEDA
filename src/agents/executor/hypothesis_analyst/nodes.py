@@ -6,13 +6,15 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from agents.llm import ModelConfig
-from schemas.artifacts import Discovery, DiscoveryClaim, Evidence, Hypothesis, ValidityBasis
+from schemas.artifacts import Discovery, Evidence, Hypothesis
+from schemas.common import DiscoveryClaim, ValidityBasis
 from schemas.enums import DiscoveryEpistemicStatus
 
 from ..capabilities import Capability
-from ..types import ExecutionRequest, ExecutionResult, ExecutorInput
+from ..types import ExecutionFailure, ExecutionRequest, ExecutionStatus, ExecutorInput
 from .deps import AdmissionCall, DispatcherCall
 from .state import HAState
+from .types import HypothesisAnalystResult
 
 
 class _HypothesisDraftModel(BaseModel):
@@ -45,7 +47,9 @@ def _is_vague_task(task: Any) -> bool:
 	return any(token in text for token in ("maybe", "some", "something", "anything", "data"))
 
 
-def _safe_agent_output(config: ModelConfig, prompt: str, output_type: type[BaseModel]) -> BaseModel | None:
+def _safe_agent_output(
+	config: ModelConfig, prompt: str, output_type: type[BaseModel]
+) -> BaseModel | None:
 	from .agent import create_ha_agent
 
 	try:
@@ -82,7 +86,9 @@ def _evaluation_outcome_from_evidence(evidence: Sequence[Evidence]) -> tuple[str
 	return "Inconclusive", "useless noise"
 
 
-def _build_discovery(hypothesis: Hypothesis, evidence: Sequence[Evidence], outcome: str) -> Discovery:
+def _build_discovery(
+	hypothesis: Hypothesis, evidence: Sequence[Evidence], outcome: str
+) -> Discovery:
 	evidence_ids = [item.evidence_id for item in evidence]
 	supporting_evidence = evidence[0]
 	return Discovery(
@@ -130,7 +136,6 @@ def _result_package(state: HAState) -> dict[str, Any]:
 		"scientific_value": state["scientific_value"],
 		"execution_run_ref": f"ha:{state['request'].input.task.task_id}",
 	}
-	package["final_result"] = dict(package)
 	return package
 
 
@@ -187,7 +192,7 @@ def plan_de_requests(state: HAState, *, mock_dispatcher_call: DispatcherCall) ->
 		)
 
 	request = ExecutionRequest(
-		capability=Capability.DATA_EXPLORATION.id,
+		capability=Capability.DATA_ANALYSIS,
 		input=ExecutorInput(task=plan_task),
 		context=state["request"].context,
 	)
@@ -199,15 +204,15 @@ def dispatch_to_de(state: HAState, *, mock_dispatcher_call: DispatcherCall) -> d
 		return {"collected_evidence": state["collected_evidence"]}
 
 	result = mock_dispatcher_call(state["de_capability_requests"][-1])
-	evidence_items = [
-		item if isinstance(item, Evidence) else Evidence.model_validate(item)
-		for item in result.evidence_drafts
-	]
-
-	if not evidence_items:
-		return {"collected_evidence": state["collected_evidence"]}
-
-	return {"collected_evidence": [*state["collected_evidence"], *evidence_items]}
+	logs = list(state["execution_logs"])
+	logs.append(
+		f"Data Explorer returned {len(result.observations)} observation(s); "
+		"canonical Evidence admission is not implemented."
+	)
+	return {
+		"collected_evidence": state["collected_evidence"],
+		"execution_logs": logs,
+	}
 
 
 def evaluate_evidence(state: HAState) -> dict[str, Any]:
@@ -219,7 +224,8 @@ def evaluate_evidence(state: HAState) -> dict[str, Any]:
 		"Evaluate the evidence against the hypothesis and classify the outcome.\n"
 		f"Hypothesis: {hypothesis.statement}\n"
 		f"Scope: {hypothesis.scope}\n"
-		f"Evidence summaries: {[item.result_summary.summary for item in state['collected_evidence']]}\n"
+		"Evidence summaries: "
+		f"{[item.result_summary.summary for item in state['collected_evidence']]}\n"
 	)
 	model_output = _safe_agent_output(ModelConfig(), prompt, _EvidenceAssessmentModel)
 	if model_output is not None:
@@ -239,7 +245,11 @@ def assess_scientific_value(state: HAState) -> dict[str, Any]:
 	if state["scientific_value"] == "useless noise":
 		logs = list(state["execution_logs"])
 		logs.append("Hypothesis assessed as trivial truth; discarded.")
-		return {"scientific_value": "useless noise", "discovery_draft": None, "execution_logs": logs}
+		return {
+			"scientific_value": "useless noise",
+			"discovery_draft": None,
+			"execution_logs": logs,
+		}
 
 	discovery = _build_discovery(
 		hypothesis=state["hypothesis_draft"],
@@ -282,5 +292,27 @@ def handle_failure_and_logs(state: HAState) -> dict[str, Any]:
 
 
 def compile_result(state: HAState) -> dict[str, Any]:
-	result = ExecutionResult(**_result_package(state))
+	package = _result_package(state)
+	succeeded = bool(state["hypothesis_draft"] and state["collected_evidence"])
+	result = HypothesisAnalystResult(
+		source_role="hypothesis_analyst",
+		task_id=state["request"].input.task.task_id,
+		work_id=f"ha:{state['request'].input.task.task_id}",
+		status=ExecutionStatus.SUCCEEDED if succeeded else ExecutionStatus.FAILED,
+		failure=(
+			None
+			if succeeded
+			else ExecutionFailure(
+				code="scientific_analysis_incomplete",
+				message="Hypothesis Analyst did not complete its donor workflow.",
+			)
+		),
+		hypothesis_draft=package["hypothesis_draft"],
+		evidence_drafts=package["evidence_drafts"],
+		discovery_draft=state["discovery_draft"],
+		evidence_refs=package["evidence_refs"],
+		execution_details=package["execution_logs"],
+		evaluation_outcome=package["evaluation_outcome"],
+		scientific_value=package["scientific_value"],
+	)
 	return {"final_result": result}

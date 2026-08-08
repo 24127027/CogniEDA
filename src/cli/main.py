@@ -1,5 +1,7 @@
-from ..runtime import Application
+from runtime import Application
+
 from .renderer import Renderer
+
 
 async def repl(app: Application, renderer: Renderer):
     await app.start_session()

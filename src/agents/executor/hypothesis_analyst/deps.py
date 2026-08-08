@@ -4,7 +4,8 @@ from collections.abc import Callable
 
 from schemas.artifacts import Discovery
 
-from ..types import ExecutionRequest, ExecutionResult
+from ..data_explorer.types import DataExplorerResult
+from ..types import ExecutionRequest
 
-DispatcherCall = Callable[[ExecutionRequest], ExecutionResult]
+DispatcherCall = Callable[[ExecutionRequest], DataExplorerResult]
 AdmissionCall = Callable[[Discovery], bool]

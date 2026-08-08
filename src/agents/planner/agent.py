@@ -1,17 +1,21 @@
 from __future__ import annotations
 
+from tools.builtin import AvailableBuiltinTools
 
 from ..types import RuntimePayload
 from .dependencies import PlannerDeps
 from .graph import build_graph
-from .types import Context, PlannerOutput, State
 from .model import PlannerModel
-from ...tools.builtin import AvailableBuiltinTools
+from .types import Context, PlannerOutput, State
 
 
 class Planner:
     """Planner responsible for producing the next research plan."""
-    builtin_tools: list = [AvailableBuiltinTools.TERMINAL]
+
+    builtin_tools = (
+        AvailableBuiltinTools.TERMINAL,
+        AvailableBuiltinTools.DATA_DELEGATION,
+    )
 
     def __init__(self, deps: PlannerDeps) -> None:
         self.graph = build_graph()

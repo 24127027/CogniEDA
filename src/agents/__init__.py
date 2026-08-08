@@ -1,4 +1,1 @@
-from .planner.agent import Planner
-# from .executor.dispatcher import ExecutorDispatcher
-# from .executor.registry import executor_registry
-
+"""Agent packages. Import concrete roles from their owning modules."""

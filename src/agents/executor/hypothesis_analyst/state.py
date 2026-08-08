@@ -6,7 +6,8 @@ from typing import TypedDict
 
 from schemas.artifacts import Discovery, Evidence, Hypothesis
 
-from ..types import ExecutionRequest, ExecutionResult
+from ..types import ExecutionRequest
+from .types import HypothesisAnalystResult
 
 
 class HAState(TypedDict):
@@ -18,7 +19,7 @@ class HAState(TypedDict):
     scientific_value: str | None
     discovery_draft: Discovery | None
     execution_logs: list[str]
-    final_result: ExecutionResult | None
+    final_result: HypothesisAnalystResult | None
 
 
 State = HAState
