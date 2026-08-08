@@ -6,7 +6,7 @@ from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from tools.builtin_tools import AvailableBuiltinTools
+from tools.builtin import AvailableBuiltinTools
 from tools.manager import initialize_tool_manager, tool_manager
 
 

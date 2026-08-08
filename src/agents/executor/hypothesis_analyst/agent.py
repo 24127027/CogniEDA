@@ -8,7 +8,7 @@ from pydantic_ai import Agent
 
 from agents.llm import ModelConfig, create_agent
 from schemas.artifacts import Discovery
-from tools.builtin_tools import AvailableBuiltinTools
+from tools.builtin import AvailableBuiltinTools
 
 from ..capabilities import Capability
 from ..executor import Executor

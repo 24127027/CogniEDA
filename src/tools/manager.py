@@ -7,7 +7,7 @@ from pydantic_ai import FunctionToolset
 from pydantic_ai.mcp import MCPToolset
 from pydantic_ai_skills import SkillsCapability
 
-from .builtin_tools import AvailableBuiltinTools
+from .builtin import AvailableBuiltinTools
 from .mcp.loader import load_mcp_toolsets
 from .skills.loader import load_skills
 

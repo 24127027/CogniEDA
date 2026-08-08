@@ -162,13 +162,19 @@ and an atomic commit boundary for a bounded set of operations; a capability
 registry and dispatcher seam; and database-backed execution-attempt, outbox,
 lease, fencing, retry, and idempotency foundations.
 
+Recent MVP progress (2026-08-08):
+- **Tool calling validated**: Planner successfully invokes built-in tools through pydantic_ai tool registration. This marks the first end-to-end MVP milestone for agent tool calling.
+- **Dependency injection**: Planner accepts `PlannerDeps` containing shared services (terminal printer, and will include executor dispatcher).
+- **Capability system simplified**: Lightweight `Capability` `StrEnum` replaces metadata-heavy `CapabilitySpec`. Registry caches instances by provider, enabling executor reuse across capabilities.
+- **Executor types cleaned**: Removed `ExecutorOutput` with extensive optional fields; `ExecutionResult` now contains only essential fields.
+- **Delegation pattern**: Tools access dispatcher and other services via `RunContext.deps` and dependency protocols (`HasExecutorDispatcher`, `HasTerminalPrinter`).
+
 The complete target architecture is not yet a supported end-to-end runtime.
 Canonical plan-version records, canonical Task kinds, role-native specialist
 contracts, runnable default specialist graphs, complete scientific
 investigation and governance flows, normalized `PlannerWorkOutcome` handling,
-and full Evidence and Discovery admission remain incomplete or absent. These
-limitations prevent the target flow from being described as currently
-operational.
+and full Evidence and Discovery admission remain incomplete or absent. Executor
+dispatch integration through the delegation tool is the immediate next step.
 
 Continue with [Authority boundaries](authority-boundaries.md), or use
 [End-to-end flow](end-to-end-flow.md) for the operational sequence.

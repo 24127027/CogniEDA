@@ -201,6 +201,53 @@ Validity transition is not deletion and does not rewrite Evidence or Discovery
 content. It changes whether recorded state is eligible for a specified present
 use and preserves why that changed.
 
+## Dependency inversion and role boundaries
+
+The target architecture separates dependency contracts from their implementations
+so that:
+
+1. **Core agents know contracts, not adapters.** Planner, Data Explorer,
+   Hypothesis Analyst, and Graph Miner depend on typed protocols (e.g.,
+   `TerminalPrinter`, `ExecutorDispatcher`) defined in an inward-facing ports
+   layer, not on concrete runtime adapters like `RichTerminalPrinter` or
+   `runtime.terminal`.
+
+2. **Bootstrap wires concrete implementations.** Application authority (bootstrap
+   or application entry point) knows both contracts and implementations. It
+   constructs `PlannerDeps`, `ExecutorDispatcher`, and other dependency holders
+   with concrete adapters and injects them into agents.
+
+3. **Agents remain testable and composable.** Each agent accepts dependencies
+   as protocol types. Tests can substitute mock or alternate implementations
+   without modifying agent code.
+
+4. **Adapter layer lives outward.** Concrete implementations (`RichTerminalPrinter`,
+   CLI adapters, external integrations) live in boundary packages, not in core
+   agent modules.
+
+Example target structure:
+
+```
+core/ports/
+  ├── terminal.py          # TerminalPrinter protocol
+  ├── dispatcher.py        # ExecutorDispatcher protocol
+  └── ...
+
+agents/planner/
+  ├── dependencies.py      # PlannerDeps with protocol types
+  ├── agent.py
+  └── ...
+
+runtime/bootstrap.py       # Wires concrete adapters
+cli/
+  ├── terminal.py          # RichTerminalPrinter implementation
+  └── ...
+```
+
+This separation is a design target and not yet implemented. Current main has
+agents depending on concrete runtime classes; refactoring to ports and
+dependency injection will occur after MVP tool calling is validated.
+
 ## Implementation status
 
 **Partially implemented.** Current main includes typed provenance records,

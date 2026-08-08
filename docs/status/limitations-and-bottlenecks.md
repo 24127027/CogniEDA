@@ -29,13 +29,11 @@ the consequences by limitation type.
 
 ## Operational limitation
 
-- There is no composed application runtime, worker process, service API, or
-  supported product CLI.
-- Execution-attempt records and outbox controls cannot produce a result through
-  a runnable default specialist.
-- Configuration mentions skills and MCP workers that do not establish a
-  working external integration by themselves. The configured skill directories
-  are absent from the current tree.
+- There is no composed application runtime, worker process, or service API.
+- Planner can now invoke built-in tools (MVP milestone: tool calling validated as of 2026-08-08).
+- Execution-attempt records and outbox controls cannot yet produce a result through a runnable default specialist.
+- Configuration mentions skills and MCP workers that do not establish a working external integration by themselves. The configured skill directories are absent from the current tree.
+- Executor dispatch through delegation tools is the immediate next step; full specialist integration remains incomplete.
 
 ## Database limitation
 
@@ -82,9 +80,12 @@ the consequences by limitation type.
   execution-request capability validation through `PlannerOutput`, which has
   no such field. `ExecutorOutput` also lacks the scientific-result fields that
   the first contract test would check after the Planner assertion passes.
+- MVP tool calling is now validated (2026-08-08): Planner successfully invokes
+  built-in tools through pydantic_ai tool registration. This does not yet cover
+  full executor dispatch through tools or specialist result admission.
 - No non-SQLite database is tested.
-- No end-to-end user, specialist, governance, admission, recovery, CLI, or
-  external-integration test exists.
+- No end-to-end user, specialist, governance, admission, recovery, or
+  external-integration test exists. CLI remains unsupported.
 - The current repository has no first-party Markdown link-check command.
 
 ## Documentation limitation

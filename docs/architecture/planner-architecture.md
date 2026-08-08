@@ -181,15 +181,21 @@ scientific proposal.
 **Partially implemented.** Current main implements typed request
 classification, bounded Task proposal and decomposition paths, durable
 PlannerOperation approval records, decision resume checks, and atomic commit
-for a bounded set of Planner operations. Several graph nodes, including answer,
-suggestion, Task selection, execution preparation, dispatch, and execution
-review, remain stubs.
+for a bounded set of Planner operations. 
+
+Recent MVP progress (2026-08-08):
+- Planner now accepts `PlannerDeps` dependency injection (terminal printer, and will include executor dispatcher).
+- Tool calling is validated: Planner can successfully invoke built-in tools via pydantic_ai tool registration.
+- Built-in tools are registered through `AvailableBuiltinTools` enum and passed to `PlannerModel`.
+- Dependency protocols enable tools to access shared services (`HasExecutorDispatcher`, `HasTerminalPrinter`).
+
+Several graph nodes, including answer, suggestion, Task selection, execution preparation with full executor dispatch, and execution review, remain stubs.
 
 Canonical `PlanRevision` and plan-binding records are not implemented, and the
 current runtime Task-kind vocabulary does not yet implement `DATA`,
 `SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`. The full approval-policy model,
 capability-safe execution integration, SessionFrame and GeneratedView
-coordination, and end-to-end recovery model remain target design.
+coordination, and end-to-end recovery model remain target design. Executor dispatch integration through tools is the next priority.
 
 Continue with [Executor and dispatch](executor-and-dispatch.md) or follow the
 complete sequence in [End-to-end flow](end-to-end-flow.md).

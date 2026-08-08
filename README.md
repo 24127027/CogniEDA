@@ -22,6 +22,12 @@ copy .env.example .env
 The default database URL resolves to `.local/cognieda_graph.sqlite3` unless
 `COGNIEDA_DB_URL` is set. Current database behavior is verified on SQLite.
 
+To run the Planner agent (MVP with tool calling):
+
+```powershell
+uv run main.py
+```
+
 Repository verification commands are:
 
 ```powershell
