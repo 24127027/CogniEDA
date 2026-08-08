@@ -1,4 +1,5 @@
 from typing import Protocol
+from src.agents.executor.dispatcher import ExecutorDispatcher
 
 """
     This module defines protocols for dependencies that can be used in tools
@@ -8,7 +9,8 @@ from typing import Protocol
 
 """
 
-
+class HasExecutorDispatcher(Protocol):
+    dispatcher: ExecutorDispatcher
 class HasGraphRepository(Protocol):
     """
         Dummy dependencies protocols for testing purposes.
