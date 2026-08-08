@@ -18,7 +18,7 @@ constraints.
 | Runtime entry boundary | **Unsupported** | The installed `cognieda` script calls `main.py`, which only prints a placeholder message. There is no composed user-facing runtime, service, or application request pipeline. |
 | Workspace and Objective support | **Partially implemented** (**Verified on SQLite**) | A database URL can identify an isolated local store. `Objective` has schema, table, repository CRUD, and `ObjectiveRevision` provenance. Tasks and other state are not Objective-bound, and no Workspace initializer, registry, or active-session authority exists. |
 | Current FCO schemas and persistence | **Partially implemented** (**Verified on SQLite**) | All eight named FCOs have Pydantic schemas and SQLModel records. Repository surfaces exist, but the current shapes and relationships do not fully implement the canonical contracts described below. |
-| Planner support | **Partially implemented** (**Verified on SQLite**) | Request classification, explicit-command parsing, bounded Task creation and decomposition proposals, durable `PlannerOperation` approval/resume, and bounded atomic commit are exercised. Planner now accepts `PlannerDeps` (terminal printer), can invoke built-in tools (starting with terminal printer), and tool calling succeeds. Question answering, question proposal, task selection, execution preparation with executor dispatch, and execution review remain stubs. |
+| Planner support | **Partially implemented** (**Verified on SQLite**) | Request classification, explicit-command parsing, bounded Task creation and decomposition proposals, durable `PlannerOperation` approval/resume, and bounded atomic commit are exercised. Planner now accepts `PlannerDeps` (terminal printer), can invoke built-in tools (starting with terminal printer), and tool calling succeeds. Current implementation depends on concrete adapter classes (`RichTerminalPrinter`); target design is dependency inversion via protocol types in `core/ports/` with wired concrete implementations at bootstrap (deferred post-MVP). Question answering, question proposal, task selection, execution preparation with executor dispatch, and execution review remain stubs. |
 | `PlanRevision` | **Unsupported** | No canonical `PlanRevision`, plan binding, dependency, assignment, activation, or plan-version persistence is present. `ObjectiveRevision` is Objective-change provenance and is not a substitute. |
 | Task taxonomy | **Known limitation** | Current `TaskKind` is `ANALYTICAL`, `ORGANIZING`, and `REVIEW`, not canonical `DATA`, `SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`. Current Task records also carry `profile_id`, `variables`, and `evidence_expectation`, which the target assigns outside semantic Task identity. |
 | Executor registry and dispatch | **Partially implemented** | Capability identifiers are now lightweight `StrEnum` values instead of metadata specs. Registry uses `Capability` enum to map to executor factories, caches executor instances by provider for reuse across capabilities, and supports one executor providing multiple capabilities. Dispatcher dependency protocol exists for delegation tools. Planner integration remains absent. |
@@ -105,7 +105,18 @@ The following refactors advance toward MVP tool-calling capability:
 - **Executor types cleanup**: Removed planned-ahead schemas (`ExecutorOutput` with extensive optional fields). Simplified `ExecutionResult` to only essential fields (`hypothesis`, `evidence`, `discoveries`, `data_profile`). Placeholder schemas for `DataProfile`, `Discovery`, `Evidence`, `Hypothesis`, `Task` are in place pending canonical schema implementation.
 - **Built-in tools organization**: Renamed `builtin_tools/` → `builtin/` for clarity. Added `terminal.py` with `print_to_terminal` tool for MVP testing.
 - **Dependency protocols for tools**: Introduced `HasExecutorDispatcher` and `HasTerminalPrinter` protocols. Tools now access shared services via `RunContext.deps`, enabling delegation to executors and terminal output.
-- **Planner dependency injection**: `Planner` now accepts `PlannerDeps` (containing `RichTerminalPrinter`). `PlannerModel` receives dependencies and builtin tools, enabling tool invocation during planning.
+- **Planner dependency injection**: `Planner` now accepts `PlannerDeps` (containing `RichTerminalPrinter`). `PlannerModel` receives dependencies and builtin tools, enabling tool invocation during planning. Current implementation uses concrete adapter classes; target design (post-MVP) is dependency inversion via protocol types in `core/ports/` with bootstrap-wired implementations.
 - **Tool calling validated**: Planner successfully invokes the terminal tool. This marks the first end-to-end MVP milestone for agent tool calling.
 
-Current boundary: Tool calling works for built-in tools. Executor dispatch remains a stub dependency; full executor integration and Evidence admission are next.
+Current boundary: Tool calling works for built-in tools. Executor dispatch remains a stub dependency; full executor integration and Evidence admission are next. Dependency inversion refactor is a deferred design improvement.
+
+## Design target: Dependency inversion
+
+The target architecture separates dependency contracts from implementations:
+
+- Core agents depend on protocols (e.g., `TerminalPrinter`, `ExecutorDispatcher`) defined in `core/ports/`, not concrete adapters.
+- Bootstrap wires concrete implementations with injected dependencies.
+- Agents remain testable and composable; tests can substitute mock implementations.
+- Adapter layer (`RichTerminalPrinter`, CLI adapters, integrations) lives in boundary packages, not core modules.
+
+This refactor is established design target but deferred post-MVP. See [Persistence and admission](../architecture/persistence-and-admission.md#dependency-inversion-and-role-boundaries) for structure details.
