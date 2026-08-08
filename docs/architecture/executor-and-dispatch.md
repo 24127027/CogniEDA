@@ -177,26 +177,35 @@ wire format, or serialization details.
 
 ## Implementation status
 
-**Partially implemented.** Current main has a lightweight capability registry
-using `Capability` `StrEnum` identifiers. Registry maps capabilities to
-executor factories, caches instances by provider for reuse, and supports one
-executor providing multiple capabilities. Unknown or unregistered capability
-identifiers fail rather than selecting an arbitrary worker.
+**Partially implemented.** At the S0 library boundary, one lightweight
+`Capability` `StrEnum` drives an explicit `Capability -> ProviderFactory`
+registry. One dependency-aware factory may serve multiple capabilities and its
+provider instance is reused. Duplicate and absent registrations fail closed.
+The thin async dispatcher invokes the resolved provider and preserves provider
+failure as a controlled error.
 
-Recent MVP progress (2026-08-08):
-- Capability system simplified from metadata-heavy `CapabilitySpec` to lightweight `StrEnum`.
-- Registry now provides instance reuse across capabilities via factory caching.
-- Dispatcher dependency protocol (`HasExecutorDispatcher`) enables tools to dispatch work.
-- Executor types simplified: removed `ExecutorOutput` with extensive optional fields; `ExecutionResult` now contains only essential fields (`hypothesis`, `evidence`, `discoveries`, `data_profile`).
-- Tool-based dispatch path: Planner can now invoke executor dispatch through built-in tools (delegation pattern), with `ExecutionRequest` binding task, capability, and context.
+The current PydanticAI adapter exposes a typed data-capability request through
+Planner dependencies. Focused tests validate adapter to dispatcher to
+registered-provider invocation without a model endpoint. Bootstrap explicitly
+composes a registry, Data Explorer provider factory, dispatcher, and
+`PlannerDeps`; availability no longer depends on executor module import order.
 
-The current capability names and generic execution request and result contracts
-predate the canonical Task-kind and role-native model. Canonical
-`DataWorkOrder`, `DataExplorerResult`, `ScientificInvestigationInput`,
-`HypothesisAnalystResult`, `GraphInquiryRequest`, `GraphInquiryResult`, and
-`PlannerWorkOutcome` are not implemented. Default Graph Miner and Hypothesis
-Analyst graphs are not runnable, Data Explorer is not registered as a runnable
-default specialist, and full Planner-to-dispatch integration remains in progress.
+`ExecutionResult` now contains only shared transport metadata.
+`DataExplorerResult` and the deferred `HypothesisAnalystResult` own their
+role-native fields. A minimal `PlannerWorkOutcome` projection seam consumes
+only shared metadata; full Planner consumption remains **Deferred**.
+
+Data Explorer is registered for `DATA_ANALYSIS`, `DATA_PROFILING`, and
+`DATA_TRANSFORMATION`. The first two have a bounded donor implementation when
+given the current legacy Task and a local dataset path. Transformation returns
+a typed blocked result until it can create a successor dataset and DataProfile;
+it never establishes in-place mutation as valid behavior.
+
+Canonical `DataWorkOrder`, `ScientificInvestigationInput`,
+`GraphInquiryRequest`, and complete role-native admission contracts remain
+**Unsupported**. Hypothesis Analyst and Graph Miner remain unregistered runtime
+scaffolds. Full Planner-to-real-dataset-to-Evidence-to-Planner execution is
+also **Unsupported**.
 
 See [Persistence and admission](persistence-and-admission.md) for the durable
 boundary around attempts and results.

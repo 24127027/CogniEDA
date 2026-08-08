@@ -7,7 +7,6 @@ from langgraph.graph.state import CompiledStateGraph, StateGraph
 
 from agents.llm import ModelConfig
 
-from ..types import ExecutionResult, ExecutorContext, ExecutorInput
 from .deps import AdmissionCall, DispatcherCall
 from .nodes import (
     assess_scientific_value,
@@ -27,7 +26,7 @@ def build_graph(
     config: ModelConfig,
     mock_dispatcher_call: DispatcherCall,
     mock_admission_call: AdmissionCall,
-) -> CompiledStateGraph[State, ExecutorContext, ExecutorInput, ExecutionResult]:
+) -> CompiledStateGraph[State, None, State, State]:
     builder = StateGraph(State)
 
     builder.add_node(

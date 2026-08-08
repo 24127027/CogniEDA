@@ -1,13 +1,18 @@
+from collections.abc import Sequence
 
-from .dependencies import PlannerDeps
+from tools.builtin import AvailableBuiltinTools
 
 from ..llm import ModelConfig, create_agent
+from .dependencies import PlannerDeps
 from .types import PlannerPlan
 
+
 class PlannerModel:
-    def __init__(self,
-                 deps: PlannerDeps,
-                 builtin_tools: list) -> None:
+    def __init__(
+        self,
+        deps: PlannerDeps,
+        builtin_tools: Sequence[AvailableBuiltinTools],
+    ) -> None:
         self.deps = deps
         self._agent = create_agent(
             worker="planner",

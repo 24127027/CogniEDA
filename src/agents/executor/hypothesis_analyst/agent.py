@@ -1,4 +1,4 @@
-"""Hypothesis-analysis executor wrapper."""
+"""Deferred Hypothesis Analyst donor wrapper."""
 
 from __future__ import annotations
 
@@ -11,24 +11,22 @@ from schemas.artifacts import Discovery
 from tools.builtin import AvailableBuiltinTools
 
 from ..capabilities import Capability
-from ..executor import Executor
-from ..registry import executor_registry
-from ..types import ExecutionRequest, ExecutionResult, ExecutorContext, ExecutorInput
-from .graph import build_graph
+from ..data_explorer.types import DataExplorerResult
+from ..types import ExecutionRequest
 from .deps import AdmissionCall, DispatcherCall
-from .state import HAState, State
+from .graph import build_graph
+from .state import HAState
+from .types import HypothesisAnalystResult
 
 
-def _missing_dispatcher_call(request: ExecutionRequest) -> ExecutionResult:
+def _missing_dispatcher_call(request: ExecutionRequest) -> DataExplorerResult:
     raise RuntimeError(
         "HypothesisAnalyst requires a dispatcher callable for Data Explorer delegation."
     )
 
 
 def _missing_admission_call(draft: Discovery) -> bool:
-    raise RuntimeError(
-        "HypothesisAnalyst requires an admission callable for discovery validation."
-    )
+    raise RuntimeError("HypothesisAnalyst requires an admission callable for discovery validation.")
 
 
 def create_ha_agent(config: ModelConfig) -> Agent[None]:
@@ -47,9 +45,8 @@ class HypothesisAnalystConfig:
     mock_admission_call: AdmissionCall = _missing_admission_call
 
 
-@executor_registry.register(Capability.HYPOTHESIS_TESTING)
-class HypothesisAnalyst(Executor[State]):
-    """Executor that can produce Evidence and Discovery drafts."""
+class HypothesisAnalyst:
+    """Import-safe donor scaffold; S0 does not register it as runnable."""
 
     builtin_tools: tuple[AvailableBuiltinTools, ...] = ()
 
@@ -63,18 +60,17 @@ class HypothesisAnalyst(Executor[State]):
         self.config = config or ModelConfig()
         self.mock_dispatcher_call = mock_dispatcher_call or _missing_dispatcher_call
         self.mock_admission_call = mock_admission_call or _missing_admission_call
-
-        super().__init__(
-            lambda: build_graph(
-                config=self.config,
-                mock_dispatcher_call=self.mock_dispatcher_call,
-                mock_admission_call=self.mock_admission_call,
-            )
+        self.graph = build_graph(
+            config=self.config,
+            mock_dispatcher_call=self.mock_dispatcher_call,
+            mock_admission_call=self.mock_admission_call,
         )
 
-    async def run(self, input: ExecutorInput, context: ExecutorContext) -> ExecutionResult:
+    async def run(self, request: ExecutionRequest) -> HypothesisAnalystResult:
+        if request.capability != Capability.HYPOTHESIS_TESTING:
+            raise ValueError(f"Hypothesis Analyst cannot provide {request.capability}.")
         initial_state: HAState = {
-            "request": self._build_request(input, context),
+            "request": request,
             "hypothesis_draft": None,
             "de_capability_requests": [],
             "collected_evidence": [],
@@ -84,20 +80,11 @@ class HypothesisAnalyst(Executor[State]):
             "execution_logs": [],
             "final_result": None,
         }
-
         result_state = await self.graph.ainvoke(initial_state)
         final_result = result_state.get("final_result")
-        if isinstance(final_result, ExecutionResult):
-            return final_result
-
-        return ExecutionResult.model_validate(result_state)
-
-    def _build_request(self, input: ExecutorInput, context: ExecutorContext) -> ExecutionRequest:
-        return ExecutionRequest(
-            capability=Capability.HYPOTHESIS_TESTING.id,
-            input=input,
-            context=context,
-        )
+        if not isinstance(final_result, HypothesisAnalystResult):
+            raise RuntimeError("Hypothesis Analyst graph did not return its role-native result.")
+        return final_result
 
 
 HypothesisAnalystExecutor = HypothesisAnalyst
@@ -108,5 +95,6 @@ __all__ = (
     "HypothesisAnalyst",
     "HypothesisAnalystConfig",
     "HypothesisAnalystExecutor",
+    "HypothesisAnalystResult",
     "create_ha_agent",
 )

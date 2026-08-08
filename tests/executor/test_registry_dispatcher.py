@@ -7,25 +7,25 @@ from pydantic import ValidationError
 
 from agents.executor import (
     Capability,
+    CapabilityNotRegisteredError,
     ExecutionRequest,
     ExecutionResult,
+    ExecutionStatus,
     ExecutorContext,
     ExecutorDispatcher,
     ExecutorInput,
+    ExecutorProviderError,
     ExecutorRegistry,
-    Task,
-    build_capability_selection_instructions,
-    build_capability_selection_model,
-    executor_registry,
+    normalize_for_planner,
 )
-from agents.executor.executor import Executor
-from agents.executor.types import BaseState
-from schemas.artifacts import Task as AnalyticalTask
+from agents.executor.capabilities import Capability as CapabilityFromOwner
+from runtime.bootstrap import bootstrap_application
+from schemas.artifacts import Task
 from schemas.enums import TaskKind
 
 
-def _task() -> AnalyticalTask:
-    return AnalyticalTask(
+def _task() -> Task:
+    return Task(
         title="Assess treatment effect",
         description="Check whether the treatment increases the target metric.",
         task_kind=TaskKind.ANALYTICAL,
@@ -35,102 +35,48 @@ def _task() -> AnalyticalTask:
     )
 
 
-class FakeGraph:
-    def __init__(self) -> None:
-        self.calls: list[tuple[ExecutorInput, ExecutorContext]] = []
-
-    async def ainvoke(
-        self,
-        input: ExecutorInput,
-        context: ExecutorContext,
-    ) -> dict[str, object]:
-        self.calls.append((input, context))
-        return {
-            "evidence_drafts": [{"kind": "draft"}],
-            "discovery_drafts": [],
-            "execution_run_ref": "execution-run:test",
-        }
-
-
-class GraphBackedExecutor(Executor[BaseState]):
-    def __init__(self) -> None:
-        self.fake_graph = FakeGraph()
-        super().__init__(lambda: self.fake_graph)
-
-
-class FakeExecutor(Executor[BaseState]):
-    instance_count = 0
-
-    def __init__(self) -> None:
-        FakeExecutor.instance_count += 1
-        self.calls: list[tuple[ExecutorInput, ExecutorContext]] = []
-        self.result = ExecutionResult()
-
-    async def run(
-        self,
-        input: ExecutorInput,
-        context: ExecutorContext,
-    ) -> ExecutionResult:
-        self.calls.append((input, context))
-        return self.result
-
-
-def test_registry_reuses_lazy_singleton() -> None:
-    FakeExecutor.instance_count = 0
-    registry = ExecutorRegistry()
-
-    registry.register(Capability.GRAPH_MINING)(FakeExecutor)
-
-    first = registry.get(Capability.GRAPH_MINING.id)
-    second = registry.get(Capability.GRAPH_MINING.id)
-
-    assert first is second
-    assert FakeExecutor.instance_count == 1
-
-
-def test_registry_rejects_duplicate_capability() -> None:
-    registry = ExecutorRegistry()
-    registry.register(Capability.GRAPH_MINING)(FakeExecutor)
-
-    with pytest.raises(ValueError, match="Capability already registered: graph_mining"):
-        registry.register(Capability.GRAPH_MINING)(FakeExecutor)
-
-
-def test_registry_reports_unknown_capability() -> None:
-    registry = ExecutorRegistry()
-
-    with pytest.raises(KeyError, match="No executor registered for capability: missing"):
-        registry.get("missing")
-
-
-def test_registry_lists_capability_specs() -> None:
-    registry = ExecutorRegistry()
-
-    registry.register(Capability.GRAPH_MINING)(FakeExecutor)
-
-    assert registry.get_spec(Capability.GRAPH_MINING.id) is Capability.GRAPH_MINING
-    assert registry.list_specs() == (Capability.GRAPH_MINING,)
-
-
-def test_dispatcher_invokes_registered_executor() -> None:
-    registry = ExecutorRegistry()
-    registry.register(Capability.GRAPH_MINING)(FakeExecutor)
-    dispatcher = ExecutorDispatcher(registry)
-    executor = registry.get(Capability.GRAPH_MINING.id)
-    request = ExecutionRequest(
-        capability=Capability.GRAPH_MINING.id,
+def _request(capability: Capability = Capability.DATA_ANALYSIS) -> ExecutionRequest:
+    return ExecutionRequest(
+        capability=capability,
         input=ExecutorInput(task=_task()),
         context=ExecutorContext(),
     )
 
-    result = asyncio.run(dispatcher.dispatch(request))
 
-    assert result is executor.result
-    assert executor.calls == [(request.input, request.context)]
+class FakeProvider:
+    def __init__(self, dependency: str = "default") -> None:
+        self.dependency = dependency
+        self.calls: list[ExecutionRequest] = []
+
+    async def run(self, request: ExecutionRequest) -> ExecutionResult:
+        self.calls.append(request)
+        return ExecutionResult(
+            source_role="fake",
+            task_id=request.input.task.task_id,
+            work_id=f"fake:{request.input.task.task_id}",
+            status=ExecutionStatus.SUCCEEDED,
+        )
 
 
-def test_execution_request_rejects_unknown_capability() -> None:
-    with pytest.raises(ValidationError, match="Unknown executor capability"):
+class FailingProvider:
+    async def run(self, request: ExecutionRequest) -> ExecutionResult:
+        raise RuntimeError("provider exploded")
+
+
+class InvalidResultProvider:
+    async def run(self, request: ExecutionRequest) -> object:
+        return {"status": "succeeded"}
+
+
+def test_capability_values_and_import_identity_are_stable() -> None:
+    assert Capability is CapabilityFromOwner
+    assert Capability.DATA_ANALYSIS.value == "data_analysis"
+    assert Capability.DATA_PROFILING.value == "data_profiling"
+    assert Capability.DATA_TRANSFORMATION.value == "data_transformation"
+
+
+def test_execution_request_rejects_unknown_raw_capability() -> None:
+    with pytest.raises(ValidationError):
         ExecutionRequest(
             capability="missing",
             input=ExecutorInput(task=_task()),
@@ -138,40 +84,119 @@ def test_execution_request_rejects_unknown_capability() -> None:
         )
 
 
-def test_capability_selection_model_restricts_to_explicit_subset() -> None:
-    selection_model = build_capability_selection_model((Capability.GRAPH_MINING,))
+def test_registry_registers_one_capability() -> None:
+    registry = ExecutorRegistry()
+    registry.register_provider(FakeProvider, capabilities=(Capability.DATA_ANALYSIS,))
 
-    valid = selection_model(capability=Capability.GRAPH_MINING.id)
-
-    assert valid.capability == Capability.GRAPH_MINING.id
-    with pytest.raises(ValidationError):
-        selection_model(capability=Capability.HYPOTHESIS_TESTING.id)
+    assert isinstance(registry.resolve(Capability.DATA_ANALYSIS), FakeProvider)
+    assert registry.list_capabilities() == (Capability.DATA_ANALYSIS,)
 
 
-def test_capability_selection_instructions_render_explicit_subset() -> None:
-    instructions = build_capability_selection_instructions((Capability.GRAPH_MINING,))
-
-    assert Capability.GRAPH_MINING.id in instructions
-    assert Capability.HYPOTHESIS_TESTING.id not in instructions
-    assert "`capability`" in instructions
-
-
-def test_executor_run_returns_validated_graph_execution_result() -> None:
-    executor = GraphBackedExecutor()
-    input = ExecutorInput(task=_task())
-    context = ExecutorContext()
-
-    result = asyncio.run(executor.run(input=input, context=context))
-
-    assert result == ExecutionResult(
-        evidence_drafts=[{"kind": "draft"}],
-        discovery_drafts=[],
-        execution_run_ref="execution-run:test",
+def test_registry_maps_multiple_capabilities_to_one_reused_provider() -> None:
+    registry = ExecutorRegistry()
+    registry.register_provider(
+        FakeProvider,
+        capabilities=(Capability.DATA_ANALYSIS, Capability.DATA_PROFILING),
     )
-    assert executor.fake_graph.calls == [(input, context)]
+
+    first = registry.resolve(Capability.DATA_ANALYSIS)
+    second = registry.resolve(Capability.DATA_PROFILING)
+
+    assert first is second
 
 
-def test_executor_package_initializes_existing_default_executors() -> None:
-    registered = {spec.id for spec in executor_registry.list_specs()}
+def test_registry_rejects_empty_and_duplicate_registration() -> None:
+    registry = ExecutorRegistry()
+    with pytest.raises(ValueError, match="At least one capability"):
+        registry.register_provider(FakeProvider, capabilities=())
 
-    assert {Capability.GRAPH_MINING.id, Capability.HYPOTHESIS_TESTING.id} <= registered
+    registry.register_provider(FakeProvider, capabilities=(Capability.DATA_ANALYSIS,))
+    with pytest.raises(ValueError, match="Capability already registered: data_analysis"):
+        registry.register_provider(FakeProvider, capabilities=(Capability.DATA_ANALYSIS,))
+
+
+def test_registry_fails_closed_for_unregistered_capability() -> None:
+    registry = ExecutorRegistry()
+    with pytest.raises(CapabilityNotRegisteredError, match="graph_mining"):
+        registry.resolve(Capability.GRAPH_MINING)
+
+
+def test_dependency_aware_factory_constructs_provider_once() -> None:
+    registry = ExecutorRegistry()
+    dependency = "injected-repository"
+    factory_calls = 0
+
+    def factory() -> FakeProvider:
+        nonlocal factory_calls
+        factory_calls += 1
+        return FakeProvider(dependency)
+
+    registry.register_provider(
+        factory,
+        capabilities=(Capability.DATA_ANALYSIS, Capability.DATA_PROFILING),
+    )
+
+    provider = registry.resolve(Capability.DATA_ANALYSIS)
+    assert registry.resolve(Capability.DATA_PROFILING) is provider
+    assert provider.dependency == dependency
+    assert factory_calls == 1
+
+
+def test_dispatcher_invokes_registered_provider_asynchronously() -> None:
+    registry = ExecutorRegistry()
+    registry.register_provider(FakeProvider, capabilities=(Capability.DATA_ANALYSIS,))
+    dispatcher = ExecutorDispatcher(registry)
+    request = _request()
+
+    result = asyncio.run(dispatcher.dispatch(request))
+    provider = registry.resolve(Capability.DATA_ANALYSIS)
+
+    assert result.status == ExecutionStatus.SUCCEEDED
+    assert provider.calls == [request]
+
+
+def test_dispatcher_preserves_controlled_provider_failure() -> None:
+    registry = ExecutorRegistry()
+    registry.register_provider(FailingProvider, capabilities=(Capability.DATA_ANALYSIS,))
+    dispatcher = ExecutorDispatcher(registry)
+
+    with pytest.raises(ExecutorProviderError, match="provider exploded") as error:
+        asyncio.run(dispatcher.dispatch(_request()))
+
+    assert isinstance(error.value.__cause__, RuntimeError)
+
+
+def test_dispatcher_rejects_incompatible_provider_result() -> None:
+    registry = ExecutorRegistry()
+    registry.register_provider(
+        InvalidResultProvider,
+        capabilities=(Capability.DATA_ANALYSIS,),
+    )
+
+    with pytest.raises(ExecutorProviderError, match="incompatible result"):
+        asyncio.run(ExecutorDispatcher(registry).dispatch(_request()))
+
+
+def test_planner_projection_does_not_expose_role_native_fields() -> None:
+    outcome = normalize_for_planner(
+        ExecutionResult(
+            source_role="fake",
+            task_id=_task().task_id,
+            work_id="fake:1",
+            status=ExecutionStatus.SUCCEEDED,
+        )
+    )
+
+    assert outcome.source_role == "fake"
+    assert outcome.permitted_next_actions == ["review_result"]
+    assert len(outcome.result_digest) == 64
+
+
+def test_bootstrap_composes_real_dispatcher_and_data_provider(tmp_path) -> None:
+    application = bootstrap_application(tmp_path)
+    request = _request(Capability.DATA_TRANSFORMATION)
+
+    result = asyncio.run(application.dispatcher.dispatch(request))
+
+    assert result.status == ExecutionStatus.BLOCKED
+    assert result.source_role == "data_explorer"

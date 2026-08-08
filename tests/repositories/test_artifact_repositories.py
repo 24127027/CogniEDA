@@ -1800,16 +1800,22 @@ def test_task_and_non_fco_generated_view_guards() -> None:
 
 
 def test_planner_and_executor_authoring_contracts() -> None:
-    from agents.executor.types import ExecutorOutput
+    from agents.executor.data_explorer.types import DataExplorerResult
+    from agents.executor.types import ExecutionResult, PlannerWorkOutcome
     from agents.planner.types import PlannerOutput
 
     planner_fields = set(PlannerOutput.model_fields)
-    executor_fields = set(ExecutorOutput.model_fields)
+    transport_fields = set(ExecutionResult.model_fields)
+    data_explorer_fields = set(DataExplorerResult.model_fields)
+    planner_outcome_fields = set(PlannerWorkOutcome.model_fields)
 
     assert "evidence_drafts" not in planner_fields
     assert "discovery_drafts" not in planner_fields
-    assert {"planner_operations", "executor_dispatch_ref"} <= planner_fields
-    assert {"evidence_drafts", "discovery_drafts", "execution_run_ref"} <= executor_fields
+    assert "evidence_drafts" not in transport_fields
+    assert "produced_data_profile" not in transport_fields
+    assert {"observations", "produced_data_profile"} <= data_explorer_fields
+    assert "discovery_drafts" not in data_explorer_fields
+    assert "evidence_drafts" not in planner_outcome_fields
 
 
 def test_repository_queries_do_not_require_project_fco(db_session) -> None:

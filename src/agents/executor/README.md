@@ -1,19 +1,20 @@
 # Executor package
 
-The executor package is **Partially implemented** at generic dispatch plumbing
-and **Unsupported** as a runnable canonical specialist workflow.
+The executor package is **Implemented** only at the bounded S0 capability,
+registry, dispatcher, provider-factory, tool-adapter, and bootstrap-composition
+surface.
 
-Current source provides a capability catalog, registry, selection helpers,
-request validation, and a thin dispatcher. `graph_mining` and
-`hypothesis_testing` wrappers register, but both default graph builders raise
-`NotImplementedError`; `data_exploration` is catalogued without a registered
-executor. Planner execution nodes do not use the dispatcher, and the shared
-input/output contracts do not implement the canonical role-native contracts.
+`DATA_ANALYSIS`, `DATA_PROFILING`, and `DATA_TRANSFORMATION` explicitly map to
+one reusable Data Explorer provider. Analysis and profiling retain narrow local
+donor behavior. Transformation is registered but fails closed until a new
+dataset state and successor DataProfile can be produced. Hypothesis Analyst and
+Graph Miner import as deferred scaffolds and are not registered as runnable.
 
-Catalog membership, wrapper registration, or a configuration entry does not
-prove runnability. No fallback from an unavailable canonical specialist is
-supported.
+Shared `ExecutionResult` is non-semantic transport metadata. Specialist fields
+belong to role-native results such as `DataExplorerResult`. Returned
+observations and DataProfile candidates are not authoritative admission and do
+not create Evidence.
 
 See [Executor and dispatch](../../../docs/architecture/executor-and-dispatch.md)
 for target authority and [Current state](../../../docs/status/current-state.md)
-for the verified current boundary.
+for the verified boundary and limitations.
