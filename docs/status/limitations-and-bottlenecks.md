@@ -85,11 +85,13 @@ backlog. [Current state](current-state.md) owns capability detail.
   donor mismatches involving `TaskManagementDraft`, `route_intent`,
   `understand_request`, `ChildTaskProposalDraft`, and `manage_tasks`.
 - Excluding exactly those three modules, the PR #36 layer-boundary run recorded
-  133 passes and 57 explicit deferred-donor skips.
+  136 passes and 57 explicit deferred-donor skips.
 - No end-to-end user-to-Planner-to-real-Data Explorer-to-Evidence-to-
   SessionFrame-to-response test exists; that is not an M1-A completion claim.
-- No production performance envelope, non-SQLite validation, external
-  integration test, or first-party Markdown link-check command exists.
+- No production performance envelope, non-SQLite validation, or external
+  integration test exists. The first-party documentation regression is
+  intentionally limited to internal Markdown links, relative anchors, and
+  compatibility-only redirect language.
 
 ## Unsupported feature
 

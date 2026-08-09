@@ -7,9 +7,9 @@ This documentation is for researchers evaluating the model, product and engineer
 ## Documentation availability
 
 All canonical tracks listed below are **Available**. Markdown files elsewhere
-in the repository may be supporting material, compatibility notices, package
-instructions, or internal development guidance. They do not compete with the
-owner pages linked here.
+in the repository may be supporting material, package instructions, or
+internal development guidance. They do not compete with the owner pages linked
+here.
 
 Implementation-status claims must distinguish supported behavior from design
 targets.

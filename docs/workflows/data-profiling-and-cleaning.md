@@ -10,11 +10,12 @@ This supporting workflow applies the canonical data-state rules:
 
 ## Implementation status
 
-**Partially implemented.** **Verified on SQLite.** Deterministic local dataframe
-and supported-file profiling can produce a typed DataProfile, and repository
-persistence is exercised on SQLite. Executable DVC identity resolution,
-cleaning execution, approval, derived-dataset creation, and complete validity
-propagation are **Unsupported**.
+**Partially implemented.** Deterministic local dataframe and supported-file
+profiling can produce a typed DataProfile without removing duplicate rows,
+all-null rows, or missing values and without mutating the input. DataProfile
+repository persistence is **Verified on SQLite**. Executable DVC identity
+resolution is **Unsupported**; cleaning execution, approval, successor dataset
+creation, and complete validity propagation remain **Deferred**.
 
 The exact current boundary is owned by [Current state](../status/current-state.md).
 See [Validity propagation](../concepts/validity/validity-propagation.md) for the

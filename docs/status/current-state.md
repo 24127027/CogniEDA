@@ -1,8 +1,8 @@
 # Current state
 
 This page answers one question: **what is supported by the current
-implementation?** It describes the source-layer boundary at checkpoint
-`8f06ce6`, based on merged PR #35 `main` commit
+implementation?** It describes the PR #36 source-layer boundary, based on
+merged PR #35 `main` commit
 `9fa7fc7eaa4f934020943366b6510ac1c69e5062` and inspected on 2026-08-09. A
 schema, table, interface, stub, fixture, or configuration entry is not a
 supported workflow by itself.
@@ -75,9 +75,11 @@ of the M1-A schemas.
 ## Verification qualification
 
 At the PR #36 source-layer checkpoint, the broad suite excluding exactly three
-pre-existing Planner collection modules recorded **133 passes and 57 explicit
+pre-existing Planner collection modules recorded **136 passes and 57 explicit
 skips**. Focused layer-boundary tests also verify that Planner cannot import
 pandas, dataset loaders, or Data Explorer profiling implementations directly.
+Documentation regressions reject compatibility-only redirect language and
+verify internal Markdown links and relative anchors.
 
 Full collection still stops on the three baseline Planner donor mismatches:
 
