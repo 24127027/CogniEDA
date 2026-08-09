@@ -67,6 +67,7 @@ from schemas.enums import (
     SessionFrameStatus,
     TaskKind,
     TaskLifecycleState,
+    TaskStatus,
     UserDecisionStatus,
     UserDecisionType,
 )
@@ -136,6 +137,7 @@ __all__ = [
     "TaskContextSummary",
     "TaskKind",
     "TaskLifecycleState",
+    "TaskStatus",
     "ToolResultCacheSummary",
     "TopValueSummary",
     "UserDecision",

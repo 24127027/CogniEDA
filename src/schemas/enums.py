@@ -176,6 +176,15 @@ class TaskLifecycleState(StrEnum):
     CANCELLED = "cancelled"
 
 
+class TaskStatus(StrEnum):
+    """Finite execution lifecycle for an MVP Task."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
 class TaskKind(StrEnum):
     """Task categories used to guard hypothesis creation."""
 
