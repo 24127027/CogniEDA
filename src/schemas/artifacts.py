@@ -29,6 +29,44 @@ from schemas.enums import (
 )
 
 
+class _FrozenJsonDict(dict[str, Any]):
+    """Internal mapping that preserves JSON shape while rejecting mutation."""
+
+    @staticmethod
+    def _immutable(*_: Any, **__: Any) -> None:
+        raise TypeError("Evidence content is immutable.")
+
+    __delitem__ = _immutable
+    __ior__ = _immutable
+    __setitem__ = _immutable
+    clear = _immutable
+    pop = _immutable
+    popitem = _immutable
+    setdefault = _immutable
+    update = _immutable
+
+
+class _FrozenJsonList(list[Any]):
+    """Internal list that preserves JSON shape while rejecting mutation."""
+
+    @staticmethod
+    def _immutable(*_: Any, **__: Any) -> None:
+        raise TypeError("Evidence content is immutable.")
+
+    __delitem__ = _immutable
+    __iadd__ = _immutable
+    __imul__ = _immutable
+    __setitem__ = _immutable
+    append = _immutable
+    clear = _immutable
+    extend = _immutable
+    insert = _immutable
+    pop = _immutable
+    remove = _immutable
+    reverse = _immutable
+    sort = _immutable
+
+
 class Objective(CogniEDABaseModel):
     """Minimum executable research intent for the active MVP session."""
 
@@ -91,6 +129,20 @@ class Evidence(ImmutableCogniEDABaseModel):
     content: dict[str, JsonValue] = Field(min_length=1)
     provenance: EvidenceProvenance
     artifact_refs: tuple[NonEmptyStr, ...] = ()
+
+    def model_post_init(self, __context: Any) -> None:
+        del __context
+        object.__setattr__(self, "content", self._freeze_json(self.content))
+
+    @classmethod
+    def _freeze_json(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            return _FrozenJsonDict(
+                {key: cls._freeze_json(item) for key, item in value.items()}
+            )
+        if isinstance(value, list):
+            return _FrozenJsonList(cls._freeze_json(item) for item in value)
+        return value
 
     @field_validator("content", mode="before")
     @classmethod

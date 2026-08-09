@@ -47,12 +47,16 @@ def test_evidence_is_immutable() -> None:
     evidence = Evidence(
         task_id=uuid4(),
         data_profile_id=data_profile_id,
-        content={"row_count": 3},
+        content={"row_count": 3, "groups": [{"name": "premium"}]},
         provenance=_provenance(data_profile_id),
     )
 
     with pytest.raises(ValidationError):
         evidence.task_id = uuid4()
+    with pytest.raises(TypeError, match="immutable"):
+        evidence.content["row_count"] = 4
+    with pytest.raises(TypeError):
+        evidence.content["groups"][0]["name"] = "changed"
 
 
 def test_evidence_rejects_mismatched_provenance_profile() -> None:
