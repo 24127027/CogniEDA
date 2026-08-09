@@ -42,6 +42,25 @@ def test_numeric_non_boolean_is_continuous_with_finite_descriptive_summary() -> 
     assert column.summary.p75 == 3.25
 
 
+def test_non_finite_source_values_are_excluded_from_continuous_statistics() -> None:
+    profile = profile_dataframe(
+        pd.DataFrame({"amount": [1.0, float("inf"), float("-inf")]})
+    )
+    column = profile.columns[0]
+
+    assert column.distinct_count == 3
+    assert column.missing_count == 0
+    assert isinstance(column.summary, ContinuousColumnSummary)
+    assert column.summary.min == 1.0
+    assert column.summary.max == 1.0
+    assert column.summary.mean == 1.0
+    assert column.summary.median == 1.0
+    assert column.summary.std == 0.0
+    assert column.summary.p25 == 1.0
+    assert column.summary.p75 == 1.0
+    json.dumps(profile.model_dump(mode="json"), allow_nan=False)
+
+
 def test_boolean_string_and_categorical_columns_are_discrete() -> None:
     dataframe = pd.DataFrame(
         {

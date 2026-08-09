@@ -93,3 +93,13 @@ def test_discrete_summary_requires_one_bounded_representation() -> None:
         DiscreteColumnSummary()
     with pytest.raises(ValidationError, match="exactly one"):
         DiscreteColumnSummary(value_counts=(), top_values=(DiscreteValueCount(value="a", count=1),))
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+@pytest.mark.parametrize("field", ["min", "max", "mean", "median", "std", "p25", "p75"])
+def test_continuous_summary_rejects_non_finite_statistics(
+    field: str,
+    value: float,
+) -> None:
+    with pytest.raises(ValidationError, match="must be finite"):
+        ContinuousColumnSummary(**{field: value})

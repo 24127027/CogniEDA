@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from math import isfinite
 from typing import Annotated
 from uuid import UUID
 
@@ -196,6 +197,13 @@ class ContinuousColumnSummary(ImmutableCogniEDABaseModel):
     std: float | None = None
     p25: float | None = None
     p75: float | None = None
+
+    @field_validator("min", "max", "mean", "median", "std", "p25", "p75")
+    @classmethod
+    def _statistics_must_be_finite(cls, value: float | None) -> float | None:
+        if value is not None and not isfinite(value):
+            raise ValueError("Continuous summary statistics must be finite.")
+        return value
 
 
 class DiscreteValueCount(ImmutableCogniEDABaseModel):

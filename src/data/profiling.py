@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from math import isfinite
 from typing import Any
 
 import pandas as pd
@@ -122,6 +123,9 @@ class DatasetProfiler:
     @classmethod
     def _continuous_summary(cls, series: pd.Series) -> ContinuousColumnSummary:
         numeric = pd.to_numeric(series, errors="coerce").dropna()
+        # Non-finite source values are retained in source-shape counts but excluded
+        # from the finite descriptive statistics admitted to DataProfile.
+        numeric = numeric[numeric.map(lambda value: isfinite(float(value)))]
         if numeric.empty:
             return ContinuousColumnSummary()
         return ContinuousColumnSummary(
@@ -138,7 +142,8 @@ class DatasetProfiler:
     def _as_float(value: Any) -> float | None:
         if value is None or pd.isna(value):
             return None
-        return float(value)
+        result = float(value)
+        return result if isfinite(result) else None
 
 
 def profile_dataframe(
