@@ -54,3 +54,11 @@ def test_task_defaults_to_pending_and_rejects_empty_instruction() -> None:
 def test_task_rejects_legacy_executable_fields() -> None:
     with pytest.raises(ValidationError):
         Task(instruction="Profile data", title="Legacy title")
+
+
+@pytest.mark.parametrize("field", ["task_id", "instruction", "status"])
+def test_task_is_immutable(field: str) -> None:
+    task = Task(instruction="Profile data")
+
+    with pytest.raises(ValidationError, match="frozen"):
+        setattr(task, field, TaskStatus.RUNNING if field == "status" else "changed")

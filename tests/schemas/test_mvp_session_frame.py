@@ -128,6 +128,9 @@ def test_mutation_seams_preserve_invariants_and_order() -> None:
     frame.set_task_status(first_task.task_id, TaskStatus.RUNNING)
 
     assert [task.instruction for task in frame.tasks] == ["First", "Second"]
+    assert frame.tasks[0] is not first_task
+    assert frame.tasks[0].task_id == first_task.task_id
+    assert frame.tasks[0].instruction == first_task.instruction
     assert frame.tasks[0].status is TaskStatus.RUNNING
 
     with pytest.raises(ValueError, match="orphan Evidence"):
@@ -140,8 +143,20 @@ def test_failed_task_creates_or_requires_no_evidence() -> None:
     task = Task(instruction="Run bounded analysis", status=TaskStatus.FAILED)
     frame = SessionFrame(tasks=[task], data_profile=_profile())
 
-    assert frame.evidences == []
+    assert frame.evidences == ()
     assert frame.tasks[0].status is TaskStatus.FAILED
+
+
+def test_session_frame_collections_cannot_bypass_validation_by_direct_mutation() -> None:
+    task = Task(instruction="Profile data")
+    frame = SessionFrame(tasks=(task,))
+
+    with pytest.raises(AttributeError):
+        frame.tasks.append(task)  # type: ignore[attr-defined]
+    with pytest.raises(AttributeError):
+        frame.evidences.append(_evidence(task, _profile()))  # type: ignore[attr-defined]
+    with pytest.raises(ValidationError, match="duplicate Task"):
+        frame.tasks = (*frame.tasks, task)
 
 
 def test_session_frame_rejects_unknown_task_status_update() -> None:

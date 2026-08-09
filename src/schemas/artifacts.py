@@ -96,7 +96,7 @@ class Assumption(CogniEDABaseModel):
     text: NonEmptyStr
 
 
-class Task(CogniEDABaseModel):
+class Task(ImmutableCogniEDABaseModel):
     """Bounded executable MVP work identity; a Task is not scientific knowledge."""
 
     task_id: UUID = Field(default_factory=uuid4)
@@ -227,9 +227,9 @@ class SessionFrame(CogniEDABaseModel):
     """Authoritative typed research state for the single active MVP session."""
 
     objective: Objective | None = None
-    assumptions: list[Assumption] = Field(default_factory=list)
-    tasks: list[Task] = Field(default_factory=list)
-    evidences: list[Evidence] = Field(default_factory=list)
+    assumptions: tuple[Assumption, ...] = ()
+    tasks: tuple[Task, ...] = ()
+    evidences: tuple[Evidence, ...] = ()
     data_profile: DataProfile | None = None
 
     @model_validator(mode="after")
@@ -271,26 +271,31 @@ class SessionFrame(CogniEDABaseModel):
     def add_assumption(self, assumption: Assumption) -> None:
         if any(item.assumption_id == assumption.assumption_id for item in self.assumptions):
             raise ValueError("SessionFrame rejects duplicate Assumption IDs.")
-        self.assumptions.append(assumption)
+        self.assumptions = (*self.assumptions, assumption)
 
     def add_task(self, task: Task) -> None:
         if any(item.task_id == task.task_id for item in self.tasks):
             raise ValueError("SessionFrame rejects duplicate Task IDs.")
-        self.tasks.append(task)
+        self.tasks = (*self.tasks, task)
 
     def set_task_status(self, task_id: UUID, status: TaskStatus) -> None:
-        for task in self.tasks:
+        for index, task in enumerate(self.tasks):
             if task.task_id == task_id:
-                task.status = status
+                replacement = Task(
+                    task_id=task.task_id,
+                    instruction=task.instruction,
+                    status=status,
+                )
+                self.tasks = (
+                    *self.tasks[:index],
+                    replacement,
+                    *self.tasks[index + 1 :],
+                )
                 return
         raise ValueError("SessionFrame cannot update a Task it does not contain.")
 
     def add_evidence(self, evidence: Evidence) -> None:
-        candidate = self.model_copy(update={"evidences": [*self.evidences, evidence]})
-        candidate._check_research_state()
-        self.evidences.append(evidence)
+        self.evidences = (*self.evidences, evidence)
 
     def set_data_profile(self, data_profile: DataProfile | None) -> None:
-        candidate = self.model_copy(update={"data_profile": data_profile})
-        candidate._check_research_state()
         self.data_profile = data_profile
