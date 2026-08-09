@@ -7,8 +7,11 @@ from uuid import UUID
 
 from sqlmodel import Session, asc, select
 
-from cognieda.db.models import PlannerOperationRecord
-from cognieda.repositories.common import record_to_schema, schema_to_record_payload
+from cognieda.infrastructure.persistence.models import PlannerOperationRecord
+from cognieda.infrastructure.persistence.repositories.common import (
+    record_to_schema,
+    schema_to_record_payload,
+)
 from cognieda.schemas.enums import PlannerOperationApprovalState
 from cognieda.schemas.planner_operations import PlannerOperation
 

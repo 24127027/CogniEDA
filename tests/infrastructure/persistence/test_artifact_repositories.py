@@ -7,9 +7,8 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
-from cognieda.db.init_db import init_db
-from cognieda.db.session import create_db_engine, get_session
-from cognieda.repositories import (
+from cognieda.infrastructure.persistence.init_db import init_db
+from cognieda.infrastructure.persistence.repositories import (
     AnalysisFrameRepository,
     AssumptionRepository,
     AssumptionUpdate,
@@ -27,6 +26,7 @@ from cognieda.repositories import (
     TaskUpdate,
     UserDecisionRepository,
 )
+from cognieda.infrastructure.persistence.session import create_db_engine, get_session
 from cognieda.schemas.artifacts import (
     Assumption,
     DataProfile,
@@ -1792,8 +1792,8 @@ def test_task_and_non_fco_generated_view_guards() -> None:
 
 def test_planner_and_executor_authoring_contracts() -> None:
     from cognieda.agents.data_explorer.contracts import DataExplorerResult
-    from cognieda.execution import ExecutionResult, PlannerWorkOutcome
     from cognieda.agents.planner.types import PlannerOutput
+    from cognieda.execution import ExecutionResult, PlannerWorkOutcome
 
     planner_fields = set(PlannerOutput.model_fields)
     transport_fields = set(ExecutionResult.model_fields)

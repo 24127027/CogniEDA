@@ -7,7 +7,9 @@ from uuid import UUID
 
 from sqlmodel import Session
 
-from cognieda.repositories.discovery_repository import DiscoveryRepository
+from cognieda.infrastructure.persistence.repositories.discovery_repository import (
+    DiscoveryRepository,
+)
 from cognieda.schemas.artifacts import Discovery, SessionFrame
 from cognieda.schemas.enums import ContextMode, FirstClassObjectType
 from cognieda.schemas.retrieval import RetrievalRequest, RetrievalResult, RetrievalResultItem

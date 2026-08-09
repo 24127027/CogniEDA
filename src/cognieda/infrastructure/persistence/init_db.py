@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from sqlmodel import SQLModel
 
-from cognieda.db import models  # noqa: F401
-from cognieda.db.migrations import upgrade_execution_attempt_schema
-from cognieda.db.session import create_db_engine, get_database_url
+from cognieda.infrastructure.persistence import models  # noqa: F401
+from cognieda.infrastructure.persistence.migrations import upgrade_execution_attempt_schema
+from cognieda.infrastructure.persistence.session import create_db_engine, get_database_url
 
 
 def init_db(database_url: str | None = None) -> str:

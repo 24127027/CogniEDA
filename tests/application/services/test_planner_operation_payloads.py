@@ -4,7 +4,10 @@ import pytest
 from pydantic import ValidationError
 
 from cognieda.application.services import commit_planner_operations
-from cognieda.repositories import PlannerOperationRepository, TaskRepository
+from cognieda.infrastructure.persistence.repositories import (
+    PlannerOperationRepository,
+    TaskRepository,
+)
 from cognieda.schemas.artifacts import Task
 from cognieda.schemas.enums import (
     PlannerNodeName,

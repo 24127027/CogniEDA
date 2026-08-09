@@ -6,8 +6,11 @@ from uuid import UUID
 
 from sqlmodel import Session, desc, select
 
-from cognieda.db.models import ExecutionRunRecord
-from cognieda.repositories.common import record_to_schema, schema_to_record_payload
+from cognieda.infrastructure.persistence.models import ExecutionRunRecord
+from cognieda.infrastructure.persistence.repositories.common import (
+    record_to_schema,
+    schema_to_record_payload,
+)
 from cognieda.schemas.enums import ExecutionRunStatus
 from cognieda.schemas.provenance import ExecutionRun
 

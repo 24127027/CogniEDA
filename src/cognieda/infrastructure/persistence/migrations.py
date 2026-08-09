@@ -5,7 +5,10 @@ from __future__ import annotations
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
 
-from cognieda.db.models import ExecutionApprovalRecord, ExecutionOutboxRecord
+from cognieda.infrastructure.persistence.models import (
+    ExecutionApprovalRecord,
+    ExecutionOutboxRecord,
+)
 
 _EXECUTION_RUN_COLUMNS = {
     "dispatch_idempotency_key": "TEXT",

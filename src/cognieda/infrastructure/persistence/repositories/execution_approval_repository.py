@@ -7,8 +7,11 @@ from uuid import UUID
 
 from sqlmodel import Session, select
 
-from cognieda.db.models import ExecutionApprovalRecord
-from cognieda.repositories.common import record_to_schema, schema_to_record_payload
+from cognieda.infrastructure.persistence.models import ExecutionApprovalRecord
+from cognieda.infrastructure.persistence.repositories.common import (
+    record_to_schema,
+    schema_to_record_payload,
+)
 from cognieda.schemas.enums import ExecutionApprovalStatus
 from cognieda.schemas.provenance import ExecutionApproval
 

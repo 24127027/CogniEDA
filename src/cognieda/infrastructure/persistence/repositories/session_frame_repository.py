@@ -7,7 +7,7 @@ from uuid import UUID
 
 from sqlmodel import Session, desc, select
 
-from cognieda.db.models import SessionFrameRecord
+from cognieda.infrastructure.persistence.models import SessionFrameRecord
 from cognieda.schemas.artifacts import SessionFrame
 
 SESSION_FRAME_JSON_FIELDS = {"state"}

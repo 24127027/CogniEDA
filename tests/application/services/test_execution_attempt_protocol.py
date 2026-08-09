@@ -10,7 +10,7 @@ from cognieda.application.services import (
     build_execution_admission_operations,
     commit_planner_operations,
 )
-from cognieda.repositories import (
+from cognieda.infrastructure.persistence.repositories import (
     DataProfileRepository,
     ExecutionApprovalRepository,
     ExecutionOutboxRepository,

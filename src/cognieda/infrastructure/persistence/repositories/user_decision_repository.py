@@ -8,8 +8,12 @@ from uuid import UUID
 from pydantic import BaseModel
 from sqlmodel import Session, desc, select
 
-from cognieda.db.models import UserDecisionRecord
-from cognieda.repositories.common import apply_update, record_to_schema, schema_to_record_payload
+from cognieda.infrastructure.persistence.models import UserDecisionRecord
+from cognieda.infrastructure.persistence.repositories.common import (
+    apply_update,
+    record_to_schema,
+    schema_to_record_payload,
+)
 from cognieda.schemas.artifacts import UserDecision
 from cognieda.schemas.enums import UserDecisionStatus, UserDecisionType
 

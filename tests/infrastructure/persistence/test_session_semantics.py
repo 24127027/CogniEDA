@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from cognieda.repositories import EvidenceRepository
+from cognieda.infrastructure.persistence.repositories import EvidenceRepository
 from cognieda.schemas import Evidence, EvidenceProvenance
 
 

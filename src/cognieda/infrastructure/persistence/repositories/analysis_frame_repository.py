@@ -6,8 +6,11 @@ from uuid import UUID
 
 from sqlmodel import Session, desc, select
 
-from cognieda.db.models import AnalysisFrameRecord
-from cognieda.repositories.common import record_to_schema, schema_to_record_payload
+from cognieda.infrastructure.persistence.models import AnalysisFrameRecord
+from cognieda.infrastructure.persistence.repositories.common import (
+    record_to_schema,
+    schema_to_record_payload,
+)
 from cognieda.schemas.provenance import AnalysisFrame
 
 ANALYSIS_FRAME_JSON_FIELDS = {"column_refs"}

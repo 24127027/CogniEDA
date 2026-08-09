@@ -8,7 +8,7 @@ from uuid import UUID
 
 from sqlmodel import Session, asc, select
 
-from cognieda.db.models import (
+from cognieda.infrastructure.persistence.models import (
     AssumptionRecord,
     ExecutionRunRecord,
     ObjectiveRecord,
@@ -16,11 +16,22 @@ from cognieda.db.models import (
     SessionFrameRecord,
     TaskRecord,
 )
-from cognieda.repositories.assumption_repository import ASSUMPTION_JSON_FIELDS, AssumptionUpdate
-from cognieda.repositories.common import apply_update, schema_to_record_payload
-from cognieda.repositories.objective_repository import ObjectiveUpdate
-from cognieda.repositories.session_frame_repository import SESSION_FRAME_JSON_FIELDS
-from cognieda.repositories.task_repository import TASK_JSON_FIELDS, TaskUpdate
+from cognieda.infrastructure.persistence.repositories.assumption_repository import (
+    ASSUMPTION_JSON_FIELDS,
+    AssumptionUpdate,
+)
+from cognieda.infrastructure.persistence.repositories.common import (
+    apply_update,
+    schema_to_record_payload,
+)
+from cognieda.infrastructure.persistence.repositories.objective_repository import ObjectiveUpdate
+from cognieda.infrastructure.persistence.repositories.session_frame_repository import (
+    SESSION_FRAME_JSON_FIELDS,
+)
+from cognieda.infrastructure.persistence.repositories.task_repository import (
+    TASK_JSON_FIELDS,
+    TaskUpdate,
+)
 from cognieda.schemas.artifacts import Assumption, SessionFrame, Task
 from cognieda.schemas.enums import (
     AssumptionStatus,

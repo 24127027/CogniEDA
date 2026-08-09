@@ -9,8 +9,16 @@ from uuid import UUID
 from pydantic import BaseModel
 from sqlmodel import Session, desc, select
 
-from cognieda.db.models import DataProfileRecord, HypothesisRecord, TaskRecord
-from cognieda.repositories.common import apply_update, record_to_schema, schema_to_record_payload
+from cognieda.infrastructure.persistence.models import (
+    DataProfileRecord,
+    HypothesisRecord,
+    TaskRecord,
+)
+from cognieda.infrastructure.persistence.repositories.common import (
+    apply_update,
+    record_to_schema,
+    schema_to_record_payload,
+)
 from cognieda.schemas.artifacts import Hypothesis, Task
 from cognieda.schemas.enums import DataProfileLifecycleState, HypothesisStatus
 

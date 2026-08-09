@@ -7,8 +7,11 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 from sqlmodel import Session, select
 
-from cognieda.db.models import ObjectiveRecord
-from cognieda.repositories.common import record_to_schema, schema_to_record_payload
+from cognieda.infrastructure.persistence.models import ObjectiveRecord
+from cognieda.infrastructure.persistence.repositories.common import (
+    record_to_schema,
+    schema_to_record_payload,
+)
 from cognieda.schemas.artifacts import Objective
 
 

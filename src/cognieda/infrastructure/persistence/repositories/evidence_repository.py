@@ -6,8 +6,11 @@ from uuid import UUID
 
 from sqlmodel import Session, select
 
-from cognieda.db.models import DataProfileRecord, EvidenceRecord, TaskRecord
-from cognieda.repositories.common import record_to_schema, schema_to_record_payload
+from cognieda.infrastructure.persistence.models import DataProfileRecord, EvidenceRecord, TaskRecord
+from cognieda.infrastructure.persistence.repositories.common import (
+    record_to_schema,
+    schema_to_record_payload,
+)
 from cognieda.schemas.artifacts import Evidence
 from cognieda.schemas.enums import TaskStatus
 

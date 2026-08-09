@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from cognieda.db.init_db import init_db
-from cognieda.db.session import create_db_engine, get_session
+from cognieda.infrastructure.persistence.init_db import init_db
+from cognieda.infrastructure.persistence.session import create_db_engine, get_session
 
 
 @pytest.fixture

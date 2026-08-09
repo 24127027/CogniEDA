@@ -7,8 +7,12 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 from sqlmodel import Session, select
 
-from cognieda.db.models import TaskRecord
-from cognieda.repositories.common import apply_update, record_to_schema, schema_to_record_payload
+from cognieda.infrastructure.persistence.models import TaskRecord
+from cognieda.infrastructure.persistence.repositories.common import (
+    apply_update,
+    record_to_schema,
+    schema_to_record_payload,
+)
 from cognieda.schemas.artifacts import Task
 from cognieda.schemas.enums import TaskStatus
 

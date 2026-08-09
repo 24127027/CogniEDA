@@ -4,7 +4,12 @@ from uuid import uuid4
 
 import pytest
 
-from cognieda.db.models import DataProfileRecord, DiscoveryRecord, HypothesisRecord, TaskRecord
+from cognieda.infrastructure.persistence.models import (
+    DataProfileRecord,
+    DiscoveryRecord,
+    HypothesisRecord,
+    TaskRecord,
+)
 from cognieda.retrieval import DiscoveryRetrievalEngine, LexicalScorer
 from cognieda.schemas.artifacts import SessionFrame
 from cognieda.schemas.enums import (

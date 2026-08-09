@@ -10,7 +10,11 @@ from sqlalchemy import or_, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from cognieda.db.models import ExecutionOutboxRecord, ExecutionRunRecord, HypothesisRecord
+from cognieda.infrastructure.persistence.models import (
+    ExecutionOutboxRecord,
+    ExecutionRunRecord,
+    HypothesisRecord,
+)
 from cognieda.schemas.enums import ExecutionRunStatus
 
 

@@ -6,8 +6,8 @@ from uuid import UUID
 
 from sqlmodel import Session, desc, select
 
-from cognieda.db.models import ExecutionOutboxRecord
-from cognieda.repositories.common import record_to_schema
+from cognieda.infrastructure.persistence.models import ExecutionOutboxRecord
+from cognieda.infrastructure.persistence.repositories.common import record_to_schema
 from cognieda.schemas.provenance import ExecutionOutbox
 
 

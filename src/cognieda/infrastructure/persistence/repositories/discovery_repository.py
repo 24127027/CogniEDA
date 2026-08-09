@@ -7,8 +7,12 @@ from uuid import UUID
 
 from sqlmodel import Session, desc, select
 
-from cognieda.db.models import DiscoveryRecord, EvidenceRecord, HypothesisRecord
-from cognieda.repositories.common import (
+from cognieda.infrastructure.persistence.models import (
+    DiscoveryRecord,
+    EvidenceRecord,
+    HypothesisRecord,
+)
+from cognieda.infrastructure.persistence.repositories.common import (
     filter_records_by_related_id,
     record_to_schema,
     schema_to_record_payload,

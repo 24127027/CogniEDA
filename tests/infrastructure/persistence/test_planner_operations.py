@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from cognieda.agents.planner.nodes import manage_tasks
 from cognieda.agents.planner.types import State, TaskCreateDraft
 from cognieda.application.services import commit_planner_operations
-from cognieda.repositories import (
+from cognieda.infrastructure.persistence.repositories import (
     AssumptionRepository,
     ObjectiveRepository,
     PlannerOperationRepository,

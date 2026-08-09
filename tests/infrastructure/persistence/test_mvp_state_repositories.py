@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from cognieda.repositories import (
+from cognieda.infrastructure.persistence.repositories import (
     AssumptionRepository,
     AssumptionUpdate,
     DataProfileRepository,
