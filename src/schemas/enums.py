@@ -128,6 +128,13 @@ class DataProfileMethod(StrEnum):
     CUSTOM = "custom"
 
 
+class VariableType(StrEnum):
+    """Bounded technical variable classification used by MVP profiling."""
+
+    DISCRETE = "discrete"
+    CONTINUOUS = "continuous"
+
+
 class ConfidenceLevel(StrEnum):
     """Confidence levels for provisional analytical artifacts."""
 

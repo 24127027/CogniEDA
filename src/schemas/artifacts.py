@@ -9,8 +9,8 @@ from pydantic import Field, NonNegativeInt, model_validator
 
 from schemas.common import (
     AssumptionContextSummary,
-    BaselineSummary,
     CogniEDABaseModel,
+    ColumnProfile,
     DataProfileContextSummary,
     DeadEndSummary,
     DiscoveryClaim,
@@ -21,11 +21,8 @@ from schemas.common import (
     HypothesisContextSummary,
     ImmutableCogniEDABaseModel,
     InvalidationRule,
-    LineageStep,
     MethodParameter,
     NonEmptyStr,
-    QualityFlag,
-    SchemaSummary,
     StaleContextMarker,
     TaskContextSummary,
     ToolResultCacheSummary,
@@ -34,9 +31,6 @@ from schemas.common import (
     utc_now,
 )
 from schemas.enums import (
-    DataProfileLifecycleState,
-    DataProfileMethod,
-    DatasetSourceType,
     DiscoveryEpistemicStatus,
     DiscoveryLifecycleState,
     EvidenceLifecycleState,
@@ -57,27 +51,18 @@ class Objective(CogniEDABaseModel):
 
 
 class DataProfile(ImmutableCogniEDABaseModel):
-    """Immutable semantic profile for one dataset version."""
+    """Immutable typed description of the single active MVP dataset."""
 
-    profile_id: UUID = Field(default_factory=uuid4)
-    dataset_path: NonEmptyStr
-    source_type: DatasetSourceType = DatasetSourceType.FILE
-    dvc_hash: str | None = None
-    dvc_version_label: str | None = None
-    source_uri: str | None = None
-    source_description: str | None = None
-    method: DataProfileMethod
-    schema_summary: SchemaSummary
-    baseline_summary: BaselineSummary
+    data_profile_id: UUID = Field(default_factory=uuid4)
     row_count: NonNegativeInt
     column_count: NonNegativeInt
-    quality_flags: list[QualityFlag] = Field(default_factory=list)
-    preprocessing_history: list[LineageStep] = Field(default_factory=list)
-    artifact_refs: list[NonEmptyStr] = Field(default_factory=list)
-    lifecycle_state: DataProfileLifecycleState = DataProfileLifecycleState.DRAFT
-    superseded_by_data_profile_id: UUID | None = None
-    accepted_as_ground_truth: bool = False
-    created_at: datetime = Field(default_factory=utc_now)
+    columns: tuple[ColumnProfile, ...]
+
+    @model_validator(mode="after")
+    def _column_count_matches_columns(self) -> DataProfile:
+        if self.column_count != len(self.columns):
+            raise ValueError("column_count must equal the number of ColumnProfile entries.")
+        return self
 
 
 class Assumption(CogniEDABaseModel):
