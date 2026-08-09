@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 from uuid import UUID
 
 from sqlmodel import Session, desc, select
@@ -29,14 +30,14 @@ class SessionFrameRepository:
         record = self._session.get(SessionFrameRecord, session_frame_id)
         return None if record is None else SessionFrame.model_validate(record.state)
 
-    def list(self) -> list[SessionFrame]:
+    def list(self) -> builtins.list[SessionFrame]:
         statement = select(SessionFrameRecord).order_by(desc(SessionFrameRecord.created_at))
         return [
             SessionFrame.model_validate(record.state)
             for record in self._session.exec(statement).all()
         ]
 
-    def list_recent(self, *, limit: int = 10) -> list[SessionFrame]:
+    def list_recent(self, *, limit: int = 10) -> builtins.list[SessionFrame]:
         return self.list()[:limit]
 
     def get_latest(self) -> SessionFrame | None:

@@ -112,7 +112,7 @@ class DatasetProfiler:
         if hasattr(value, "item"):
             value = value.item()
         if isinstance(value, pd.Timestamp):
-            return value.isoformat()
+            return str(value.isoformat())
         if isinstance(value, bool):
             return value
         if isinstance(value, (str, int, float)):

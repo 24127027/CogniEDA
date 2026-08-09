@@ -37,11 +37,11 @@ class _FrozenJsonDict(dict[str, Any]):
         raise TypeError("Evidence content is immutable.")
 
     __delitem__ = _immutable
-    __ior__ = _immutable
+    __ior__ = _immutable  # type: ignore[assignment]
     __setitem__ = _immutable
     clear = _immutable
     pop = _immutable
-    popitem = _immutable
+    popitem = _immutable  # type: ignore[assignment]
     setdefault = _immutable
     update = _immutable
 
@@ -54,8 +54,8 @@ class _FrozenJsonList(list[Any]):
         raise TypeError("Evidence content is immutable.")
 
     __delitem__ = _immutable
-    __iadd__ = _immutable
-    __imul__ = _immutable
+    __iadd__ = _immutable  # type: ignore[assignment]
+    __imul__ = _immutable  # type: ignore[assignment]
     __setitem__ = _immutable
     append = _immutable
     clear = _immutable
@@ -234,6 +234,10 @@ class SessionFrame(CogniEDABaseModel):
 
     @model_validator(mode="after")
     def _validate_research_state(self) -> SessionFrame:
+        self._check_research_state()
+        return self
+
+    def _check_research_state(self) -> None:
         self._reject_duplicate_ids(
             [assumption.assumption_id for assumption in self.assumptions],
             object_name="Assumption",
@@ -255,7 +259,6 @@ class SessionFrame(CogniEDABaseModel):
                 raise ValueError("SessionFrame cannot retain Evidence without a DataProfile.")
             if evidence.data_profile_id != self.data_profile.data_profile_id:
                 raise ValueError("Evidence must reference the active SessionFrame DataProfile.")
-        return self
 
     @staticmethod
     def _reject_duplicate_ids(ids: list[UUID], *, object_name: str) -> None:
@@ -284,10 +287,10 @@ class SessionFrame(CogniEDABaseModel):
 
     def add_evidence(self, evidence: Evidence) -> None:
         candidate = self.model_copy(update={"evidences": [*self.evidences, evidence]})
-        candidate._validate_research_state()
+        candidate._check_research_state()
         self.evidences.append(evidence)
 
     def set_data_profile(self, data_profile: DataProfile | None) -> None:
         candidate = self.model_copy(update={"data_profile": data_profile})
-        candidate._validate_research_state()
+        candidate._check_research_state()
         self.data_profile = data_profile
