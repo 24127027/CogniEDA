@@ -2,155 +2,106 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import Field, NonNegativeInt, model_validator
+from pydantic import Field, JsonValue, NonNegativeInt, field_validator, model_validator
 
 from schemas.common import (
-    AssumptionContextSummary,
-    BaselineSummary,
     CogniEDABaseModel,
-    DataProfileContextSummary,
-    DeadEndSummary,
+    ColumnProfile,
     DiscoveryClaim,
-    DiscoveryContextSummary,
-    EvidenceContextSummary,
     EvidenceProvenance,
-    EvidenceResultSummary,
-    HypothesisContextSummary,
     ImmutableCogniEDABaseModel,
-    InvalidationRule,
-    LineageStep,
-    MethodParameter,
     NonEmptyStr,
-    QualityFlag,
-    SchemaSummary,
-    StaleContextMarker,
-    TaskContextSummary,
-    ToolResultCacheSummary,
-    UserDecisionContextSummary,
     ValidityBasis,
     utc_now,
 )
 from schemas.enums import (
-    AssumptionSource,
-    AssumptionStatus,
-    AssumptionTestability,
-    ConfidenceLevel,
-    DataProfileLifecycleState,
-    DataProfileMethod,
-    DatasetSourceType,
     DiscoveryEpistemicStatus,
     DiscoveryLifecycleState,
-    EvidenceLifecycleState,
-    EvidenceType,
     HypothesisStatus,
-    ObjectiveStatus,
-    SessionFrameStatus,
-    TaskKind,
-    TaskLifecycleState,
+    TaskStatus,
     UserDecisionStatus,
     UserDecisionType,
 )
 
 
+class _FrozenJsonDict(dict[str, Any]):
+    """Internal mapping that preserves JSON shape while rejecting mutation."""
+
+    @staticmethod
+    def _immutable(*_: Any, **__: Any) -> None:
+        raise TypeError("Evidence content is immutable.")
+
+    __delitem__ = _immutable
+    __ior__ = _immutable  # type: ignore[assignment]
+    __setitem__ = _immutable
+    clear = _immutable
+    pop = _immutable
+    popitem = _immutable  # type: ignore[assignment]
+    setdefault = _immutable
+    update = _immutable
+
+
+class _FrozenJsonList(list[Any]):
+    """Internal list that preserves JSON shape while rejecting mutation."""
+
+    @staticmethod
+    def _immutable(*_: Any, **__: Any) -> None:
+        raise TypeError("Evidence content is immutable.")
+
+    __delitem__ = _immutable
+    __iadd__ = _immutable  # type: ignore[assignment]
+    __imul__ = _immutable  # type: ignore[assignment]
+    __setitem__ = _immutable
+    append = _immutable
+    clear = _immutable
+    extend = _immutable
+    insert = _immutable
+    pop = _immutable
+    remove = _immutable
+    reverse = _immutable
+    sort = _immutable
+
+
 class Objective(CogniEDABaseModel):
-    """Research intent for one workspace graph."""
+    """Minimum executable research intent for the active MVP session."""
 
     objective_id: UUID = Field(default_factory=uuid4)
-    title: NonEmptyStr
-    statement: NonEmptyStr
-    status: ObjectiveStatus = ObjectiveStatus.ACTIVE
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
+    text: NonEmptyStr
 
 
 class DataProfile(ImmutableCogniEDABaseModel):
-    """Immutable semantic profile for one dataset version."""
+    """Immutable typed description of the single active MVP dataset."""
 
-    profile_id: UUID = Field(default_factory=uuid4)
-    dataset_path: NonEmptyStr
-    source_type: DatasetSourceType = DatasetSourceType.FILE
-    dvc_hash: str | None = None
-    dvc_version_label: str | None = None
-    source_uri: str | None = None
-    source_description: str | None = None
-    method: DataProfileMethod
-    schema_summary: SchemaSummary
-    baseline_summary: BaselineSummary
+    data_profile_id: UUID = Field(default_factory=uuid4)
     row_count: NonNegativeInt
     column_count: NonNegativeInt
-    quality_flags: list[QualityFlag] = Field(default_factory=list)
-    preprocessing_history: list[LineageStep] = Field(default_factory=list)
-    artifact_refs: list[NonEmptyStr] = Field(default_factory=list)
-    lifecycle_state: DataProfileLifecycleState = DataProfileLifecycleState.DRAFT
-    superseded_by_data_profile_id: UUID | None = None
-    accepted_as_ground_truth: bool = False
-    created_at: datetime = Field(default_factory=utc_now)
-
-
-class Assumption(CogniEDABaseModel):
-    """Provisional analytical statement used for planning, not inference."""
-
-    assumption_id: UUID = Field(default_factory=uuid4)
-    statement: NonEmptyStr
-    scope: NonEmptyStr
-    source: AssumptionSource = AssumptionSource.USER
-    testability: AssumptionTestability = AssumptionTestability.UNTESTABLE_IN_PROJECT
-    basis: NonEmptyStr | None = None
-    confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM
-    status: AssumptionStatus = AssumptionStatus.ACTIVE
-    scoped_data_profile_ids: list[UUID] = Field(default_factory=list)
-    contradicted_by_discovery_ids: list[UUID] = Field(default_factory=list)
-    replacement_assumption_id: UUID | None = None
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
+    columns: tuple[ColumnProfile, ...]
 
     @model_validator(mode="after")
-    def _reject_testable_claim_as_assumption(self) -> Assumption:
-        if (
-            self.testability
-            == AssumptionTestability.TESTABLE_CLAIM_REJECTED_AS_ASSUMPTION
-        ):
-            raise ValueError(
-                "Testable claims must become Task/Hypothesis candidates, not Assumptions."
-            )
+    def _column_count_matches_columns(self) -> DataProfile:
+        if self.column_count != len(self.columns):
+            raise ValueError("column_count must equal the number of ColumnProfile entries.")
         return self
 
 
-class Task(CogniEDABaseModel):
-    """Durable workflow state. A Task is not scientific knowledge."""
+class Assumption(CogniEDABaseModel):
+    """Planning-only statement; an Assumption is never empirical Evidence."""
+
+    assumption_id: UUID = Field(default_factory=uuid4)
+    text: NonEmptyStr
+
+
+class Task(ImmutableCogniEDABaseModel):
+    """Bounded executable MVP work identity; a Task is not scientific knowledge."""
 
     task_id: UUID = Field(default_factory=uuid4)
-    title: NonEmptyStr
-    description: NonEmptyStr
-    lifecycle_state: TaskLifecycleState = TaskLifecycleState.ACTIVE
-    task_kind: TaskKind = TaskKind.ANALYTICAL
-    parent_task_id: UUID | None = None
-    profile_id: UUID | None = None
-    variables: list[NonEmptyStr] = Field(default_factory=list)
-    evidence_expectation: str | None = None
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
-
-    def can_generate_hypothesis(
-        self,
-        *,
-        has_child_tasks: bool = False,
-        data_profile_accepted: bool = True,
-    ) -> bool:
-        """Return whether this Task satisfies local hypothesis-admission guards."""
-
-        return (
-            self.lifecycle_state == TaskLifecycleState.ACTIVE
-            and self.task_kind == TaskKind.ANALYTICAL
-            and not has_child_tasks
-            and data_profile_accepted
-            and self.profile_id is not None
-            and len(self.variables) > 0
-            and bool(self.evidence_expectation)
-        )
+    instruction: NonEmptyStr
+    status: TaskStatus = TaskStatus.PENDING
 
 
 class Hypothesis(CogniEDABaseModel):
@@ -170,33 +121,61 @@ class Hypothesis(CogniEDABaseModel):
 
 
 class Evidence(ImmutableCogniEDABaseModel):
-    """Directly observed analytical result, not interpretation."""
+    """Immutable structured result linked directly to real MVP work and data state."""
 
     evidence_id: UUID = Field(default_factory=uuid4)
-    hypothesis_id: UUID
-    profile_id: UUID
-    # Skeleton stage: these are string identifiers for provenance records.
-    # EvidenceRepository can strictly dereference them when provenance repos are wired.
-    analysis_frame_ref: NonEmptyStr
-    execution_run_ref: NonEmptyStr
-    evidence_type: EvidenceType
-    method: NonEmptyStr
-    parameters: list[MethodParameter] = Field(default_factory=list)
+    task_id: UUID
+    data_profile_id: UUID
+    content: dict[str, JsonValue] = Field(min_length=1)
     provenance: EvidenceProvenance
-    result_summary: EvidenceResultSummary
-    artifact_refs: list[NonEmptyStr] = Field(default_factory=list)
-    limitations: list[NonEmptyStr] = Field(default_factory=list)
-    lifecycle_state: EvidenceLifecycleState = EvidenceLifecycleState.ACTIVE
-    superseded_by_evidence_id: UUID | None = None
-    lifecycle_reason: str | None = None
-    created_at: datetime = Field(default_factory=utc_now)
+    artifact_refs: tuple[NonEmptyStr, ...] = ()
+
+    def model_post_init(self, __context: Any) -> None:
+        del __context
+        object.__setattr__(self, "content", self._freeze_json(self.content))
+
+    @classmethod
+    def _freeze_json(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            return _FrozenJsonDict(
+                {key: cls._freeze_json(item) for key, item in value.items()}
+            )
+        if isinstance(value, list):
+            return _FrozenJsonList(cls._freeze_json(item) for item in value)
+        return value
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def _content_is_native_json(cls, value: Any) -> Any:
+        cls._validate_json_value(value, path="content")
+        return value
+
+    @classmethod
+    def _validate_json_value(cls, value: Any, *, path: str) -> None:
+        if value is None or isinstance(value, (str, bool, int)):
+            return
+        if isinstance(value, float):
+            try:
+                json.dumps(value, allow_nan=False)
+            except ValueError as exc:
+                raise ValueError(f"{path} contains a non-finite float.") from exc
+            return
+        if isinstance(value, list):
+            for index, item in enumerate(value):
+                cls._validate_json_value(item, path=f"{path}[{index}]")
+            return
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if not isinstance(key, str):
+                    raise ValueError(f"{path} requires string object keys.")
+                cls._validate_json_value(item, path=f"{path}.{key}")
+            return
+        raise ValueError(f"{path} contains unsupported value type {type(value).__name__}.")
 
     @model_validator(mode="after")
-    def _provenance_matches_required_refs(self) -> Evidence:
-        if self.provenance.analysis_frame_ref != self.analysis_frame_ref:
-            raise ValueError("Evidence provenance must reference the same AnalysisFrame.")
-        if self.provenance.execution_run_ref != self.execution_run_ref:
-            raise ValueError("Evidence provenance must reference the same ExecutionRun.")
+    def _provenance_matches_data_profile(self) -> Evidence:
+        if self.provenance.data_profile_id != self.data_profile_id:
+            raise ValueError("Evidence provenance must reference the same DataProfile.")
         return self
 
 
@@ -244,38 +223,94 @@ class UserDecision(CogniEDABaseModel):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
-class SessionFrame(CogniEDABaseModel):
-    """Concrete active-context frame for session continuity and handoff."""
+class SessionFrame(ImmutableCogniEDABaseModel):
+    """Authoritative typed research state for the single active MVP session."""
 
-    session_frame_id: UUID = Field(default_factory=uuid4)
-    frame_topic: NonEmptyStr
-    frame_status: SessionFrameStatus = SessionFrameStatus.ACTIVE
-    objective_snapshot: NonEmptyStr
-    frame_outcome: str | None = None
-    objective_summary: str | None = None
-    branch_key: str | None = None
-    checkpoint_label: str | None = None
-    parent_session_frame_id: UUID | None = None
-    handoff_summary: str | None = None
-    data_profile_summaries: list[DataProfileContextSummary] = Field(default_factory=list)
-    active_data_profile_refs: list[UUID] = Field(default_factory=list)
-    active_tasks: list[TaskContextSummary] = Field(default_factory=list)
-    active_task_refs: list[UUID] = Field(default_factory=list)
-    active_assumptions: list[AssumptionContextSummary] = Field(default_factory=list)
-    active_assumption_refs: list[UUID] = Field(default_factory=list)
-    active_hypotheses: list[HypothesisContextSummary] = Field(default_factory=list)
-    active_hypothesis_refs: list[UUID] = Field(default_factory=list)
-    relevant_discoveries: list[DiscoveryContextSummary] = Field(default_factory=list)
-    relevant_discovery_refs: list[UUID] = Field(default_factory=list)
-    supporting_evidence: list[EvidenceContextSummary] = Field(default_factory=list)
-    supporting_evidence_refs: list[UUID] = Field(default_factory=list)
-    recent_user_decisions: list[UserDecisionContextSummary] = Field(default_factory=list)
-    recent_user_decision_refs: list[UUID] = Field(default_factory=list)
-    pending_tasks: list[NonEmptyStr] = Field(default_factory=list)
-    open_questions: list[NonEmptyStr] = Field(default_factory=list)
-    key_warnings: list[NonEmptyStr] = Field(default_factory=list)
-    stale_context: list[StaleContextMarker] = Field(default_factory=list)
-    dead_ends: list[DeadEndSummary] = Field(default_factory=list)
-    cached_tool_results: list[ToolResultCacheSummary] = Field(default_factory=list)
-    frame_invalidation_rules: list[InvalidationRule] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=utc_now)
+    objective: Objective | None = None
+    assumptions: tuple[Assumption, ...] = ()
+    tasks: tuple[Task, ...] = ()
+    evidences: tuple[Evidence, ...] = ()
+    data_profile: DataProfile | None = None
+
+    @model_validator(mode="after")
+    def _validate_research_state(self) -> SessionFrame:
+        self._check_research_state()
+        return self
+
+    def _check_research_state(self) -> None:
+        self._reject_duplicate_ids(
+            [assumption.assumption_id for assumption in self.assumptions],
+            object_name="Assumption",
+        )
+        self._reject_duplicate_ids(
+            [task.task_id for task in self.tasks],
+            object_name="Task",
+        )
+        self._reject_duplicate_ids(
+            [evidence.evidence_id for evidence in self.evidences],
+            object_name="Evidence",
+        )
+
+        tasks_by_id = {task.task_id: task for task in self.tasks}
+        for evidence in self.evidences:
+            task = tasks_by_id.get(evidence.task_id)
+            if task is None:
+                raise ValueError("SessionFrame rejects orphan Evidence without its Task.")
+            if task.status is not TaskStatus.COMPLETED:
+                raise ValueError("SessionFrame accepts Evidence only for COMPLETED Tasks.")
+            if self.data_profile is None:
+                raise ValueError("SessionFrame cannot retain Evidence without a DataProfile.")
+            if evidence.data_profile_id != self.data_profile.data_profile_id:
+                raise ValueError("Evidence must reference the active SessionFrame DataProfile.")
+
+    @staticmethod
+    def _reject_duplicate_ids(ids: list[UUID], *, object_name: str) -> None:
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"SessionFrame rejects duplicate {object_name} IDs.")
+
+    def _validated_copy(self, **updates: object) -> SessionFrame:
+        values: dict[str, object] = {
+            "objective": self.objective,
+            "assumptions": self.assumptions,
+            "tasks": self.tasks,
+            "evidences": self.evidences,
+            "data_profile": self.data_profile,
+        }
+        values.update(updates)
+        return SessionFrame.model_validate(values)
+
+    def set_objective(self, objective: Objective | None) -> SessionFrame:
+        return self._validated_copy(objective=objective)
+
+    def add_assumption(self, assumption: Assumption) -> SessionFrame:
+        if any(item.assumption_id == assumption.assumption_id for item in self.assumptions):
+            raise ValueError("SessionFrame rejects duplicate Assumption IDs.")
+        return self._validated_copy(assumptions=(*self.assumptions, assumption))
+
+    def add_task(self, task: Task) -> SessionFrame:
+        if any(item.task_id == task.task_id for item in self.tasks):
+            raise ValueError("SessionFrame rejects duplicate Task IDs.")
+        return self._validated_copy(tasks=(*self.tasks, task))
+
+    def set_task_status(self, task_id: UUID, status: TaskStatus) -> SessionFrame:
+        for index, task in enumerate(self.tasks):
+            if task.task_id == task_id:
+                replacement = Task(
+                    task_id=task.task_id,
+                    instruction=task.instruction,
+                    status=status,
+                )
+                return self._validated_copy(
+                    tasks=(
+                        *self.tasks[:index],
+                        replacement,
+                        *self.tasks[index + 1 :],
+                    )
+                )
+        raise ValueError("SessionFrame cannot update a Task it does not contain.")
+
+    def add_evidence(self, evidence: Evidence) -> SessionFrame:
+        return self._validated_copy(evidences=(*self.evidences, evidence))
+
+    def set_data_profile(self, data_profile: DataProfile | None) -> SessionFrame:
+        return self._validated_copy(data_profile=data_profile)

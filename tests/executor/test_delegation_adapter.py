@@ -12,7 +12,6 @@ from agents.executor import (
     ExecutorRegistry,
 )
 from schemas.artifacts import Task
-from schemas.enums import TaskKind
 from tools.delegation.dataset import invoke_data_capability
 
 
@@ -35,9 +34,7 @@ def test_pydantic_ai_adapter_dispatches_to_registered_provider() -> None:
     deps = SimpleNamespace(dispatcher=ExecutorDispatcher(registry))
     context = SimpleNamespace(deps=deps)
     task = Task(
-        title="Inspect rows",
-        description="Count dataset rows.",
-        task_kind=TaskKind.ANALYTICAL,
+        instruction="Count dataset rows.",
     )
 
     result = asyncio.run(invoke_data_capability(context, task))

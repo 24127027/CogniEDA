@@ -164,12 +164,13 @@ observation and provenance boundary.
 
 ## Implementation status
 
-**Design target.** Current source has partial legacy support: it enforces a
-repository-level one-Hypothesis-per-leaf guard using the legacy `ANALYTICAL`
-Task kind and stores scientific fields directly on current Task/Hypothesis
-models. Canonical feasibility outcomes, `ScientificInvestigationRun`,
-InvestigationPlan, InvestigationProtocol, Evidence obligations, EvidenceRequest,
-and the eight immutable canonical contract schemas are not implemented. The
-placeholder Hypothesis Analyst graph is not runnable and currently declares a
-dataset tool, which is a known deviation from the canonical no-dataset-access
-boundary.
+**Design target.** M1-A removed legacy scientific fields from the active Task
+and made Hypothesis independent of the executable MVP state. The donor
+Hypothesis repository and placeholder Hypothesis Analyst remain **Deferred**;
+they are not composed with the M1-A Task contract and do not establish a
+supported scientific workflow. Canonical feasibility outcomes,
+`ScientificInvestigationRun`, InvestigationPlan, InvestigationProtocol,
+Evidence obligations, EvidenceRequest, and application-authority admission are
+not implemented. The placeholder Hypothesis Analyst is not runnable and still
+declares a dataset tool, which is a known deviation from the canonical
+no-dataset-access boundary.

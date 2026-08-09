@@ -155,6 +155,10 @@ instruction. A simple `PENDING`, `RUNNING`, `COMPLETED`, or `FAILED` lifecycle
 may support the vertical slice. Semantic change must create a successor or new
 Task identity; it must not silently rewrite existing work meaning.
 
+The M1-A boundary is **Implemented** as an immutable Task value. Lifecycle
+change returns a validated replacement with the same `task_id` and instruction;
+neither semantic field can be changed in place.
+
 ### DataProfile
 
 The active dataset description must contain enough typed context for Planner
@@ -162,6 +166,11 @@ and Data Explorer. At minimum it describes `data_profile_id`, row count, column
 count, and columns. Each column profile describes name, dtype, variable type,
 distinct count, missing count, and summary. MVP variable type is `DISCRETE` or
 `CONTINUOUS`.
+
+M1-A continuous statistics are **Implemented** as finite, JSON-safe values.
+Direct schema construction rejects non-finite statistics. Profiling excludes
+non-finite source observations from continuous descriptive calculations and
+uses `None` if a computed statistic is non-finite.
 
 ### Evidence
 
@@ -171,16 +180,23 @@ provenance, and artifact references.
 
 This direct Task-to-Evidence MVP linkage is an executable-subset contract, not
 the complete canonical scientific Evidence contract. It must not fabricate a
-Hypothesis or set `hypothesis_id = task_id`. A failed execution creates no
-Evidence. The later canonical scientific cutover must introduce its real
-Hypothesis, EvidenceRequest, ExecutionRun, AnalysisFrame, and admission
-lineage rather than aliasing their identities.
+Hypothesis or set `hypothesis_id = task_id`. M1-A admission is **Implemented**
+to require the referenced Task to be exactly `COMPLETED`; `PENDING`, `RUNNING`,
+and `FAILED` work cannot produce admitted MVP Evidence. The later canonical
+scientific cutover must introduce its real Hypothesis, EvidenceRequest,
+ExecutionRun, AnalysisFrame, and admission lineage rather than aliasing their
+identities.
 
 ### SessionFrame
 
 The MVP active context contains the Objective, Assumptions, Tasks, Evidence,
 and active DataProfile. Evidence must remain typed and retained in the frame so
 follow-up work does not depend on transcript reconstruction.
+
+M1-A SessionFrame state is **Implemented** with ordered, read-only collections.
+Its controlled seams return validated successor frames, so callers cannot
+append Tasks or Evidence directly or leave the original frame partially
+changed after rejected lineage validation.
 
 ## Role and authority boundaries
 
@@ -291,7 +307,7 @@ part of the canonical architecture and must not be described as removed.
 | --- | --- | --- |
 | S0 | executor capability stabilization | **Implemented** at the bounded S0 library surface |
 | D0 | MVP and canonical documentation reconciliation | **Implemented** by this documentation boundary |
-| M1-A | MVP research-state core: Objective, Assumption, Task, Evidence, DataProfile, and SessionFrame | **Deferred** |
+| M1-A | MVP research-state core: Objective, Assumption, Task, Evidence, DataProfile, and SessionFrame | **Implemented** |
 | M1-B | MVP Planner behavior, including `PlannerWorkOutcome` consumption | **Deferred** |
 | M3-A | MVP Data Explorer plus Evidence and real tool execution | **Deferred** |
 | M5-A | single-session runtime composition | **Deferred** |

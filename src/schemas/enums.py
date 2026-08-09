@@ -128,6 +128,13 @@ class DataProfileMethod(StrEnum):
     CUSTOM = "custom"
 
 
+class VariableType(StrEnum):
+    """Bounded technical variable classification used by MVP profiling."""
+
+    DISCRETE = "discrete"
+    CONTINUOUS = "continuous"
+
+
 class ConfidenceLevel(StrEnum):
     """Confidence levels for provisional analytical artifacts."""
 
@@ -174,6 +181,15 @@ class TaskLifecycleState(StrEnum):
     FAILED = "failed"
     REJECTED = "rejected"
     CANCELLED = "cancelled"
+
+
+class TaskStatus(StrEnum):
+    """Finite execution lifecycle for an MVP Task."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 class TaskKind(StrEnum):

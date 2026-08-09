@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from uuid import UUID
 
 import pandas as pd
 
@@ -16,18 +15,10 @@ from agents.executor import (
 )
 from agents.executor.data_explorer import DataExplorer, DataExplorerResult
 from schemas.artifacts import Task
-from schemas.enums import TaskKind
 
 
-def _task(*, description: str, evidence_expectation: str) -> Task:
-    return Task(
-        title="Inspect dataset",
-        description=description,
-        task_kind=TaskKind.ANALYTICAL,
-        profile_id=UUID("11111111-1111-1111-1111-111111111111"),
-        variables=["value"],
-        evidence_expectation=evidence_expectation,
-    )
+def _task(instruction: str) -> Task:
+    return Task(instruction=instruction)
 
 
 def _request(capability: Capability, task: Task, dataset_path: str | None = None):
@@ -47,10 +38,7 @@ def test_data_explorer_analysis_returns_role_native_observation(tmp_path) -> Non
         DataExplorer().run(
             _request(
                 Capability.DATA_ANALYSIS,
-                _task(
-                    description="Report the row count and column names for this dataset.",
-                    evidence_expectation="row_count",
-                ),
+                _task("Report the row count and column names for this dataset."),
                 str(dataset_path),
             )
         )
@@ -72,7 +60,7 @@ def test_data_explorer_profiling_returns_successor_candidate_profile(tmp_path) -
         DataExplorer().run(
             _request(
                 Capability.DATA_PROFILING,
-                _task(description="Profile the dataset.", evidence_expectation="profile"),
+                _task("Profile the dataset."),
                 str(dataset_path),
             )
         )
@@ -89,7 +77,7 @@ def test_data_transformation_fails_closed_without_successor_semantics() -> None:
         DataExplorer().run(
             _request(
                 Capability.DATA_TRANSFORMATION,
-                _task(description="Transform the dataset.", evidence_expectation="new state"),
+                _task("Transform the dataset."),
             )
         )
     )

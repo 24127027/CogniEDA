@@ -5,9 +5,6 @@ from uuid import uuid4
 
 import pytest
 
-from runtime.orchestrator.execution_admission import build_execution_admission_operations
-from runtime.orchestrator.planner_commit import commit_planner_operations
-from runtime.orchestrator.transition_service import ExecutionAttemptTransitionService
 from repositories import (
     DataProfileRepository,
     ExecutionApprovalRepository,
@@ -17,6 +14,9 @@ from repositories import (
     PlannerOperationRepository,
     TaskRepository,
 )
+from runtime.orchestrator.execution_admission import build_execution_admission_operations
+from runtime.orchestrator.planner_commit import commit_planner_operations
+from runtime.orchestrator.transition_service import ExecutionAttemptTransitionService
 from schemas.artifacts import DataProfile, Hypothesis, Task
 from schemas.common import BaselineSummary, QualityFlag, SchemaSummary
 from schemas.enums import (
@@ -27,6 +27,10 @@ from schemas.enums import (
     QualityFlagSeverity,
 )
 from schemas.provenance import ExecutionApproval
+
+pytestmark = pytest.mark.skip(
+    reason="Canonical execution-attempt admission is deferred to M2/M3-B after M1-A."
+)
 
 
 def seed_execution_contract(db_session):

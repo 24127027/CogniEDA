@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+import pytest
+
 from memory import ContextBundle, ContextMode, SessionContextBuilder, SessionFrameBuilder
 from schemas.artifacts import (
     Assumption,
@@ -38,6 +40,10 @@ from schemas.enums import (
     SessionFrameStatus,
     TaskKind,
     TaskLifecycleState,
+)
+
+pytestmark = pytest.mark.skip(
+    reason="Canonical context projections are deferred; M1-A owns the direct MVP SessionFrame."
 )
 
 

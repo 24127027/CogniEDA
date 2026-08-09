@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from math import isfinite
 from typing import Annotated
 from uuid import UUID
 
@@ -13,6 +14,7 @@ from pydantic import (
     NonNegativeFloat,
     NonNegativeInt,
     field_validator,
+    model_validator,
 )
 
 from schemas.enums import (
@@ -32,6 +34,7 @@ from schemas.enums import (
     QualityFlagSeverity,
     UserDecisionStatus,
     UserDecisionType,
+    VariableType,
 )
 
 type NonEmptyStr = Annotated[str, Field(min_length=1)]
@@ -63,12 +66,8 @@ def reject_unqualified_absence_claim(value: str) -> str:
     """Reject over-strong absence wording for inconclusive analytical results."""
 
     normalized = value.lower()
-    has_absence_phrase = any(
-        phrase in normalized for phrase in _UNQUALIFIED_ABSENCE_PHRASES
-    )
-    has_qualifier = any(
-        qualifier in normalized for qualifier in _INSUFFICIENT_EVIDENCE_QUALIFIERS
-    )
+    has_absence_phrase = any(phrase in normalized for phrase in _UNQUALIFIED_ABSENCE_PHRASES)
+    has_qualifier = any(qualifier in normalized for qualifier in _INSUFFICIENT_EVIDENCE_QUALIFIERS)
     if has_absence_phrase and not has_qualifier:
         raise ValueError(
             "Use scoped insufficient-evidence wording instead of an unqualified "
@@ -188,14 +187,86 @@ class QualityFlag(CogniEDABaseModel):
     column_name: str | None = None
 
 
-class EvidenceProvenance(CogniEDABaseModel):
-    """Provenance fields that explain how an Evidence record was produced."""
+class ContinuousColumnSummary(ImmutableCogniEDABaseModel):
+    """Finite descriptive statistics for one continuous MVP column."""
 
-    analysis_frame_ref: NonEmptyStr
-    execution_run_ref: NonEmptyStr
-    code_reference: str | None = None
-    environment_reference: str | None = None
-    artifact_paths: list[NonEmptyStr] = Field(default_factory=list)
+    min: float | None = None
+    max: float | None = None
+    mean: float | None = None
+    median: float | None = None
+    std: float | None = None
+    p25: float | None = None
+    p75: float | None = None
+
+    @field_validator("min", "max", "mean", "median", "std", "p25", "p75")
+    @classmethod
+    def _statistics_must_be_finite(cls, value: float | None) -> float | None:
+        if value is not None and not isfinite(value):
+            raise ValueError("Continuous summary statistics must be finite.")
+        return value
+
+
+class DiscreteValueCount(ImmutableCogniEDABaseModel):
+    """JSON-safe value and frequency pair for one discrete column."""
+
+    value: str | int | float | bool
+    count: NonNegativeInt
+
+
+class DiscreteColumnSummary(ImmutableCogniEDABaseModel):
+    """Complete low-cardinality counts or bounded high-cardinality top values."""
+
+    value_counts: tuple[DiscreteValueCount, ...] | None = None
+    top_values: tuple[DiscreteValueCount, ...] | None = None
+
+    @field_validator("top_values")
+    @classmethod
+    def _top_values_must_be_bounded(
+        cls, value: tuple[DiscreteValueCount, ...] | None
+    ) -> tuple[DiscreteValueCount, ...] | None:
+        if value is not None and not value:
+            raise ValueError("top_values must contain at least one value when present.")
+        return value
+
+    @model_validator(mode="after")
+    def _has_exactly_one_count_representation(self) -> DiscreteColumnSummary:
+        if (self.value_counts is None) == (self.top_values is None):
+            raise ValueError("Provide exactly one of value_counts or top_values.")
+        return self
+
+
+class ColumnProfile(ImmutableCogniEDABaseModel):
+    """Typed deterministic profile for one dataset column."""
+
+    name: NonEmptyStr
+    dtype: NonEmptyStr
+    variable_type: VariableType
+    distinct_count: NonNegativeInt
+    missing_count: NonNegativeInt
+    summary: ContinuousColumnSummary | DiscreteColumnSummary
+
+    @model_validator(mode="after")
+    def _summary_matches_variable_type(self) -> ColumnProfile:
+        if self.variable_type is VariableType.CONTINUOUS and not isinstance(
+            self.summary, ContinuousColumnSummary
+        ):
+            raise ValueError("CONTINUOUS columns require ContinuousColumnSummary.")
+        if self.variable_type is VariableType.DISCRETE and not isinstance(
+            self.summary, DiscreteColumnSummary
+        ):
+            raise ValueError("DISCRETE columns require DiscreteColumnSummary.")
+        return self
+
+
+class EvidenceProvenance(ImmutableCogniEDABaseModel):
+    """Bounded MVP lineage from Evidence to dataset/tool work."""
+
+    producer_role: NonEmptyStr
+    work_reference: NonEmptyStr
+    dataset_reference: NonEmptyStr
+    data_profile_id: UUID
+    tool_reference: NonEmptyStr | None = None
+    code_reference: NonEmptyStr | None = None
 
 
 class HypothesisEvaluation(CogniEDABaseModel):

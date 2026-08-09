@@ -197,7 +197,8 @@ only shared metadata; full Planner consumption remains **Deferred**.
 
 Data Explorer is registered for `DATA_ANALYSIS`, `DATA_PROFILING`, and
 `DATA_TRANSFORMATION`. The first two have a bounded donor implementation when
-given the current legacy Task and a local dataset path. Transformation returns
+given the active M1-A Task instruction and a local dataset path. Profiling
+returns the typed M1-A DataProfile. Transformation returns
 a typed blocked result until it can create a successor dataset and DataProfile;
 it never establishes in-place mutation as valid behavior.
 
