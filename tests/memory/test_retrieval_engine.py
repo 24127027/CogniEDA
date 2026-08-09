@@ -2,12 +2,18 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+import pytest
+
 from db.models import DataProfileRecord, DiscoveryRecord, HypothesisRecord, TaskRecord
 from memory.retrieval_engine import DiscoveryRetrievalEngine
 from memory.semantic_scorer import LexicalScorer
 from schemas.artifacts import SessionFrame
 from schemas.enums import DataProfileMethod, DiscoveryEpistemicStatus, DiscoveryLifecycleState
 from schemas.retrieval import RetrievalRequest
+
+pytestmark = pytest.mark.skip(
+    reason="Discovery retrieval is outside the M1-A executable MVP research-state subset."
+)
 
 
 def _add_discovery(

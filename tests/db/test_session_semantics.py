@@ -3,30 +3,24 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from sqlalchemy.exc import IntegrityError
 
 from repositories import EvidenceRepository
-from schemas.artifacts import Evidence
-from schemas.common import EvidenceProvenance, EvidenceResultSummary
-from schemas.enums import EvidenceType
+from schemas import Evidence, EvidenceProvenance
 
 
-def test_sqlite_foreign_keys_are_enforced_without_project_fco(db_session) -> None:
-    repository = EvidenceRepository(db_session)
+def test_evidence_repository_fails_closed_for_missing_mvp_lineage(db_session) -> None:
+    data_profile_id = uuid4()
+    evidence = Evidence(
+        task_id=uuid4(),
+        data_profile_id=data_profile_id,
+        content={"row_count": 1},
+        provenance=EvidenceProvenance(
+            producer_role="data_explorer",
+            work_reference="de:missing",
+            dataset_reference="dataset:missing.csv",
+            data_profile_id=data_profile_id,
+        ),
+    )
 
-    with pytest.raises(IntegrityError):
-        repository.create(
-            Evidence(
-                hypothesis_id=uuid4(),
-                profile_id=uuid4(),
-                analysis_frame_ref="analysis-frame:missing",
-                execution_run_ref="execution-run:missing",
-                evidence_type=EvidenceType.STATISTICAL_TEST,
-                method="chi_square",
-                provenance=EvidenceProvenance(
-                    analysis_frame_ref="analysis-frame:missing",
-                    execution_run_ref="execution-run:missing",
-                ),
-                result_summary=EvidenceResultSummary(summary="Invalid orphan evidence."),
-            )
-        )
+    with pytest.raises(ValueError, match="existing Task"):
+        EvidenceRepository(db_session).create(evidence)
