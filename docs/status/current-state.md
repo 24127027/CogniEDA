@@ -1,9 +1,9 @@
 # Current state
 
 This page answers one question: **what is supported by the current
-implementation?** It describes the M1-A corrective source checkpoint
-`cf9f82ce8ba561b9b3f151dd7b95d9a95d4806bb`, based on `main` commit
-`d7348144b4678a83de8f08c43e9af14305bbc9be` and inspected on 2026-08-09.
+implementation?** It describes the package and CLI source checkpoint
+`ee8c50f8c360a0e3d04bd1959f0c38cbc594d149`, based on merged M1-A `main`
+commit `11785e14c768e77817ab7cc1921460b04884dfec` and inspected on 2026-08-09.
 A schema, table, interface, stub, fixture, or configuration entry is not a
 supported workflow by itself.
 
@@ -30,7 +30,7 @@ contracts remain authoritative targets.
 | M3-A Data Explorer execution and Evidence integration | **Deferred** | Production bounded Python execution, full tool coverage, real Data Explorer-to-Evidence admission, and successor transformation are not implemented by M1-A. |
 | M5-A runtime composition | **Deferred** | No supported Planner-to-Data Explorer-to-Evidence-to-SessionFrame user workflow is composed. |
 | Canonical scientific runtime | **Deferred** | Hypothesis and Discovery remain canonical FCOs but are not dependencies of the active MVP state. Hypothesis Analyst, scientific investigation, EvidenceRequest, canonical ExecutionRun and AnalysisFrame, protected evaluation, governance, Discovery admission, and validity propagation remain M2/M3-B/M4 work. |
-| Runtime entry boundary | **Unsupported** | The installed `cognieda` script is a development placeholder, not a supported product CLI, service, or complete research-state request pipeline. |
+| Runtime entry boundary | **Partially implemented** | An editable uv tool installation exposes `cognieda [PATH]`; `python -m cognieda` delegates to the same package entrypoint. Help parsing is bootstrap-free, startup uses the selected workspace, and missing repository development config falls back to an empty Planner tool/skill mapping. The command reaches the development Planner REPL, not a supported product CLI, service, or complete research-state request pipeline. |
 | External integrations | **Unsupported** | DVC execution, graph-database integration, external MCP composition, deployment adapters, and non-SQLite database support are not verified. |
 
 ## Active M1-A contracts
@@ -78,7 +78,8 @@ At the M1-A source checkpoint:
 - the requested nine-module M1-A schema, profiling, repository, and executor
   suite recorded **95 passes**;
 - the broad suite excluding exactly three pre-existing Planner collection
-  modules recorded **116 passes and 72 explicit skips**.
+  modules recorded **124 passes and 72 explicit skips** after the package and
+  CLI stabilization.
 
 Full collection still stops on the three baseline Planner donor mismatches:
 
@@ -95,5 +96,6 @@ pre-existing M1-B debt, not an M1-A research-state regression.
 
 The target architecture keeps core agents dependent on protocols, bootstrap
 responsible for concrete composition, and external adapters outside core
-agents. S0 establishes the bounded dispatcher foundation. The final package
-placement and broader adapter refactor remain a **Design target** beyond M1-A.
+agents. S0 establishes the bounded dispatcher foundation. One canonical
+`cognieda` package namespace and installed development entrypoint are
+**Implemented**; the broader adapter refactor remains a **Design target**.

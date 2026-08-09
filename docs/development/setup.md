@@ -11,8 +11,20 @@ From the repository root:
 
 ```powershell
 uv sync
+uv tool install --editable .
 copy .env.example .env
 ```
+
+If uv's tool binary directory is not on `PATH`, run:
+
+```powershell
+uv tool update-shell
+```
+
+Then open a new shell. The editable tool installation does not require
+activation of the project `.venv`, and Python source edits are visible to the
+installed command without reinstalling. Refresh or reinstall the tool when
+project dependency metadata changes.
 
 ## Environment
 
@@ -33,27 +45,46 @@ Database behavior:
 
 Agent LLM behavior:
 
-- `src/agents/llm.py` reads `COGNIEDA_MODEL_NAME`, `COGNIEDA_OPENAI_BASE_URL`, and `COGNIEDA_OPENAI_API_KEY`.
+- `src/cognieda/agents/llm.py` reads `COGNIEDA_MODEL_NAME`, `COGNIEDA_OPENAI_BASE_URL`, and `COGNIEDA_OPENAI_API_KEY`.
 - `COGNIEDA_MODEL_NAME` and `COGNIEDA_OPENAI_API_KEY` are required by `create_agent()`.
 - These agent variables are not currently listed in `.env.example`.
 
-## Commands
+## Normal application launch
 
-Current package script:
+Use the current working directory as the workspace:
 
 ```powershell
-uv run cognieda
+cognieda
 ```
 
-Current result: the script runs `main.py`, which prints a placeholder message.
-This is **Unsupported** as a product CLI.
+Or select a workspace explicitly:
+
+```powershell
+cognieda PATH
+```
+
+The installed console script delegates to `cognieda.cli.app:main`.
+`python -m cognieda` delegates to the same implementation inside an
+environment containing the package. `--help` parses without application
+bootstrap or model configuration.
+
+This command is **Partially implemented** as a development Planner REPL
+boundary. The supported end-to-end product CLI remains **Unsupported** because
+Planner-to-Data Explorer-to-Evidence-to-SessionFrame composition is deferred.
+
+The selected workspace owns `.cognieda/project.toml` and workspace-local
+state. Root `config/*.toml` files remain optional development configuration;
+installed startup does not require the source repository as the working
+directory.
+
+## Verification commands
 
 Verification commands:
 
 ```powershell
 uv run pytest
 uv run ruff check .
-uv run mypy src
+uv run mypy src/cognieda
 ```
 
 No docs build or docs link-check command was found in the current repo.
