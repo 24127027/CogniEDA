@@ -1,5 +1,5 @@
 from cognieda.application.ports import ModelConfig
 
-from .factory import OpenAICompatibleAgentFactory
+from .factory import AgentFactory
 
-__all__ = ("ModelConfig", "OpenAICompatibleAgentFactory")
+__all__ = ("ModelConfig", "AgentFactory")

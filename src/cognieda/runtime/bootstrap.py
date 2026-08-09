@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import cast
 
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
-from cognieda.application.ports import ModelConfig
+from cognieda.application.ports import ModelConfig, ProviderType
 from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
 from cognieda.infrastructure.agent_tooling import AgentTooling
-from cognieda.infrastructure.llm import OpenAICompatibleAgentFactory
+from cognieda.infrastructure.llm import AgentFactory
 
 from .application import Application
 from .workspace import Workspace
@@ -24,7 +25,7 @@ def bootstrap_application(workspace_path: Path) -> Application:
         mcp_path=config_root / "mcp.toml",
         skills_path=config_root / "skills.toml",
     )
-    agent_factory = OpenAICompatibleAgentFactory(tooling)
+    agent_factory = AgentFactory(tooling)
 
     registry = ExecutorRegistry()
     registry.register_provider(
@@ -59,6 +60,7 @@ def _resolved_value(workspace: Workspace, key: str, environment_name: str) -> st
 def resolve_model_config(workspace: Workspace) -> ModelConfig:
     """Resolve workspace-first model configuration without mutating process state."""
 
+    provider = _resolved_value(workspace, "model.provider", "COGNIEDA_MODEL_PROVIDER")
     model_name = _resolved_value(workspace, "model.name", "COGNIEDA_MODEL_NAME")
     base_url = _resolved_value(workspace, "model.base_url", "COGNIEDA_OPENAI_BASE_URL")
     api_key = _resolved_value(workspace, "model.api_key", "COGNIEDA_OPENAI_API_KEY")
@@ -72,5 +74,21 @@ def resolve_model_config(workspace: Workspace) -> ModelConfig:
             "Model API key is required in .cognieda/project.toml or "
             "COGNIEDA_OPENAI_API_KEY."
         )
+    if not provider:
+        raise ValueError(
+            "Model provider is required in .cognieda/project.toml or "
+            "COGNIEDA_MODEL_PROVIDER."
+        )
 
-    return ModelConfig(model_name=model_name, base_url=base_url, api_key=api_key)
+    try :
+        return ModelConfig(
+            provider=cast(ProviderType, provider),
+            model_name=model_name,
+            base_url=base_url,
+            api_key=api_key,
+        )
+    except Exception as e:
+        raise ValueError(
+            f"Invalid model configuration: {e}. "
+            "Check .cognieda/project.toml and environment variables."
+        ) from e
