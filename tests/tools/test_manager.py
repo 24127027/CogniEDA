@@ -35,3 +35,16 @@ def test_unknown_worker_is_rejected() -> None:
 
     with pytest.raises(ValueError, match="Unknown worker 'missing_worker'"):
         manager.toolsets_for("missing_worker", ())
+
+
+def test_missing_development_config_uses_bounded_planner_defaults(tmp_path) -> None:
+    manager = ToolManager.from_config_path(
+        path=tmp_path / "missing-agents.toml",
+        mcp_path=tmp_path / "missing-mcp.toml",
+        skills_path=tmp_path / "missing-skills.toml",
+    )
+
+    assert manager.toolsets_for("planner", ()) == []
+    assert manager.skills_for("planner") == []
+    with pytest.raises(ValueError, match="Unknown worker 'data_explorer'"):
+        manager.toolsets_for("data_explorer", ())

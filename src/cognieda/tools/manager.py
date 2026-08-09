@@ -31,6 +31,9 @@ class WorkerConfig(TypedDict, total=False):
     mcp: list[str]
 
 
+DEFAULT_WORKER_CONFIG: dict[str, WorkerConfig] = {"planner": {}}
+
+
 class ToolManager:
     def __init__(
         self,
@@ -49,7 +52,7 @@ class ToolManager:
         mcp_path: str | Path = "config/mcp.toml",
         skills_path: str | Path = "config/skills.toml",
     ) -> "ToolManager":
-        config: dict[str, WorkerConfig] = {}
+        config = {worker: values.copy() for worker, values in DEFAULT_WORKER_CONFIG.items()}
         try:
             with open(path, "rb") as f:
                 config = tomllib.load(f)
