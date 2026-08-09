@@ -191,20 +191,29 @@ START
 ```
 
 At that library boundary, typed model output selects one finite MVP action;
-deterministic code constructs successor Objective, Assumption, and Task state;
-tracked data work transitions `PENDING -> RUNNING -> COMPLETED|FAILED`; and the
-injected dispatcher remains the only active execution path. The Planner
+`BuildPlanningContext` first resolves retained SessionFrame IDs through the
+application research-state port into one ephemeral materialized context.
+Deterministic code persists successor Objective, Assumption, and Task objects
+through that port before retaining their IDs; tracked data work transitions
+`PENDING -> RUNNING -> COMPLETED|FAILED` in authoritative storage while the
+SessionFrame Task ID remains stable; and the injected dispatcher remains the
+only active execution path. The Planner
 normalizes and identity-checks `PlannerWorkOutcome`, preserves its digest and
 diagnostics, creates no Evidence, and gives empirical answer drafting an input
 containing admitted Evidence but no Assumptions. `PlannerOutput` exposes the
 human response, successor `SessionFrame`, typed decision, created Task IDs,
 selected `Capability`, work outcome, and controlled error.
 
+Selected native PydanticAI `ModelMessage` history reaches request understanding
+through the adapter's `message_history` argument rather than typed prompt prose.
+Full retained conversation remains outside SessionFrame, and empirical answer
+composition receives no conversation history.
+
 The direct PydanticAI data-capability adapter remains a bounded tested seam but
 is not composed as an M1-B Planner tool. This prevents model tool calls from
 dispatching work before a canonical Task enters typed state. Planner receives
-its model and dispatcher dependencies explicitly; it constructs no persistence
-or provider infrastructure.
+its model, dispatcher, and application research-state port explicitly; it
+constructs no concrete persistence or provider infrastructure.
 
 The former donor request-understanding and decomposition tests were rewritten
 against active M1-A/M1-B contracts, and the obsolete PlannerOperation

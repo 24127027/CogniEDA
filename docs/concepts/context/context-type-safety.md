@@ -116,12 +116,16 @@ permitted use.
 
 ## Implementation status
 
-**Partially implemented.** The bounded Planner builds a typed request-
-understanding input from the retained `SessionFrame`, latest request, and
-normalized prior Human-to-Planner turns. Conversation is labeled as
-non-authoritative discourse context. The separate empirical answer input
-accepts admitted Evidence and excludes conversation and Assumptions. A pure
-retrieval policy also rejects unknown types and unsafe lifecycle/mode
+**Partially implemented.** The bounded Planner rebuilds one `PlanningContext`
+per run. `BuildPlanningContext` resolves the retained `SessionFrame` IDs into
+current Objective, Assumption, Task, DataProfile, and Evidence objects through
+an authoritative repository port; dangling and inconsistent references fail
+closed. Request understanding receives the latest request, the materialized
+planning projection, and purpose-eligible native PydanticAI `ModelMessage`
+history through the model adapter's `message_history` channel. Conversation
+remains non-authoritative discourse context. The separate empirical answer
+input accepts admitted Evidence and excludes conversation and Assumptions. A
+pure retrieval policy also rejects unknown types and unsafe lifecycle/mode
 combinations at its isolated library surface.
 
 Planning consultation, scientific-investigation control, Graph Miner inquiry,

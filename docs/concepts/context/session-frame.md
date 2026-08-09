@@ -72,14 +72,17 @@ Session
 
 `Session` is the in-process chat lifetime aggregate, not an FCO or scientific
 authority. `ConversationHistory` is the ordered Human-to-Planner interaction
-presented at that boundary. It is not embedded in `SessionFrame`, and provider
-messages, tool protocols, retries, and intermediate model calls are not the
-runtime conversation contract.
+presented at that boundary. It is not embedded in `SessionFrame`. The runtime
+retains native PydanticAI `ModelMessage` sequences rather than reducing them to
+Human/Planner strings, so request/response structure and coherent tool-call and
+tool-return protocol can survive serialization and later context selection.
 
-A Planner invocation builds purpose-specific initial context from the retained
-frame and a normalized conversation projection. Conversation may resolve
-discourse and references, but it cannot become Evidence or an empirical premise.
-The evidence-grounded answer input remains restricted to admitted Evidence.
+A Planner invocation runs `BuildPlanningContext`: it resolves the frame's typed
+FCO IDs through authoritative repositories, validates the selected lineage,
+and combines the resulting materialized objects with the latest request and
+purpose-eligible native message history. Conversation may resolve discourse and
+references, but it cannot become Evidence or an empirical premise. The
+evidence-grounded answer input remains restricted to admitted Evidence.
 
 Initial invocation context is not a closed reasoning universe. An authorized
 role may later acquire additional purpose-specific context during its run.
@@ -143,12 +146,20 @@ raw SessionFrame as a substitute.
 
 ## Implementation status
 
-**Partially implemented.** The active MVP `SessionFrame` is one frozen,
-materialized-object schema with one optional Objective, ordered read-only
-Assumption, Task, and Evidence collections, and one optional active DataProfile.
-Validated successor seams preserve the fail-closed Task, Evidence, and
-DataProfile invariants. A separate in-process runtime `Session` retains that
-successor frame and normalized Human-to-Planner conversation across turns.
+**Partially implemented.** The active MVP `SessionFrame` is one frozen typed
+reference manifest with one optional Objective ID, ordered Assumption, Task,
+and Evidence IDs, and one optional DataProfile ID. It stores no materialized
+research objects and imports no PydanticAI types. Duplicate IDs fail schema
+validation. `BuildPlanningContext` resolves references through the authoritative
+SQLite-backed object seam for each Planner run and fails closed on missing
+references, orphan Evidence, non-`COMPLETED` authoritative Tasks, a missing
+DataProfile, or a profile mismatch. Evidence admission remains the owner of the
+underlying Task/DataProfile lineage invariant.
+
+A separate in-process runtime `Session` retains the successor frame and native
+PydanticAI `ModelMessage` conversation turns. Request understanding receives
+selected native history through PydanticAI's `message_history` channel;
+empirical answer composition still excludes conversation and Assumptions.
 
 The active schema does not encode the complete canonical purpose, reasoning
 mode, Objective-isolation, validity, or item-level eligibility model. Runtime
