@@ -180,9 +180,10 @@ provenance, and artifact references.
 
 This direct Task-to-Evidence MVP linkage is an executable-subset contract, not
 the complete canonical scientific Evidence contract. It must not fabricate a
-Hypothesis or set `hypothesis_id = task_id`. M1-A admission is **Implemented**
-to require the referenced Task to be exactly `COMPLETED`; `PENDING`, `RUNNING`,
-and `FAILED` work cannot produce admitted MVP Evidence. The later canonical
+Hypothesis or set `hypothesis_id = task_id`. M1-A schema and repository guards,
+plus the bounded M3-A application service, are **Implemented** to require the
+referenced Task to be exactly `COMPLETED`; `PENDING`, `RUNNING`, and `FAILED`
+work cannot produce admitted MVP Evidence. The later canonical
 scientific cutover must introduce its real Hypothesis, EvidenceRequest,
 ExecutionRun, AnalysisFrame, and admission lineage rather than aliasing their
 identities.
@@ -218,6 +219,20 @@ role-native observations and provenance material. It does not answer the
 human, evaluate a scientific Hypothesis, author a Discovery, perform
 governance, or admit durable state. Application/runtime authority owns
 validation and admission where the MVP contract requires them.
+
+The bounded M3-A library surface separates three contracts:
+
+```text
+DataProfileCandidate or DataExplorerResult   non-authoritative specialist output
+Evidence or admitted DataProfile             authoritative application state
+PlannerWorkOutcome                           Planner-facing projection
+```
+
+Initial profiling may produce a task-free `DataProfileCandidate`. Filesystem
+presence never admits or activates it; application authority performs the
+separate admission. Profiling an already admitted profile returns observation
+material instead of creating another candidate, and Evidence admission checks
+that the observed metrics match the authoritative DataProfile.
 
 ## Capability and dispatch model
 
@@ -257,6 +272,26 @@ understanding proposes work, deterministic Planner code constructs and tracks
 the canonical Task, and only then invokes `ExecutorDispatcher`. PydanticAI
 remains an adapter, not part of the canonical architecture.
 
+For `DATA_ANALYSIS`, `ExecutorContext` carries an explicit absolute
+`dataset_path`, exact `data_profile_id`, and finite `DataAnalysisPlan`. The plan
+contains one allowlisted operation, exact column names, and only the bounded
+parameters admitted for that operation. M3-A supports:
+
+```text
+ROW_COUNT
+COLUMN_SUMMARY
+MISSINGNESS
+VALUE_COUNTS
+DESCRIPTIVE_STATISTICS
+GROUP_SUMMARY
+CORRELATION (PEARSON or SPEARMAN)
+```
+
+Deterministic code validates the plan against the loaded dataset and computes
+the result. A model does not author numeric output. Arbitrary generated Python
+is **Unsupported**, and there is no environment or repository-root dataset
+fallback.
+
 `DATA_TRANSFORMATION` must preserve immutable dataset-state semantics:
 
 ```text
@@ -266,7 +301,7 @@ current dataset state
   -> successor DataProfile
 ```
 
-It must never mutate the active dataset in place. The current S0 provider
+It must never mutate the active dataset in place. The current M3-A provider
 correctly returns a typed blocker because successor dataset and DataProfile
 creation are not implemented.
 
@@ -287,6 +322,15 @@ M1-B consumption is **Implemented** at the bounded Planner library boundary:
 the Planner verifies Task identity, preserves the normalized digest,
 limitations, blockers, and permitted next actions, and applies a terminal Task
 status. The outcome is not admitted as Evidence.
+
+M3-A adds an application-owned admission seam after `DataExplorerResult`.
+Admission verifies successful status, source role, Task identity and persisted
+`COMPLETED` state, capability, authoritative DataProfile identity, normalized
+dataset binding, plan/tool/provenance agreement, one non-empty JSON-safe result,
+and bounded lineage. It then commits one immutable Evidence whose content is
+the validated operation, parameters, and deterministic result. Exact replay
+returns the same Evidence; conflicting reuse of a work reference fails closed.
+The resulting application projection contains the real Evidence reference.
 
 ## Bounded M1-B Planner behavior
 
@@ -318,10 +362,12 @@ PENDING -> RUNNING -> COMPLETED  on SUCCEEDED
 PENDING -> RUNNING -> FAILED     on FAILED, BLOCKED, or dispatch failure
 ```
 
-Successful work before M3-A is reported only as executor-boundary completion.
-Failed or blocked work surfaces controlled diagnostics. Neither path creates
-Evidence. Answers that claim empirical support receive an evidence-only typed
-input from admitted `SessionFrame.evidences`; planning Assumptions are excluded.
+The M1-B Planner still reports direct dispatcher completion and does not author
+or admit Evidence. Failed or blocked work surfaces controlled diagnostics.
+The separate M3-A application service admits eligible successful work for
+later composition; failed or blocked work cannot pass that service. Answers
+that claim empirical support receive an evidence-only typed input from admitted
+`SessionFrame.evidences`; planning Assumptions are excluded.
 
 ## Explicit MVP non-goals
 
@@ -350,7 +396,7 @@ part of the canonical architecture and must not be described as removed.
 | D0 | MVP and canonical documentation reconciliation | **Implemented** by this documentation boundary |
 | M1-A | MVP research-state core: Objective, Assumption, Task, Evidence, DataProfile, and SessionFrame | **Implemented** |
 | M1-B | MVP Planner behavior, including `PlannerWorkOutcome` consumption | **Implemented** at the bounded library behavior surface |
-| M3-A | MVP Data Explorer plus Evidence and real tool execution | **Deferred** |
+| M3-A | MVP Data Explorer plus Evidence and real tool execution | **Implemented** at the bounded library/data-authority surface |
 | M5-A | single-session runtime composition | **Deferred** |
 | MVP-I | vertical integration | **Deferred** |
 | MVP-V | final MVP verification | **Deferred** |
