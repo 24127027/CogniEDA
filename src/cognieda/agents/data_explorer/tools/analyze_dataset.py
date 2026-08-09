@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd  # type: ignore[import-untyped]
 from pydantic import JsonValue
 
-from cognieda.execution import DataAnalysisOperation, DataAnalysisPlan
+from cognieda.agents.data_explorer.contracts import DataAnalysisOperation, DataAnalysisPlan
 
 TOOL_VERSION = "v1"
 

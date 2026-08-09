@@ -6,7 +6,7 @@ from enum import StrEnum
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, model_validator
 from pydantic_ai.messages import ModelMessage
 
 from cognieda.schemas.artifacts import Task
@@ -22,91 +22,6 @@ class ExecutorInput(BaseModel):
     task: Task
 
 
-class DataAnalysisOperation(StrEnum):
-    """Finite deterministic operations admitted by the M3-A Data Explorer."""
-
-    ROW_COUNT = "row_count"
-    COLUMN_SUMMARY = "column_summary"
-    MISSINGNESS = "missingness"
-    VALUE_COUNTS = "value_counts"
-    DESCRIPTIVE_STATISTICS = "descriptive_statistics"
-    GROUP_SUMMARY = "group_summary"
-    CORRELATION = "correlation"
-
-
-class CorrelationMethod(StrEnum):
-    PEARSON = "pearson"
-    SPEARMAN = "spearman"
-
-
-class DataAnalysisPlan(BaseModel):
-    """Validated bounded parameters for one deterministic data operation."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    operation: DataAnalysisOperation
-    columns: tuple[str, ...] = Field(default=(), max_length=10)
-    top_k: int | None = Field(default=None, ge=1, le=50)
-    max_groups: int | None = Field(default=None, ge=1, le=50)
-    correlation_method: CorrelationMethod | None = None
-
-    @model_validator(mode="after")
-    def _parameters_match_operation(self) -> DataAnalysisPlan:
-        if any(not column.strip() for column in self.columns):
-            raise ValueError("Analysis columns must be non-empty exact names.")
-        if len(set(self.columns)) != len(self.columns):
-            raise ValueError("Analysis columns must not contain duplicates.")
-
-        expected_columns: int | tuple[int, int]
-        if self.operation is DataAnalysisOperation.ROW_COUNT:
-            expected_columns = 0
-        elif self.operation in {
-            DataAnalysisOperation.COLUMN_SUMMARY,
-            DataAnalysisOperation.VALUE_COUNTS,
-            DataAnalysisOperation.DESCRIPTIVE_STATISTICS,
-        }:
-            expected_columns = 1
-        elif self.operation is DataAnalysisOperation.MISSINGNESS:
-            expected_columns = (1, 10)
-        elif self.operation is DataAnalysisOperation.GROUP_SUMMARY:
-            expected_columns = 2
-        else:
-            expected_columns = (2, 10)
-
-        if isinstance(expected_columns, int):
-            valid_column_count = len(self.columns) == expected_columns
-        else:
-            valid_column_count = expected_columns[0] <= len(self.columns) <= expected_columns[1]
-        if not valid_column_count:
-            raise ValueError(
-                f"{self.operation.value} received an invalid number of exact column names."
-            )
-
-        if (self.operation is DataAnalysisOperation.VALUE_COUNTS) != (self.top_k is not None):
-            raise ValueError("top_k is required only for value_counts.")
-        if (self.operation is DataAnalysisOperation.GROUP_SUMMARY) != (
-            self.max_groups is not None
-        ):
-            raise ValueError("max_groups is required only for group_summary.")
-        if (self.operation is DataAnalysisOperation.CORRELATION) != (
-            self.correlation_method is not None
-        ):
-            raise ValueError("correlation_method is required only for correlation.")
-        return self
-
-    def bounded_parameters(self) -> dict[str, JsonValue]:
-        """Return only the finite parameters that determine tool behavior."""
-
-        parameters: dict[str, JsonValue] = {"columns": list(self.columns)}
-        if self.top_k is not None:
-            parameters["top_k"] = self.top_k
-        if self.max_groups is not None:
-            parameters["max_groups"] = self.max_groups
-        if self.correlation_method is not None:
-            parameters["correlation_method"] = self.correlation_method.value
-        return parameters
-
-
 class ExecutorContext(BaseModel):
     """Small shared context that is safe for every registered executor."""
 
@@ -114,7 +29,6 @@ class ExecutorContext(BaseModel):
 
     dataset_path: str | None = None
     data_profile_id: UUID | None = None
-    analysis_plan: DataAnalysisPlan | None = None
 
 
 class BaseState(BaseModel):
@@ -132,7 +46,7 @@ class ExecutionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     capability: Capability
-    input: ExecutorInput
+    input: SerializeAsAny[ExecutorInput]
     context: ExecutorContext = Field(default_factory=ExecutorContext)
 
 

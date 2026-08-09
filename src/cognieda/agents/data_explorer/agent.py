@@ -13,11 +13,16 @@ from cognieda.execution import Capability, ExecutionFailure, ExecutionRequest, E
 from cognieda.infrastructure.datasets import load_dataset
 
 from .contracts import (
+    DataAnalysisPlan,
+    DataAnalysisPlannerPort,
+    DataAnalysisPlanningRequest,
     DataExecutionProvenance,
+    DataExplorerInput,
     DataExplorerObservation,
     DataExplorerResult,
     DataProfileCandidate,
 )
+from .planning import ModelDataAnalysisPlanner, UnsupportedAnalysisRequest
 from .tools import (
     DataToolError,
     InvalidToolResultError,
@@ -52,9 +57,15 @@ class DataExplorer:
         *,
         config: ModelConfig | None = None,
         agent_factory: AgentFactoryPort | None = None,
+        analysis_planner: DataAnalysisPlannerPort | None = None,
     ) -> None:
         self.config = config or ModelConfig()
         self.agent_factory = agent_factory
+        self.analysis_planner = analysis_planner or (
+            ModelDataAnalysisPlanner(config=self.config, agent_factory=agent_factory)
+            if agent_factory is not None
+            else None
+        )
 
     @staticmethod
     def _work_id() -> str:
@@ -100,6 +111,7 @@ class DataExplorer:
             profile=profile,
             provenance=DataExecutionProvenance(
                 dataset_reference=str(loaded.path),
+                dataset_digest=loaded.dataset_digest,
                 data_profile_id=None,
                 tool_reference="cognieda.data_explorer.dataset_profile:v1",
                 operation="dataset_profile",
@@ -166,23 +178,70 @@ class DataExplorer:
             )
 
         dataset_reference = str(loaded.path)
+        dataset_digest = loaded.dataset_digest
         dataframe = loaded.dataframe.copy(deep=True)
 
         if request.capability is Capability.DATA_ANALYSIS:
-            plan = request.context.analysis_plan
-            if plan is None:
-                return self._failure(
-                    request,
-                    work_id,
-                    code="invalid_analysis_plan",
-                    message="DATA_ANALYSIS requires an explicit validated analysis_plan.",
-                )
             if request.context.data_profile_id is None:
                 return self._failure(
                     request,
                     work_id,
                     code="missing_data_profile_binding",
                     message="DATA_ANALYSIS requires an explicit data_profile_id.",
+                )
+            if not isinstance(request.input, DataExplorerInput):
+                return self._failure(
+                    request,
+                    work_id,
+                    code="missing_data_profile_binding",
+                    message=(
+                        "DATA_ANALYSIS requires the role-specific authoritative DataProfile "
+                        "projection for planning."
+                    ),
+                )
+            profile = request.input.data_profile
+            if profile.data_profile_id != request.context.data_profile_id:
+                return self._failure(
+                    request,
+                    work_id,
+                    code="invalid_dataset_binding",
+                    message="The Data Explorer profile projection does not match data_profile_id.",
+                )
+            if self.analysis_planner is None:
+                return self._failure(
+                    request,
+                    work_id,
+                    code="analysis_planning_unavailable",
+                    message="No Data Explorer analysis planning adapter is configured.",
+                )
+            try:
+                proposed_plan = await self.analysis_planner.propose(
+                    DataAnalysisPlanningRequest(
+                        task_instruction=request.input.task.instruction,
+                        data_profile=profile,
+                    )
+                )
+                plan = DataAnalysisPlan.model_validate(proposed_plan)
+            except UnsupportedAnalysisRequest as exc:
+                return self._failure(
+                    request,
+                    work_id,
+                    code="unsupported_analysis_request",
+                    message=str(exc),
+                )
+            except (TypeError, ValueError) as exc:
+                return self._failure(
+                    request,
+                    work_id,
+                    code="invalid_analysis_plan",
+                    message=f"Data Explorer planning returned an invalid plan: {exc}",
+                )
+            except Exception as exc:
+                return self._failure(
+                    request,
+                    work_id,
+                    code="analysis_planning_failed",
+                    message=f"Data Explorer planning failed: {exc}",
                 )
             try:
                 normalized_payload = normalize_json_value(execute_analysis(dataframe, plan))
@@ -221,11 +280,13 @@ class DataExplorer:
                 ],
                 provenance=DataExecutionProvenance(
                     dataset_reference=dataset_reference,
+                    dataset_digest=dataset_digest,
                     data_profile_id=request.context.data_profile_id,
                     tool_reference=tool_reference(plan.operation),
                     operation=plan.operation,
                     parameters=plan.bounded_parameters(),
                 ),
+                analysis_plan=plan,
             )
 
         try:
@@ -241,6 +302,7 @@ class DataExplorer:
         profile_id = request.context.data_profile_id
         provenance = DataExecutionProvenance(
             dataset_reference=dataset_reference,
+            dataset_digest=dataset_digest,
             data_profile_id=profile_id,
             tool_reference="cognieda.data_explorer.dataset_profile:v1",
             operation="dataset_profile",

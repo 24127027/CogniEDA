@@ -8,8 +8,21 @@ from uuid import UUID, uuid4
 
 from pydantic import Field, model_validator
 
-from cognieda.schemas.common import CogniEDABaseModel, NonEmptyStr, utc_now
+from cognieda.schemas.common import (
+    CogniEDABaseModel,
+    ImmutableCogniEDABaseModel,
+    NonEmptyStr,
+    utc_now,
+)
 from cognieda.schemas.enums import ExecutionApprovalStatus, ExecutionRunStatus, ObjectiveStatus
+
+
+class DataProfileDatasetBinding(ImmutableCogniEDABaseModel):
+    """Authoritative non-FCO binding from a DataProfile to exact dataset bytes."""
+
+    data_profile_id: UUID
+    dataset_reference: NonEmptyStr
+    dataset_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
 
 
 class AnalysisFrame(CogniEDABaseModel):

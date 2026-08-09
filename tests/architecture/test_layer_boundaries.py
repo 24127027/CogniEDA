@@ -162,3 +162,59 @@ def test_removed_unsafe_analysis_adapter_is_absent_and_unreferenced() -> None:
         "_unsafe_python_analysis" not in path.read_text(encoding="utf-8")
         for path in data_explorer_root.rglob("*.py")
     )
+
+
+def test_execution_package_does_not_own_data_explorer_analysis_contracts() -> None:
+    forbidden = {
+        "CorrelationMethod",
+        "DataAnalysisOperation",
+        "DataAnalysisPlan",
+        "DataExplorerInput",
+        "DataProfile",
+    }
+    violations: list[str] = []
+    for path in _python_files("execution"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.ClassDef, ast.FunctionDef)) and node.name in forbidden:
+                violations.append(f"{path.relative_to(PROJECT_ROOT)} defines {node.name}")
+            if isinstance(node, ast.ImportFrom):
+                imported = forbidden.intersection(alias.name for alias in node.names)
+                if imported:
+                    violations.append(
+                        f"{path.relative_to(PROJECT_ROOT)} imports {sorted(imported)}"
+                    )
+
+    assert violations == []
+
+
+def test_planner_and_runtime_do_not_construct_data_analysis_plans() -> None:
+    violations: list[str] = []
+    for relative_root in ("agents/planner", "runtime"):
+        for path in _python_files(relative_root):
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom):
+                    imported = {
+                        alias.name for alias in node.names if alias.name == "DataAnalysisPlan"
+                    }
+                    if imported:
+                        violations.append(
+                            f"{path.relative_to(PROJECT_ROOT)} imports DataAnalysisPlan"
+                        )
+                if isinstance(node, ast.Name) and node.id == "DataAnalysisPlan":
+                    violations.append(
+                        f"{path.relative_to(PROJECT_ROOT)} references DataAnalysisPlan"
+                    )
+
+    assert violations == []
+
+
+def test_data_explorer_is_persistence_free() -> None:
+    violations = [
+        f"{path.relative_to(PROJECT_ROOT)} imports {module}"
+        for path, module in _imports(_python_files("agents/data_explorer"))
+        if module.startswith("cognieda.infrastructure.persistence") or module == "sqlmodel"
+    ]
+
+    assert violations == []

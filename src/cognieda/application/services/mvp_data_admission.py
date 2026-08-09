@@ -12,21 +12,32 @@ from pydantic import BaseModel, ConfigDict, JsonValue, ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
-from cognieda.agents.data_explorer import DataExplorerResult, DataProfileCandidate
+from cognieda.agents.data_explorer import (
+    DataAnalysisOperation,
+    DataExplorerInput,
+    DataExplorerResult,
+    DataProfileCandidate,
+)
 from cognieda.execution import (
     Capability,
-    DataAnalysisOperation,
     ExecutionRequest,
     ExecutionStatus,
     PlannerWorkOutcome,
     normalize_for_planner,
 )
 from cognieda.infrastructure.persistence.repositories import (
+    DataProfileDatasetBindingRepository,
     DataProfileRepository,
     EvidenceRepository,
     TaskRepository,
 )
-from cognieda.schemas import DataProfile, Evidence, EvidenceProvenance, TaskStatus
+from cognieda.schemas import (
+    DataProfile,
+    DataProfileDatasetBinding,
+    Evidence,
+    EvidenceProvenance,
+    TaskStatus,
+)
 
 
 class DataAdmissionErrorCode(StrEnum):
@@ -50,6 +61,7 @@ class DataProfileAdmissionResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     data_profile: DataProfile
+    dataset_binding: DataProfileDatasetBinding
     created: bool
 
 
@@ -82,7 +94,9 @@ class MvpDataProfileAdmissionService:
     """Admit only a typed initial profile candidate; do not activate it."""
 
     def __init__(self, session: Session) -> None:
-        self._repository = DataProfileRepository(session)
+        self._session = session
+        self._profiles = DataProfileRepository(session)
+        self._bindings = DataProfileDatasetBindingRepository(session)
 
     def admit_candidate(self, candidate: DataProfileCandidate) -> DataProfileAdmissionResult:
         normalized_path = _normalized_explicit_path(candidate.provenance.dataset_reference)
@@ -101,16 +115,68 @@ class MvpDataProfileAdmissionService:
                 DataAdmissionErrorCode.INVALID_RESULT,
                 "DataProfile candidate provenance does not match deterministic profiling.",
             )
-        existing = self._repository.get_by_id(candidate.profile.data_profile_id)
-        if existing is not None:
-            if existing != candidate.profile:
-                raise DataAdmissionError(
-                    DataAdmissionErrorCode.DUPLICATE_WORK_CONFLICT,
-                    "DataProfile identity already exists with different content.",
+        binding = DataProfileDatasetBinding(
+            data_profile_id=candidate.profile.data_profile_id,
+            dataset_reference=normalized_path,
+            dataset_digest=candidate.provenance.dataset_digest,
+        )
+        existing_profile = self._profiles.get_by_id(candidate.profile.data_profile_id)
+        existing_binding = self._bindings.get_by_profile_id(
+            candidate.profile.data_profile_id
+        )
+        if existing_profile is not None and existing_profile != candidate.profile:
+            raise DataAdmissionError(
+                DataAdmissionErrorCode.DUPLICATE_WORK_CONFLICT,
+                "DataProfile identity already exists with different content.",
+            )
+        if existing_binding is not None and existing_binding != binding:
+            raise DataAdmissionError(
+                DataAdmissionErrorCode.DUPLICATE_WORK_CONFLICT,
+                "DataProfile identity already has a different physical dataset binding.",
+            )
+        if existing_profile is not None and existing_binding is not None:
+            return DataProfileAdmissionResult(
+                data_profile=existing_profile,
+                dataset_binding=existing_binding,
+                created=False,
+            )
+
+        try:
+            if existing_profile is None:
+                self._profiles.add(candidate.profile)
+                self._session.flush()
+            if existing_binding is None:
+                self._bindings.add(binding)
+            self._session.commit()
+        except IntegrityError:
+            self._session.rollback()
+            concurrent_profile = self._profiles.get_by_id(candidate.profile.data_profile_id)
+            concurrent_binding = self._bindings.get_by_profile_id(
+                candidate.profile.data_profile_id
+            )
+            if concurrent_profile == candidate.profile and concurrent_binding == binding:
+                return DataProfileAdmissionResult(
+                    data_profile=candidate.profile,
+                    dataset_binding=binding,
+                    created=False,
                 )
-            return DataProfileAdmissionResult(data_profile=existing, created=False)
-        admitted = self._repository.create(candidate.profile)
-        return DataProfileAdmissionResult(data_profile=admitted, created=True)
+            raise DataAdmissionError(
+                DataAdmissionErrorCode.DUPLICATE_WORK_CONFLICT,
+                "Concurrent DataProfile admission produced an identity conflict.",
+            ) from None
+        except Exception:
+            self._session.rollback()
+            raise
+
+        admitted_profile = self._profiles.get_by_id(candidate.profile.data_profile_id)
+        admitted_binding = self._bindings.get_by_profile_id(candidate.profile.data_profile_id)
+        if admitted_profile is None or admitted_binding is None:
+            raise RuntimeError("Committed DataProfile admission could not be reloaded.")
+        return DataProfileAdmissionResult(
+            data_profile=admitted_profile,
+            dataset_binding=admitted_binding,
+            created=True,
+        )
 
 
 class MvpEvidenceAdmissionService:
@@ -120,6 +186,7 @@ class MvpEvidenceAdmissionService:
         self._session = session
         self._tasks = TaskRepository(session)
         self._profiles = DataProfileRepository(session)
+        self._bindings = DataProfileDatasetBindingRepository(session)
         self._evidence = EvidenceRepository(session)
 
     @staticmethod
@@ -133,6 +200,11 @@ class MvpEvidenceAdmissionService:
                 "task_id": str(request.input.task.task_id),
                 "work_id": result.work_id,
                 "data_profile_id": str(request.context.data_profile_id),
+                "dataset_digest": (
+                    result.provenance.dataset_digest
+                    if result.provenance is not None
+                    else None
+                ),
                 "content": content,
             },
             allow_nan=False,
@@ -194,18 +266,40 @@ class MvpEvidenceAdmissionService:
                 DataAdmissionErrorCode.DATA_PROFILE_MISMATCH,
                 "Evidence requires an authoritative matching DataProfile.",
             )
+        binding = self._bindings.get_by_profile_id(profile_id)
+        if binding is None:
+            raise DataAdmissionError(
+                DataAdmissionErrorCode.DATA_PROFILE_MISMATCH,
+                "Evidence requires an authoritative physical dataset binding.",
+            )
+        if isinstance(request.input, DataExplorerInput) and (
+            request.input.data_profile != authoritative_profile
+        ):
+            raise DataAdmissionError(
+                DataAdmissionErrorCode.DATA_PROFILE_MISMATCH,
+                "The execution DataProfile projection is not authoritative.",
+            )
         provenance = result.provenance
-        if provenance is None or provenance.data_profile_id != profile_id:
+        if provenance is None or provenance.data_profile_id != binding.data_profile_id:
             raise DataAdmissionError(
                 DataAdmissionErrorCode.DATA_PROFILE_MISMATCH,
                 "Execution provenance does not match the authoritative DataProfile.",
             )
-        if provenance.dataset_reference != _normalized_explicit_path(
-            request.context.dataset_path
-        ):
+        request_path = _normalized_explicit_path(request.context.dataset_path)
+        if request_path != binding.dataset_reference:
             raise DataAdmissionError(
                 DataAdmissionErrorCode.DATASET_MISMATCH,
-                "Execution provenance does not match the explicit dataset binding.",
+                "The requested dataset path does not match the authoritative binding.",
+            )
+        if provenance.dataset_reference != binding.dataset_reference:
+            raise DataAdmissionError(
+                DataAdmissionErrorCode.DATASET_MISMATCH,
+                "Execution provenance path does not match the authoritative binding.",
+            )
+        if provenance.dataset_digest != binding.dataset_digest:
+            raise DataAdmissionError(
+                DataAdmissionErrorCode.DATASET_MISMATCH,
+                "Executed dataset content does not match the authoritative binding.",
             )
         if len(result.observations) != 1 or result.produced_data_profile is not None:
             raise DataAdmissionError(
@@ -220,7 +314,7 @@ class MvpEvidenceAdmissionService:
             )
 
         if result.capability is Capability.DATA_ANALYSIS:
-            plan = request.context.analysis_plan
+            plan = result.analysis_plan
             if (
                 plan is None
                 or provenance.operation != plan.operation

@@ -6,7 +6,12 @@ import inspect
 import pandas as pd
 import pytest
 
-from cognieda.agents.data_explorer import DataExplorer
+from cognieda.agents.data_explorer import (
+    DataAnalysisOperation,
+    DataAnalysisPlan,
+    DataExplorer,
+    DataExplorerInput,
+)
 from cognieda.application.services import (
     DataAdmissionError,
     DataAdmissionErrorCode,
@@ -15,14 +20,13 @@ from cognieda.application.services import (
 )
 from cognieda.execution import (
     Capability,
-    DataAnalysisOperation,
-    DataAnalysisPlan,
     ExecutionRequest,
     ExecutorContext,
     ExecutorInput,
 )
 from cognieda.infrastructure.persistence.repositories import (
     AssumptionRepository,
+    DataProfileDatasetBindingRepository,
     DataProfileRepository,
     EvidenceRepository,
     TaskRepository,
@@ -30,10 +34,23 @@ from cognieda.infrastructure.persistence.repositories import (
 from cognieda.schemas import Assumption, DataProfile, Task, TaskStatus
 
 
-def _profile(db_session, row_count: int = 3) -> DataProfile:
+class FixedPlanner:
+    def __init__(self, plan: DataAnalysisPlan | None = None) -> None:
+        self.plan = plan or DataAnalysisPlan(operation=DataAnalysisOperation.ROW_COUNT)
+
+    async def propose(self, _request):
+        return self.plan
+
+
+def _raw_profile(db_session, row_count: int = 3) -> DataProfile:
     return DataProfileRepository(db_session).create(
         DataProfile(row_count=row_count, column_count=0, columns=())
     )
+
+
+def _admitted_profile(db_session, dataset_path) -> DataProfile:
+    candidate = DataExplorer().profile_candidate(str(dataset_path))
+    return MvpDataProfileAdmissionService(db_session).admit_candidate(candidate).data_profile
 
 
 def _completed_task(db_session, instruction: str = "Count rows") -> Task:
@@ -45,14 +62,13 @@ def _completed_task(db_session, instruction: str = "Count rows") -> Task:
 def _execute(dataset_path, task: Task, profile: DataProfile):
     request = ExecutionRequest(
         capability=Capability.DATA_ANALYSIS,
-        input=ExecutorInput(task=task),
+        input=DataExplorerInput(task=task, data_profile=profile),
         context=ExecutorContext(
             dataset_path=str(dataset_path),
             data_profile_id=profile.data_profile_id,
-            analysis_plan=DataAnalysisPlan(operation=DataAnalysisOperation.ROW_COUNT),
         ),
     )
-    result = asyncio.run(DataExplorer().run(request))
+    result = asyncio.run(DataExplorer(analysis_planner=FixedPlanner()).run(request))
     return request, result
 
 
@@ -60,7 +76,7 @@ def test_successful_real_work_admits_exactly_one_immutable_evidence(db_session, 
     dataset_path = tmp_path / "admission.csv"
     pd.DataFrame({"value": [1, 2, 3]}).to_csv(dataset_path, index=False)
     task = _completed_task(db_session)
-    profile = _profile(db_session)
+    profile = _admitted_profile(db_session, dataset_path)
     request, result = _execute(dataset_path, task, profile)
     service = MvpEvidenceAdmissionService(db_session)
 
@@ -110,14 +126,14 @@ def test_lineage_or_payload_mismatch_creates_zero_evidence(
     dataset_path = tmp_path / "mismatch.csv"
     pd.DataFrame({"value": [1, 2, 3]}).to_csv(dataset_path, index=False)
     task = _completed_task(db_session)
-    profile = _profile(db_session)
+    profile = _admitted_profile(db_session, dataset_path)
     request, result = _execute(dataset_path, task, profile)
 
     if mutation == "wrong_task":
         other_task = _completed_task(db_session, "Different work")
         request = request.model_copy(update={"input": ExecutorInput(task=other_task)})
     elif mutation == "wrong_profile":
-        other_profile = _profile(db_session)
+        other_profile = _raw_profile(db_session)
         request = request.model_copy(
             update={
                 "context": request.context.model_copy(
@@ -157,7 +173,7 @@ def test_non_completed_authoritative_task_creates_zero_evidence(
     dataset_path = tmp_path / "task-status.csv"
     pd.DataFrame({"value": [1]}).to_csv(dataset_path, index=False)
     task = TaskRepository(db_session).create(Task(instruction="Count rows", status=task_status))
-    profile = _profile(db_session, row_count=1)
+    profile = _admitted_profile(db_session, dataset_path)
     request, result = _execute(dataset_path, task, profile)
 
     with pytest.raises(DataAdmissionError) as exc_info:
@@ -171,7 +187,7 @@ def test_failed_and_blocked_work_create_zero_evidence(db_session, tmp_path) -> N
     dataset_path = tmp_path / "fail-closed.csv"
     pd.DataFrame({"value": [1]}).to_csv(dataset_path, index=False)
     task = _completed_task(db_session)
-    profile = _profile(db_session, row_count=1)
+    profile = _admitted_profile(db_session, dataset_path)
     missing_request, failed_result = _execute(tmp_path / "missing.csv", task, profile)
     blocked_request = ExecutionRequest(
         capability=Capability.DATA_TRANSFORMATION,
@@ -244,7 +260,7 @@ def test_changed_dataset_reprofiling_does_not_match_authoritative_profile(
     with pytest.raises(DataAdmissionError) as exc_info:
         MvpEvidenceAdmissionService(db_session).admit(request, result)
 
-    assert exc_info.value.code is DataAdmissionErrorCode.DATA_PROFILE_MISMATCH
+    assert exc_info.value.code is DataAdmissionErrorCode.DATASET_MISMATCH
     assert EvidenceRepository(db_session).list() == []
 
 
@@ -252,7 +268,7 @@ def test_duplicate_work_reference_with_changed_result_fails_closed(db_session, t
     dataset_path = tmp_path / "duplicate.csv"
     pd.DataFrame({"value": [1, 2]}).to_csv(dataset_path, index=False)
     task = _completed_task(db_session)
-    profile = _profile(db_session, row_count=2)
+    profile = _admitted_profile(db_session, dataset_path)
     request, result = _execute(dataset_path, task, profile)
     service = MvpEvidenceAdmissionService(db_session)
     service.admit(request, result)
@@ -269,7 +285,7 @@ def test_duplicate_work_reference_with_changed_result_fails_closed(db_session, t
 def test_initial_profile_admission_is_application_owned_and_does_not_activate(
     db_session, tmp_path
 ) -> None:
-    active_profile = _profile(db_session, row_count=1)
+    active_profile = _raw_profile(db_session, row_count=1)
     dataset_path = tmp_path / "initial-profile.csv"
     pd.DataFrame({"value": [1, 2, 3]}).to_csv(dataset_path, index=False)
     candidate = DataExplorer().profile_candidate(str(dataset_path))
@@ -293,7 +309,7 @@ def test_evidence_admission_has_no_assumption_input_or_lookup(db_session, tmp_pa
     dataset_path = tmp_path / "assumption-isolation.csv"
     pd.DataFrame({"value": [1]}).to_csv(dataset_path, index=False)
     task = _completed_task(db_session)
-    profile = _profile(db_session, row_count=1)
+    profile = _admitted_profile(db_session, dataset_path)
     request, result = _execute(dataset_path, task, profile)
 
     admission = MvpEvidenceAdmissionService(db_session).admit(request, result)
@@ -302,3 +318,146 @@ def test_evidence_admission_has_no_assumption_input_or_lookup(db_session, tmp_pa
     assert "assumption" not in inspect.signature(
         MvpEvidenceAdmissionService.admit
     ).parameters
+
+
+def test_raw_profile_without_dataset_binding_is_not_evidence_eligible(
+    db_session, tmp_path
+) -> None:
+    dataset_path = tmp_path / "unbound.csv"
+    pd.DataFrame({"value": [1, 2]}).to_csv(dataset_path, index=False)
+    profile = _raw_profile(db_session, row_count=2)
+    task = _completed_task(db_session)
+    request, result = _execute(dataset_path, task, profile)
+
+    with pytest.raises(DataAdmissionError) as exc_info:
+        MvpEvidenceAdmissionService(db_session).admit(request, result)
+
+    assert exc_info.value.code is DataAdmissionErrorCode.DATA_PROFILE_MISMATCH
+    assert EvidenceRepository(db_session).list() == []
+
+
+def test_bound_profile_cannot_be_used_for_another_dataset_path(
+    db_session, tmp_path
+) -> None:
+    dataset_a = tmp_path / "dataset-a.csv"
+    dataset_b = tmp_path / "dataset-b.csv"
+    pd.DataFrame({"value": [1, 2]}).to_csv(dataset_a, index=False)
+    pd.DataFrame({"value": [8, 9]}).to_csv(dataset_b, index=False)
+    profile = _admitted_profile(db_session, dataset_a)
+    task = _completed_task(db_session)
+    request, result = _execute(dataset_b, task, profile)
+
+    with pytest.raises(DataAdmissionError) as exc_info:
+        MvpEvidenceAdmissionService(db_session).admit(request, result)
+
+    assert exc_info.value.code is DataAdmissionErrorCode.DATASET_MISMATCH
+    assert EvidenceRepository(db_session).list() == []
+
+
+def test_profile_binding_exact_replay_is_idempotent(db_session, tmp_path) -> None:
+    dataset_path = tmp_path / "binding-replay.csv"
+    pd.DataFrame({"value": [1]}).to_csv(dataset_path, index=False)
+    candidate = DataExplorer().profile_candidate(str(dataset_path))
+    service = MvpDataProfileAdmissionService(db_session)
+
+    first = service.admit_candidate(candidate)
+    replay = service.admit_candidate(candidate)
+
+    assert first.created is True
+    assert replay.created is False
+    assert replay.data_profile == first.data_profile
+    assert replay.dataset_binding == first.dataset_binding
+    assert replay.dataset_binding.dataset_digest == candidate.provenance.dataset_digest
+
+
+def test_profile_identity_with_conflicting_dataset_binding_fails_closed(
+    db_session, tmp_path
+) -> None:
+    dataset_a = tmp_path / "binding-a.csv"
+    dataset_b = tmp_path / "binding-b.csv"
+    pd.DataFrame({"value": [1, 2]}).to_csv(dataset_a, index=False)
+    pd.DataFrame({"value": [8, 9]}).to_csv(dataset_b, index=False)
+    candidate_a = DataExplorer().profile_candidate(str(dataset_a))
+    candidate_b = DataExplorer().profile_candidate(str(dataset_b))
+    service = MvpDataProfileAdmissionService(db_session)
+    service.admit_candidate(candidate_a)
+    conflicting = candidate_b.model_copy(
+        update={
+            "profile": candidate_b.profile.model_copy(
+                update={"data_profile_id": candidate_a.profile.data_profile_id}
+            )
+        }
+    )
+
+    with pytest.raises(DataAdmissionError) as exc_info:
+        service.admit_candidate(conflicting)
+
+    assert exc_info.value.code is DataAdmissionErrorCode.DUPLICATE_WORK_CONFLICT
+    binding = DataProfileDatasetBindingRepository(db_session).get_by_profile_id(
+        candidate_a.profile.data_profile_id
+    )
+    assert binding is not None
+    assert binding.dataset_reference == str(dataset_a.resolve())
+
+
+def test_same_content_at_different_path_requires_new_profile_admission(
+    db_session, tmp_path
+) -> None:
+    dataset_a = tmp_path / "original.csv"
+    dataset_b = tmp_path / "copy.csv"
+    pd.DataFrame({"value": [1, 2]}).to_csv(dataset_a, index=False)
+    dataset_b.write_bytes(dataset_a.read_bytes())
+    profile = _admitted_profile(db_session, dataset_a)
+    task = _completed_task(db_session)
+    request, result = _execute(dataset_b, task, profile)
+
+    with pytest.raises(DataAdmissionError) as exc_info:
+        MvpEvidenceAdmissionService(db_session).admit(request, result)
+
+    assert exc_info.value.code is DataAdmissionErrorCode.DATASET_MISMATCH
+    assert result.provenance is not None
+    binding = DataProfileDatasetBindingRepository(db_session).get_by_profile_id(
+        profile.data_profile_id
+    )
+    assert binding is not None
+    assert result.provenance.dataset_digest == binding.dataset_digest
+    assert EvidenceRepository(db_session).list() == []
+
+
+def test_same_path_mutation_blocks_analysis_evidence(db_session, tmp_path) -> None:
+    dataset_path = tmp_path / "mutated-analysis.csv"
+    pd.DataFrame({"value": [1, 2]}).to_csv(dataset_path, index=False)
+    profile = _admitted_profile(db_session, dataset_path)
+    binding = DataProfileDatasetBindingRepository(db_session).get_by_profile_id(
+        profile.data_profile_id
+    )
+    assert binding is not None
+    pd.DataFrame({"value": [3, 4]}).to_csv(dataset_path, index=False)
+    task = _completed_task(db_session)
+    request, result = _execute(dataset_path, task, profile)
+
+    assert result.provenance is not None
+    assert result.provenance.dataset_reference == binding.dataset_reference
+    assert result.provenance.dataset_digest != binding.dataset_digest
+    with pytest.raises(DataAdmissionError) as exc_info:
+        MvpEvidenceAdmissionService(db_session).admit(request, result)
+
+    assert exc_info.value.code is DataAdmissionErrorCode.DATASET_MISMATCH
+    assert EvidenceRepository(db_session).list() == []
+
+
+def test_profile_and_binding_admission_rolls_back_as_one_transaction(
+    db_session, tmp_path, monkeypatch
+) -> None:
+    dataset_path = tmp_path / "atomic-profile.csv"
+    pd.DataFrame({"value": [1]}).to_csv(dataset_path, index=False)
+    candidate = DataExplorer().profile_candidate(str(dataset_path))
+
+    def reject_binding(_repository, _binding):
+        raise RuntimeError("binding storage failed")
+
+    monkeypatch.setattr(DataProfileDatasetBindingRepository, "add", reject_binding)
+    with pytest.raises(RuntimeError, match="binding storage failed"):
+        MvpDataProfileAdmissionService(db_session).admit_candidate(candidate)
+
+    assert DataProfileRepository(db_session).get_by_id(candidate.profile.data_profile_id) is None

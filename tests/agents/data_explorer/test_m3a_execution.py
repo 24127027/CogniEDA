@@ -10,12 +10,16 @@ import pytest
 from pandas.testing import assert_frame_equal
 from pydantic import ValidationError
 
-from cognieda.agents.data_explorer import DataExplorer
-from cognieda.execution import (
-    Capability,
+from cognieda.agents.data_explorer import (
     CorrelationMethod,
     DataAnalysisOperation,
     DataAnalysisPlan,
+    DataExplorer,
+    DataExplorerInput,
+)
+from cognieda.agents.data_explorer.planning import UnsupportedAnalysisRequest
+from cognieda.execution import (
+    Capability,
     ExecutionRequest,
     ExecutionStatus,
     ExecutorContext,
@@ -23,7 +27,30 @@ from cognieda.execution import (
     ExecutorInput,
     ExecutorRegistry,
 )
-from cognieda.schemas import Task
+from cognieda.schemas import DataProfile, Task
+
+
+class InstructionPlanFake:
+    async def propose(self, request):
+        try:
+            return DataAnalysisPlan.model_validate_json(request.task_instruction)
+        except ValueError as exc:
+            raise UnsupportedAnalysisRequest("Task is outside the finite operation set.") from exc
+
+
+class RecordingPlanner:
+    def __init__(self, plan: DataAnalysisPlan) -> None:
+        self.plan = plan
+        self.requests = []
+
+    async def propose(self, request):
+        self.requests.append(request)
+        return self.plan
+
+
+class FailingPlanner:
+    async def propose(self, _request):
+        raise RuntimeError("model unavailable")
 
 
 def _request(
@@ -33,19 +60,56 @@ def _request(
     capability: Capability = Capability.DATA_ANALYSIS,
     data_profile_id=None,
 ) -> ExecutionRequest:
+    profile_projection = _profile_projection(dataset_path, data_profile_id)
     return ExecutionRequest(
         capability=capability,
-        input=ExecutorInput(task=Task(instruction="Execute the supplied typed data plan.")),
+        input=(
+            DataExplorerInput(
+                task=Task(
+                    instruction=(
+                        plan.model_dump_json()
+                        if plan is not None
+                        else "Unsupported direct analysis request"
+                    )
+                ),
+                data_profile=profile_projection,
+            )
+            if profile_projection is not None
+            else ExecutorInput(
+                task=Task(
+                    instruction=(
+                        plan.model_dump_json()
+                        if plan is not None
+                        else "Unsupported direct analysis request"
+                    )
+                )
+            )
+        ),
         context=ExecutorContext(
             dataset_path=str(dataset_path) if dataset_path is not None else None,
             data_profile_id=data_profile_id,
-            analysis_plan=plan,
         ),
     )
 
 
 def _run(request: ExecutionRequest):
-    return asyncio.run(DataExplorer().run(request))
+    return asyncio.run(DataExplorer(analysis_planner=InstructionPlanFake()).run(request))
+
+
+def _profile_projection(
+    dataset_path: Path | None, data_profile_id
+) -> DataProfile | None:
+    if data_profile_id is None:
+        return None
+    if dataset_path is not None and dataset_path.exists():
+        profile = DataExplorer().profile_candidate(str(dataset_path.resolve())).profile
+        return profile.model_copy(update={"data_profile_id": data_profile_id})
+    return DataProfile(
+        data_profile_id=data_profile_id,
+        row_count=0,
+        column_count=0,
+        columns=(),
+    )
 
 
 def _write_dataset(path: Path) -> pd.DataFrame:
@@ -95,7 +159,7 @@ def test_real_request_dispatches_through_registered_data_explorer(tmp_path) -> N
     )
     registry = ExecutorRegistry()
     registry.register_provider(
-        DataExplorer,
+        lambda: DataExplorer(analysis_planner=InstructionPlanFake()),
         capabilities=(
             Capability.DATA_ANALYSIS,
             Capability.DATA_PROFILING,
@@ -243,7 +307,7 @@ def test_missing_plan_profile_binding_and_dataset_fail_closed(tmp_path) -> None:
     )
 
     assert missing_plan.failure is not None
-    assert missing_plan.failure.code == "invalid_analysis_plan"
+    assert missing_plan.failure.code == "unsupported_analysis_request"
     assert missing_profile.failure is not None
     assert missing_profile.failure.code == "missing_data_profile_binding"
     assert missing_dataset.failure is not None
@@ -348,6 +412,9 @@ def test_initial_profile_candidate_has_no_fabricated_task_lineage(tmp_path) -> N
 
     assert candidate.profile.row_count == 4
     assert candidate.provenance.data_profile_id is None
+    assert candidate.provenance.dataset_digest == (
+        f"sha256:{hashlib.sha256(dataset_path.read_bytes()).hexdigest()}"
+    )
     assert candidate.provenance.parameters == {"mode": "candidate"}
     assert "task_id" not in type(candidate).model_fields
 
@@ -396,3 +463,82 @@ def test_tool_exception_and_non_json_result_are_typed_failures(tmp_path, monkeyp
     assert tool_failure.failure.code == "tool_execution_error"
     assert invalid_result.failure is not None
     assert invalid_result.failure.code == "invalid_result"
+
+
+def test_task_instruction_is_operationalized_inside_data_explorer(tmp_path) -> None:
+    dataset_path = tmp_path / "planning.csv"
+    _write_dataset(dataset_path)
+    profile = DataExplorer().profile_candidate(str(dataset_path)).profile
+    planner = RecordingPlanner(DataAnalysisPlan(operation=DataAnalysisOperation.ROW_COUNT))
+    request = ExecutionRequest(
+        capability=Capability.DATA_ANALYSIS,
+        input=DataExplorerInput(
+            task=Task(instruction="Count the rows in the active dataset"),
+            data_profile=profile,
+        ),
+        context=ExecutorContext(
+            dataset_path=str(dataset_path),
+            data_profile_id=profile.data_profile_id,
+        ),
+    )
+
+    result = asyncio.run(DataExplorer(analysis_planner=planner).run(request))
+
+    assert result.status is ExecutionStatus.SUCCEEDED
+    assert result.observations[0].payload == {"row_count": 4}
+    assert planner.requests[0].task_instruction == request.input.task.instruction
+    assert planner.requests[0].data_profile == profile
+    assert result.analysis_plan == planner.plan
+
+
+def test_descriptive_task_uses_planner_proposal_and_deterministic_tool(tmp_path) -> None:
+    dataset_path = tmp_path / "descriptive-planning.csv"
+    pd.DataFrame({"age": [21, 34, 55]}).to_csv(dataset_path, index=False)
+    profile = DataExplorer().profile_candidate(str(dataset_path)).profile
+    planner = RecordingPlanner(
+        DataAnalysisPlan(
+            operation=DataAnalysisOperation.DESCRIPTIVE_STATISTICS,
+            columns=("age",),
+        )
+    )
+    request = ExecutionRequest(
+        capability=Capability.DATA_ANALYSIS,
+        input=DataExplorerInput(
+            task=Task(instruction="Summarize age"),
+            data_profile=profile,
+        ),
+        context=ExecutorContext(
+            dataset_path=str(dataset_path),
+            data_profile_id=profile.data_profile_id,
+        ),
+    )
+
+    result = asyncio.run(DataExplorer(analysis_planner=planner).run(request))
+
+    assert result.status is ExecutionStatus.SUCCEEDED
+    assert result.observations[0].payload["column"] == "age"
+    assert result.analysis_plan == planner.plan
+
+
+def test_model_planner_failure_creates_typed_zero_observation_failure(tmp_path) -> None:
+    dataset_path = tmp_path / "planner-failure.csv"
+    _write_dataset(dataset_path)
+    profile = DataExplorer().profile_candidate(str(dataset_path)).profile
+    request = ExecutionRequest(
+        capability=Capability.DATA_ANALYSIS,
+        input=DataExplorerInput(
+            task=Task(instruction="Count rows"),
+            data_profile=profile,
+        ),
+        context=ExecutorContext(
+            dataset_path=str(dataset_path),
+            data_profile_id=profile.data_profile_id,
+        ),
+    )
+
+    result = asyncio.run(DataExplorer(analysis_planner=FailingPlanner()).run(request))
+
+    assert result.status is ExecutionStatus.FAILED
+    assert result.failure is not None
+    assert result.failure.code == "analysis_planning_failed"
+    assert result.observations == []

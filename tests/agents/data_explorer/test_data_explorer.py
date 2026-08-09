@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import asyncio
-from uuid import uuid4
 
 import pandas as pd
 
-from cognieda.agents.data_explorer import DataExplorer, DataExplorerResult
-from cognieda.execution import (
-    Capability,
+from cognieda.agents.data_explorer import (
     DataAnalysisOperation,
     DataAnalysisPlan,
+    DataExplorer,
+    DataExplorerInput,
+    DataExplorerResult,
+)
+from cognieda.execution import (
+    Capability,
     ExecutionRequest,
     ExecutionStatus,
     ExecutorContext,
@@ -17,7 +20,15 @@ from cognieda.execution import (
     ExecutorInput,
     ExecutorRegistry,
 )
-from cognieda.schemas.artifacts import Task
+from cognieda.schemas.artifacts import DataProfile, Task
+
+
+class FakeAnalysisPlanner:
+    def __init__(self, plan: DataAnalysisPlan) -> None:
+        self.plan = plan
+
+    async def propose(self, _request):
+        return self.plan
 
 
 def _task(instruction: str) -> Task:
@@ -30,15 +41,18 @@ def _request(
     dataset_path: str | None = None,
     *,
     data_profile_id=None,
-    analysis_plan: DataAnalysisPlan | None = None,
+    data_profile: DataProfile | None = None,
 ):
     return ExecutionRequest(
         capability=capability,
-        input=ExecutorInput(task=task),
+        input=(
+            DataExplorerInput(task=task, data_profile=data_profile)
+            if data_profile is not None
+            else ExecutorInput(task=task)
+        ),
         context=ExecutorContext(
             dataset_path=dataset_path,
             data_profile_id=data_profile_id,
-            analysis_plan=analysis_plan,
         ),
     )
 
@@ -47,15 +61,20 @@ def test_data_explorer_analysis_returns_role_native_observation(tmp_path) -> Non
     dataframe = pd.DataFrame({"value": [1, 2, 3], "group": ["a", "b", "a"]})
     dataset_path = tmp_path / "analysis.csv"
     dataframe.to_csv(dataset_path, index=False)
+    profile = DataExplorer().profile_candidate(str(dataset_path)).profile
 
     result = asyncio.run(
-        DataExplorer().run(
+        DataExplorer(
+            analysis_planner=FakeAnalysisPlanner(
+                DataAnalysisPlan(operation=DataAnalysisOperation.ROW_COUNT)
+            )
+        ).run(
             _request(
                 Capability.DATA_ANALYSIS,
                 _task("Report the row count and column names for this dataset."),
                 str(dataset_path),
-                data_profile_id=uuid4(),
-                analysis_plan=DataAnalysisPlan(operation=DataAnalysisOperation.ROW_COUNT),
+                data_profile_id=profile.data_profile_id,
+                data_profile=profile,
             )
         )
     )

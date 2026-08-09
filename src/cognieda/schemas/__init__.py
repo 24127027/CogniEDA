@@ -77,7 +77,12 @@ from cognieda.schemas.enums import (
     VariableType,
 )
 from cognieda.schemas.planner_operations import PlannerCommitResult, PlannerOperation
-from cognieda.schemas.provenance import AnalysisFrame, ExecutionRun, ObjectiveRevision
+from cognieda.schemas.provenance import (
+    AnalysisFrame,
+    DataProfileDatasetBinding,
+    ExecutionRun,
+    ObjectiveRevision,
+)
 
 __all__ = [
     "AnalysisFrame",
@@ -95,6 +100,7 @@ __all__ = [
     "ContextMode",
     "ContextProvenance",
     "DataProfile",
+    "DataProfileDatasetBinding",
     "DataProfileContextSummary",
     "DataProfileLifecycleState",
     "DataProfileMethod",

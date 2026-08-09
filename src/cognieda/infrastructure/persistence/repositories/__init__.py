@@ -8,6 +8,7 @@ from cognieda.infrastructure.persistence.repositories.assumption_repository impo
     AssumptionUpdate,
 )
 from cognieda.infrastructure.persistence.repositories.data_profile_repository import (
+    DataProfileDatasetBindingRepository,
     DataProfileRepository,
 )
 from cognieda.infrastructure.persistence.repositories.discovery_repository import (
@@ -54,6 +55,7 @@ __all__ = [
     "AssumptionRepository",
     "AssumptionUpdate",
     "DataProfileRepository",
+    "DataProfileDatasetBindingRepository",
     "DiscoveryRepository",
     "EvidenceRepository",
     "ExecutionRunRepository",
