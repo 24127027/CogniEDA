@@ -5,7 +5,7 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
-from schemas import Assumption, Objective, Task, TaskStatus
+from cognieda.schemas import Assumption, Objective, Task, TaskStatus
 
 
 def test_objective_has_stable_identity_and_only_requires_text() -> None:

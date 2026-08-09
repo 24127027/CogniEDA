@@ -6,18 +6,18 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel import select
 
-from agents.planner.agent import Planner
-from agents.planner.types import (
+from cognieda.agents.planner.agent import Planner
+from cognieda.agents.planner.types import (
     ChildTaskProposalDraft,
     Context,
     PlannerDecision,
     TaskDecompositionDraft,
 )
-from runtime.orchestrator.planner_commit import commit_planner_operations
-from db.models import PlannerOperationRecord
-from repositories import TaskRepository
-from schemas.artifacts import Task
-from schemas.enums import (
+from cognieda.db.models import PlannerOperationRecord
+from cognieda.repositories import TaskRepository
+from cognieda.runtime.orchestrator.planner_commit import commit_planner_operations
+from cognieda.schemas.artifacts import Task
+from cognieda.schemas.enums import (
     PlannerOperationApprovalState,
     PlannerOperationType,
     TaskKind,

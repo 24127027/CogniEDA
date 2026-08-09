@@ -1,8 +1,8 @@
 import pytest
 from pydantic_ai import FunctionToolset
 
-from tools.builtin import AvailableBuiltinTools
-from tools.manager import ToolManager
+from cognieda.tools.builtin import AvailableBuiltinTools
+from cognieda.tools.manager import ToolManager
 
 
 def test_explicit_builtin_tools_are_wrapped_in_one_function_toolset() -> None:

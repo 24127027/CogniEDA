@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from pydantic import ValidationError
 
-from schemas import Evidence, EvidenceProvenance
+from cognieda.schemas import Evidence, EvidenceProvenance
 
 
 def _provenance(data_profile_id):

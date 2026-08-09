@@ -5,7 +5,7 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
-from schemas import (
+from cognieda.schemas import (
     ColumnProfile,
     ContinuousColumnSummary,
     DataProfile,

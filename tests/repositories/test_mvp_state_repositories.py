@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from repositories import (
+from cognieda.repositories import (
     AssumptionRepository,
     AssumptionUpdate,
     DataProfileRepository,
@@ -15,7 +15,7 @@ from repositories import (
     TaskRepository,
     TaskUpdate,
 )
-from schemas import (
+from cognieda.schemas import (
     Assumption,
     DataProfile,
     Evidence,

@@ -2,8 +2,8 @@ import asyncio
 from argparse import ArgumentParser
 from pathlib import Path
 
-from cli import Renderer, repl
-from runtime import bootstrap_application
+from cognieda.cli import Renderer, repl
+from cognieda.runtime import bootstrap_application
 
 
 def parse_args():
