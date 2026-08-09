@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from .capabilities import Capability
 from .contracts import (
+    CorrelationMethod,
+    DataAnalysisOperation,
+    DataAnalysisPlan,
     ExecutionFailure,
     ExecutionRequest,
     ExecutionResult,
@@ -17,6 +20,9 @@ from .registry import CapabilityNotRegisteredError, ExecutorRegistry
 __all__ = (
     "Capability",
     "CapabilityNotRegisteredError",
+    "CorrelationMethod",
+    "DataAnalysisOperation",
+    "DataAnalysisPlan",
     "ExecutionFailure",
     "ExecutionRequest",
     "ExecutionResult",

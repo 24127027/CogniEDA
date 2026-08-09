@@ -29,6 +29,7 @@ def test_planner_cannot_access_dataset_implementation_directly() -> None:
     forbidden = (
         "pandas",
         "cognieda.infrastructure.datasets",
+        "cognieda.agents.data_explorer",
         "cognieda.agents.data_explorer.analysis",
         "cognieda.agents.data_explorer.tools",
     )
@@ -115,20 +116,49 @@ def test_production_source_contains_only_python_files() -> None:
     assert non_python == []
 
 
-def test_dynamic_code_execution_is_confined_to_named_provisional_adapter() -> None:
+def test_data_explorer_has_no_dynamic_code_execution() -> None:
     locations = [
         path.relative_to(SOURCE_ROOT).as_posix()
-        for path in SOURCE_ROOT.rglob("*.py")
+        for path in _python_files("agents/data_explorer")
         if any(
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
-            and node.func.id == "exec"
+            and node.func.id in {"exec", "eval"}
             for node in ast.walk(
                 ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
             )
         )
     ]
 
-    assert locations == [
-        "agents/data_explorer/tools/_unsafe_python_analysis.py",
-    ]
+    assert locations == []
+
+
+def test_data_explorer_does_not_author_or_persist_evidence() -> None:
+    forbidden_modules = {
+        "cognieda.infrastructure.persistence.repositories.evidence_repository",
+    }
+    forbidden_symbols = {"Evidence", "EvidenceRepository"}
+    violations: list[str] = []
+    for path in _python_files("agents/data_explorer"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                if node.module in forbidden_modules:
+                    violations.append(f"{path.relative_to(PROJECT_ROOT)} imports {node.module}")
+                imported = forbidden_symbols.intersection(alias.name for alias in node.names)
+                if imported:
+                    violations.append(
+                        f"{path.relative_to(PROJECT_ROOT)} imports {sorted(imported)}"
+                    )
+
+    assert violations == []
+
+
+def test_removed_unsafe_analysis_adapter_is_absent_and_unreferenced() -> None:
+    data_explorer_root = SOURCE_ROOT / "agents" / "data_explorer"
+
+    assert not (data_explorer_root / "tools" / "_unsafe_python_analysis.py").exists()
+    assert all(
+        "_unsafe_python_analysis" not in path.read_text(encoding="utf-8")
+        for path in data_explorer_root.rglob("*.py")
+    )

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+from uuid import uuid4
 
 import pandas as pd
 
 from cognieda.agents.data_explorer import DataExplorer, DataExplorerResult
 from cognieda.execution import (
     Capability,
+    DataAnalysisOperation,
+    DataAnalysisPlan,
     ExecutionRequest,
     ExecutionStatus,
     ExecutorContext,
@@ -21,11 +24,22 @@ def _task(instruction: str) -> Task:
     return Task(instruction=instruction)
 
 
-def _request(capability: Capability, task: Task, dataset_path: str | None = None):
+def _request(
+    capability: Capability,
+    task: Task,
+    dataset_path: str | None = None,
+    *,
+    data_profile_id=None,
+    analysis_plan: DataAnalysisPlan | None = None,
+):
     return ExecutionRequest(
         capability=capability,
         input=ExecutorInput(task=task),
-        context=ExecutorContext(dataset_path=dataset_path),
+        context=ExecutorContext(
+            dataset_path=dataset_path,
+            data_profile_id=data_profile_id,
+            analysis_plan=analysis_plan,
+        ),
     )
 
 
@@ -40,6 +54,8 @@ def test_data_explorer_analysis_returns_role_native_observation(tmp_path) -> Non
                 Capability.DATA_ANALYSIS,
                 _task("Report the row count and column names for this dataset."),
                 str(dataset_path),
+                data_profile_id=uuid4(),
+                analysis_plan=DataAnalysisPlan(operation=DataAnalysisOperation.ROW_COUNT),
             )
         )
     )
@@ -48,6 +64,9 @@ def test_data_explorer_analysis_returns_role_native_observation(tmp_path) -> Non
     assert result.status == ExecutionStatus.SUCCEEDED
     assert result.capability == Capability.DATA_ANALYSIS
     assert result.observations
+    assert result.observations[0].payload == {"row_count": 3}
+    assert result.provenance is not None
+    assert result.provenance.dataset_reference == str(dataset_path.resolve())
     assert result.produced_data_profile is None
 
 

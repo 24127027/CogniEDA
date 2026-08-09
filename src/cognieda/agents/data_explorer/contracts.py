@@ -1,10 +1,16 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Literal
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
-from cognieda.execution import Capability, ExecutionResult, ExecutionStatus
+from cognieda.execution import (
+    Capability,
+    DataAnalysisOperation,
+    ExecutionResult,
+    ExecutionStatus,
+)
 from cognieda.schemas.artifacts import DataProfile
 
 
@@ -15,8 +21,40 @@ class DataExplorerObservation(BaseModel):
 
     observation_type: str = Field(min_length=1)
     summary: str = Field(min_length=1)
-    payload: dict[str, Any] = Field(default_factory=dict)
+    payload: dict[str, JsonValue] = Field(min_length=1)
     artifact_refs: list[str] = Field(default_factory=list)
+
+
+class DataExecutionProvenance(BaseModel):
+    """Immutable lineage material for one explicit deterministic dataset operation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    dataset_reference: str = Field(min_length=1)
+    data_profile_id: UUID | None = None
+    tool_reference: str = Field(min_length=1)
+    operation: DataAnalysisOperation | Literal["dataset_profile"]
+    parameters: dict[str, JsonValue] = Field(default_factory=dict)
+    code_reference: str | None = Field(default=None, min_length=1)
+
+
+class DataProfileCandidate(BaseModel):
+    """Non-authoritative initial profile candidate without fabricated Task lineage."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source_role: Literal["data_explorer"] = "data_explorer"
+    work_id: str = Field(min_length=1)
+    profile: DataProfile
+    provenance: DataExecutionProvenance
+
+    @model_validator(mode="after")
+    def _requires_initial_profile_lineage(self) -> DataProfileCandidate:
+        if self.provenance.operation != "dataset_profile":
+            raise ValueError("A DataProfile candidate requires dataset_profile provenance.")
+        if self.provenance.data_profile_id is not None:
+            raise ValueError("An initial DataProfile candidate cannot claim prior authority.")
+        return self
 
 
 class DataExplorerResult(ExecutionResult):
@@ -25,6 +63,7 @@ class DataExplorerResult(ExecutionResult):
     capability: Capability
     observations: list[DataExplorerObservation] = Field(default_factory=list)
     produced_data_profile: DataProfile | None = None
+    provenance: DataExecutionProvenance | None = None
     artifact_refs: list[str] = Field(default_factory=list)
     execution_details: list[str] = Field(default_factory=list)
 
@@ -42,6 +81,8 @@ class DataExplorerResult(ExecutionResult):
             and self.produced_data_profile is None
         ):
             raise ValueError("A successful DataExplorerResult requires role-native output.")
+        if self.status == ExecutionStatus.SUCCEEDED and self.provenance is None:
+            raise ValueError("A successful DataExplorerResult requires execution provenance.")
         if (
             self.capability == Capability.DATA_TRANSFORMATION
             and self.status == ExecutionStatus.SUCCEEDED
