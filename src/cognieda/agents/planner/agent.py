@@ -12,7 +12,7 @@ from .context import Context, PlanningContext
 class Planner:
     """Planner responsible for producing the next research plan."""
 
-    builtin_tools = (invoke_data_capability,)
+    builtin_tools = ()
 
     def __init__(
         self,
@@ -33,28 +33,24 @@ class Planner:
         self,
         query: str,
         *,
-        planning_context: PlanningContext 
+        planning_context: PlanningContext | None = None,
     ) -> PlannerOutput:
-        
+        planning_context = planning_context or PlanningContext()
+
         context = Context(
-            planning_context=planning_context,
             planner_model=self.model,
+            planning_context=planning_context,
         )
 
-        context.planner_model = self.model
-
-        state = State(query=query)
-
         result = await self.graph.ainvoke(
-            state,
+            State(query=query),
             context=context,
         )
 
         final_state = State.model_validate(result)
 
-        planner_output = PlannerOutput(
+        return PlannerOutput(
             plan=final_state.plan,
+            new_messages=final_state.new_messages,
             error=final_state.error,
         )
-
-        return planner_output
