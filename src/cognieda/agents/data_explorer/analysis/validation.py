@@ -1,4 +1,4 @@
-"""Optional dataframe validation helpers for dataset profiling."""
+"""Structural validation for the Data Explorer profiling computation."""
 
 from __future__ import annotations
 
@@ -24,24 +24,5 @@ def validate_profile_input_frame(dataframe: pd.DataFrame) -> pd.DataFrame:
         ],
         strict=False,
         coerce=False,
-    )
-    return schema.validate(dataframe)
-
-
-def validate_sample_profile_frame(dataframe: pd.DataFrame) -> pd.DataFrame:
-    """Example Pandera schema for the bundled sample profiling dataset."""
-
-    schema = pa.DataFrameSchema(
-        {
-            "customer_id": pa.Column(int),
-            "city": pa.Column(str, nullable=False),
-            "plan": pa.Column(str, nullable=False),
-            "country": pa.Column(str, nullable=False),
-            "age": pa.Column(float, nullable=True),
-            "monthly_spend": pa.Column(float, nullable=True),
-            "notes": pa.Column(object, nullable=True),
-        },
-        strict=False,
-        coerce=True,
     )
     return schema.validate(dataframe)

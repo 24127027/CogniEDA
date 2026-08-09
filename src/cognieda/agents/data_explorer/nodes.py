@@ -9,12 +9,13 @@ import pandas as pd
 from pydantic import BaseModel, Field, ValidationError
 
 from cognieda.agents.llm import ModelConfig
-from cognieda.data import DatasetProfiler, load_dataset
 from cognieda.execution import Capability, ExecutionFailure, ExecutionStatus
+from cognieda.infrastructure.datasets import load_dataset
 from cognieda.schemas.artifacts import DataProfile, Task
 
 from .contracts import DataExplorerObservation, DataExplorerResult
 from .state import State
+from .tools import profile_dataset
 
 _MAX_LOGICAL_RETRIES = 2
 _MAX_CODE_RETRIES = 2
@@ -176,18 +177,13 @@ def _build_observation(state: State) -> DataExplorerObservation:
     )
 
 
-def _build_profile_draft(state: State, dataframe: pd.DataFrame) -> DataProfile:
-    cleaned_dataframe = dataframe.drop_duplicates().copy()
-    if any("missing" in log.lower() for log in state["execution_logs"]):
-        cleaned_dataframe = cleaned_dataframe.dropna(how="all")
-
-    profiler = DatasetProfiler()
-    return profiler.profile_dataframe(cleaned_dataframe)
+def _build_profile_draft(dataframe: pd.DataFrame) -> DataProfile:
+    return profile_dataset(dataframe)
 
 
 def route_request(state: State, runtime: Any = None) -> str:
     if state["request"].capability == Capability.DATA_PROFILING:
-        return "execute_profiling_and_cleaning"
+        return "execute_profiling"
     return "generate_and_execute_code"
 
 
@@ -242,24 +238,22 @@ def draft_observation(state: State, runtime: Any = None) -> State:
     return {**state, "observation": _build_observation(state)}
 
 
-def execute_profiling_and_cleaning(
+def execute_profiling(
     state: State,
     runtime: Any = None,
-    *,
-    agent_config: ModelConfig,
 ) -> State:
     logs = list(state["execution_logs"])
 
     try:
         dataframe = _load_dataframe(state)
-        profile_draft = _build_profile_draft(state, dataframe)
+        profile_draft = _build_profile_draft(dataframe)
         return {
             **state,
             "data_profile_draft": profile_draft,
             "execution_logs": logs,
         }
     except Exception as exc:
-        logs.append(f"Profiling and cleaning failed: {exc}")
+        logs.append(f"Profiling failed: {exc}")
         return {**state, "data_profile_draft": None, "execution_logs": logs}
 
 

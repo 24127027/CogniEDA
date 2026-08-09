@@ -1,4 +1,4 @@
-"""Deterministic dataset profiling for the M1-A executable DataProfile."""
+"""Pure deterministic profiling for the M1-A executable DataProfile."""
 
 from __future__ import annotations
 
@@ -10,8 +10,6 @@ from typing import Any
 import pandas as pd
 from pandas.api import types as pd_types
 
-from cognieda.data.loaders import LoadedDataset, load_dataset
-from cognieda.data.validation import validate_profile_input_frame
 from cognieda.schemas.artifacts import DataProfile
 from cognieda.schemas.common import (
     ColumnProfile,
@@ -20,6 +18,8 @@ from cognieda.schemas.common import (
     DiscreteValueCount,
 )
 from cognieda.schemas.enums import VariableType
+
+from .validation import validate_profile_input_frame
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,23 +39,13 @@ class DatasetProfiler:
     def __init__(self, options: ProfilingOptions | None = None) -> None:
         self._options = options or ProfilingOptions()
 
-    def profile_loaded_dataset(self, loaded_dataset: LoadedDataset) -> DataProfile:
-        """Profile an already-loaded dataset without embedding its location."""
-
-        return self._build_profile(loaded_dataset.dataframe)
-
     def profile_dataframe(self, dataframe: pd.DataFrame) -> DataProfile:
         """Profile an in-memory dataframe without model or ontology participation."""
 
         return self._build_profile(dataframe)
 
-    def profile_path(self, path: str) -> DataProfile:
-        """Load and profile a supported dataset path."""
-
-        return self.profile_loaded_dataset(load_dataset(path))
-
     def _build_profile(self, dataframe: pd.DataFrame) -> DataProfile:
-        frame = validate_profile_input_frame(dataframe.copy())
+        frame = validate_profile_input_frame(dataframe.copy(deep=True))
         columns = tuple(self._profile_column(frame[column]) for column in frame.columns)
         return DataProfile(
             row_count=int(len(frame)),
@@ -154,13 +144,3 @@ def profile_dataframe(
     """Convenience wrapper for deterministic in-memory profiling."""
 
     return DatasetProfiler(options=options).profile_dataframe(dataframe)
-
-
-def profile_path(
-    path: str,
-    *,
-    options: ProfilingOptions | None = None,
-) -> DataProfile:
-    """Convenience wrapper for loading and profiling one dataset path."""
-
-    return DatasetProfiler(options=options).profile_path(path)

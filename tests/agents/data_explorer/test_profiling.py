@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 
 import pandas as pd
+from pandas.testing import assert_frame_equal
 
-from cognieda.data.profiling import ProfilingOptions, profile_dataframe
+from cognieda.agents.data_explorer.analysis import ProfilingOptions, profile_dataframe
+from cognieda.agents.data_explorer.tools import profile_dataset
 from cognieda.schemas import ContinuousColumnSummary, DiscreteColumnSummary, VariableType
 
 
@@ -25,6 +27,23 @@ def test_profile_dataframe_preserves_shape_order_dtype_and_missingness() -> None
     assert [column.dtype for column in profile.columns] == ["float64", "bool", "category"]
     assert profile.columns[0].missing_count == 1
     assert profile.columns[0].distinct_count == 2
+
+
+def test_profile_dataset_does_not_transform_or_mutate_active_data() -> None:
+    dataframe = pd.DataFrame(
+        {
+            "value": [1.0, 1.0, None, None],
+            "group": ["a", "a", None, "b"],
+        }
+    )
+    original = dataframe.copy(deep=True)
+
+    profile = profile_dataset(dataframe)
+
+    assert_frame_equal(dataframe, original)
+    assert profile.row_count == len(original)
+    assert profile.columns[0].missing_count == 2
+    assert profile.columns[1].missing_count == 1
 
 
 def test_numeric_non_boolean_is_continuous_with_finite_descriptive_summary() -> None:
