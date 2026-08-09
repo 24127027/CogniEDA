@@ -36,10 +36,16 @@ backlog. [Current state](current-state.md) owns capability detail.
   M3-A Task-to-Evidence contract and **Verified on SQLite**. It is not the
   canonical scientific M3-B admission contract and does not fabricate
   EvidenceRequest, ExecutionRun, AnalysisFrame, or Hypothesis lineage.
-- An admitted DataProfile does not currently retain its physical dataset path
-  or a content digest. M3-A verifies the execution request path against Data
-  Explorer provenance and verifies reprofiling metrics against the persisted
-  profile, but durable dataset-version identity remains a **Known limitation**.
+- M3-A atomically persists an admitted initial DataProfile with an immutable
+  one-to-one non-FCO `DataProfileDatasetBinding` containing the normalized
+  physical dataset reference and `sha256:<64 lowercase hexadecimal characters>`
+  digest of the exact loaded file bytes. Evidence admission requires the request
+  path and independently observed execution path and digest to match that
+  authoritative binding. Admission does not activate or switch the profile.
+- This bounded path-plus-content identity is not a complete dataset-versioning
+  subsystem. Dataset relocation and successor transformation lineage remain
+  **Deferred**; identical bytes at another path require a new explicit profile
+  admission, and executable DVC identity resolution is **Unsupported**.
 - Non-finite source numbers are excluded from continuous descriptive
   calculations, and non-finite computed statistics become `None`. This is a
   **Known limitation** of bounded profiling, not data-quality governance or
