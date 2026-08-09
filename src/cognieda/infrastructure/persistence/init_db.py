@@ -1,4 +1,4 @@
-"""Database initialization helpers for the workspace-local graph store."""
+"""Database initialization helpers for the provisional persistence store."""
 
 from __future__ import annotations
 

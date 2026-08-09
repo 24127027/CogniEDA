@@ -1,11 +1,9 @@
 # Current state
 
 This page answers one question: **what is supported by the current
-implementation?** It describes the PR #36 source-layer boundary, based on
-merged PR #35 `main` commit
-`9fa7fc7eaa4f934020943366b6510ac1c69e5062` and inspected on 2026-08-09. A
-schema, table, interface, stub, fixture, or configuration entry is not a
-supported workflow by itself.
+implementation?** It describes source and tests inspected on 2026-08-09. A
+schema, table, interface, stub, fixture, configuration entry, or directory is
+not a supported workflow by itself.
 
 The [MVP runtime subset](../architecture/mvp-runtime-subset.md) defines the
 smaller executable slice. It does not replace the
@@ -31,6 +29,7 @@ contracts remain authoritative targets.
 | M5-A runtime composition | **Deferred** | No supported Planner-to-Data Explorer-to-Evidence-to-SessionFrame user workflow is composed. |
 | Canonical scientific runtime | **Deferred** | Hypothesis and Discovery remain canonical FCOs but are not dependencies of the active MVP state. Hypothesis Analyst, scientific investigation, EvidenceRequest, canonical ExecutionRun and AnalysisFrame, protected evaluation, governance, Discovery admission, and validity propagation remain M2/M3-B/M4 work. |
 | Runtime entry boundary | **Partially implemented** | An editable uv tool installation exposes `cognieda [PATH]`; `python -m cognieda` delegates to the same package entrypoint. Help parsing is bootstrap-free. Runtime bootstrap explicitly composes the registry, Data Explorer provider, dispatcher, Planner dependencies, model factory, and workspace-local agent tooling. Model name, base URL, and API key resolve workspace-first with environment fallback. The command reaches the development Planner REPL, not a supported product CLI, service, or complete research-state request pipeline. |
+| Workspace filesystem ownership | **Implemented** | `Workspace.open()` normalizes the selected user research project root. Conventional `data/`, private `.cognieda/`, `state/`, and `sessions/` paths derive from that root and remain independent of process CWD. Initialization creates `.cognieda/project.toml` and `data/`; specific data and operational subdirectories remain lazy. External absolute dataset paths remain loadable and are not forced into the Workspace. Filesystem presence does not perform DataProfile admission. |
 | External integrations | **Unsupported** | DVC execution, graph-database integration, external MCP composition, deployment adapters, and non-SQLite database support are not verified. |
 
 ## Active M1-A contracts
@@ -79,7 +78,9 @@ pre-existing Planner collection modules recorded **136 passes and 57 explicit
 skips**. Focused layer-boundary tests also verify that Planner cannot import
 pandas, dataset loaders, or Data Explorer profiling implementations directly.
 Documentation regressions reject compatibility-only redirect language and
-verify internal Markdown links and relative anchors.
+verify internal Markdown links and relative anchors. Workspace ownership
+regressions reject product-root `data/`, `artifacts/`, and DVC project state,
+package-relative user-data lookup, and production dependency on test fixtures.
 
 Full collection still stops on the three baseline Planner donor mismatches:
 

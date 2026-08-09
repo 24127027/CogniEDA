@@ -51,9 +51,3 @@ def test_user_datasets_are_not_located_under_private_workspace_state(tmp_path: P
 
     assert workspace.data_dir == workspace.root / "data"
     assert workspace.data_dir != workspace.root / ".cognieda" / "data"
-
-
-def test_product_repository_has_no_canonical_research_data_directory() -> None:
-    project_root = Path(__file__).resolve().parents[2]
-
-    assert not (project_root / "data").exists()

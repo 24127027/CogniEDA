@@ -69,6 +69,9 @@ backlog. [Current state](current-state.md) owns capability detail.
   and successor DataProfile handling exist.
 - Planner-to-dispatch adapter tests use a registered fake provider; they do not
   prove model-selected real Data Explorer work.
+- Workspace path selection and initialization are **Implemented**, but
+  automatic dataset discovery or admission is **Unsupported**. The
+  conventional `data/` directory does not itself establish a DataProfile.
 
 ## Database limitation
 
@@ -77,6 +80,10 @@ backlog. [Current state](current-state.md) owns capability detail.
   migration are outside M1-A.
 - SessionFrame snapshots use an internal serialized SQLite envelope; this is a
   bounded round-trip seam, not M5-A/M5-B durable runtime authority.
+- The persistence helper is not composed with `Workspace`; without an explicit
+  `COGNIEDA_DB_URL`, it retains a provisional package-local SQLite default.
+  Binding authoritative persistence under `<workspace>/.cognieda/state/` is
+  **Deferred** to the runtime/persistence phase rather than implied here.
 - No non-SQLite database is tested.
 
 ## Verification gap
