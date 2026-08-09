@@ -18,14 +18,14 @@ contracts remain authoritative targets.
 | M1-A research-state contracts | **Implemented** | The active `Objective`, `Assumption`, `Task`, `DataProfile`, `Evidence`, and `SessionFrame` schemas implement the approved executable MVP subset. No parallel MVP FCO family exists. |
 | Objective and Assumption | **Implemented** | `Objective` and planning-only `Assumption` each have stable UUID identity and non-empty text. Bounded Planner behavior returns validated successor frames: semantic Objective refinement allocates a new identity, and explicit Assumptions use the controlled addition seam. Durable behavioral persistence remains outside M1-B. |
 | Task lifecycle | **Implemented** | Active Task has immutable `task_id` and non-empty `instruction`, plus exactly `PENDING`, `RUNNING`, `COMPLETED`, or `FAILED`. A status transition produces a validated replacement Task with the same identity and instruction. Legacy Task taxonomy and scientific fields are not accepted by the active schema. |
-| DataProfile and deterministic profiling | **Implemented** | Immutable DataProfile has `data_profile_id`, row and column counts, and ordered typed columns. Data Explorer can produce a task-free initial candidate from an explicit absolute CSV or Parquet path; application authority separately admits that candidate on SQLite without activating or switching it. Profiling preserves duplicate rows, all-null rows, and missing values and does not mutate its input. Reprofiling an admitted DataProfile can produce Evidence only when the computed metrics exactly match that authoritative profile. |
-| Direct MVP Evidence | **Implemented** | Immutable Evidence retains deterministic JSON-safe content, artifact references, bounded producer/work/dataset/tool provenance, and real `task_id` plus `data_profile_id` lineage. The M3-A application service admits exactly one successful Data Explorer observation for a matching persisted `COMPLETED` Task, persisted DataProfile, explicit dataset binding, capability, plan, source role, and provenance contract. Failed, blocked, mismatched, empty, or invalid work creates no Evidence. Evidence does not require Hypothesis, AnalysisFrame, or canonical ExecutionRun. |
+| DataProfile and deterministic profiling | **Implemented** | Immutable DataProfile has `data_profile_id`, row and column counts, and ordered typed columns. Data Explorer produces a task-free initial candidate from an explicit absolute CSV or Parquet path with the normalized path and `sha256:<hex>` digest observed from the exact loaded bytes. Application authority atomically admits the profile and its one-to-one non-FCO physical dataset binding on SQLite without activating or switching it. Exact replay is idempotent; conflicting profile, path, or digest reuse fails closed. |
+| Direct MVP Evidence | **Implemented** | Immutable Evidence retains deterministic JSON-safe content, artifact references, bounded producer/work/dataset/tool provenance, and real `task_id` plus `data_profile_id` lineage. The M3-A application service admits exactly one successful Data Explorer observation only after matching the persisted `COMPLETED` Task, authoritative DataProfile and dataset binding, request path, independently observed execution path and digest, capability, role-native plan, source role, and provenance contract. Failed, blocked, mismatched, empty, or invalid work creates no Evidence. Evidence does not require Hypothesis, AnalysisFrame, or canonical ExecutionRun. |
 | MVP SessionFrame | **Implemented** | The frozen active-state envelope retains one optional Objective, ordered read-only Assumption, Task, and Evidence collections, and one optional active DataProfile. Controlled seams return validated successor frames. It rejects duplicate IDs, orphan Evidence, Evidence for any Task not exactly `COMPLETED`, Evidence without a DataProfile, and Evidence for a different profile. Direct collection mutation cannot bypass validation. |
 | Bounded persistence | **Verified on SQLite** | Concrete models, sessions, migrations, and repositories under `infrastructure.persistence` round-trip minimum Objective, Assumption, Task, DataProfile, Evidence, and SessionFrame state on fresh SQLite. Task persistence changes status only. M3-A stages one Evidence insert after all admission checks and commits it once; deterministic identity makes exact replay return the existing Evidence and conflicting reuse of a work reference fail closed. Durable Objective and Assumption update composition and restart/recovery are not claimed. |
 | Executor registry and dispatch | **Implemented** | The role-neutral `execution` package retains one typed `Capability`, explicit dependency-aware provider factories, provider reuse, typed async dispatch, fail-closed missing registration, controlled provider errors, and role-native results. Specialist roles are peer packages under `agents`; no compatibility `agents.executor` path remains. |
-| Data Explorer | **Implemented** | At the bounded M3-A library surface, the provider loads only an explicit absolute CSV or Parquet path and executes a validated finite `DataAnalysisPlan`. Supported deterministic operations are row count, column summary, missingness, bounded value counts, descriptive statistics, bounded group summary, and bounded Pearson or Spearman correlation. Exact column names are required. Data Explorer returns role-native observations and typed execution provenance; it never creates or persists Evidence. General-purpose Python execution is **Unsupported**. Transformation remains a typed blocker. |
+| Data Explorer | **Implemented** | At the bounded M3-A library surface, Planner selects `DATA_ANALYSIS` and creates only the Task and capability. Data Explorer owns typed operationalization of the Task instruction plus the supplied authoritative DataProfile projection into one finite `DataAnalysisPlan`; deterministic validation and tools alone compute values. Supported operations are row count, column summary, missingness, bounded value counts, descriptive statistics, bounded group summary, and bounded Pearson or Spearman correlation. Exact column names are required. Analysis contracts live under `agents.data_explorer`, not role-neutral `execution`. Data Explorer remains persistence-free and never creates Evidence. General-purpose Python execution is **Unsupported**. Transformation remains a typed blocker. |
 | Planner behavior and `PlannerWorkOutcome` consumption | **Implemented** | The bounded library graph performs typed request understanding, successor-state Objective and Assumption handling, canonical Task creation, typed capability selection, dispatcher invocation, Task-identity-checked outcome consumption, lifecycle completion/failure, Evidence-only follow-up answering, and controlled human-facing responses. Planner still does not admit Evidence; the separate M3-A application service can project a real admitted Evidence reference for later M5-A composition. |
-| M3-A Data Explorer execution and Evidence integration | **Implemented** | The bounded library/data-authority surface proves explicit dataset binding, deterministic real tool execution, typed Data Explorer provenance, application-owned DataProfile candidate admission, and application-owned immutable Evidence admission. Exact replay is idempotent and all tested failure, blocker, lineage-mismatch, and invalid-payload paths create zero Evidence. Retained runtime composition is outside this claim. |
+| M3-A Data Explorer execution and Evidence integration | **Implemented** | The bounded library/data-authority surface proves immutable path-plus-content DataProfile binding, Data Explorer-owned bounded planning, deterministic real tool execution, typed provenance with the actual execution digest, application-owned atomic profile/binding admission, and application-owned immutable Evidence admission. Exact replay is idempotent; wrong-path, wrong-profile, same-path mutation, planning failure, blocker, lineage mismatch, and invalid payload paths create zero Evidence. Retained runtime composition is outside this claim. |
 | M5-A runtime composition | **Deferred** | No supported Planner-to-Data Explorer-to-Evidence-to-SessionFrame user workflow is composed. |
 | Canonical scientific runtime | **Deferred** | Hypothesis and Discovery remain canonical FCOs but are not dependencies of the active MVP state. Hypothesis Analyst, scientific investigation, EvidenceRequest, canonical ExecutionRun and AnalysisFrame, protected evaluation, governance, Discovery admission, and validity propagation remain M2/M3-B/M4 work. |
 | Runtime entry boundary | **Partially implemented** | An editable uv tool installation exposes `cognieda [PATH]`; `python -m cognieda` delegates to the same package entrypoint. Help parsing is bootstrap-free. Runtime bootstrap composes the registry, Data Explorer provider, dispatcher, M1-B Planner, model factory, and workspace-local agent tooling. The development REPL does not retain successor `SessionFrame` state or supply composed dataset execution context across turns, so it is not M5-A or a supported product CLI. |
@@ -57,17 +57,34 @@ AnalysisFrame or ExecutionRun references.
 
 ## Bounded M3-A data-authority surface
 
-`DATA_ANALYSIS` requires `dataset_path`, `data_profile_id`, and a finite typed
-`DataAnalysisPlan` in `ExecutorContext`. `DATA_PROFILING` requires the explicit
-dataset path; it may omit `data_profile_id` only when producing a
-non-authoritative candidate. Dataset selection never falls back to process
-CWD, the product repository, or `COGNIEDA_DE_DATASET_PATH`.
+`DATA_ANALYSIS` requires an explicit absolute `dataset_path`, exact
+`data_profile_id`, and a `DataExplorerInput` carrying the matching authoritative
+DataProfile projection.
+Planner selects the capability but does not construct analytical semantics.
+Data Explorer passes the Task instruction, DataProfile/schema, and finite
+operation set through its typed planning port, validates the returned
+role-native `DataAnalysisPlan`, and invokes the deterministic tool. Runtime and
+generic execution contracts do not construct the plan. `DATA_PROFILING` may
+omit `data_profile_id` only when producing a non-authoritative candidate.
+Dataset selection never falls back to process CWD, the product repository, or
+`COGNIEDA_DE_DATASET_PATH`.
+
+Candidate profiling reads the physical bytes once, computes SHA-256 as
+`sha256:<64 lowercase hexadecimal characters>`, and parses those same bytes.
+Admission persists `data_profile_id`, normalized dataset reference, and digest
+as an immutable one-to-one non-FCO binding in the same transaction as a new
+DataProfile. A raw repository-created DataProfile without this binding is not
+M3-A Evidence-eligible. Path and digest are both authoritative: identical bytes
+at another path require a new explicit profile admission, and no relocation
+mechanism is implemented.
 
 Successful analysis returns one `DataExplorerResult` with a real `work_id`,
 the requested Task and capability identity, one structured observation, and
 `DataExecutionProvenance` containing the normalized physical dataset path,
-DataProfile identity, deterministic tool/version/operation reference, and
-bounded parameters. Application admission creates Evidence content exactly as:
+independently observed content digest, DataProfile identity, deterministic
+tool/version/operation reference, and bounded parameters. Application admission
+checks request path, observed path, observed digest, and provenance profile ID
+against the authoritative binding before it creates Evidence content exactly as:
 
 ```text
 {
@@ -111,8 +128,10 @@ PlanRevision contracts directly. Workspace ownership and documentation
 regressions retain their existing boundaries. M3-A focused tests additionally
 execute real CSV and Parquet data, all seven allowlisted operations, explicit
 Workspace and external paths under an arbitrary CWD, source-file immutability,
-candidate/profile admission, successful and replayed Evidence admission, and
-zero-Evidence failure paths.
+atomic candidate/profile/binding admission, Data Explorer-owned fake-planner
+operationalization, successful and replayed Evidence admission, same-path
+mutation, wrong-profile/path, unsupported/invalid planning, and zero-Evidence
+failure paths.
 
 ## Design target: dependency inversion
 

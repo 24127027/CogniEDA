@@ -11,9 +11,10 @@ This supporting workflow applies the canonical data-state rules:
 ## Implementation status
 
 **Partially implemented.** Deterministic local dataframe and supported-file
-profiling can produce a typed DataProfile without removing duplicate rows,
-all-null rows, or missing values and without mutating the input. DataProfile
-repository persistence is **Verified on SQLite**. Executable DVC identity
+profiling can produce a typed DataProfile candidate with an observed normalized
+path and SHA-256 content digest without removing duplicate rows, all-null rows,
+or missing values and without mutating the input. Atomic DataProfile plus
+physical-dataset-binding admission is **Verified on SQLite**. Executable DVC identity
 resolution is **Unsupported**; cleaning execution, approval, successor dataset
 creation, and complete validity propagation remain **Deferred**.
 
