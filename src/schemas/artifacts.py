@@ -269,7 +269,7 @@ class SessionFrame(ImmutableCogniEDABaseModel):
             raise ValueError(f"SessionFrame rejects duplicate {object_name} IDs.")
 
     def _validated_copy(self, **updates: object) -> SessionFrame:
-        values = {
+        values: dict[str, object] = {
             "objective": self.objective,
             "assumptions": self.assumptions,
             "tasks": self.tasks,
