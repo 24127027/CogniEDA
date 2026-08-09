@@ -21,13 +21,8 @@ class Application:
     async def submit_message(self, message: str) -> Message:
         planner_output = await self.planner_agent.run(message)
 
-        if planner_output.error:
-            content = f"Planner error: {planner_output.error}"
-        else:
-            content = str(planner_output.plan)
-
         return Message(
             type=MessageType.TEXT,
             role=MessageRole.ASSISTANT,
-            content=content,
+            content=planner_output.response,
         )
