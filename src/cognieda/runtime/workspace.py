@@ -26,7 +26,7 @@ class ProjectConfig:
 
 class Workspace:
     def __init__(self, root: Path, config: ProjectConfig):
-        self.root = root
+        self.root = self._normalize_root(root)
         self.config = config
 
     @property
@@ -43,10 +43,9 @@ class Workspace:
 
     @classmethod
     def open(cls, root: Path) -> "Workspace":
+        root = cls._normalize_root(root)
+        cls.init_workspace(root)
         config_path = root / ".cognieda" / "project.toml"
-
-        if not config_path.exists():
-            cls.init_workspace(root)
 
         config = cls.load_config(config_path)
 
@@ -56,13 +55,15 @@ class Workspace:
         )
 
     @classmethod
-    def init_workspace(cls, root: Path):
+    def init_workspace(cls, root: Path) -> None:
+        root = cls._normalize_root(root)
         config_path = root / ".cognieda" / "project.toml"
 
         config_path.parent.mkdir(
             parents=True,
             exist_ok=True,
         )
+        (root / "data").mkdir(parents=True, exist_ok=True)
 
         if not config_path.exists():
             default_config = textwrap.dedent(
@@ -78,6 +79,10 @@ class Workspace:
                 default_config,
                 encoding="utf-8",
             )
+
+    @staticmethod
+    def _normalize_root(root: Path) -> Path:
+        return root.expanduser().resolve()
 
     @staticmethod
     def load_config(config_path: Path) -> ProjectConfig:
