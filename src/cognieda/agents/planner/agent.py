@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 
-from ..types import RuntimePayload
 from .dependencies import PlannerDeps
 from .graph import build_graph
 from .model import PlannerModel
@@ -35,7 +34,7 @@ class Planner:
         query: str,
         *,
         context: Context | None = None,
-    ) -> RuntimePayload:
+    ) -> PlannerOutput:
         if context is None:
             context = Context()
 
@@ -55,4 +54,4 @@ class Planner:
             error=final_state.error,
         )
 
-        return RuntimePayload(payload=planner_output)
+        return planner_output

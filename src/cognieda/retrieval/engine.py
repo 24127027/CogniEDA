@@ -12,8 +12,8 @@ from cognieda.schemas.artifacts import Discovery, SessionFrame
 from cognieda.schemas.enums import ContextMode, FirstClassObjectType
 from cognieda.schemas.retrieval import RetrievalRequest, RetrievalResult, RetrievalResultItem
 
-from .retrieval_policy import exclusion_reason
-from .semantic_scorer import LexicalScorer, SemanticScorer
+from .policy import exclusion_reason
+from .scoring import LexicalScorer, SemanticScorer
 
 
 @dataclass

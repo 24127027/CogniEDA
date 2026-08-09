@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from cognieda.memory.retrieval_policy import exclusion_reason, is_allowed_in_context
+from cognieda.retrieval import exclusion_reason, is_allowed_in_context
 from cognieda.schemas.enums import (
     AssumptionStatus,
     ContextMode,

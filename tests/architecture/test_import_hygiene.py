@@ -11,8 +11,8 @@ from cognieda.db import create_db_engine
 from cognieda.execution import Capability
 from cognieda.execution.capabilities import Capability as CapabilityOwner
 from cognieda.infrastructure.agent_tooling import AgentTooling
-from cognieda.memory import SessionFrameBuilder
 from cognieda.repositories import TaskRepository
+from cognieda.retrieval import is_allowed_in_context
 from cognieda.runtime import Application
 from cognieda.schemas import Task
 from cognieda.schemas.artifacts import Task as TaskOwner
@@ -110,7 +110,7 @@ def test_major_package_boundaries_import_from_cognieda() -> None:
             Renderer,
             DatasetProfiler,
             create_db_engine,
-            SessionFrameBuilder,
+            is_allowed_in_context,
             TaskRepository,
             Application,
             AgentTooling,

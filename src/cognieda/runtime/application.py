@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.types import PlannerOutput
 from cognieda.execution import ExecutorDispatcher
 
 from .messages import Message, MessageRole, MessageType
@@ -20,9 +19,7 @@ class Application:
         self.dispatcher = dispatcher
 
     async def submit_message(self, message: str) -> Message:
-        result = await self.planner_agent.run(message)
-
-        planner_output = PlannerOutput.model_validate(result.payload)
+        planner_output = await self.planner_agent.run(message)
 
         if planner_output.error:
             content = f"Planner error: {planner_output.error}"

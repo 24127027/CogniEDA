@@ -5,8 +5,7 @@ from uuid import uuid4
 import pytest
 
 from cognieda.db.models import DataProfileRecord, DiscoveryRecord, HypothesisRecord, TaskRecord
-from cognieda.memory.retrieval_engine import DiscoveryRetrievalEngine
-from cognieda.memory.semantic_scorer import LexicalScorer
+from cognieda.retrieval import DiscoveryRetrievalEngine, LexicalScorer
 from cognieda.schemas.artifacts import SessionFrame
 from cognieda.schemas.enums import (
     DataProfileMethod,
