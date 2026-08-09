@@ -45,9 +45,15 @@ Database behavior:
 
 Agent LLM behavior:
 
-- `src/cognieda/agents/llm.py` reads `COGNIEDA_MODEL_NAME`, `COGNIEDA_OPENAI_BASE_URL`, and `COGNIEDA_OPENAI_API_KEY`.
-- `COGNIEDA_MODEL_NAME` and `COGNIEDA_OPENAI_API_KEY` are required by `create_agent()`.
-- These agent variables are not currently listed in `.env.example`.
+- `.cognieda/project.toml` may provide `model.name`, `model.base_url`, and
+  `model.api_key` for the selected workspace.
+- Missing workspace values fall back individually to `COGNIEDA_MODEL_NAME`,
+  `COGNIEDA_OPENAI_BASE_URL`, and `COGNIEDA_OPENAI_API_KEY`.
+- Model name and API key are required at bootstrap. Base URL is optional and a
+  user-provided value is not overwritten by a fixed router endpoint.
+- Bootstrap passes the resolved configuration into the infrastructure LLM
+  factory; agents do not initialize global tooling or read configuration paths
+  implicitly.
 
 ## Normal application launch
 
@@ -73,9 +79,11 @@ boundary. The supported end-to-end product CLI remains **Unsupported** because
 Planner-to-Data Explorer-to-Evidence-to-SessionFrame composition is deferred.
 
 The selected workspace owns `.cognieda/project.toml` and workspace-local
-state. Root `config/*.toml` files remain optional development configuration;
-installed startup does not require the source repository as the working
-directory.
+state. Optional agent, MCP, and skill configuration is read only from
+workspace-local `.cognieda/agents.toml`, `.cognieda/mcp.toml`, and
+`.cognieda/skills.toml` when those files exist. Root `config/*.toml` files are
+development examples; installed startup does not require the source repository
+as the working directory.
 
 ## Verification commands
 
@@ -89,7 +97,7 @@ uv run mypy src/cognieda
 
 No docs build or docs link-check command was found in the current repo.
 
-## Tool And MCP Config
+## Agent and MCP configuration
 
 `config/agents.toml` contains worker references, while `config/mcp.toml`
 contains commented examples rather than enabled servers. These configuration
