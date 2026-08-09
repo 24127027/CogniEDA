@@ -21,7 +21,6 @@ from cognieda.repositories.common import apply_update, schema_to_record_payload
 from cognieda.repositories.objective_repository import ObjectiveUpdate
 from cognieda.repositories.session_frame_repository import SESSION_FRAME_JSON_FIELDS
 from cognieda.repositories.task_repository import TASK_JSON_FIELDS, TaskUpdate
-from cognieda.runtime.orchestrator.transition_service import ExecutionAttemptTransitionService
 from cognieda.schemas.artifacts import Assumption, SessionFrame, Task
 from cognieda.schemas.enums import (
     AssumptionStatus,
@@ -41,6 +40,8 @@ from cognieda.schemas.planner_operations import (
     TaskUpdateOperationPayload,
 )
 from cognieda.schemas.provenance import ExecutionOutbox, ExecutionRun
+
+from .transition_service import ExecutionAttemptTransitionService
 
 _COMMITTABLE_STATES = {
     PlannerOperationApprovalState.APPROVED,

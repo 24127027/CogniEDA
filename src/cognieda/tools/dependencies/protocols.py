@@ -19,11 +19,3 @@ class HasGraphRepository(Protocol):
 
 class HasDatasetRepository(Protocol):
     """Temporary dependency boundary for the existing dataset tool scaffold."""
-
-
-class TerminalPrinter(Protocol):
-    def print_pretty(self, message: str) -> None: ...
-
-
-class HasTerminalPrinter(Protocol):
-    terminal: TerminalPrinter

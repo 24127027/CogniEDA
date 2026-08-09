@@ -48,7 +48,6 @@ def test_create_agent_forwards_agent_owned_builtin_tools(
 
 def test_concrete_agent_classes_own_their_builtin_tool_selections() -> None:
     assert Planner.builtin_tools == (
-        AvailableBuiltinTools.TERMINAL,
         AvailableBuiltinTools.DATA_DELEGATION,
     )
     assert GraphMiner.builtin_tools == (AvailableBuiltinTools.GRAPH,)

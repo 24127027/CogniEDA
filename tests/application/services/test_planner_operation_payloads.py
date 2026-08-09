@@ -3,8 +3,8 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from cognieda.application.services import commit_planner_operations
 from cognieda.repositories import PlannerOperationRepository, TaskRepository
-from cognieda.runtime.orchestrator.planner_commit import commit_planner_operations
 from cognieda.schemas.artifacts import Task
 from cognieda.schemas.enums import (
     PlannerNodeName,

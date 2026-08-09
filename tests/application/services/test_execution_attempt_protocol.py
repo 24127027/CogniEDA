@@ -5,6 +5,11 @@ from uuid import uuid4
 
 import pytest
 
+from cognieda.application.services import (
+    ExecutionAttemptTransitionService,
+    build_execution_admission_operations,
+    commit_planner_operations,
+)
 from cognieda.repositories import (
     DataProfileRepository,
     ExecutionApprovalRepository,
@@ -14,9 +19,6 @@ from cognieda.repositories import (
     PlannerOperationRepository,
     TaskRepository,
 )
-from cognieda.runtime.orchestrator.execution_admission import build_execution_admission_operations
-from cognieda.runtime.orchestrator.planner_commit import commit_planner_operations
-from cognieda.runtime.orchestrator.transition_service import ExecutionAttemptTransitionService
 from cognieda.schemas.artifacts import DataProfile, Hypothesis, Task
 from cognieda.schemas.common import BaselineSummary, QualityFlag, SchemaSummary
 from cognieda.schemas.enums import (

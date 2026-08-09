@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from cognieda.agents.planner.nodes import manage_tasks
 from cognieda.agents.planner.types import State, TaskCreateDraft
+from cognieda.application.services import commit_planner_operations
 from cognieda.repositories import (
     AssumptionRepository,
     ObjectiveRepository,
@@ -15,7 +16,6 @@ from cognieda.repositories import (
     SessionFrameRepository,
     TaskRepository,
 )
-from cognieda.runtime.orchestrator.planner_commit import commit_planner_operations
 from cognieda.schemas.artifacts import Assumption, Objective, SessionFrame
 from cognieda.schemas.common import TaskContextSummary
 from cognieda.schemas.enums import (

@@ -13,9 +13,9 @@ from cognieda.agents.planner.types import (
     PlannerDecision,
     TaskDecompositionDraft,
 )
+from cognieda.application.services import commit_planner_operations
 from cognieda.db.models import PlannerOperationRecord
 from cognieda.repositories import TaskRepository
-from cognieda.runtime.orchestrator.planner_commit import commit_planner_operations
 from cognieda.schemas.artifacts import Task
 from cognieda.schemas.enums import (
     PlannerOperationApprovalState,

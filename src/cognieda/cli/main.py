@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 async def repl(app: Application, renderer: Renderer) -> None:
-    await app.start_session()
+    renderer.render_session_start(app.workspace.root)
 
     while True:
         text = input("> ").strip()

@@ -12,10 +12,7 @@ from .types import Context, PlannerOutput, State
 class Planner:
     """Planner responsible for producing the next research plan."""
 
-    builtin_tools = (
-        AvailableBuiltinTools.TERMINAL,
-        AvailableBuiltinTools.DATA_DELEGATION,
-    )
+    builtin_tools = (AvailableBuiltinTools.DATA_DELEGATION,)
 
     def __init__(self, deps: PlannerDeps) -> None:
         self.graph = build_graph()
