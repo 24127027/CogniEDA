@@ -95,6 +95,19 @@ class DataProfileRecord(SQLModel, table=True):
     )
 
 
+class DataProfileDatasetBindingRecord(SQLModel, table=True):
+    """One-to-one immutable physical dataset-state binding for a DataProfile."""
+
+    __tablename__ = "data_profile_dataset_bindings"
+
+    data_profile_id: UUID = Field(
+        primary_key=True,
+        foreign_key="data_profiles.data_profile_id",
+    )
+    dataset_reference: str = Field(sa_column=Column(Text, nullable=False))
+    dataset_digest: str = Field(nullable=False, index=True)
+
+
 class AssumptionRecord(SQLModel, table=True):
     """Bounded SQLite mapping for the planning-only MVP Assumption."""
 

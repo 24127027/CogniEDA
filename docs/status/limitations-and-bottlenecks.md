@@ -18,9 +18,9 @@ backlog. [Current state](current-state.md) owns capability detail.
 
 ## Implementation gap
 
-- M1-B Planner behavior is **Implemented** at a bounded library surface. M3-A
-  real Data Explorer-to-Evidence integration and M5-A retained single-session
-  composition are **Deferred**.
+- M1-B Planner behavior and M3-A deterministic Data Explorer-to-Evidence
+  admission are **Implemented** at bounded library surfaces. M5-A retained
+  single-session composition is **Deferred**.
 - `PlanRevision`, `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
@@ -32,10 +32,20 @@ backlog. [Current state](current-state.md) owns capability detail.
   **Deferred**. Task persistence supports status change only. Active Task
   values are immutable; changing Task meaning requires a new identity, while
   status change produces a replacement with the same identity and instruction.
-- Evidence creation from Data Explorer output and sole application-authority
-  admission are not implemented. The active frame and SQLite repository
-  boundaries admit Evidence only for a `COMPLETED` Task; incomplete or failed
-  work cannot produce admitted MVP Evidence.
+- Application-authority Evidence admission is **Implemented** for the direct
+  M3-A Task-to-Evidence contract and **Verified on SQLite**. It is not the
+  canonical scientific M3-B admission contract and does not fabricate
+  EvidenceRequest, ExecutionRun, AnalysisFrame, or Hypothesis lineage.
+- M3-A atomically persists an admitted initial DataProfile with an immutable
+  one-to-one non-FCO `DataProfileDatasetBinding` containing the normalized
+  physical dataset reference and `sha256:<64 lowercase hexadecimal characters>`
+  digest of the exact loaded file bytes. Evidence admission requires the request
+  path and independently observed execution path and digest to match that
+  authoritative binding. Admission does not activate or switch the profile.
+- This bounded path-plus-content identity is not a complete dataset-versioning
+  subsystem. Dataset relocation and successor transformation lineage remain
+  **Deferred**; identical bytes at another path require a new explicit profile
+  admission, and executable DVC identity resolution is **Unsupported**.
 - Non-finite source numbers are excluded from continuous descriptive
   calculations, and non-finite computed statistics become `None`. This is a
   **Known limitation** of bounded profiling, not data-quality governance or
@@ -61,9 +71,14 @@ backlog. [Current state](current-state.md) owns capability detail.
   The installable `cognieda [PATH]` command reaches the development Planner
   REPL and is **Partially implemented**; no supported end-to-end application
   runtime, worker, service API, or product CLI exists.
-- The local Data Explorer donor path can execute bounded analysis or profiling
-  from a direct request. It is not a production sandbox and is not connected
-  to Evidence admission.
+- The local Data Explorer path executes only finite validated deterministic
+  operations from an explicit absolute CSV or Parquet path. General-purpose
+  Python, generated code, `exec`, `eval`, fuzzy column resolution, implicit
+  repository data, and environment dataset fallback are **Unsupported**.
+- Value counts and group summaries are limited to 50 results, correlation and
+  selected-column operations accept at most 10 columns, and Evidence-producing
+  profile observations accept at most 50 columns. This bounded result surface
+  is a **Known limitation** that prevents accidental dataset dumps.
 - Profiling describes the active dataset without duplicate removal, null-row
   removal, or input mutation. Actual cleaning and transformation remain
   blocked until successor dataset and DataProfile semantics exist.
@@ -80,6 +95,10 @@ backlog. [Current state](current-state.md) owns capability detail.
 ## Database limitation
 
 - Current bounded persistence is **Verified on SQLite** only.
+- M3-A prevents exact replay duplicates with deterministic Evidence identity
+  and rejects conflicting reuse of a Data Explorer work reference. Durable
+  inboxes, leases, fencing, and general cross-process replay remain **Deferred**
+  to M5-B.
 - Durable restart/resume, replay, claims, leases, result inbox, and multi-store
   migration are outside M1-A.
 - SessionFrame snapshots use an internal serialized SQLite envelope; this is a
@@ -95,9 +114,10 @@ backlog. [Current state](current-state.md) owns capability detail.
 - Full pytest collection includes the rewritten M1-B Planner tests. The three
   former donor import blockers were removed rather than restored as
   compatibility APIs.
-- No end-to-end user-to-Planner-to-real-Data Explorer-to-Evidence-to-
-  SessionFrame-to-response test exists; bounded M1-B library completion does
-  not establish that M3-A/M5-A path.
+- A bounded harness proves real dispatcher-compatible Data Explorer execution
+  and application Evidence admission. No composed user-to-Planner-to-real-Data
+  Explorer-to-Evidence-to-SessionFrame-to-response test exists; M3-A library
+  completion does not establish M5-A or MVP-I.
 - No production performance envelope, non-SQLite validation, or external
   integration test exists. The first-party documentation regression is
   intentionally limited to internal Markdown links, relative anchors, and
@@ -109,9 +129,9 @@ backlog. [Current state](current-state.md) owns capability detail.
   APIs, UI, and the product CLI are **Unsupported**.
 - Cross-Objective Evidence reuse and cross-Objective relation admission have
   no supported path and must remain fail closed.
-- Production bounded Python execution, full analytical tool coverage,
-  streaming, multi-session coordination, and successor transformation remain
-  **Deferred**.
+- General-purpose Python execution and analytical operations outside the
+  finite M3-A set are **Unsupported**. Streaming, multi-session coordination,
+  and successor transformation remain **Deferred**.
 
 ## Documentation limitation
 

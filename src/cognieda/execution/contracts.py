@@ -6,7 +6,7 @@ from enum import StrEnum
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, model_validator
 from pydantic_ai.messages import ModelMessage
 
 from cognieda.schemas.artifacts import Task
@@ -28,6 +28,7 @@ class ExecutorContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     dataset_path: str | None = None
+    data_profile_id: UUID | None = None
 
 
 class BaseState(BaseModel):
@@ -45,7 +46,7 @@ class ExecutionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     capability: Capability
-    input: ExecutorInput
+    input: SerializeAsAny[ExecutorInput]
     context: ExecutorContext = Field(default_factory=ExecutorContext)
 
 

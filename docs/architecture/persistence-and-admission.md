@@ -240,10 +240,18 @@ remains a design target.
 
 ## Implementation status
 
-**Partially implemented.** Current main includes typed provenance records,
+**Partially implemented.** The current implementation includes typed provenance records,
 durable PlannerOperation approval state, an atomic commit function for a bounded
 operation set, paired execution-attempt and outbox admission, database-backed
 leases and fencing epochs, retry lineage, and idempotency fields.
+
+The bounded M3-A SQLite surface is **Verified on SQLite** for atomic initial
+DataProfile admission with an immutable one-to-one physical dataset binding.
+The binding stores `data_profile_id`, normalized dataset reference, and the
+`sha256:<hex>` digest of exact loaded file bytes. M3-A Evidence admission fails
+closed unless request path, observed execution path, observed digest, and
+provenance profile identity all match that authoritative binding. This is a
+non-FCO provenance/authority record and does not expand the semantic graph.
 
 The complete target boundary is not implemented. Canonical PlanRevision
 activation, durable role-native result inbox processing, complete replay

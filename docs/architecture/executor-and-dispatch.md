@@ -195,9 +195,21 @@ composes a registry, Data Explorer provider factory, dispatcher, and
 role-native fields. A minimal `PlannerWorkOutcome` projection seam consumes
 only shared metadata; full Planner consumption remains **Deferred**.
 
+At the bounded M3-A direct-DATA surface, Planner selects `DATA_ANALYSIS` and
+creates the Task without choosing a Data Explorer operation. Data Explorer owns
+the typed `Task.instruction -> DataAnalysisPlan` translation through its
+`DataAnalysisPlannerPort`, using the application-supplied authoritative
+DataProfile projection from `DataExplorerInput` and the finite
+supported-operation set. Deterministic code
+then validates exact columns and bounded parameters before execution. The
+role-specific `DataAnalysisPlan`, `DataAnalysisOperation`, and
+`CorrelationMethod` contracts live under `agents.data_explorer`; the generic
+`execution` package does not define or import them.
+
 Data Explorer is registered for `DATA_ANALYSIS`, `DATA_PROFILING`, and
 `DATA_TRANSFORMATION`. The first two have a bounded donor implementation when
-given the active M1-A Task instruction and a local dataset path. Profiling
+given the active M1-A Task instruction, authoritative DataProfile projection,
+and a local dataset path. Profiling
 returns the typed M1-A DataProfile through a Data Explorer-owned tool boundary
 and pure deterministic computation. It does not drop duplicate rows, all-null
 rows, or missing values and does not mutate the active frame. Transformation

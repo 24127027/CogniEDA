@@ -10,8 +10,10 @@ This supporting page states the target guardrails for local data work:
 
 ## Implementation status
 
-**Partially implemented.** The active DataProfile is immutable and profiling
-describes the supplied dataset without transformation. The infrastructure DVC
+**Partially implemented.** The active DataProfile is immutable, profiling
+describes the supplied dataset without transformation, and bounded initial
+admission stores an immutable normalized-path plus SHA-256 content binding on
+SQLite. The infrastructure DVC
 adapter fails closed because executable identity resolution is
 **Unsupported**. Successor dataset creation, successor DataProfile lineage, and
 a governed transformation workflow remain **Deferred**. See [Current
