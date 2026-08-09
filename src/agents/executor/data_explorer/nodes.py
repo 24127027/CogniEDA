@@ -11,7 +11,6 @@ from pydantic import BaseModel, Field, ValidationError
 from agents.llm import ModelConfig
 from data import DatasetProfiler, load_dataset
 from schemas.artifacts import DataProfile, Task
-from schemas.enums import DataProfileMethod
 
 from ..capabilities import Capability
 from ..types import ExecutionFailure, ExecutionStatus
@@ -34,7 +33,7 @@ def _task(state: State) -> Task:
 
 def _task_text(state: State) -> str:
 	task = _task(state)
-	return f"{task.title}\n{task.description}\n{task.evidence_expectation or ''}"
+	return task.instruction
 
 
 def _context_value(state: State, name: str, default: Any = None) -> Any:
@@ -45,10 +44,6 @@ def _dataset_path(state: State) -> str | None:
 	dataset_path = _context_value(state, "dataset_path")
 	if dataset_path:
 		return str(dataset_path)
-
-	profile = _context_value(state, "data_profile")
-	if isinstance(profile, DataProfile):
-		return profile.dataset_path
 
 	return os.environ.get("COGNIEDA_DE_DATASET_PATH") or None
 
@@ -136,15 +131,7 @@ def _results_match_request(state: State) -> bool:
 
 	request_text = _task_text(state).lower()
 	result_text = _result_text(raw_data_results)
-	expected_tokens = [
-		token
-		for token in (
-			_task(state).evidence_expectation,
-			_task(state).title,
-			_task(state).description,
-		)
-		if isinstance(token, str) and token.strip()
-	]
+	expected_tokens = [token for token in _task(state).instruction.split() if token.strip()]
 
 	if any(token.lower() in result_text for token in expected_tokens):
 		return True
@@ -191,20 +178,12 @@ def _build_observation(state: State) -> DataExplorerObservation:
 
 
 def _build_profile_draft(state: State, dataframe: pd.DataFrame) -> DataProfile:
-	dataset_path = _dataset_path(state)
-	if dataset_path is None:
-		raise RuntimeError("Data profiling requires a dataset_path on executor context.")
-
 	cleaned_dataframe = dataframe.drop_duplicates().copy()
 	if any("missing" in log.lower() for log in state["execution_logs"]):
 		cleaned_dataframe = cleaned_dataframe.dropna(how="all")
 
 	profiler = DatasetProfiler()
-	return profiler.profile_dataframe(
-		cleaned_dataframe,
-		dataset_path=dataset_path,
-		method=DataProfileMethod.DATA_QUALITY_SCAN,
-	)
+	return profiler.profile_dataframe(cleaned_dataframe)
 
 
 def route_request(state: State, runtime: Any = None) -> str:

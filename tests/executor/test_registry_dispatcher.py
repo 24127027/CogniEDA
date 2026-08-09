@@ -21,17 +21,11 @@ from agents.executor import (
 from agents.executor.capabilities import Capability as CapabilityFromOwner
 from runtime.bootstrap import bootstrap_application
 from schemas.artifacts import Task
-from schemas.enums import TaskKind
 
 
 def _task() -> Task:
     return Task(
-        title="Assess treatment effect",
-        description="Check whether the treatment increases the target metric.",
-        task_kind=TaskKind.ANALYTICAL,
-        profile_id="11111111-1111-1111-1111-111111111111",
-        variables=["treatment", "target_metric"],
-        evidence_expectation="Treatment increases the target metric.",
+        instruction="Check whether the treatment increases the target metric.",
     )
 
 
