@@ -7,7 +7,7 @@ from .graph import build_graph
 from .model import PlannerModel
 from .tools import invoke_data_capability
 from .types import PlannerOutput, State
-from .context import Context
+from .context import Context, PlanningContext
 
 class Planner:
     """Planner responsible for producing the next research plan."""
@@ -33,10 +33,13 @@ class Planner:
         self,
         query: str,
         *,
-        context: Context | None = None,
+        planning_context: PlanningContext 
     ) -> PlannerOutput:
-        if context is None:
-            context = Context()
+        
+        context = Context(
+            planning_context=planning_context,
+            planner_model=self.model,
+        )
 
         context.planner_model = self.model
 

@@ -2,7 +2,8 @@ from langgraph.graph import END, START
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 
 from .nodes import create_plan
-from .types import Context, State
+from .types import State
+from .context import Context
 
 
 def build_graph() -> CompiledStateGraph[State, Context, State, State]:
