@@ -53,6 +53,11 @@ def test_objective_and_assumption_behavioral_updates_are_explicitly_deferred(db_
 
 def test_data_profile_evidence_and_session_frame_round_trip_with_direct_lineage(db_session) -> None:
     task = TaskRepository(db_session).create(Task(instruction="Count rows"))
+    task = TaskRepository(db_session).update(
+        task.task_id,
+        TaskUpdate(status=TaskStatus.COMPLETED),
+    )
+    assert task is not None
     profile = DataProfileRepository(db_session).create(
         DataProfile(row_count=3, column_count=0, columns=())
     )
@@ -101,6 +106,11 @@ def test_evidence_repository_rejects_missing_task_or_profile(db_session) -> None
         EvidenceRepository(db_session).create(missing_task_evidence)
 
     task = TaskRepository(db_session).create(Task(instruction="Count rows"))
+    task = TaskRepository(db_session).update(
+        task.task_id,
+        TaskUpdate(status=TaskStatus.COMPLETED),
+    )
+    assert task is not None
     missing_profile_id = uuid4()
     missing_profile_evidence = Evidence(
         task_id=task.task_id,
@@ -115,3 +125,50 @@ def test_evidence_repository_rejects_missing_task_or_profile(db_session) -> None
     )
     with pytest.raises(ValueError, match="existing DataProfile"):
         EvidenceRepository(db_session).create(missing_profile_evidence)
+
+
+@pytest.mark.parametrize(
+    "status",
+    [TaskStatus.PENDING, TaskStatus.RUNNING, TaskStatus.FAILED],
+)
+def test_evidence_repository_rejects_incomplete_task(db_session, status: TaskStatus) -> None:
+    task = TaskRepository(db_session).create(Task(instruction="Count rows", status=status))
+    profile = DataProfileRepository(db_session).create(
+        DataProfile(row_count=0, column_count=0, columns=())
+    )
+    evidence = Evidence(
+        task_id=task.task_id,
+        data_profile_id=profile.data_profile_id,
+        content={"row_count": 0},
+        provenance=EvidenceProvenance(
+            producer_role="data_explorer",
+            work_reference=f"de:{task.task_id}",
+            dataset_reference="dataset:empty.csv",
+            data_profile_id=profile.data_profile_id,
+        ),
+    )
+
+    with pytest.raises(ValueError, match="COMPLETED Task"):
+        EvidenceRepository(db_session).create(evidence)
+
+
+def test_evidence_repository_accepts_completed_task(db_session) -> None:
+    task = TaskRepository(db_session).create(
+        Task(instruction="Count rows", status=TaskStatus.COMPLETED)
+    )
+    profile = DataProfileRepository(db_session).create(
+        DataProfile(row_count=0, column_count=0, columns=())
+    )
+    evidence = Evidence(
+        task_id=task.task_id,
+        data_profile_id=profile.data_profile_id,
+        content={"row_count": 0},
+        provenance=EvidenceProvenance(
+            producer_role="data_explorer",
+            work_reference=f"de:{task.task_id}",
+            dataset_reference="dataset:empty.csv",
+            data_profile_id=profile.data_profile_id,
+        ),
+    )
+
+    assert EvidenceRepository(db_session).create(evidence) == evidence

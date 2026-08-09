@@ -9,6 +9,7 @@ from sqlmodel import Session, select
 from db.models import DataProfileRecord, EvidenceRecord, TaskRecord
 from repositories.common import record_to_schema, schema_to_record_payload
 from schemas.artifacts import Evidence
+from schemas.enums import TaskStatus
 
 EVIDENCE_JSON_FIELDS = {"content", "provenance", "artifact_refs"}
 
@@ -20,8 +21,11 @@ class EvidenceRepository:
         self._session = session
 
     def create(self, evidence: Evidence) -> Evidence:
-        if self._session.get(TaskRecord, evidence.task_id) is None:
+        task = self._session.get(TaskRecord, evidence.task_id)
+        if task is None:
             raise ValueError("Evidence requires an existing Task.")
+        if task.status is not TaskStatus.COMPLETED:
+            raise ValueError("Evidence requires a COMPLETED Task.")
         if self._session.get(DataProfileRecord, evidence.data_profile_id) is None:
             raise ValueError("Evidence requires an existing DataProfile.")
         record = EvidenceRecord(

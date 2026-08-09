@@ -223,7 +223,7 @@ class UserDecision(CogniEDABaseModel):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
-class SessionFrame(CogniEDABaseModel):
+class SessionFrame(ImmutableCogniEDABaseModel):
     """Authoritative typed research state for the single active MVP session."""
 
     objective: Objective | None = None
@@ -251,10 +251,13 @@ class SessionFrame(CogniEDABaseModel):
             object_name="Evidence",
         )
 
-        task_ids = {task.task_id for task in self.tasks}
+        tasks_by_id = {task.task_id: task for task in self.tasks}
         for evidence in self.evidences:
-            if evidence.task_id not in task_ids:
+            task = tasks_by_id.get(evidence.task_id)
+            if task is None:
                 raise ValueError("SessionFrame rejects orphan Evidence without its Task.")
+            if task.status is not TaskStatus.COMPLETED:
+                raise ValueError("SessionFrame accepts Evidence only for COMPLETED Tasks.")
             if self.data_profile is None:
                 raise ValueError("SessionFrame cannot retain Evidence without a DataProfile.")
             if evidence.data_profile_id != self.data_profile.data_profile_id:
@@ -265,20 +268,31 @@ class SessionFrame(CogniEDABaseModel):
         if len(ids) != len(set(ids)):
             raise ValueError(f"SessionFrame rejects duplicate {object_name} IDs.")
 
-    def set_objective(self, objective: Objective | None) -> None:
-        self.objective = objective
+    def _validated_copy(self, **updates: object) -> SessionFrame:
+        values = {
+            "objective": self.objective,
+            "assumptions": self.assumptions,
+            "tasks": self.tasks,
+            "evidences": self.evidences,
+            "data_profile": self.data_profile,
+        }
+        values.update(updates)
+        return SessionFrame.model_validate(values)
 
-    def add_assumption(self, assumption: Assumption) -> None:
+    def set_objective(self, objective: Objective | None) -> SessionFrame:
+        return self._validated_copy(objective=objective)
+
+    def add_assumption(self, assumption: Assumption) -> SessionFrame:
         if any(item.assumption_id == assumption.assumption_id for item in self.assumptions):
             raise ValueError("SessionFrame rejects duplicate Assumption IDs.")
-        self.assumptions = (*self.assumptions, assumption)
+        return self._validated_copy(assumptions=(*self.assumptions, assumption))
 
-    def add_task(self, task: Task) -> None:
+    def add_task(self, task: Task) -> SessionFrame:
         if any(item.task_id == task.task_id for item in self.tasks):
             raise ValueError("SessionFrame rejects duplicate Task IDs.")
-        self.tasks = (*self.tasks, task)
+        return self._validated_copy(tasks=(*self.tasks, task))
 
-    def set_task_status(self, task_id: UUID, status: TaskStatus) -> None:
+    def set_task_status(self, task_id: UUID, status: TaskStatus) -> SessionFrame:
         for index, task in enumerate(self.tasks):
             if task.task_id == task_id:
                 replacement = Task(
@@ -286,16 +300,17 @@ class SessionFrame(CogniEDABaseModel):
                     instruction=task.instruction,
                     status=status,
                 )
-                self.tasks = (
-                    *self.tasks[:index],
-                    replacement,
-                    *self.tasks[index + 1 :],
+                return self._validated_copy(
+                    tasks=(
+                        *self.tasks[:index],
+                        replacement,
+                        *self.tasks[index + 1 :],
+                    )
                 )
-                return
         raise ValueError("SessionFrame cannot update a Task it does not contain.")
 
-    def add_evidence(self, evidence: Evidence) -> None:
-        self.evidences = (*self.evidences, evidence)
+    def add_evidence(self, evidence: Evidence) -> SessionFrame:
+        return self._validated_copy(evidences=(*self.evidences, evidence))
 
-    def set_data_profile(self, data_profile: DataProfile | None) -> None:
-        self.data_profile = data_profile
+    def set_data_profile(self, data_profile: DataProfile | None) -> SessionFrame:
+        return self._validated_copy(data_profile=data_profile)
