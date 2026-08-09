@@ -291,7 +291,7 @@ part of the canonical architecture and must not be described as removed.
 | --- | --- | --- |
 | S0 | executor capability stabilization | **Implemented** at the bounded S0 library surface |
 | D0 | MVP and canonical documentation reconciliation | **Implemented** by this documentation boundary |
-| M1-A | MVP research-state core: Objective, Assumption, Task, Evidence, DataProfile, and SessionFrame | **Deferred** |
+| M1-A | MVP research-state core: Objective, Assumption, Task, Evidence, DataProfile, and SessionFrame | **Implemented** |
 | M1-B | MVP Planner behavior, including `PlannerWorkOutcome` consumption | **Deferred** |
 | M3-A | MVP Data Explorer plus Evidence and real tool execution | **Deferred** |
 | M5-A | single-session runtime composition | **Deferred** |

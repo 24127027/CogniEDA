@@ -1,108 +1,97 @@
 # Limitations and bottlenecks
 
-These are verified constraints of current `main`, not a sprint backlog. The
-[current-state page](current-state.md) owns capability detail; this page groups
-the consequences by limitation type.
+These are verified constraints of the M1-A implementation, not a sprint
+backlog. [Current state](current-state.md) owns capability detail.
 
 ## Architectural gap
 
-- Current Task identity combines coordination and scientific fields and uses
-  the legacy `ANALYTICAL/ORGANIZING/REVIEW` taxonomy. The canonical separation
-  among Task, PlanRevision, plan bindings, and scientific operationalization is
-  therefore not represented.
-- Current schemas do not bind most durable state to an Objective. Multiple
-  Objectives can be stored, but exact Objective isolation cannot be enforced
-  across Tasks, scientific state, retrieval, or SessionFrames.
-- A bounded `DataExplorerResult` and Planner projection seam exist, but the
-  canonical work-order, specialist, governance, and admission contract family
-  is incomplete.
+- M1-A implements the approved executable subset, not the full canonical Task,
+  plan-version, scientific, governance, validity, or continuity architecture.
+- Active MVP Task has no PlanRevision membership, dependencies, assignment,
+  ordering, approval, parent/leaf semantics, or canonical Task kind. Those
+  contracts are **Deferred** to M1-C rather than represented by legacy fields.
+- The MVP SessionFrame supports one active Objective and one active
+  DataProfile but does not implement Workspace-wide multi-Objective isolation.
+- Direct Task-to-Evidence linkage is executable MVP state. Canonical
+  Hypothesis, EvidenceRequest, ExecutionRun, AnalysisFrame, evaluation, and
+  admission lineage remain **Deferred** to M2/M3-B.
 
 ## Implementation gap
 
+- M1-B Planner behavior, M3-A real Data Explorer-to-Evidence integration, and
+  M5-A single-session composition are **Deferred**.
 - `PlanRevision`, `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
-  and `GovernanceDecision` have no current supported implementation.
-- Planner execution nodes remain incomplete. Hypothesis Analyst and Graph Miner
-  are import-safe scaffolds and are deliberately not registered as runnable.
-- The three pre-existing Planner donor/test mismatches belong to M1-B unless
-  they block M1-A test collection earlier; they do not establish an S0 executor
-  regression or a separate repair milestone.
-- Evidence and Discovery repository guards are not composed behind complete
-  application-authority admission services.
-- There is no result-inbox or canonical result-to-Evidence workflow.
+  and `GovernanceDecision` have no supported implementation.
+- Hypothesis Analyst and Graph Miner remain unregistered scaffolds. Discovery
+  and Hypothesis remain canonical FCO names but have no active MVP runtime.
+- Objective and Assumption update behavior is **Deferred** to M1-B. Task
+  persistence supports status change only; changing Task meaning requires a
+  new identity rather than an in-place instruction update.
+- Evidence creation from Data Explorer output and sole application-authority
+  admission are not implemented. A failed execution produces no Evidence.
+
+## Donor isolation limitation
+
+- Canonical-heavy donor tests for old persistence, scientific attempts,
+  Discovery retrieval, and context projections are explicitly skipped after
+  the hard cutover. They remain as historical design/test material and are not
+  compatibility authority for active schemas.
+- The unregistered Hypothesis Analyst, legacy context builder, Planner
+  operation contracts, and scientific repositories still contain deferred
+  field references. They are not composed into the active M1-A path.
+- Fresh SQLite metadata reflects M1-A mappings. Upgrading an existing donor
+  database to the hard-cutover schema is **Unsupported**; no production data
+  migration is included in this milestone.
 
 ## Operational limitation
 
-- Bootstrap composes the in-process S0 registry and dispatcher, but there is no
-  supported end-to-end application runtime, worker process, or service API.
-- Planner is configured with built-in tool adapters, and the data-capability
-  adapter is tested through dispatcher to a registered fake provider. This is
-  an invocation-seam proof, not completed MVP Planner behavior.
-- The local Data Explorer donor provider can produce a typed result from a
-  direct capability request, but it is not connected to execution-attempt
-  records, outbox controls, or admission.
-- Configuration mentions skills and MCP workers that do not establish a working external integration by themselves. The configured skill directories are absent from the current tree.
-- Delegation adapter dispatch is tested with a fake provider; real Planner to
-  Data Explorer to admission integration remains incomplete.
+- Bootstrap composes the in-process S0 dispatcher and bounded Data Explorer,
+  but no supported end-to-end application runtime, worker, service API, or
+  product CLI exists.
+- The local Data Explorer donor path can execute bounded analysis or profiling
+  from a direct request. It is not a production sandbox and is not connected
+  to Evidence admission.
+- `DATA_TRANSFORMATION` remains blocked until immutable successor dataset state
+  and successor DataProfile handling exist.
+- Planner-to-dispatch adapter tests use a registered fake provider; they do not
+  prove model-selected real Data Explorer work.
 
 ## Database limitation
 
-- Current behavior is **Verified on SQLite** only.
-- The execution-attempt upgrade helper applies only to SQLite.
-- Older databases are not upgraded to all fresh-schema cardinality
-  constraints; creating tables from metadata is not a general migration plan.
-- JSON-held reference lists cannot receive the same database foreign-key
-  enforcement as typed columns.
-
-## Recovery limitation
-
-- Planner proposal resumption covers exact pending operation IDs, not complete
-  Objective or plan reconstruction.
-- Execution attempts have outbox, lease, fencing, and retry foundations but no
-  durable result inbox or end-to-end replay path.
-- SessionFrame latest/recent lookup is store-wide rather than Objective-bound.
-
-## Unsupported feature
-
-- Data Explorer is runnable only through its bounded local donor path;
-  Hypothesis Analyst and Graph Miner have no registered runtime provider.
-- DVC execution, graph-database integration, external MCP services, service
-  APIs, and the product CLI are unsupported.
-- Cross-Objective Evidence reuse and cross-Objective relation admission have no
-  supported path and must remain fail closed.
-
-## Performance bottleneck
-
-- No production performance envelope has been established. Repository queries
-  and context assembly are exercised only at test scale.
-- Discovery retrieval performs bounded relational filtering followed by local
-  lexical scoring; no scale, latency, or quality benchmark supports a broader
-  claim.
-- JSON collections and store-wide SessionFrame queries may become expensive,
-  but their production impact has not been measured.
+- Current bounded persistence is **Verified on SQLite** only.
+- Durable restart/resume, replay, claims, leases, result inbox, and multi-store
+  migration are outside M1-A.
+- SessionFrame snapshots use an internal serialized SQLite envelope; this is a
+  bounded round-trip seam, not M5-A/M5-B durable runtime authority.
+- No non-SQLite database is tested.
 
 ## Verification gap
 
-- The focused S0 selection recorded 24 passing tests. The full S0 suite was
-  interrupted by three pre-existing Planner collection mismatches: tests
-  import `TaskManagementDraft`, `route_intent`, `understand_request`,
-  `ChildTaskProposalDraft`, and `manage_tasks`, which the corresponding Planner
-  source does not define. Those files were unchanged by S0, so this is not an
-  S0 executor regression.
-  Excluding those three files, the S0 report recorded 111 passing tests.
-  Ownership is M1-B unless the collection failure blocks M1-A earlier.
-- PydanticAI delegation adapter to dispatcher to a registered fake provider is
-  validated. This does not cover model-selected real Data Explorer work or
-  specialist result admission.
-- No non-SQLite database is tested.
-- No end-to-end user, specialist, governance, admission, recovery, or
-  external-integration test exists. CLI remains unsupported.
-- The current repository has no first-party Markdown link-check command.
+- Full pytest collection is interrupted by three pre-existing M1-B Planner
+  donor mismatches involving `TaskManagementDraft`, `route_intent`,
+  `understand_request`, `ChildTaskProposalDraft`, and `manage_tasks`.
+- Excluding exactly those three modules, the M1-A broad run recorded 82 passes
+  and 72 explicit deferred-donor skips.
+- No end-to-end user-to-Planner-to-real-Data Explorer-to-Evidence-to-
+  SessionFrame-to-response test exists; that is not an M1-A completion claim.
+- No production performance envelope, non-SQLite validation, external
+  integration test, or first-party Markdown link-check command exists.
+
+## Unsupported feature
+
+- DVC execution, graph-database integration, external MCP services, service
+  APIs, UI, and the product CLI are **Unsupported**.
+- Cross-Objective Evidence reuse and cross-Objective relation admission have
+  no supported path and must remain fail closed.
+- Production bounded Python execution, full analytical tool coverage,
+  streaming, multi-session coordination, and successor transformation remain
+  **Deferred**.
 
 ## Documentation limitation
 
-- Current status is a dated source audit and can drift when runtime code
-  changes. Capability changes must update this track in the same change.
-- Compatibility notices preserve old inbound paths but intentionally do not
-  repeat the canonical explanation.
+- Current status is a dated source/test audit and can drift when runtime code
+  changes. Capability changes must update this status track in the same change.
+- Compatibility notices preserve old inbound paths but do not redefine the
+  canonical target or the executable MVP subset.
