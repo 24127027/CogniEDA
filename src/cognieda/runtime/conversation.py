@@ -56,6 +56,37 @@ class ConversationHistory(ImmutableCogniEDABaseModel):
 
         return self.model_messages()
 
+    def presentation_transcript(self) -> tuple[tuple[str, str], ...]:
+        """Derive non-authoritative Human/Planner text pairs when a turn provides them."""
+
+        transcript: list[tuple[str, str]] = []
+        for turn in self.turns:
+            human_message = self._last_user_text(turn.messages)
+            planner_message = self._last_response_text(turn.messages)
+            if human_message is not None and planner_message is not None:
+                transcript.append((human_message, planner_message))
+        return tuple(transcript)
+
+    @staticmethod
+    def _last_user_text(messages: tuple[ModelMessage, ...]) -> str | None:
+        for message in reversed(messages):
+            if not isinstance(message, ModelRequest):
+                continue
+            for part in reversed(message.parts):
+                if isinstance(part, UserPromptPart) and isinstance(part.content, str):
+                    return part.content
+        return None
+
+    @staticmethod
+    def _last_response_text(messages: tuple[ModelMessage, ...]) -> str | None:
+        for message in reversed(messages):
+            if not isinstance(message, ModelResponse):
+                continue
+            for part in reversed(message.parts):
+                if isinstance(part, TextPart):
+                    return part.content
+        return None
+
 
 def planner_interaction_messages(
     *, human_message: str, planner_message: str

@@ -159,7 +159,9 @@ underlying Task/DataProfile lineage invariant.
 A separate in-process runtime `Session` retains the successor frame and native
 PydanticAI `ModelMessage` conversation turns. Request understanding receives
 selected native history through PydanticAI's `message_history` channel;
-empirical answer composition still excludes conversation and Assumptions.
+empirical answer composition still excludes conversation and Assumptions. A
+Human/Planner text transcript is a derived presentation view, not the canonical
+stored interaction representation.
 
 The active schema does not encode the complete canonical purpose, reasoning
 mode, Objective-isolation, validity, or item-level eligibility model. Runtime

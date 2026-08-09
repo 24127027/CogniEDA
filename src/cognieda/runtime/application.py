@@ -26,13 +26,14 @@ class Application:
         planner_output = await self.planner_agent.run(
             message,
             session_frame=self.session.session_frame,
-            message_history=(
-                self.session.conversation_history.select_for_request_understanding()
-            ),
+            message_history=(self.session.conversation_history.select_for_request_understanding()),
         )
-        turn_messages = planner_output.new_messages or planner_interaction_messages(
-            human_message=message,
-            planner_message=planner_output.response,
+        turn_messages = (
+            *planner_output.new_messages,
+            *planner_interaction_messages(
+                human_message=message,
+                planner_message=planner_output.response,
+            ),
         )
         self.session = self.session.advance(
             session_frame=planner_output.session_frame,

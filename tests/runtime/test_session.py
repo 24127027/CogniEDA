@@ -179,6 +179,17 @@ def test_application_retains_ids_and_resolved_context_across_turns(db_session) -
     assert model.message_histories[0] == ()
     assert model.message_histories[1] == first_session.conversation_history.model_messages()
     assert len(application.session.conversation_history.turns) == 2
+    assert application.session.conversation_history.presentation_transcript() == (
+        (
+            "Investigate customer churn.",
+            "Active Objective set to: Understand customer churn.",
+        ),
+        (
+            "Summarize what we established.",
+            "Active Objective: Understand customer churn.. Planning Assumptions "
+            "(not Evidence): 0. Tasks: 0. Admitted Evidence items: 0.",
+        ),
+    )
 
 
 def test_completed_task_lifecycle_is_resolved_on_the_next_turn(db_session) -> None:
