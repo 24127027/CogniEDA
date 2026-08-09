@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
+from pydantic_ai.messages import ModelMessage
+
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import ExecutorContext
 from cognieda.schemas.artifacts import SessionFrame
@@ -10,7 +14,6 @@ from .model import PlannerDecisionModel, PlannerModel
 from .types import (
     Context,
     PlannerControlledError,
-    PlannerConversationTurn,
     PlannerErrorCode,
     PlannerOutput,
     State,
@@ -55,7 +58,7 @@ class Planner:
         query: str,
         *,
         session_frame: SessionFrame | None = None,
-        conversation_context: tuple[PlannerConversationTurn, ...] = (),
+        message_history: Sequence[ModelMessage] = (),
         execution_context: ExecutorContext | None = None,
     ) -> PlannerOutput:
         """Run one request against explicit typed state and return its validated successor."""
@@ -71,7 +74,7 @@ class Planner:
         state = State(
             query=query,
             session_frame=frame,
-            conversation_context=conversation_context,
+            message_history=tuple(message_history),
             execution_context=execution_context or ExecutorContext(),
         )
         context = Context(planner_model=self.model, dispatcher=self.deps.dispatcher)
@@ -98,4 +101,5 @@ class Planner:
             selected_capability=final_state.selected_capability,
             work_outcome=final_state.work_outcome,
             error=final_state.error,
+            new_messages=final_state.new_messages,
         )

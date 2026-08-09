@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.types import PlannerConversationTurn
 from cognieda.execution import ExecutorDispatcher
 
+from .conversation import planner_interaction_messages
 from .messages import Message, MessageRole, MessageType
 from .session import Session
 from .workspace import Workspace
@@ -23,22 +23,20 @@ class Application:
         self.session = session or Session()
 
     async def submit_message(self, message: str) -> Message:
-        conversation_context = tuple(
-            PlannerConversationTurn(
-                human_message=turn.human_message,
-                planner_message=turn.planner_message,
-            )
-            for turn in self.session.conversation_history.turns
-        )
         planner_output = await self.planner_agent.run(
             message,
             session_frame=self.session.session_frame,
-            conversation_context=conversation_context,
+            message_history=(
+                self.session.conversation_history.select_for_request_understanding()
+            ),
+        )
+        turn_messages = planner_output.new_messages or planner_interaction_messages(
+            human_message=message,
+            planner_message=planner_output.response,
         )
         self.session = self.session.advance(
             session_frame=planner_output.session_frame,
-            human_message=message,
-            planner_message=planner_output.response,
+            messages=turn_messages,
         )
 
         return Message(

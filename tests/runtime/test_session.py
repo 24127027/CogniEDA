@@ -2,12 +2,24 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from collections.abc import Sequence
 
 import pytest
 from pydantic import ValidationError
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelMessagesTypeAdapter,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    ToolCallPart,
+    ToolReturnPart,
+    UserPromptPart,
+)
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
+from cognieda.agents.planner.model import PlannerModelResult
 from cognieda.agents.planner.types import (
     PlannerAction,
     PlannerAnswerInput,
@@ -40,15 +52,35 @@ class SequencePlannerModel:
     def __init__(self, *decisions: PlannerDecision) -> None:
         self._decisions = iter(decisions)
         self.decision_inputs: list[PlannerModelInput] = []
+        self.message_histories: list[tuple[ModelMessage, ...]] = []
         self.answer_inputs: list[PlannerAnswerInput] = []
 
-    async def decide(self, model_input: PlannerModelInput) -> PlannerDecision:
+    async def decide(
+        self,
+        model_input: PlannerModelInput,
+        *,
+        message_history: Sequence[ModelMessage] = (),
+    ) -> PlannerModelResult[PlannerDecision]:
         self.decision_inputs.append(model_input)
-        return next(self._decisions)
+        self.message_histories.append(tuple(message_history))
+        messages = (
+            ModelRequest(parts=[UserPromptPart(content=model_input.latest_request)]),
+            ModelResponse(parts=[TextPart(content="typed decision")]),
+        )
+        return PlannerModelResult(output=next(self._decisions), new_messages=messages)
 
-    async def answer(self, answer_input: PlannerAnswerInput) -> PlannerResponseDraft:
+    async def answer(
+        self, answer_input: PlannerAnswerInput
+    ) -> PlannerModelResult[PlannerResponseDraft]:
         self.answer_inputs.append(answer_input)
-        return PlannerResponseDraft(text="The admitted Evidence reports 42 rows.")
+        messages = (
+            ModelRequest(parts=[UserPromptPart(content=answer_input.latest_request)]),
+            ModelResponse(parts=[TextPart(content="The admitted Evidence reports 42 rows.")]),
+        )
+        return PlannerModelResult(
+            output=PlannerResponseDraft(text="The admitted Evidence reports 42 rows."),
+            new_messages=messages,
+        )
 
 
 class FakeDispatcher:
@@ -131,15 +163,13 @@ def test_application_retains_objective_and_prior_conversation_across_turns() -> 
     assert application.session.session_frame.objective is not None
     assert application.session.session_frame.objective.text == "Understand customer churn."
     assert model.decision_inputs[1].objective == first_session.session_frame.objective
-    assert len(model.decision_inputs[1].conversation) == 1
-    assert model.decision_inputs[1].conversation[0].human_message == ("Investigate customer churn.")
-    assert model.decision_inputs[1].conversation[0].planner_message == (
-        "Active Objective set to: Understand customer churn."
+    assert model.message_histories[0] == ()
+    assert model.message_histories[1] == first_session.conversation_history.model_messages()
+    assert len(application.session.conversation_history.turns) == 2
+    assert all(
+        isinstance(message, (ModelRequest, ModelResponse))
+        for message in application.session.conversation_history.model_messages()
     )
-    assert [turn.human_message for turn in application.session.conversation_history.turns] == [
-        "Investigate customer churn.",
-        "Summarize what we established.",
-    ]
 
 
 def test_completed_task_lifecycle_survives_the_next_turn() -> None:
@@ -181,9 +211,11 @@ def test_assumption_survives_but_cannot_become_empirical_support() -> None:
 
 def test_existing_profile_and_evidence_survive_and_answer_input_excludes_conversation() -> None:
     frame, evidence = _frame_with_admitted_evidence()
-    history = ConversationHistory().append(
-        human_message="I think there are 100 rows.",
-        planner_message="That statement is not admitted Evidence.",
+    history = ConversationHistory().add_turn(
+        (
+            ModelRequest(parts=[UserPromptPart(content="I think there are 100 rows.")]),
+            ModelResponse(parts=[TextPart(content="That statement is not admitted Evidence.")]),
+        )
     )
     model = SequencePlannerModel(PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE))
     application, _ = _application(
@@ -205,34 +237,60 @@ def test_session_components_and_conversation_are_immutable_successors() -> None:
     session = Session()
     successor = session.advance(
         session_frame=session.session_frame,
-        human_message="First",
-        planner_message="First response",
+        messages=(ModelRequest(parts=[UserPromptPart(content="First")]),),
     )
     final = successor.advance(
         session_frame=successor.session_frame,
-        human_message="Second",
-        planner_message="Second response",
+        messages=(ModelResponse(parts=[TextPart(content="Second response")]),),
     )
 
     assert session.conversation_history.turns == ()
-    assert [turn.human_message for turn in final.conversation_history.turns] == [
-        "First",
-        "Second",
-    ]
+    assert len(final.conversation_history.turns) == 2
     assert final.session_frame is successor.session_frame
     assert "conversation_history" not in SessionFrame.model_fields
     with pytest.raises(ValidationError, match="frozen"):
         final.conversation_history = ConversationHistory()
 
 
-def test_conversation_contract_contains_no_provider_native_messages() -> None:
+def test_conversation_contract_contains_provider_native_messages_only_at_runtime() -> None:
     import cognieda.runtime.conversation as conversation_module
     import cognieda.schemas.artifacts as artifacts_module
 
     conversation_source = inspect.getsource(conversation_module)
     artifacts_source = inspect.getsource(artifacts_module)
 
-    assert "ModelMessage" not in conversation_source
-    assert "pydantic_ai" not in conversation_source
+    assert "ModelMessage" in conversation_source
+    assert "pydantic_ai" in conversation_source
     assert "ModelMessage" not in artifacts_source
     assert "pydantic_ai" not in artifacts_source
+
+
+def test_conversation_round_trip_preserves_tool_call_and_return_coherence() -> None:
+    messages: tuple[ModelMessage, ...] = (
+        ModelRequest(parts=[UserPromptPart(content="Inspect the active state.")]),
+        ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="lookup_state", args={"scope": "active"}, tool_call_id="call-1"
+                )
+            ]
+        ),
+        ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_name="lookup_state", content={"status": "ready"}, tool_call_id="call-1"
+                )
+            ]
+        ),
+        ModelResponse(parts=[TextPart(content="The active state is ready.")]),
+    )
+    history = ConversationHistory().add_turn(messages)
+
+    encoded = history.model_dump_json()
+    restored = ConversationHistory.model_validate_json(encoded)
+
+    assert restored.model_messages() == messages
+    assert ModelMessagesTypeAdapter.validate_json(
+        ModelMessagesTypeAdapter.dump_json(list(restored.model_messages()))
+    ) == list(messages)
+    assert len(restored.turns) == 1

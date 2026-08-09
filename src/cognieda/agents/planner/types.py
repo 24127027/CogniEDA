@@ -4,6 +4,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic_ai.messages import ModelMessage
 
 from cognieda.execution import Capability, ExecutorContext, PlannerWorkOutcome
 from cognieda.schemas.artifacts import (
@@ -47,15 +48,6 @@ class PlannerControlledError(BaseModel):
 
     code: PlannerErrorCode
     message: str = Field(min_length=1)
-
-
-class PlannerConversationTurn(BaseModel):
-    """Non-authoritative conversation projection used only for request understanding."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    human_message: str
-    planner_message: str = Field(min_length=1)
 
 
 class PlannerDecision(BaseModel):
@@ -126,15 +118,12 @@ class PlannerModelInput(BaseModel):
     tasks: tuple[Task, ...] = ()
     data_profile: DataProfile | None = None
     evidences: tuple[Evidence, ...] = ()
-    conversation: tuple[PlannerConversationTurn, ...] = ()
 
     @classmethod
     def from_frame(
         cls,
         latest_request: str,
         frame: SessionFrame,
-        *,
-        conversation: tuple[PlannerConversationTurn, ...] = (),
     ) -> PlannerModelInput:
         return cls(
             latest_request=latest_request,
@@ -143,7 +132,6 @@ class PlannerModelInput(BaseModel):
             tasks=frame.tasks,
             data_profile=frame.data_profile,
             evidences=frame.evidences,
-            conversation=conversation,
         )
 
 
@@ -173,7 +161,8 @@ class State(BaseModel):
 
     query: str = Field(min_length=1)
     session_frame: SessionFrame
-    conversation_context: tuple[PlannerConversationTurn, ...] = ()
+    message_history: tuple[ModelMessage, ...] = ()
+    new_messages: tuple[ModelMessage, ...] = ()
     execution_context: ExecutorContext = Field(default_factory=ExecutorContext)
     decision: PlannerDecision | None = None
     created_task_id: UUID | None = None
@@ -204,3 +193,4 @@ class PlannerOutput(BaseModel):
     selected_capability: Capability | None = None
     work_outcome: PlannerWorkOutcome | None = None
     error: PlannerControlledError | None = None
+    new_messages: tuple[ModelMessage, ...] = ()

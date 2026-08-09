@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Sequence
 from uuid import UUID, uuid4
 
 import pytest
+from pydantic_ai.messages import ModelMessage
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
+from cognieda.agents.planner.model import PlannerModelResult
 from cognieda.agents.planner.types import (
     PlannerAction,
     PlannerAnswerInput,
@@ -44,15 +47,27 @@ class FakePlannerModel:
         self.decision = decision
         self.answer_text = answer
         self.decision_inputs: list[PlannerModelInput] = []
+        self.message_histories: list[tuple[ModelMessage, ...]] = []
         self.answer_inputs: list[PlannerAnswerInput] = []
 
-    async def decide(self, model_input: PlannerModelInput) -> PlannerDecision:
+    async def decide(
+        self,
+        model_input: PlannerModelInput,
+        *,
+        message_history: Sequence[ModelMessage] = (),
+    ) -> PlannerModelResult[PlannerDecision]:
         self.decision_inputs.append(model_input)
-        return self.decision
+        self.message_histories.append(tuple(message_history))
+        return PlannerModelResult(output=self.decision, new_messages=())
 
-    async def answer(self, answer_input: PlannerAnswerInput) -> PlannerResponseDraft:
+    async def answer(
+        self, answer_input: PlannerAnswerInput
+    ) -> PlannerModelResult[PlannerResponseDraft]:
         self.answer_inputs.append(answer_input)
-        return PlannerResponseDraft(text=self.answer_text)
+        return PlannerModelResult(
+            output=PlannerResponseDraft(text=self.answer_text),
+            new_messages=(),
+        )
 
 
 class FakeDispatcher:

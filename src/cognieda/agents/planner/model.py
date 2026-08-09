@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from typing import Protocol
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Protocol, TypeVar
+
+from pydantic_ai.messages import ModelMessage
 
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 
@@ -12,13 +16,30 @@ from .types import (
     PlannerResponseDraft,
 )
 
+PlannerModelOutputT = TypeVar("PlannerModelOutputT")
+
+
+@dataclass(frozen=True)
+class PlannerModelResult[PlannerModelOutputT]:
+    """Typed output plus the exact native messages produced by one model run."""
+
+    output: PlannerModelOutputT
+    new_messages: tuple[ModelMessage, ...]
+
 
 class PlannerDecisionModel(Protocol):
     """Model boundary used by deterministic Planner orchestration."""
 
-    async def decide(self, model_input: PlannerModelInput) -> PlannerDecision: ...
+    async def decide(
+        self,
+        model_input: PlannerModelInput,
+        *,
+        message_history: Sequence[ModelMessage] = (),
+    ) -> PlannerModelResult[PlannerDecision]: ...
 
-    async def answer(self, answer_input: PlannerAnswerInput) -> PlannerResponseDraft: ...
+    async def answer(
+        self, answer_input: PlannerAnswerInput
+    ) -> PlannerModelResult[PlannerResponseDraft]: ...
 
 
 class PlannerModel:
@@ -38,7 +59,12 @@ class PlannerModel:
             builtin_tools=(),
         )
 
-    async def decide(self, model_input: PlannerModelInput) -> PlannerDecision:
+    async def decide(
+        self,
+        model_input: PlannerModelInput,
+        *,
+        message_history: Sequence[ModelMessage] = (),
+    ) -> PlannerModelResult[PlannerDecision]:
         prompt = (
             "Classify the latest request into exactly one bounded MVP Planner action.\n"
             "Use only the typed research-state projection below as authoritative state.\n"
@@ -57,10 +83,16 @@ class PlannerModel:
             prompt,
             output_type=PlannerDecision,
             deps=self.deps,
+            message_history=message_history,
         )
-        return PlannerDecision.model_validate(result.output)
+        return PlannerModelResult(
+            output=PlannerDecision.model_validate(result.output),
+            new_messages=tuple(result.new_messages()),
+        )
 
-    async def answer(self, answer_input: PlannerAnswerInput) -> PlannerResponseDraft:
+    async def answer(
+        self, answer_input: PlannerAnswerInput
+    ) -> PlannerModelResult[PlannerResponseDraft]:
         prompt = (
             "Answer the latest request using only the admitted Evidence in this typed input.\n"
             "Do not invent analysis, strengthen the Evidence, or treat omitted planning "
@@ -72,4 +104,7 @@ class PlannerModel:
             output_type=PlannerResponseDraft,
             deps=self.deps,
         )
-        return PlannerResponseDraft.model_validate(result.output)
+        return PlannerModelResult(
+            output=PlannerResponseDraft.model_validate(result.output),
+            new_messages=tuple(result.new_messages()),
+        )

@@ -109,13 +109,12 @@ async def understand_request(state: State, runtime: Runtime[Context]) -> State:
 
     model = cast(PlannerDecisionModel, runtime.context.planner_model)
     try:
-        state.decision = await model.decide(
-            PlannerModelInput.from_frame(
-                state.query,
-                state.session_frame,
-                conversation=state.conversation_context,
-            )
+        result = await model.decide(
+            PlannerModelInput.from_frame(state.query, state.session_frame),
+            message_history=state.message_history,
         )
+        state.decision = result.output
+        state.new_messages = (*state.new_messages, *result.new_messages)
     except Exception as exc:
         state.error = _error(
             PlannerErrorCode.INVALID_MODEL_DECISION,
@@ -275,7 +274,7 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
             return state
         model = cast(PlannerDecisionModel, runtime.context.planner_model)
         try:
-            draft = await model.answer(
+            result = await model.answer(
                 PlannerAnswerInput(
                     latest_request=state.query,
                     objective=state.session_frame.objective,
@@ -283,7 +282,8 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
                     evidences=state.session_frame.evidences,
                 )
             )
-            state.response = draft.text
+            state.new_messages = (*state.new_messages, *result.new_messages)
+            state.response = result.output.text
         except Exception as exc:
             state.error = _error(
                 PlannerErrorCode.RESPONSE_FAILED,
