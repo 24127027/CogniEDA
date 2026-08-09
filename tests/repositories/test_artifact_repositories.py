@@ -7,9 +7,9 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
-from db.init_db import init_db
-from db.session import create_db_engine, get_session
-from repositories import (
+from cognieda.db.init_db import init_db
+from cognieda.db.session import create_db_engine, get_session
+from cognieda.repositories import (
     AnalysisFrameRepository,
     AssumptionRepository,
     AssumptionUpdate,
@@ -27,7 +27,7 @@ from repositories import (
     TaskUpdate,
     UserDecisionRepository,
 )
-from schemas.artifacts import (
+from cognieda.schemas.artifacts import (
     Assumption,
     DataProfile,
     Discovery,
@@ -38,7 +38,7 @@ from schemas.artifacts import (
     Task,
     UserDecision,
 )
-from schemas.common import (
+from cognieda.schemas.common import (
     BaselineSummary,
     DiscoveryClaim,
     EvidenceProvenance,
@@ -48,7 +48,7 @@ from schemas.common import (
     SchemaSummary,
     ValidityBasis,
 )
-from schemas.enums import (
+from cognieda.schemas.enums import (
     AssumptionSource,
     AssumptionStatus,
     AssumptionTestability,
@@ -68,7 +68,7 @@ from schemas.enums import (
     TaskLifecycleState,
     UserDecisionType,
 )
-from schemas.provenance import AnalysisFrame, ExecutionRun, ObjectiveRevision
+from cognieda.schemas.provenance import AnalysisFrame, ExecutionRun, ObjectiveRevision
 
 pytestmark = pytest.mark.skip(
     reason="Canonical donor persistence tests are deferred after the M1-A active-schema cutover."
@@ -296,7 +296,7 @@ def test_obsolete_domain_types_are_not_exported_or_fcos() -> None:
     assert "dataset_asset" not in fcos
     assert "decision_log" not in fcos
 
-    import schemas.artifacts as artifacts
+    import cognieda.schemas.artifacts as artifacts
 
     assert not hasattr(artifacts, "Project")
     assert not hasattr(artifacts, "DatasetAsset")
@@ -336,8 +336,8 @@ def test_objective_revision_is_non_fco_provenance() -> None:
 
     assert "objective_revision" not in fcos
 
-    import schemas.artifacts as artifacts
-    import schemas.provenance as provenance
+    import cognieda.schemas.artifacts as artifacts
+    import cognieda.schemas.provenance as provenance
 
     assert not hasattr(artifacts, "ObjectiveRevision")
     assert hasattr(provenance, "ObjectiveRevision")
@@ -347,9 +347,7 @@ def test_objective_revision_repository_create_get_list_for_objective(db_session)
     objective_repository = ObjectiveRepository(db_session)
     revision_repository = ObjectiveRevisionRepository(db_session)
     objective = objective_repository.create(build_objective())
-    other_objective = objective_repository.create(
-        build_objective(title="Retention Investigation")
-    )
+    other_objective = objective_repository.create(build_objective(title="Retention Investigation"))
 
     revision = revision_repository.create(
         ObjectiveRevision(
@@ -384,9 +382,7 @@ def test_objective_revision_repository_create_get_list_for_objective(db_session)
 
     assert loaded == revision
     assert revision_repository.list_for_objective(objective.objective_id) == [revision]
-    assert revision_repository.list_for_objective(other_objective.objective_id) == [
-        other_revision
-    ]
+    assert revision_repository.list_for_objective(other_objective.objective_id) == [other_revision]
 
 
 def test_objective_update_with_revision_repository_creates_revision(
@@ -464,9 +460,12 @@ def test_objective_update_rejects_revision_repository_from_different_session(
         assert reloaded.title == objective.title
         assert reloaded.statement == objective.statement
         assert reloaded.status == objective.status
-        assert ObjectiveRevisionRepository(objective_session).list_for_objective(
-            objective.objective_id
-        ) == []
+        assert (
+            ObjectiveRevisionRepository(objective_session).list_for_objective(
+                objective.objective_id
+            )
+            == []
+        )
         assert revision_repository.list_for_objective(objective.objective_id) == []
     finally:
         objective_session.close()
@@ -488,9 +487,7 @@ def test_objective_update_without_revision_repository_preserves_behavior(
     assert updated is not None
     assert updated.objective_id == objective.objective_id
     assert updated.statement == "Refined churn objective."
-    assert ObjectiveRevisionRepository(db_session).list_for_objective(
-        objective.objective_id
-    ) == []
+    assert ObjectiveRevisionRepository(db_session).list_for_objective(objective.objective_id) == []
 
 
 def test_objective_noop_update_with_revision_repository_does_not_create_revision(
@@ -583,9 +580,7 @@ def test_data_profile_supersede_with_repositories_marks_historical_scope(
     historically_scoped = evidence_repository.get_by_id(evidence.evidence_id)
     flagged = discovery_repository.get_by_id(discovery.discovery_id)
     unaffected_evidence = evidence_repository.get_by_id(unrelated_evidence.evidence_id)
-    unaffected_discovery = discovery_repository.get_by_id(
-        unrelated_discovery.discovery_id
-    )
+    unaffected_discovery = discovery_repository.get_by_id(unrelated_discovery.discovery_id)
 
     assert superseded_profile is not None
     assert superseded_profile.lifecycle_state == DataProfileLifecycleState.SUPERSEDED
@@ -595,13 +590,9 @@ def test_data_profile_supersede_with_repositories_marks_historical_scope(
     assert historically_scoped.lifecycle_reason is not None
     assert str(old_profile.profile_id) in historically_scoped.lifecycle_reason
     assert str(replacement_profile.profile_id) in historically_scoped.lifecycle_reason
-    assert "Cleaning produced a replacement DataProfile." in (
-        historically_scoped.lifecycle_reason
-    )
+    assert "Cleaning produced a replacement DataProfile." in (historically_scoped.lifecycle_reason)
     assert historically_scoped.result_summary == evidence.result_summary
-    assert evidence_without_lifecycle_metadata(historically_scoped) == (
-        original_evidence_payload
-    )
+    assert evidence_without_lifecycle_metadata(historically_scoped) == (original_evidence_payload)
 
     assert flagged is not None
     assert flagged.lifecycle_state == DiscoveryLifecycleState.FLAGGED
@@ -1301,9 +1292,7 @@ def test_evidence_supersede_rejects_discovery_repository_from_different_session(
     discovery_session = get_session(database_url)
     verification_session = get_session(database_url)
     try:
-        profile, hypothesis, evidence, discovery = create_evidence_bound_discovery(
-            evidence_session
-        )
+        profile, hypothesis, evidence, discovery = create_evidence_bound_discovery(evidence_session)
         evidence_repository = EvidenceRepository(evidence_session)
         replacement = evidence_repository.create(
             build_evidence(
@@ -1588,12 +1577,13 @@ def test_data_profile_evidence_and_discovery_invariants_are_enforced() -> None:
     with pytest.raises(ValidationError):
         Evidence(
             **(
-                build_evidence(uuid4(), profile.profile_id)
-                .model_dump()
-                | {"provenance": EvidenceProvenance(
-                    analysis_frame_ref="different-frame",
-                    execution_run_ref="execution-run:001",
-                )}
+                build_evidence(uuid4(), profile.profile_id).model_dump()
+                | {
+                    "provenance": EvidenceProvenance(
+                        analysis_frame_ref="different-frame",
+                        execution_run_ref="execution-run:001",
+                    )
+                }
             )
         )
 
@@ -1605,8 +1595,7 @@ def test_data_profile_evidence_and_discovery_invariants_are_enforced() -> None:
 
     careful_summary = EvidenceResultSummary(
         summary=(
-            "Available evidence is insufficient to reject independence within scope "
-            "using method M."
+            "Available evidence is insufficient to reject independence within scope using method M."
         )
     )
     assert "insufficient" in careful_summary.summary
@@ -1635,9 +1624,7 @@ def test_hypothesis_repository_enforces_task_admission_and_cardinality(db_sessio
         build_task(profile.profile_id, lifecycle_state=TaskLifecycleState.PROPOSED)
     )
     with pytest.raises(ValueError):
-        hypothesis_repository.create(
-            build_hypothesis(proposed_task.task_id, profile.profile_id)
-        )
+        hypothesis_repository.create(build_hypothesis(proposed_task.task_id, profile.profile_id))
 
     draft_profile_task = task_repository.create(build_task(draft_profile.profile_id))
     with pytest.raises(ValueError):
@@ -1804,9 +1791,9 @@ def test_task_and_non_fco_generated_view_guards() -> None:
 
 
 def test_planner_and_executor_authoring_contracts() -> None:
-    from agents.executor.data_explorer.types import DataExplorerResult
-    from agents.executor.types import ExecutionResult, PlannerWorkOutcome
-    from agents.planner.types import PlannerOutput
+    from cognieda.agents.executor.data_explorer.types import DataExplorerResult
+    from cognieda.agents.executor.types import ExecutionResult, PlannerWorkOutcome
+    from cognieda.agents.planner.types import PlannerOutput
 
     planner_fields = set(PlannerOutput.model_fields)
     transport_fields = set(ExecutionResult.model_fields)

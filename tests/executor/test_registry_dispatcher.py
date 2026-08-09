@@ -5,7 +5,7 @@ import asyncio
 import pytest
 from pydantic import ValidationError
 
-from agents.executor import (
+from cognieda.agents.executor import (
     Capability,
     CapabilityNotRegisteredError,
     ExecutionRequest,
@@ -18,9 +18,9 @@ from agents.executor import (
     ExecutorRegistry,
     normalize_for_planner,
 )
-from agents.executor.capabilities import Capability as CapabilityFromOwner
-from runtime.bootstrap import bootstrap_application
-from schemas.artifacts import Task
+from cognieda.agents.executor.capabilities import Capability as CapabilityFromOwner
+from cognieda.runtime.bootstrap import bootstrap_application
+from cognieda.schemas.artifacts import Task
 
 
 def _task() -> Task:

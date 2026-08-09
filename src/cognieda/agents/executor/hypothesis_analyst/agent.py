@@ -1,0 +1,100 @@
+"""Deferred Hypothesis Analyst donor wrapper."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from pydantic_ai import Agent
+
+from cognieda.agents.llm import ModelConfig, create_agent
+from cognieda.schemas.artifacts import Discovery
+from cognieda.tools.builtin import AvailableBuiltinTools
+
+from ..capabilities import Capability
+from ..data_explorer.types import DataExplorerResult
+from ..types import ExecutionRequest
+from .deps import AdmissionCall, DispatcherCall
+from .graph import build_graph
+from .state import HAState
+from .types import HypothesisAnalystResult
+
+
+def _missing_dispatcher_call(request: ExecutionRequest) -> DataExplorerResult:
+    raise RuntimeError(
+        "HypothesisAnalyst requires a dispatcher callable for Data Explorer delegation."
+    )
+
+
+def _missing_admission_call(draft: Discovery) -> bool:
+    raise RuntimeError("HypothesisAnalyst requires an admission callable for discovery validation.")
+
+
+def create_ha_agent(config: ModelConfig) -> Agent[None]:
+    return create_agent(
+        worker="hypothesis_analyst",
+        config=config,
+        deps_type=type(None),
+        builtin_tools=(),
+    )
+
+
+@dataclass(slots=True)
+class HypothesisAnalystConfig:
+    model: ModelConfig = field(default_factory=ModelConfig)
+    mock_dispatcher_call: DispatcherCall = _missing_dispatcher_call
+    mock_admission_call: AdmissionCall = _missing_admission_call
+
+
+class HypothesisAnalyst:
+    """Import-safe donor scaffold; S0 does not register it as runnable."""
+
+    builtin_tools: tuple[AvailableBuiltinTools, ...] = ()
+
+    def __init__(
+        self,
+        *,
+        config: ModelConfig | None = None,
+        mock_dispatcher_call: DispatcherCall | None = None,
+        mock_admission_call: AdmissionCall | None = None,
+    ) -> None:
+        self.config = config or ModelConfig()
+        self.mock_dispatcher_call = mock_dispatcher_call or _missing_dispatcher_call
+        self.mock_admission_call = mock_admission_call or _missing_admission_call
+        self.graph = build_graph(
+            config=self.config,
+            mock_dispatcher_call=self.mock_dispatcher_call,
+            mock_admission_call=self.mock_admission_call,
+        )
+
+    async def run(self, request: ExecutionRequest) -> HypothesisAnalystResult:
+        if request.capability != Capability.HYPOTHESIS_TESTING:
+            raise ValueError(f"Hypothesis Analyst cannot provide {request.capability}.")
+        initial_state: HAState = {
+            "request": request,
+            "hypothesis_draft": None,
+            "de_capability_requests": [],
+            "collected_evidence": [],
+            "evaluation_outcome": None,
+            "scientific_value": None,
+            "discovery_draft": None,
+            "execution_logs": [],
+            "final_result": None,
+        }
+        result_state = await self.graph.ainvoke(initial_state)
+        final_result = result_state.get("final_result")
+        if not isinstance(final_result, HypothesisAnalystResult):
+            raise RuntimeError("Hypothesis Analyst graph did not return its role-native result.")
+        return final_result
+
+
+HypothesisAnalystExecutor = HypothesisAnalyst
+
+__all__ = (
+    "AdmissionCall",
+    "DispatcherCall",
+    "HypothesisAnalyst",
+    "HypothesisAnalystConfig",
+    "HypothesisAnalystExecutor",
+    "HypothesisAnalystResult",
+    "create_ha_agent",
+)

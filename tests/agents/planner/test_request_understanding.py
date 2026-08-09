@@ -8,9 +8,9 @@ import pytest
 from langgraph.runtime import Runtime
 from pydantic_ai.messages import ModelRequest, UserPromptPart
 
-from agents.planner.agent import Planner
-from agents.planner.nodes import TaskManagementDraft, route_intent, understand_request
-from agents.planner.types import (
+from cognieda.agents.planner.agent import Planner
+from cognieda.agents.planner.nodes import TaskManagementDraft, route_intent, understand_request
+from cognieda.agents.planner.types import (
     COMMAND_TO_INTENT,
     Context,
     PlannerDecision,
@@ -20,8 +20,8 @@ from agents.planner.types import (
     TaskCreateDraft,
     parse_explicit_command,
 )
-from repositories import PlannerOperationRepository, TaskRepository
-from schemas.enums import PlannerOperationApprovalState
+from cognieda.repositories import PlannerOperationRepository, TaskRepository
+from cognieda.schemas.enums import PlannerOperationApprovalState
 
 
 class FakeRequestUnderstandingModel(RequestUnderstandingModel):

@@ -6,9 +6,10 @@ scientific commitments, observations, claims, validity, provenance, and active
 context distinct and traceable.
 
 The repository currently provides partial library and SQLite persistence
-foundations. It does not provide a supported end-to-end application, service,
-or product CLI. See [Current state](docs/status/current-state.md) for the
-evidence-qualified capability boundary.
+foundations plus an installable development Planner REPL. It does not provide
+a supported end-to-end application, service, or product CLI. See
+[Current state](docs/status/current-state.md) for the evidence-qualified
+capability boundary.
 
 ## Development setup
 
@@ -16,24 +17,35 @@ Prerequisites are Python 3.12+ and `uv`.
 
 ```powershell
 uv sync
+uv tool install --editable .
 copy .env.example .env
 ```
+
+If uv's tool directory is not already on `PATH`, run `uv tool update-shell`
+once and open a new shell. The editable tool installation makes later Python
+source edits visible without reinstalling; refresh the tool environment after
+dependency metadata changes.
 
 The default database URL resolves to `.local/cognieda_graph.sqlite3` unless
 `COGNIEDA_DB_URL` is set. Current database behavior is verified on SQLite.
 
-To run the development-only Planner REPL scaffold:
+Normal development launch does not require activating `.venv`:
 
 ```powershell
-uv run main.py
+cognieda
+cognieda PATH
 ```
+
+`python -m cognieda` is also available inside an environment containing the
+package. These entrypoints expose the development Planner REPL scaffold, not a
+supported end-to-end product workflow.
 
 Repository verification commands are:
 
 ```powershell
 uv run pytest
 uv run ruff check .
-uv run mypy src
+uv run mypy src/cognieda
 ```
 
 These commands are declared by the repository; passing status is not implied

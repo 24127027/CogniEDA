@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import pytest
-from memory.retrieval_policy import exclusion_reason, is_allowed_in_context
-from schemas.enums import (
+
+from cognieda.memory.retrieval_policy import exclusion_reason, is_allowed_in_context
+from cognieda.schemas.enums import (
     AssumptionStatus,
     ContextMode,
     DataProfileLifecycleState,

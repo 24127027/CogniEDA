@@ -4,7 +4,7 @@ import asyncio
 
 import pandas as pd
 
-from agents.executor import (
+from cognieda.agents.executor import (
     Capability,
     ExecutionRequest,
     ExecutionStatus,
@@ -13,8 +13,8 @@ from agents.executor import (
     ExecutorInput,
     ExecutorRegistry,
 )
-from agents.executor.data_explorer import DataExplorer, DataExplorerResult
-from schemas.artifacts import Task
+from cognieda.agents.executor.data_explorer import DataExplorer, DataExplorerResult
+from cognieda.schemas.artifacts import Task
 
 
 def _task(instruction: str) -> Task:

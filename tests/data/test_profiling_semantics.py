@@ -4,8 +4,8 @@ import json
 
 import pandas as pd
 
-from data.profiling import ProfilingOptions, profile_dataframe
-from schemas import ContinuousColumnSummary, DiscreteColumnSummary, VariableType
+from cognieda.data.profiling import ProfilingOptions, profile_dataframe
+from cognieda.schemas import ContinuousColumnSummary, DiscreteColumnSummary, VariableType
 
 
 def test_profile_dataframe_preserves_shape_order_dtype_and_missingness() -> None:
@@ -43,9 +43,7 @@ def test_numeric_non_boolean_is_continuous_with_finite_descriptive_summary() -> 
 
 
 def test_non_finite_source_values_are_excluded_from_continuous_statistics() -> None:
-    profile = profile_dataframe(
-        pd.DataFrame({"amount": [1.0, float("inf"), float("-inf")]})
-    )
+    profile = profile_dataframe(pd.DataFrame({"amount": [1.0, float("inf"), float("-inf")]}))
     column = profile.columns[0]
 
     assert column.distinct_count == 3

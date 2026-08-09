@@ -54,9 +54,10 @@ backlog. [Current state](current-state.md) owns capability detail.
 
 ## Operational limitation
 
-- Bootstrap composes the in-process S0 dispatcher and bounded Data Explorer,
-  but no supported end-to-end application runtime, worker, service API, or
-  product CLI exists.
+- Bootstrap composes the in-process S0 dispatcher and bounded Data Explorer.
+  The installable `cognieda [PATH]` command reaches the development Planner
+  REPL and is **Partially implemented**; no supported end-to-end application
+  runtime, worker, service API, or product CLI exists.
 - The local Data Explorer donor path can execute bounded analysis or profiling
   from a direct request. It is not a production sandbox and is not connected
   to Evidence admission.
@@ -79,8 +80,8 @@ backlog. [Current state](current-state.md) owns capability detail.
 - Full pytest collection is interrupted by three pre-existing M1-B Planner
   donor mismatches involving `TaskManagementDraft`, `route_intent`,
   `understand_request`, `ChildTaskProposalDraft`, and `manage_tasks`.
-- Excluding exactly those three modules, the M1-A broad run recorded 116 passes
-  and 72 explicit deferred-donor skips.
+- Excluding exactly those three modules, the package/CLI broad run recorded
+  124 passes and 72 explicit deferred-donor skips.
 - No end-to-end user-to-Planner-to-real-Data Explorer-to-Evidence-to-
   SessionFrame-to-response test exists; that is not an M1-A completion claim.
 - No production performance envelope, non-SQLite validation, external

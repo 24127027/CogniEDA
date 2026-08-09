@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from repositories import (
+from cognieda.repositories import (
     DataProfileRepository,
     ExecutionApprovalRepository,
     ExecutionOutboxRepository,
@@ -14,19 +14,19 @@ from repositories import (
     PlannerOperationRepository,
     TaskRepository,
 )
-from runtime.orchestrator.execution_admission import build_execution_admission_operations
-from runtime.orchestrator.planner_commit import commit_planner_operations
-from runtime.orchestrator.transition_service import ExecutionAttemptTransitionService
-from schemas.artifacts import DataProfile, Hypothesis, Task
-from schemas.common import BaselineSummary, QualityFlag, SchemaSummary
-from schemas.enums import (
+from cognieda.runtime.orchestrator.execution_admission import build_execution_admission_operations
+from cognieda.runtime.orchestrator.planner_commit import commit_planner_operations
+from cognieda.runtime.orchestrator.transition_service import ExecutionAttemptTransitionService
+from cognieda.schemas.artifacts import DataProfile, Hypothesis, Task
+from cognieda.schemas.common import BaselineSummary, QualityFlag, SchemaSummary
+from cognieda.schemas.enums import (
     DataProfileLifecycleState,
     DataProfileMethod,
     ExecutionApprovalStatus,
     ExecutionRunStatus,
     QualityFlagSeverity,
 )
-from schemas.provenance import ExecutionApproval
+from cognieda.schemas.provenance import ExecutionApproval
 
 pytestmark = pytest.mark.skip(
     reason="Canonical execution-attempt admission is deferred to M2/M3-B after M1-A."
@@ -131,8 +131,7 @@ def test_commit_rejects_mismatched_admission_pair_without_partial_write(db_sessi
     assert result.failed_operation_ids
     assert ExecutionRunRepository(db_session).get_by_id(run.execution_run_id) is None
     assert (
-        ExecutionOutboxRepository(db_session).get_by_execution_run_id(run.execution_run_id)
-        is None
+        ExecutionOutboxRepository(db_session).get_by_execution_run_id(run.execution_run_id) is None
     )
 
 

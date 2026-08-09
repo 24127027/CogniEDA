@@ -4,8 +4,8 @@ from uuid import uuid4
 
 import pytest
 
-from memory import ContextBundle, ContextMode, SessionContextBuilder, SessionFrameBuilder
-from schemas.artifacts import (
+from cognieda.memory import ContextBundle, ContextMode, SessionContextBuilder, SessionFrameBuilder
+from cognieda.schemas.artifacts import (
     Assumption,
     DataProfile,
     Discovery,
@@ -14,7 +14,7 @@ from schemas.artifacts import (
     Objective,
     Task,
 )
-from schemas.common import (
+from cognieda.schemas.common import (
     BaselineSummary,
     DiscoveryClaim,
     DiscoveryContextSummary,
@@ -25,7 +25,7 @@ from schemas.common import (
     ToolResultCacheSummary,
     ValidityBasis,
 )
-from schemas.enums import (
+from cognieda.schemas.enums import (
     AssumptionStatus,
     ConfidenceLevel,
     DataProfileLifecycleState,
@@ -171,11 +171,7 @@ def get_discovery_exclusion_note(
     context: ContextBundle,
     discovery: Discovery,
 ) -> str:
-    notes = [
-        note
-        for note in context.exclusion_notes
-        if str(discovery.discovery_id) in note
-    ]
+    notes = [note for note in context.exclusion_notes if str(discovery.discovery_id) in note]
 
     assert len(notes) == 1
     return notes[0]
@@ -282,9 +278,7 @@ def test_session_context_builder_separates_planning_and_conclusion_context() -> 
 
     assert planning_context.assumption_refs == (assumption.assumption_id,)
     assert planning_context.task_refs == (task.task_id,)
-    assert planning_context.pending_tasks == (
-        "Review account-month grain before deeper modeling.",
-    )
+    assert planning_context.pending_tasks == ("Review account-month grain before deeper modeling.",)
 
     assert conclusion_context.assumptions == ()
     assert conclusion_context.assumption_refs == ()
@@ -367,10 +361,7 @@ def test_planning_context_may_include_flagged_discovery_for_review() -> None:
     planning_context = SessionContextBuilder().build(frame, mode=ContextMode.PLANNING)
 
     assert planning_context.discovery_refs == (discovery.discovery_id,)
-    assert not any(
-        str(discovery.discovery_id) in note
-        for note in planning_context.exclusion_notes
-    )
+    assert not any(str(discovery.discovery_id) in note for note in planning_context.exclusion_notes)
 
 
 def test_discovery_exclusion_notes_do_not_mutate_original_summary() -> None:

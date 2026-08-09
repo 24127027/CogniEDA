@@ -6,19 +6,19 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
-from agents.planner.nodes import manage_tasks
-from agents.planner.types import State, TaskCreateDraft
-from runtime.orchestrator.planner_commit import commit_planner_operations
-from repositories import (
+from cognieda.agents.planner.nodes import manage_tasks
+from cognieda.agents.planner.types import State, TaskCreateDraft
+from cognieda.repositories import (
     AssumptionRepository,
     ObjectiveRepository,
     PlannerOperationRepository,
     SessionFrameRepository,
     TaskRepository,
 )
-from schemas.artifacts import Assumption, Objective, SessionFrame
-from schemas.common import TaskContextSummary
-from schemas.enums import (
+from cognieda.runtime.orchestrator.planner_commit import commit_planner_operations
+from cognieda.schemas.artifacts import Assumption, Objective, SessionFrame
+from cognieda.schemas.common import TaskContextSummary
+from cognieda.schemas.enums import (
     AssumptionSource,
     AssumptionStatus,
     AssumptionTestability,
@@ -30,7 +30,7 @@ from schemas.enums import (
     TaskKind,
     TaskLifecycleState,
 )
-from schemas.planner_operations import PlannerOperation, TaskCreateOperationPayload
+from cognieda.schemas.planner_operations import PlannerOperation, TaskCreateOperationPayload
 
 
 def build_task_payload(task_id: UUID | None = None, **overrides: object) -> dict[str, object]:
@@ -82,9 +82,7 @@ def build_operation(
         produced_by_node=produced_by_node,
         approval_state=approval_state,
         approved_at=(
-            datetime.now(UTC)
-            if approval_state == PlannerOperationApprovalState.APPROVED
-            else None
+            datetime.now(UTC) if approval_state == PlannerOperationApprovalState.APPROVED else None
         ),
     )
 
@@ -353,9 +351,7 @@ def test_commit_updates_objective_and_assumption_through_operations(db_session) 
             status=ObjectiveStatus.ACTIVE,
         )
     )
-    assumption = AssumptionRepository(db_session).create(
-        Assumption(**build_assumption_payload())
-    )
+    assumption = AssumptionRepository(db_session).create(Assumption(**build_assumption_payload()))
     repository = PlannerOperationRepository(db_session)
     objective_operation = repository.create(
         build_operation(

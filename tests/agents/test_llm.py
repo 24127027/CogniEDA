@@ -1,10 +1,10 @@
 from unittest.mock import Mock
 
-from agents import llm
-from agents.executor.graph_miner.agent import GraphMiner
-from agents.executor.hypothesis_analyst.agent import HypothesisAnalyst
-from agents.planner.agent import Planner
-from tools.builtin import AvailableBuiltinTools
+from cognieda.agents import llm
+from cognieda.agents.executor.graph_miner.agent import GraphMiner
+from cognieda.agents.executor.hypothesis_analyst.agent import HypothesisAnalyst
+from cognieda.agents.planner.agent import Planner
+from cognieda.tools.builtin import AvailableBuiltinTools
 
 
 def test_create_agent_forwards_agent_owned_builtin_tools(

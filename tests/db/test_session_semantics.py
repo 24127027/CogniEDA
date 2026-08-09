@@ -4,8 +4,8 @@ from uuid import uuid4
 
 import pytest
 
-from repositories import EvidenceRepository
-from schemas import Evidence, EvidenceProvenance
+from cognieda.repositories import EvidenceRepository
+from cognieda.schemas import Evidence, EvidenceProvenance
 
 
 def test_evidence_repository_fails_closed_for_missing_mvp_lineage(db_session) -> None:

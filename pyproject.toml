@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
-cognieda = "main:main"
+cognieda = "cognieda.cli.app:main"
 
 [dependency-groups]
 dev = [
@@ -33,7 +33,11 @@ dev = [
 ]
 
 [tool.setuptools]
-py-modules = ["main"]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["cognieda*"]
 
 [tool.uv]
 default-groups = ["dev"]
@@ -64,7 +68,7 @@ line-ending = "lf"
 
 [tool.mypy]
 python_version = "3.12"
-files = ["src"]
+files = ["src/cognieda"]
 mypy_path = ["src"]
 strict = true
 explicit_package_bases = true
