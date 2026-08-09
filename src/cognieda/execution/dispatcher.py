@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from .contracts import ExecutionRequest, ExecutionResult
 from .registry import CapabilityNotRegisteredError, ExecutorRegistry
-from .types import ExecutionRequest, ExecutionResult
 
 
 class ExecutorProviderError(RuntimeError):

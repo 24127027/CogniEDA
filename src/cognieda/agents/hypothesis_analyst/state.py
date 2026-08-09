@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import TypedDict
 
+from cognieda.execution import ExecutionRequest
 from cognieda.schemas.artifacts import Discovery, Evidence, Hypothesis
 
-from ..types import ExecutionRequest
-from .types import HypothesisAnalystResult
+from .contracts import HypothesisAnalystResult
 
 
 class HAState(TypedDict):

@@ -1,8 +1,8 @@
 from unittest.mock import Mock
 
 from cognieda.agents import llm
-from cognieda.agents.executor.graph_miner.agent import GraphMiner
-from cognieda.agents.executor.hypothesis_analyst.agent import HypothesisAnalyst
+from cognieda.agents.graph_miner import GraphMiner
+from cognieda.agents.hypothesis_analyst import HypothesisAnalyst
 from cognieda.agents.planner.agent import Planner
 from cognieda.tools.builtin import AvailableBuiltinTools
 

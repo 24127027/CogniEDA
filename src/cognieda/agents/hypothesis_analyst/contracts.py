@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from pydantic import Field
 
+from cognieda.execution import ExecutionResult
 from cognieda.schemas.artifacts import Discovery, Evidence, Hypothesis
-
-from ..types import ExecutionResult
 
 
 class HypothesisAnalystResult(ExecutionResult):

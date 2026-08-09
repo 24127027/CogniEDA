@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 
 from .capabilities import Capability
-from .types import ExecutorProvider
+from .contracts import ExecutorProvider
 
 ProviderFactory = Callable[[], ExecutorProvider]
 

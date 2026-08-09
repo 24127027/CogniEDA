@@ -6,15 +6,20 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from cognieda.agents.llm import ModelConfig
+from cognieda.execution import (
+    Capability,
+    ExecutionFailure,
+    ExecutionRequest,
+    ExecutionStatus,
+    ExecutorInput,
+)
 from cognieda.schemas.artifacts import Discovery, Evidence, Hypothesis
 from cognieda.schemas.common import DiscoveryClaim, ValidityBasis
 from cognieda.schemas.enums import DiscoveryEpistemicStatus
 
-from ..capabilities import Capability
-from ..types import ExecutionFailure, ExecutionRequest, ExecutionStatus, ExecutorInput
+from .contracts import HypothesisAnalystResult
 from .deps import AdmissionCall, DispatcherCall
 from .state import HAState
-from .types import HypothesisAnalystResult
 
 
 class _HypothesisDraftModel(BaseModel):

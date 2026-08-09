@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from .capabilities import Capability
-from .dispatcher import ExecutorDispatcher, ExecutorProviderError
-from .registry import CapabilityNotRegisteredError, ExecutorRegistry
-from .types import (
+from .contracts import (
     ExecutionFailure,
     ExecutionRequest,
     ExecutionResult,
@@ -13,6 +11,8 @@ from .types import (
     PlannerWorkOutcome,
     normalize_for_planner,
 )
+from .dispatcher import ExecutorDispatcher, ExecutorProviderError
+from .registry import CapabilityNotRegisteredError, ExecutorRegistry
 
 __all__ = (
     "Capability",

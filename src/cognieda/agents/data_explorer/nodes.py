@@ -10,12 +10,11 @@ from pydantic import BaseModel, Field, ValidationError
 
 from cognieda.agents.llm import ModelConfig
 from cognieda.data import DatasetProfiler, load_dataset
+from cognieda.execution import Capability, ExecutionFailure, ExecutionStatus
 from cognieda.schemas.artifacts import DataProfile, Task
 
-from ..capabilities import Capability
-from ..types import ExecutionFailure, ExecutionStatus
+from .contracts import DataExplorerObservation, DataExplorerResult
 from .state import State
-from .types import DataExplorerObservation, DataExplorerResult
 
 _MAX_LOGICAL_RETRIES = 2
 _MAX_CODE_RETRIES = 2

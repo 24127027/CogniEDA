@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any, TypedDict
 
+from cognieda.execution import ExecutionRequest
 from cognieda.schemas.artifacts import DataProfile
 
-from ..types import ExecutionRequest
-from .types import DataExplorerObservation, DataExplorerResult
+from .contracts import DataExplorerObservation, DataExplorerResult
 
 
 class DEState(TypedDict):

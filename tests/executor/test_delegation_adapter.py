@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-from cognieda.agents.executor import (
+from cognieda.execution import (
     Capability,
     ExecutionRequest,
     ExecutionResult,

@@ -3,10 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from cognieda.agents.executor.capabilities import Capability
-from cognieda.agents.executor.data_explorer.agent import DataExplorer
-from cognieda.agents.executor.dispatcher import ExecutorDispatcher
-from cognieda.agents.executor.registry import ExecutorRegistry
+from cognieda.agents.data_explorer import DataExplorer
+from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
 

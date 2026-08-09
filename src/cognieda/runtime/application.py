@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cognieda.agents.executor.dispatcher import ExecutorDispatcher
+from cognieda.execution import ExecutorDispatcher
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.types import PlannerOutput
 

@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
+from cognieda.execution import Capability, ExecutionRequest, ExecutionResult
 from cognieda.tools.builtin import AvailableBuiltinTools
-
-from ..capabilities import Capability
-from ..types import ExecutionRequest, ExecutionResult
 
 
 class GraphMiner:

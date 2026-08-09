@@ -4,10 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from cognieda.execution import Capability, ExecutionResult, ExecutionStatus
 from cognieda.schemas.artifacts import DataProfile
-
-from ..capabilities import Capability
-from ..types import ExecutionResult, ExecutionStatus
 
 
 class DataExplorerObservation(BaseModel):

@@ -1791,8 +1791,8 @@ def test_task_and_non_fco_generated_view_guards() -> None:
 
 
 def test_planner_and_executor_authoring_contracts() -> None:
-    from cognieda.agents.executor.data_explorer.types import DataExplorerResult
-    from cognieda.agents.executor.types import ExecutionResult, PlannerWorkOutcome
+    from cognieda.agents.data_explorer.contracts import DataExplorerResult
+    from cognieda.execution import ExecutionResult, PlannerWorkOutcome
     from cognieda.agents.planner.types import PlannerOutput
 
     planner_fields = set(PlannerOutput.model_fields)

@@ -6,17 +6,16 @@ from dataclasses import dataclass, field
 
 from pydantic_ai import Agent
 
+from cognieda.agents.data_explorer.contracts import DataExplorerResult
 from cognieda.agents.llm import ModelConfig, create_agent
+from cognieda.execution import Capability, ExecutionRequest
 from cognieda.schemas.artifacts import Discovery
 from cognieda.tools.builtin import AvailableBuiltinTools
 
-from ..capabilities import Capability
-from ..data_explorer.types import DataExplorerResult
-from ..types import ExecutionRequest
+from .contracts import HypothesisAnalystResult
 from .deps import AdmissionCall, DispatcherCall
 from .graph import build_graph
 from .state import HAState
-from .types import HypothesisAnalystResult
 
 
 def _missing_dispatcher_call(request: ExecutionRequest) -> DataExplorerResult:

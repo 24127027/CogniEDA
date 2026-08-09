@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pydantic_ai.tools import RunContext
 
-from cognieda.agents.executor.capabilities import Capability
-from cognieda.agents.executor.types import (
+from cognieda.execution import (
+    Capability,
     ExecutionRequest,
     ExecutionResult,
     ExecutorContext,

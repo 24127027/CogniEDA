@@ -7,13 +7,12 @@ from dataclasses import dataclass, field
 from pydantic_ai import Agent
 
 from cognieda.agents.llm import ModelConfig, create_agent
+from cognieda.execution import Capability, ExecutionFailure, ExecutionRequest, ExecutionStatus
 from cognieda.tools.builtin import AvailableBuiltinTools
 
-from ..capabilities import Capability
-from ..types import ExecutionFailure, ExecutionRequest, ExecutionStatus
+from .contracts import DataExplorerResult
 from .graph import build_graph
 from .state import State
-from .types import DataExplorerResult
 
 
 def create_de_agent(config: ModelConfig) -> Agent[None]:
