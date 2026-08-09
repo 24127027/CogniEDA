@@ -16,6 +16,7 @@ from cognieda.schemas.artifacts import DataProfile, Task
 from .contracts import DataExplorerObservation, DataExplorerResult
 from .state import State
 from .tools import profile_dataset
+from .tools._unsafe_python_analysis import run_unsafe_python_analysis
 
 _MAX_LOGICAL_RETRIES = 2
 _MAX_CODE_RETRIES = 2
@@ -104,16 +105,6 @@ def _safe_agent_output(
         return _GeneratedCodeDraft.model_validate(result.output)
     except ValidationError:
         return None
-
-
-def _run_python(code: str, dataframe: pd.DataFrame) -> Any:
-    namespace: dict[str, Any] = {
-        "dataframe": dataframe,
-        "pd": pd,
-        "result": None,
-    }
-    exec(compile(code, "<data_explorer>", "exec"), namespace, namespace)
-    return namespace.get("result")
 
 
 def _result_text(raw_data_results: Any) -> str:
@@ -209,7 +200,7 @@ def generate_and_execute_code(
         draft = _safe_agent_output(agent_config, agent_factory, prompt)
         code = draft.python_code if draft is not None else _fallback_code(state)
         try:
-            raw_data_results = _run_python(code, dataframe)
+            raw_data_results = run_unsafe_python_analysis(code, dataframe)
             return {
                 **state,
                 "raw_data_results": raw_data_results,

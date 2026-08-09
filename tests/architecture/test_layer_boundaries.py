@@ -89,3 +89,22 @@ def test_production_source_contains_only_python_files() -> None:
     ]
 
     assert non_python == []
+
+
+def test_dynamic_code_execution_is_confined_to_named_provisional_adapter() -> None:
+    locations = [
+        path.relative_to(SOURCE_ROOT).as_posix()
+        for path in SOURCE_ROOT.rglob("*.py")
+        if any(
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "exec"
+            for node in ast.walk(
+                ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            )
+        )
+    ]
+
+    assert locations == [
+        "agents/data_explorer/tools/_unsafe_python_analysis.py",
+    ]
