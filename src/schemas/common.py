@@ -250,14 +250,15 @@ class ColumnProfile(ImmutableCogniEDABaseModel):
         return self
 
 
-class EvidenceProvenance(CogniEDABaseModel):
-    """Provenance fields that explain how an Evidence record was produced."""
+class EvidenceProvenance(ImmutableCogniEDABaseModel):
+    """Bounded MVP lineage from Evidence to dataset/tool work."""
 
-    analysis_frame_ref: NonEmptyStr
-    execution_run_ref: NonEmptyStr
-    code_reference: str | None = None
-    environment_reference: str | None = None
-    artifact_paths: list[NonEmptyStr] = Field(default_factory=list)
+    producer_role: NonEmptyStr
+    work_reference: NonEmptyStr
+    dataset_reference: NonEmptyStr
+    data_profile_id: UUID
+    tool_reference: NonEmptyStr | None = None
+    code_reference: NonEmptyStr | None = None
 
 
 class HypothesisEvaluation(CogniEDABaseModel):

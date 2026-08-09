@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import Field, NonNegativeInt, model_validator
+from pydantic import Field, JsonValue, NonNegativeInt, field_validator, model_validator
 
 from schemas.common import (
     AssumptionContextSummary,
@@ -17,11 +19,9 @@ from schemas.common import (
     DiscoveryContextSummary,
     EvidenceContextSummary,
     EvidenceProvenance,
-    EvidenceResultSummary,
     HypothesisContextSummary,
     ImmutableCogniEDABaseModel,
     InvalidationRule,
-    MethodParameter,
     NonEmptyStr,
     StaleContextMarker,
     TaskContextSummary,
@@ -33,8 +33,6 @@ from schemas.common import (
 from schemas.enums import (
     DiscoveryEpistemicStatus,
     DiscoveryLifecycleState,
-    EvidenceLifecycleState,
-    EvidenceType,
     HypothesisStatus,
     SessionFrameStatus,
     TaskStatus,
@@ -97,33 +95,47 @@ class Hypothesis(CogniEDABaseModel):
 
 
 class Evidence(ImmutableCogniEDABaseModel):
-    """Directly observed analytical result, not interpretation."""
+    """Immutable structured result linked directly to real MVP work and data state."""
 
     evidence_id: UUID = Field(default_factory=uuid4)
-    hypothesis_id: UUID
-    profile_id: UUID
-    # Skeleton stage: these are string identifiers for provenance records.
-    # EvidenceRepository can strictly dereference them when provenance repos are wired.
-    analysis_frame_ref: NonEmptyStr
-    execution_run_ref: NonEmptyStr
-    evidence_type: EvidenceType
-    method: NonEmptyStr
-    parameters: list[MethodParameter] = Field(default_factory=list)
+    task_id: UUID
+    data_profile_id: UUID
+    content: dict[str, JsonValue] = Field(min_length=1)
     provenance: EvidenceProvenance
-    result_summary: EvidenceResultSummary
-    artifact_refs: list[NonEmptyStr] = Field(default_factory=list)
-    limitations: list[NonEmptyStr] = Field(default_factory=list)
-    lifecycle_state: EvidenceLifecycleState = EvidenceLifecycleState.ACTIVE
-    superseded_by_evidence_id: UUID | None = None
-    lifecycle_reason: str | None = None
-    created_at: datetime = Field(default_factory=utc_now)
+    artifact_refs: tuple[NonEmptyStr, ...] = ()
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def _content_is_native_json(cls, value: Any) -> Any:
+        cls._validate_json_value(value, path="content")
+        return value
+
+    @classmethod
+    def _validate_json_value(cls, value: Any, *, path: str) -> None:
+        if value is None or isinstance(value, (str, bool, int)):
+            return
+        if isinstance(value, float):
+            try:
+                json.dumps(value, allow_nan=False)
+            except ValueError as exc:
+                raise ValueError(f"{path} contains a non-finite float.") from exc
+            return
+        if isinstance(value, list):
+            for index, item in enumerate(value):
+                cls._validate_json_value(item, path=f"{path}[{index}]")
+            return
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if not isinstance(key, str):
+                    raise ValueError(f"{path} requires string object keys.")
+                cls._validate_json_value(item, path=f"{path}.{key}")
+            return
+        raise ValueError(f"{path} contains unsupported value type {type(value).__name__}.")
 
     @model_validator(mode="after")
-    def _provenance_matches_required_refs(self) -> Evidence:
-        if self.provenance.analysis_frame_ref != self.analysis_frame_ref:
-            raise ValueError("Evidence provenance must reference the same AnalysisFrame.")
-        if self.provenance.execution_run_ref != self.execution_run_ref:
-            raise ValueError("Evidence provenance must reference the same ExecutionRun.")
+    def _provenance_matches_data_profile(self) -> Evidence:
+        if self.provenance.data_profile_id != self.data_profile_id:
+            raise ValueError("Evidence provenance must reference the same DataProfile.")
         return self
 
 
