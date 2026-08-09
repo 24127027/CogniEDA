@@ -95,18 +95,35 @@ The protected EvaluationBundle is distinct from SessionFrame. Application
 authority constructs or validates the closed bundle for one investigation and
 protocol revision; a raw frame or retrieval result cannot substitute for it.
 
+## Initial context and context acquired during a run
+
+A build-context step creates a role- and purpose-specific initial projection; it
+is not a universal `AgentContext`. The projection may combine eligible retained
+state with non-authoritative interaction context when the role needs discourse
+continuity.
+
+An authorized role may acquire more context during a run through a bounded role
+seam, such as a future Graph Miner inquiry or Data Explorer planning
+consultation. Access does not imply selection or persistence:
+
+```text
+initial context != all context accessible during the run
+accessible during the run != persisted in SessionFrame
+```
+
+Every acquired item retains its original authority, scope, lifecycle, and
+permitted use.
+
 ## Implementation status
 
-**Partially implemented.** Current `SessionContextBuilder` projects planning,
-answer, conclusion, and discovery-synthesis bundles. The protected synthesis
-projection excludes Assumptions, Tasks, prior Discoveries, user decisions,
-pending questions, stale context, dead ends, and cached tool summaries, and it
-filters profile and Evidence lifecycle. A separate pure retrieval policy
-rejects unknown types and unsafe lifecycle/mode combinations.
+**Partially implemented.** The bounded Planner builds a typed request-
+understanding input from the retained `SessionFrame`, latest request, and
+normalized prior Human-to-Planner turns. Conversation is labeled as
+non-authoritative discourse context. The separate empirical answer input
+accepts admitted Evidence and excludes conversation and Assumptions. A pure
+retrieval policy also rejects unknown types and unsafe lifecycle/mode
+combinations at its isolated library surface.
 
-The current mode vocabulary does not cover planning consultation, scientific
-investigation control, Graph Miner inquiry, recovery, or validity review as
-first-class modes. Objective identity and full scientific lineage are not
-bound by the current SessionFrame projection, and current conclusion handling
-is a legacy alias for discovery synthesis rather than the canonical
-EvaluationBundle.
+Planning consultation, scientific-investigation control, Graph Miner inquiry,
+protected EvaluationBundle construction, recovery, and validity review remain
+**Deferred**. No universal context contract is implemented.

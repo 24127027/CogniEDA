@@ -126,6 +126,19 @@ authoritative research state. Follow-up reasoning must use typed state retained
 in the active `SessionFrame`, including prior Evidence, instead of reconstructing
 research truth from the transcript.
 
+The bounded runtime represents that separation explicitly:
+
+```text
+Session = SessionFrame + ConversationHistory
+```
+
+`Session` is a non-FCO in-process lifetime aggregate. `ConversationHistory`
+contains ordered Human-to-Planner turns, not raw provider/model-call history.
+The initial Planner request-understanding context is built from the retained
+frame, the latest request, and a normalized conversation projection. Empirical
+answer context remains Evidence-only. Context acquired later through an
+authorized role seam is not automatically persisted into `SessionFrame`.
+
 ## MVP object semantics
 
 This section fixes minimum meaning for M1-A without freezing implementation
@@ -215,7 +228,10 @@ request, establishes or replaces the active Objective, records planning-only
 Assumptions, creates bounded Tasks, selects a typed capability, invokes the
 injected dispatcher, consumes `PlannerWorkOutcome`, returns a successor frame,
 and responds to the human. This does not persist or retain the frame across
-runtime turns; that composition remains **Deferred** to M5-A.
+process restarts. The runtime `Application` does retain one coherent successor
+`SessionFrame` and append-only `ConversationHistory` across in-process turns.
+Restart-safe persistence and full M3-A-to-Planner Evidence composition remain
+**Deferred**.
 
 Planner does not read a dataframe, run pandas or analytical code, mutate a
 dataset, or author authoritative Evidence directly. Dataset work belongs
@@ -418,7 +434,7 @@ part of the canonical architecture and must not be described as removed.
 | M1-A | MVP research-state core: Objective, Assumption, Task, Evidence, DataProfile, and SessionFrame | **Implemented** |
 | M1-B | MVP Planner behavior, including `PlannerWorkOutcome` consumption | **Implemented** at the bounded library behavior surface |
 | M3-A | MVP Data Explorer plus Evidence and real tool execution | **Implemented** at the bounded library/data-authority surface |
-| M5-A | single-session runtime composition | **Deferred** |
+| M5-A | single-session runtime composition | **Partially implemented** for in-process SessionFrame and ConversationHistory continuity; dataset execution context and Evidence admission composition remain **Deferred** |
 | MVP-I | vertical integration | **Deferred** |
 | MVP-V | final MVP verification | **Deferred** |
 

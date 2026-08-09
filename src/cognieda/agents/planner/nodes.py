@@ -110,7 +110,11 @@ async def understand_request(state: State, runtime: Runtime[Context]) -> State:
     model = cast(PlannerDecisionModel, runtime.context.planner_model)
     try:
         state.decision = await model.decide(
-            PlannerModelInput.from_frame(state.query, state.session_frame)
+            PlannerModelInput.from_frame(
+                state.query,
+                state.session_frame,
+                conversation=state.conversation_context,
+            )
         )
     except Exception as exc:
         state.error = _error(

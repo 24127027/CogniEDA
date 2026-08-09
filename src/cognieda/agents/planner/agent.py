@@ -10,6 +10,7 @@ from .model import PlannerDecisionModel, PlannerModel
 from .types import (
     Context,
     PlannerControlledError,
+    PlannerConversationTurn,
     PlannerErrorCode,
     PlannerOutput,
     State,
@@ -54,6 +55,7 @@ class Planner:
         query: str,
         *,
         session_frame: SessionFrame | None = None,
+        conversation_context: tuple[PlannerConversationTurn, ...] = (),
         execution_context: ExecutorContext | None = None,
     ) -> PlannerOutput:
         """Run one request against explicit typed state and return its validated successor."""
@@ -69,6 +71,7 @@ class Planner:
         state = State(
             query=query,
             session_frame=frame,
+            conversation_context=conversation_context,
             execution_context=execution_context or ExecutorContext(),
         )
         context = Context(planner_model=self.model, dispatcher=self.deps.dispatcher)

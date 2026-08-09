@@ -19,8 +19,11 @@ backlog. [Current state](current-state.md) owns capability detail.
 ## Implementation gap
 
 - M1-B Planner behavior and M3-A deterministic Data Explorer-to-Evidence
-  admission are **Implemented** at bounded library surfaces. M5-A retained
-  single-session composition is **Deferred**.
+  admission are **Implemented** at bounded library surfaces. M5-A is
+  **Partially implemented** only for retained in-process SessionFrame and
+  Human-to-Planner conversation continuity. Authoritative dataset execution
+  context, Evidence admission composition, and restart recovery remain
+  **Deferred**.
 - `PlanRevision`, `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
@@ -56,8 +59,10 @@ backlog. [Current state](current-state.md) owns capability detail.
 - Canonical-heavy donor tests for scientific attempts and Discovery retrieval
   are explicitly skipped after the hard cutover. They remain design/test
   material and are not compatibility authority for active schemas.
-- The obsolete SessionFrame/context builder was removed; the active M1-A
-  SessionFrame schema is the only executable owner. The unregistered
+- The obsolete duplicate SessionFrame/context builder was removed; the active
+  M1-A SessionFrame schema is the only executable owner. The runtime Session
+  keeps normalized conversation separate and builds only the bounded Planner
+  request-understanding projection. The unregistered
   Hypothesis Analyst, Planner operation contracts, deferred retrieval engine,
   and scientific repositories still contain deferred field references. They
   are not composed into the active M1-A path.
@@ -67,10 +72,11 @@ backlog. [Current state](current-state.md) owns capability detail.
 
 ## Operational limitation
 
-- Bootstrap composes the in-process S0 dispatcher and bounded Data Explorer.
-  The installable `cognieda [PATH]` command reaches the development Planner
-  REPL and is **Partially implemented**; no supported end-to-end application
-  runtime, worker, service API, or product CLI exists.
+- Bootstrap composes the in-process S0 dispatcher, bounded Data Explorer, and
+  retained runtime Session. The installable `cognieda [PATH]` command reaches
+  the development Planner REPL and is **Partially implemented**; session state
+  is process-local, and no supported end-to-end Evidence workflow, worker,
+  service API, or product CLI exists.
 - The local Data Explorer path executes only finite validated deterministic
   operations from an explicit absolute CSV or Parquet path. General-purpose
   Python, generated code, `exec`, `eval`, fuzzy column resolution, implicit
@@ -118,6 +124,11 @@ backlog. [Current state](current-state.md) owns capability detail.
   and application Evidence admission. No composed user-to-Planner-to-real-Data
   Explorer-to-Evidence-to-SessionFrame-to-response test exists; M3-A library
   completion does not establish M5-A or MVP-I.
+- Focused runtime tests prove in-process successor SessionFrame retention,
+  ordered normalized Human-to-Planner turns, prior-conversation use only during
+  request understanding, and conversation exclusion from empirical answer
+  input. They do not prove restart-safe persistence or Evidence admission
+  composition.
 - No production performance envelope, non-SQLite validation, or external
   integration test exists. The first-party documentation regression is
   intentionally limited to internal Markdown links, relative anchors, and

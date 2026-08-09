@@ -49,6 +49,15 @@ class PlannerControlledError(BaseModel):
     message: str = Field(min_length=1)
 
 
+class PlannerConversationTurn(BaseModel):
+    """Non-authoritative conversation projection used only for request understanding."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    human_message: str
+    planner_message: str = Field(min_length=1)
+
+
 class PlannerDecision(BaseModel):
     """Typed semantic proposal returned by request understanding."""
 
@@ -107,7 +116,7 @@ class PlannerDecision(BaseModel):
 
 
 class PlannerModelInput(BaseModel):
-    """Bounded typed research-state projection used for request understanding."""
+    """Typed initial context used for one request-understanding invocation."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -117,9 +126,16 @@ class PlannerModelInput(BaseModel):
     tasks: tuple[Task, ...] = ()
     data_profile: DataProfile | None = None
     evidences: tuple[Evidence, ...] = ()
+    conversation: tuple[PlannerConversationTurn, ...] = ()
 
     @classmethod
-    def from_frame(cls, latest_request: str, frame: SessionFrame) -> PlannerModelInput:
+    def from_frame(
+        cls,
+        latest_request: str,
+        frame: SessionFrame,
+        *,
+        conversation: tuple[PlannerConversationTurn, ...] = (),
+    ) -> PlannerModelInput:
         return cls(
             latest_request=latest_request,
             objective=frame.objective,
@@ -127,6 +143,7 @@ class PlannerModelInput(BaseModel):
             tasks=frame.tasks,
             data_profile=frame.data_profile,
             evidences=frame.evidences,
+            conversation=conversation,
         )
 
 
@@ -156,6 +173,7 @@ class State(BaseModel):
 
     query: str = Field(min_length=1)
     session_frame: SessionFrame
+    conversation_context: tuple[PlannerConversationTurn, ...] = ()
     execution_context: ExecutorContext = Field(default_factory=ExecutorContext)
     decision: PlannerDecision | None = None
     created_task_id: UUID | None = None

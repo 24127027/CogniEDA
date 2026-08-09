@@ -60,6 +60,32 @@ SessionFrame is not:
 A frame may carry bounded summaries for presentation or efficiency, but those
 summaries do not replace the referenced authoritative records.
 
+## Runtime Session and conversation
+
+The bounded runtime keeps `SessionFrame` separate from interaction memory:
+
+```text
+Session
+  -> SessionFrame
+  -> ConversationHistory
+```
+
+`Session` is the in-process chat lifetime aggregate, not an FCO or scientific
+authority. `ConversationHistory` is the ordered Human-to-Planner interaction
+presented at that boundary. It is not embedded in `SessionFrame`, and provider
+messages, tool protocols, retries, and intermediate model calls are not the
+runtime conversation contract.
+
+A Planner invocation builds purpose-specific initial context from the retained
+frame and a normalized conversation projection. Conversation may resolve
+discourse and references, but it cannot become Evidence or an empirical premise.
+The evidence-grounded answer input remains restricted to admitted Evidence.
+
+Initial invocation context is not a closed reasoning universe. An authorized
+role may later acquire additional purpose-specific context during its run.
+Information accessible during a run is not automatically selected into or
+persisted in `SessionFrame`.
+
 ## Selection without authority transfer
 
 Frame membership means only that a reference is selected for an authorized
@@ -117,15 +143,15 @@ raw SessionFrame as a substitute.
 
 ## Implementation status
 
-**Partially implemented.** A known target gap remains. Current source defines and
-persists append-only SessionFrame snapshots with compact DataProfile, Task,
-Assumption, Hypothesis, Discovery, Evidence, and user-decision summaries plus
-warnings, stale context, dead ends, cached-result summaries, invalidation
-rules, and parent-frame identity. Builders project mode-specific bundles.
+**Partially implemented.** The active MVP `SessionFrame` is one frozen,
+materialized-object schema with one optional Objective, ordered read-only
+Assumption, Task, and Evidence collections, and one optional active DataProfile.
+Validated successor seams preserve the fail-closed Task, Evidence, and
+DataProfile invariants. A separate in-process runtime `Session` retains that
+successor frame and normalized Human-to-Planner conversation across turns.
 
-The current schema stores an Objective snapshot string rather than an explicit
-Objective identifier and does not encode the full canonical purpose, reasoning
-mode, scope, lifecycle point, validity basis, or item-level eligibility record.
-Repository `get_latest` and recent-frame queries are Workspace-wide rather than
-Objective-bound. Therefore the current snapshot surface is not the complete
-canonical SessionFrame or concurrency model.
+The active schema does not encode the complete canonical purpose, reasoning
+mode, Objective-isolation, validity, or item-level eligibility model. Runtime
+Session continuity is not restart-safe, and persisted snapshots are not composed
+into durable resume or concurrency control. Therefore the bounded MVP surface is
+not the complete canonical SessionFrame or continuity model.
