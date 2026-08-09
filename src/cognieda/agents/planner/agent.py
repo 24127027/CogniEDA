@@ -6,8 +6,8 @@ from .dependencies import PlannerDeps
 from .graph import build_graph
 from .model import PlannerModel
 from .tools import invoke_data_capability
-from .types import Context, PlannerOutput, State
-
+from .types import PlannerOutput, State
+from .context import Context
 
 class Planner:
     """Planner responsible for producing the next research plan."""

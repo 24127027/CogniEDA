@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+"""Graph contracts and transient state for the Planner agent."""
 
 class PlannedStep(BaseModel):
     """One bounded step proposed by the Planner."""
@@ -28,14 +29,6 @@ class State(BaseModel):
     query: str
     plan: PlannerPlan | None = None
     error: str | None = None
-
-
-class Context(BaseModel):
-    """Dependencies available to the Planner."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    planner_model: object | None = None
-
 
 class PlannerOutput(BaseModel):
     """Application-facing Planner result."""
