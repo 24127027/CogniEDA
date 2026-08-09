@@ -17,13 +17,13 @@ DEFAULT_SQLITE_PATH = Path(__file__).resolve().parents[2] / ".local" / "cognieda
 
 
 def get_default_sqlite_url() -> str:
-    """Return the default workspace-local SQLite URL for graph persistence."""
+    """Return the provisional package-local SQLite URL for donor persistence."""
 
     return f"sqlite:///{DEFAULT_SQLITE_PATH.as_posix()}"
 
 
 def get_database_url() -> str:
-    """Return the configured database URL or the default local SQLite URL."""
+    """Return the configured database URL or provisional package-local default."""
 
     return os.getenv("COGNIEDA_DB_URL", "").strip() or get_default_sqlite_url()
 
@@ -52,7 +52,7 @@ def ensure_sqlite_directory(database_url: str) -> None:
 
 @lru_cache(maxsize=4)
 def create_db_engine(database_url: str | None = None) -> Engine:
-    """Create and cache a SQLModel engine for the configured workspace graph."""
+    """Create and cache a SQLModel engine for the configured persistence URL."""
 
     resolved_url = database_url or get_database_url()
     ensure_sqlite_directory(resolved_url)

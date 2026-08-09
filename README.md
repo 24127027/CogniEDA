@@ -26,8 +26,9 @@ once and open a new shell. The editable tool installation makes later Python
 source edits visible without reinstalling; refresh the tool environment after
 dependency metadata changes.
 
-The default database URL resolves to `.local/cognieda_graph.sqlite3` unless
-`COGNIEDA_DB_URL` is set. Current database behavior is verified on SQLite.
+The provisional persistence helper uses a package-local SQLite path unless
+`COGNIEDA_DB_URL` is set. It is not composed as Workspace-local runtime state.
+Current database behavior is verified on SQLite.
 
 Normal development launch does not require activating `.venv`:
 
@@ -39,6 +40,12 @@ cognieda PATH
 `python -m cognieda` is also available inside an environment containing the
 package. These entrypoints expose the development Planner REPL scaffold, not a
 supported end-to-end product workflow.
+
+`cognieda PATH` treats resolved `PATH` as the user research project root.
+Workspace-managed datasets conventionally live under `<workspace>/data/`,
+while CogniEDA-private configuration and operational state live under
+`<workspace>/.cognieda/`. Explicit external dataset paths remain possible;
+directory presence does not admit a DataProfile or other authoritative state.
 
 Repository verification commands are:
 
@@ -61,4 +68,5 @@ The [MVP runtime subset](docs/architecture/mvp-runtime-subset.md) defines the
 approved executable vertical slice and distinguishes it from the complete
 canonical architecture. The end-to-end MVP remains a design target.
 Contributors changing package ownership should also read the
-[source layout](docs/development/source-layout.md).
+[source layout](docs/development/source-layout.md) and
+[Workspace ownership](docs/development/workspace-layout.md).

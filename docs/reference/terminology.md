@@ -39,7 +39,7 @@ authority lookup.
 | semantic Knowledge Graph | The canonical epistemic graph containing exactly Objective, Hypothesis, Evidence, and Discovery. | all durable state, all FCOs, or a generic vector store | [Semantic graph membership](../concepts/research-state/objects-and-state-layers.md#semantic-graph-membership) |
 | `Task` | FCO durable semantic work unit of kind `DATA`, `SCIENTIFIC`, `GRAPH`, or `SYNTHESIS`. | PlanRevision, scientific knowledge, or a semantic-graph node | [Task and PlanRevision](../concepts/research-state/planning-and-scientific-state.md#task-is-work-planrevision-is-a-plan) |
 | validity | The governed basis for deciding whether recorded state remains eligible for a particular current use. | truth-to-record, popularity, confidence wording, retrieval relevance, or an unscoped boolean | [Validity](../concepts/validity/index.md) |
-| `Workspace` | A non-FCO container and scope boundary within which multiple Objectives and workspace-scoped resources may be organized. | an FCO, an Objective, or one semantic Knowledge Graph node | [Objective scope](../concepts/research-state/identity-scope-and-lineage.md#objective-scope) |
+| `Workspace` | The resolved user research project root: a non-FCO container in which multiple Objectives and workspace-scoped resources may be organized. Conventional user data is under `data/`; CogniEDA-private state is under `.cognieda/`. | the product repository, an FCO, an Objective, or one semantic Knowledge Graph node | [Workspace ownership](../development/workspace-layout.md) |
 
 The canonical object set and state-family classification are summarized in the
 [object catalog](object-catalog.md).

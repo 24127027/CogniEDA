@@ -35,6 +35,9 @@ The enforced boundaries are more important than package names:
   implementations. It delegates through typed execution contracts.
 - Direct dataset loading is infrastructure; direct dataset operations are Data
   Explorer-owned.
+- The product repository contains code and development resources, while the
+  resolved `Workspace.root` owns conventional user research data and private
+  operational state. See [Workspace ownership](workspace-layout.md).
 - Generic execution infrastructure is not an agent.
 - Application and execution code must not depend on CLI presentation.
 - Runtime bootstrap owns concrete construction. Agent creation must not create
@@ -49,7 +52,9 @@ The enforced boundaries are more important than package names:
 **Implemented.** Focused architecture tests enforce the Planner dataset-access
 boundary, inward-layer independence from CLI, peer specialist package paths,
 removed-package hard cutovers, and the absence of non-Python artifacts in the
-production package tree.
+production package tree. Workspace ownership regressions also reject
+product-root research-state directories, package-relative user-data lookup,
+and production references to test fixture paths.
 
 **Partially implemented.** Dependency injection is explicit for execution,
 model construction, and agent tooling, but some application services still use
