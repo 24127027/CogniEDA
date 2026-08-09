@@ -1,29 +1,36 @@
 import pytest
 from pydantic_ai import FunctionToolset
 
-from cognieda.tools.builtin import AvailableBuiltinTools
-from cognieda.tools.manager import ToolManager
+from cognieda.infrastructure.agent_tooling import AgentTooling
+
+
+def first_tool() -> None:
+    return None
+
+
+def second_tool() -> None:
+    return None
 
 
 def test_explicit_builtin_tools_are_wrapped_in_one_function_toolset() -> None:
-    manager = ToolManager(config={"test_worker": {}}, mcp_toolsets={}, skills={})
+    manager = AgentTooling(config={"test_worker": {}}, mcp_toolsets={}, skills={})
 
     toolsets = manager.toolsets_for(
         "test_worker",
-        (AvailableBuiltinTools.GRAPH, AvailableBuiltinTools.DATASET),
+        (first_tool, second_tool),
     )
 
     assert len(toolsets) == 1
     function_toolset = toolsets[0]
     assert isinstance(function_toolset, FunctionToolset)
     assert set(function_toolset.tools) == {
-        "create_graph_toolset",
-        "create_dataset_toolset",
+        "first_tool",
+        "second_tool",
     }
 
 
 def test_worker_without_builtin_tools_has_no_function_toolset() -> None:
-    manager = ToolManager(config={"planner": {}}, mcp_toolsets={}, skills={})
+    manager = AgentTooling(config={"planner": {}}, mcp_toolsets={}, skills={})
 
     toolsets = manager.toolsets_for("planner", ())
 
@@ -31,14 +38,14 @@ def test_worker_without_builtin_tools_has_no_function_toolset() -> None:
 
 
 def test_unknown_worker_is_rejected() -> None:
-    manager = ToolManager(config={}, mcp_toolsets={}, skills={})
+    manager = AgentTooling(config={}, mcp_toolsets={}, skills={})
 
     with pytest.raises(ValueError, match="Unknown worker 'missing_worker'"):
         manager.toolsets_for("missing_worker", ())
 
 
 def test_missing_development_config_uses_bounded_planner_defaults(tmp_path) -> None:
-    manager = ToolManager.from_config_path(
+    manager = AgentTooling.from_config_path(
         path=tmp_path / "missing-agents.toml",
         mcp_path=tmp_path / "missing-mcp.toml",
         skills_path=tmp_path / "missing-skills.toml",
@@ -46,5 +53,4 @@ def test_missing_development_config_uses_bounded_planner_defaults(tmp_path) -> N
 
     assert manager.toolsets_for("planner", ()) == []
     assert manager.skills_for("planner") == []
-    with pytest.raises(ValueError, match="Unknown worker 'data_explorer'"):
-        manager.toolsets_for("data_explorer", ())
+    assert manager.toolsets_for("data_explorer", ()) == []

@@ -10,12 +10,12 @@ from cognieda.cli.renderer import Renderer
 from cognieda.db import create_db_engine
 from cognieda.execution import Capability
 from cognieda.execution.capabilities import Capability as CapabilityOwner
+from cognieda.infrastructure.agent_tooling import AgentTooling
 from cognieda.memory import SessionFrameBuilder
 from cognieda.repositories import TaskRepository
 from cognieda.runtime import Application
 from cognieda.schemas import Task
 from cognieda.schemas.artifacts import Task as TaskOwner
-from cognieda.tools import ToolManager
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 LEGACY_IMPORT_ROOTS = frozenset(
@@ -113,7 +113,7 @@ def test_major_package_boundaries_import_from_cognieda() -> None:
             SessionFrameBuilder,
             TaskRepository,
             Application,
-            ToolManager,
+            AgentTooling,
         )
     )
 

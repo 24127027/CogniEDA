@@ -8,7 +8,7 @@ from typing import Any
 import pandas as pd
 from pydantic import BaseModel, Field, ValidationError
 
-from cognieda.agents.llm import ModelConfig
+from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import Capability, ExecutionFailure, ExecutionStatus
 from cognieda.infrastructure.datasets import load_dataset
 from cognieda.schemas.artifacts import DataProfile, Task
@@ -80,11 +80,18 @@ def _fallback_code(state: State) -> str:
     )
 
 
-def _safe_agent_output(config: ModelConfig, prompt: str) -> _GeneratedCodeDraft | None:
+def _safe_agent_output(
+    config: ModelConfig,
+    agent_factory: AgentFactoryPort | None,
+    prompt: str,
+) -> _GeneratedCodeDraft | None:
     from .agent import create_de_agent
 
+    if agent_factory is None:
+        return None
+
     try:
-        agent = create_de_agent(config)
+        agent = create_de_agent(config, agent_factory)
     except ValueError:
         return None
 
@@ -188,14 +195,18 @@ def route_request(state: State, runtime: Any = None) -> str:
 
 
 def generate_and_execute_code(
-    state: State, runtime: Any = None, *, agent_config: ModelConfig
+    state: State,
+    runtime: Any = None,
+    *,
+    agent_config: ModelConfig,
+    agent_factory: AgentFactoryPort | None,
 ) -> State:
     logs = list(state["execution_logs"])
     dataframe = _load_dataframe(state)
 
     for attempt in range(_MAX_CODE_RETRIES + 1):
         prompt = _prompt_for_code(state)
-        draft = _safe_agent_output(agent_config, prompt)
+        draft = _safe_agent_output(agent_config, agent_factory, prompt)
         code = draft.python_code if draft is not None else _fallback_code(state)
         try:
             raw_data_results = _run_python(code, dataframe)

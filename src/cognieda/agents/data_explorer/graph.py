@@ -5,7 +5,7 @@ from functools import partial
 from langgraph.graph import END, START
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 
-from cognieda.agents.llm import ModelConfig
+from cognieda.application.ports import AgentFactoryPort, ModelConfig
 
 from .nodes import (
     compile_result,
@@ -24,12 +24,17 @@ from .state import State
 def build_graph(
     *,
     config: ModelConfig,
+    agent_factory: AgentFactoryPort | None,
 ) -> CompiledStateGraph[State, None, State, State]:
     builder = StateGraph(State)
 
     builder.add_node(
         "generate_and_execute_code",
-        partial(generate_and_execute_code, agent_config=config),
+        partial(
+            generate_and_execute_code,
+            agent_config=config,
+            agent_factory=agent_factory,
+        ),
     )
     builder.add_node("evaluate_results", evaluate_results)
     builder.add_node("draft_observation", draft_observation)

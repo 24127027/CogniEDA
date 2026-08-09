@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydantic_ai.tools import RunContext
 
+from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.execution import (
     Capability,
     ExecutionRequest,
@@ -11,11 +12,9 @@ from cognieda.execution import (
 )
 from cognieda.schemas.artifacts import Task
 
-from ..dependencies.protocols import HasExecutorDispatcher
-
 
 async def invoke_data_capability(
-    ctx: RunContext[HasExecutorDispatcher],
+    ctx: RunContext[PlannerDeps],
     task: Task,
     capability: Capability = Capability.DATA_ANALYSIS,
 ) -> ExecutionResult:

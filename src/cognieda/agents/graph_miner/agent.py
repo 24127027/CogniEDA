@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from cognieda.execution import Capability, ExecutionRequest, ExecutionResult
-from cognieda.tools.builtin import AvailableBuiltinTools
 
 
 class GraphMiner:
     """Import-safe scaffold; S0 does not register the unimplemented graph."""
 
-    builtin_tools: tuple[AvailableBuiltinTools, ...] = (AvailableBuiltinTools.GRAPH,)
+    builtin_tools: tuple[()] = ()
 
     async def run(self, request: ExecutionRequest) -> ExecutionResult:
         if request.capability != Capability.GRAPH_MINING:

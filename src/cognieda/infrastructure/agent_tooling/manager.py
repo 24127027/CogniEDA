@@ -7,9 +7,9 @@ from pydantic_ai import FunctionToolset
 from pydantic_ai.mcp import MCPToolset
 from pydantic_ai_skills import SkillsCapability
 
-from .builtin import AvailableBuiltinTools
-from .mcp.loader import load_mcp_toolsets
-from .skills.loader import load_skills
+from cognieda.application.ports import AgentTool
+from cognieda.infrastructure.mcp import load_mcp_toolsets
+from cognieda.infrastructure.skills import load_skills
 
 # Example configuration for agents.toml:
 # [planner]
@@ -31,10 +31,15 @@ class WorkerConfig(TypedDict, total=False):
     mcp: list[str]
 
 
-DEFAULT_WORKER_CONFIG: dict[str, WorkerConfig] = {"planner": {}}
+DEFAULT_WORKER_CONFIG: dict[str, WorkerConfig] = {
+    "planner": {},
+    "data_explorer": {},
+    "graph_miner": {},
+    "hypothesis_analyst": {},
+}
 
 
-class ToolManager:
+class AgentTooling:
     def __init__(
         self,
         config: dict[str, WorkerConfig],
@@ -48,14 +53,15 @@ class ToolManager:
     @classmethod
     def from_config_path(
         cls,
-        path: str | Path = "config/agents.toml",
-        mcp_path: str | Path = "config/mcp.toml",
-        skills_path: str | Path = "config/skills.toml",
-    ) -> "ToolManager":
+        path: str | Path,
+        mcp_path: str | Path,
+        skills_path: str | Path,
+    ) -> "AgentTooling":
         config = {worker: values.copy() for worker, values in DEFAULT_WORKER_CONFIG.items()}
         try:
             with open(path, "rb") as f:
-                config = tomllib.load(f)
+                loaded_config = tomllib.load(f)
+                config.update(loaded_config)
         except FileNotFoundError:
             pass
 
@@ -72,7 +78,7 @@ class ToolManager:
     def toolsets_for(
         self,
         worker: str,
-        builtin_tools: Sequence[AvailableBuiltinTools],
+        builtin_tools: Sequence[AgentTool],
     ) -> list[FunctionToolset[Any] | MCPToolset[Any]]:
         if worker not in self.config:
             raise ValueError(f"Unknown worker '{worker}'.")
@@ -83,7 +89,7 @@ class ToolManager:
         # Built-in tools
         #
         if builtin_tools:
-            toolsets.append(FunctionToolset(tuple(tool.function for tool in builtin_tools)))
+            toolsets.append(FunctionToolset(tuple(builtin_tools)))
 
         #
         # MCP toolsets
@@ -106,20 +112,3 @@ class ToolManager:
         configured_skills = worker_cfg.get("skills", [])
 
         return [self.skills[skill] for skill in configured_skills]
-
-
-tool_manager: ToolManager | None = None
-
-
-def initialize_tool_manager(
-    path: str | Path = "config/agents.toml",
-    mcp_path: str | Path = "config/mcp.toml",
-    skills_path: str | Path = "config/skills.toml",
-) -> ToolManager:
-    global tool_manager
-    tool_manager = ToolManager.from_config_path(
-        path=path,
-        mcp_path=mcp_path,
-        skills_path=skills_path,
-    )
-    return tool_manager

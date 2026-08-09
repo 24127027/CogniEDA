@@ -5,7 +5,7 @@ from functools import partial
 from langgraph.graph import END, START
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 
-from cognieda.agents.llm import ModelConfig
+from cognieda.application.ports import AgentFactoryPort, ModelConfig
 
 from .deps import AdmissionCall, DispatcherCall
 from .nodes import (
@@ -24,6 +24,7 @@ from .state import State
 def build_graph(
     *,
     config: ModelConfig,
+    agent_factory: AgentFactoryPort | None,
     mock_dispatcher_call: DispatcherCall,
     mock_admission_call: AdmissionCall,
 ) -> CompiledStateGraph[State, None, State, State]:
@@ -31,7 +32,11 @@ def build_graph(
 
     builder.add_node(
         "formulate_hypothesis",
-        partial(formulate_hypothesis, agent_config=config),
+        partial(
+            formulate_hypothesis,
+            agent_config=config,
+            agent_factory=agent_factory,
+        ),
     )
     builder.add_node(
         "plan_de_requests",
@@ -41,7 +46,14 @@ def build_graph(
         "dispatch_to_de",
         partial(dispatch_to_de, mock_dispatcher_call=mock_dispatcher_call),
     )
-    builder.add_node("evaluate_evidence", evaluate_evidence)
+    builder.add_node(
+        "evaluate_evidence",
+        partial(
+            evaluate_evidence,
+            agent_config=config,
+            agent_factory=agent_factory,
+        ),
+    )
     builder.add_node("assess_scientific_value", assess_scientific_value)
     builder.add_node(
         "request_admission",

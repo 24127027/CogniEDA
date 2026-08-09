@@ -6,17 +6,16 @@ from dataclasses import dataclass, field
 
 from pydantic_ai import Agent
 
-from cognieda.agents.llm import ModelConfig, create_agent
+from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import Capability, ExecutionFailure, ExecutionRequest, ExecutionStatus
-from cognieda.tools.builtin import AvailableBuiltinTools
 
 from .contracts import DataExplorerResult
 from .graph import build_graph
 from .state import State
 
 
-def create_de_agent(config: ModelConfig) -> Agent[None]:
-    return create_agent(
+def create_de_agent(config: ModelConfig, agent_factory: AgentFactoryPort) -> Agent[None]:
+    return agent_factory.create_agent(
         worker="data_explorer",
         config=config,
         deps_type=type(None),
@@ -32,11 +31,17 @@ class DataExplorerConfig:
 class DataExplorer:
     """Provider for bounded data analysis and profiling capability requests."""
 
-    builtin_tools: tuple[AvailableBuiltinTools, ...] = ()
+    builtin_tools: tuple[()] = ()
 
-    def __init__(self, *, config: ModelConfig | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        config: ModelConfig | None = None,
+        agent_factory: AgentFactoryPort | None = None,
+    ) -> None:
         self.config = config or ModelConfig()
-        self.graph = build_graph(config=self.config)
+        self.agent_factory = agent_factory
+        self.graph = build_graph(config=self.config, agent_factory=agent_factory)
 
     async def run(self, request: ExecutionRequest) -> DataExplorerResult:
         if request.capability == Capability.DATA_TRANSFORMATION:

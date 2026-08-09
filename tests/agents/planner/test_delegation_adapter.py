@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
+from cognieda.agents.planner.tools import invoke_data_capability
 from cognieda.execution import (
     Capability,
     ExecutionRequest,
@@ -12,7 +13,6 @@ from cognieda.execution import (
     ExecutorRegistry,
 )
 from cognieda.schemas.artifacts import Task
-from cognieda.tools.delegation.dataset import invoke_data_capability
 
 
 class ToolTestProvider:

@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from cognieda.agents.llm import ModelConfig
+from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import (
     Capability,
     ExecutionFailure,
@@ -53,12 +53,18 @@ def _is_vague_task(task: Any) -> bool:
 
 
 def _safe_agent_output(
-    config: ModelConfig, prompt: str, output_type: type[BaseModel]
+    config: ModelConfig,
+    agent_factory: AgentFactoryPort | None,
+    prompt: str,
+    output_type: type[BaseModel],
 ) -> BaseModel | None:
     from .agent import create_ha_agent
 
+    if agent_factory is None:
+        return None
+
     try:
-        agent = create_ha_agent(config)
+        agent = create_ha_agent(config, agent_factory)
     except ValueError:
         return None
 
@@ -144,7 +150,12 @@ def _result_package(state: HAState) -> dict[str, Any]:
     return package
 
 
-def formulate_hypothesis(state: HAState, *, agent_config: ModelConfig) -> dict[str, Any]:
+def formulate_hypothesis(
+    state: HAState,
+    *,
+    agent_config: ModelConfig,
+    agent_factory: AgentFactoryPort | None,
+) -> dict[str, Any]:
     task = _task(state)
     logs = list(state["execution_logs"])
 
@@ -157,7 +168,12 @@ def formulate_hypothesis(state: HAState, *, agent_config: ModelConfig) -> dict[s
         f"Task:\n{_task_text(state)}\n\n"
         "Return statement, scope, validation_method, evidence_expectation, and variables."
     )
-    model_output = _safe_agent_output(agent_config, prompt, _HypothesisDraftModel)
+    model_output = _safe_agent_output(
+        agent_config,
+        agent_factory,
+        prompt,
+        _HypothesisDraftModel,
+    )
     hypothesis = (
         Hypothesis(
             task_id=task.task_id,
@@ -220,7 +236,12 @@ def dispatch_to_de(state: HAState, *, mock_dispatcher_call: DispatcherCall) -> d
     }
 
 
-def evaluate_evidence(state: HAState) -> dict[str, Any]:
+def evaluate_evidence(
+    state: HAState,
+    *,
+    agent_config: ModelConfig,
+    agent_factory: AgentFactoryPort | None,
+) -> dict[str, Any]:
     hypothesis = state["hypothesis_draft"]
     if hypothesis is None or not state["collected_evidence"]:
         return {"evaluation_outcome": None, "scientific_value": None}
@@ -232,7 +253,12 @@ def evaluate_evidence(state: HAState) -> dict[str, Any]:
         "Evidence summaries: "
         f"{[item.result_summary.summary for item in state['collected_evidence']]}\n"
     )
-    model_output = _safe_agent_output(ModelConfig(), prompt, _EvidenceAssessmentModel)
+    model_output = _safe_agent_output(
+        agent_config,
+        agent_factory,
+        prompt,
+        _EvidenceAssessmentModel,
+    )
     if model_output is not None:
         return {
             "evaluation_outcome": model_output.outcome,

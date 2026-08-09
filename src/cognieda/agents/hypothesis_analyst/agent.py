@@ -7,10 +7,9 @@ from dataclasses import dataclass, field
 from pydantic_ai import Agent
 
 from cognieda.agents.data_explorer.contracts import DataExplorerResult
-from cognieda.agents.llm import ModelConfig, create_agent
+from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import Capability, ExecutionRequest
 from cognieda.schemas.artifacts import Discovery
-from cognieda.tools.builtin import AvailableBuiltinTools
 
 from .contracts import HypothesisAnalystResult
 from .deps import AdmissionCall, DispatcherCall
@@ -28,8 +27,8 @@ def _missing_admission_call(draft: Discovery) -> bool:
     raise RuntimeError("HypothesisAnalyst requires an admission callable for discovery validation.")
 
 
-def create_ha_agent(config: ModelConfig) -> Agent[None]:
-    return create_agent(
+def create_ha_agent(config: ModelConfig, agent_factory: AgentFactoryPort) -> Agent[None]:
+    return agent_factory.create_agent(
         worker="hypothesis_analyst",
         config=config,
         deps_type=type(None),
@@ -47,20 +46,23 @@ class HypothesisAnalystConfig:
 class HypothesisAnalyst:
     """Import-safe donor scaffold; S0 does not register it as runnable."""
 
-    builtin_tools: tuple[AvailableBuiltinTools, ...] = ()
+    builtin_tools: tuple[()] = ()
 
     def __init__(
         self,
         *,
         config: ModelConfig | None = None,
+        agent_factory: AgentFactoryPort | None = None,
         mock_dispatcher_call: DispatcherCall | None = None,
         mock_admission_call: AdmissionCall | None = None,
     ) -> None:
         self.config = config or ModelConfig()
+        self.agent_factory = agent_factory
         self.mock_dispatcher_call = mock_dispatcher_call or _missing_dispatcher_call
         self.mock_admission_call = mock_admission_call or _missing_admission_call
         self.graph = build_graph(
             config=self.config,
+            agent_factory=agent_factory,
             mock_dispatcher_call=self.mock_dispatcher_call,
             mock_admission_call=self.mock_admission_call,
         )

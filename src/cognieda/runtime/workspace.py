@@ -69,6 +69,7 @@ class Workspace:
                 """\
                 [model]
                 name = "default-model"
+                base_url = ""
                 api_key = "local"
                 """
             )

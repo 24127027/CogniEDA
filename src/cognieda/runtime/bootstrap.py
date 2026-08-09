@@ -6,21 +6,29 @@ from pathlib import Path
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
+from cognieda.application.ports import ModelConfig
 from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
+from cognieda.infrastructure.agent_tooling import AgentTooling
+from cognieda.infrastructure.llm import OpenAICompatibleAgentFactory
 
 from .application import Application
 from .workspace import Workspace
 
-NINE_ROUTER_BASE_URL = "http://localhost:20128/v1"
-
 
 def bootstrap_application(workspace_path: Path) -> Application:
     workspace = Workspace.open(workspace_path)
-    _configure_environment(workspace)
+    model_config = resolve_model_config(workspace)
+    config_root = workspace.root / ".cognieda"
+    tooling = AgentTooling.from_config_path(
+        path=config_root / "agents.toml",
+        mcp_path=config_root / "mcp.toml",
+        skills_path=config_root / "skills.toml",
+    )
+    agent_factory = OpenAICompatibleAgentFactory(tooling)
 
     registry = ExecutorRegistry()
     registry.register_provider(
-        lambda: DataExplorer(),
+        lambda: DataExplorer(config=model_config, agent_factory=agent_factory),
         capabilities=(
             Capability.DATA_ANALYSIS,
             Capability.DATA_PROFILING,
@@ -28,7 +36,11 @@ def bootstrap_application(workspace_path: Path) -> Application:
         ),
     )
     dispatcher = ExecutorDispatcher(registry)
-    planner = Planner(deps=PlannerDeps(dispatcher=dispatcher))
+    planner = Planner(
+        deps=PlannerDeps(dispatcher=dispatcher),
+        agent_factory=agent_factory,
+        model_config=model_config,
+    )
 
     return Application(
         workspace=workspace,
@@ -37,13 +49,28 @@ def bootstrap_application(workspace_path: Path) -> Application:
     )
 
 
-def _configure_environment(workspace: Workspace) -> None:
-    model_name = workspace.config.get("model.name")
-    api_key = workspace.config.get("model.api_key", "local")
+def _resolved_value(workspace: Workspace, key: str, environment_name: str) -> str:
+    workspace_value = workspace.config.get(key)
+    if workspace_value is not None and str(workspace_value).strip():
+        return str(workspace_value)
+    return os.environ.get(environment_name, "").strip()
+
+
+def resolve_model_config(workspace: Workspace) -> ModelConfig:
+    """Resolve workspace-first model configuration without mutating process state."""
+
+    model_name = _resolved_value(workspace, "model.name", "COGNIEDA_MODEL_NAME")
+    base_url = _resolved_value(workspace, "model.base_url", "COGNIEDA_OPENAI_BASE_URL")
+    api_key = _resolved_value(workspace, "model.api_key", "COGNIEDA_OPENAI_API_KEY")
 
     if not model_name:
-        raise ValueError("Missing [model].name in .cognieda/project.toml")
+        raise ValueError(
+            "Model name is required in .cognieda/project.toml or COGNIEDA_MODEL_NAME."
+        )
+    if not api_key:
+        raise ValueError(
+            "Model API key is required in .cognieda/project.toml or "
+            "COGNIEDA_OPENAI_API_KEY."
+        )
 
-    os.environ["COGNIEDA_MODEL_NAME"] = str(model_name)
-    os.environ["COGNIEDA_OPENAI_BASE_URL"] = NINE_ROUTER_BASE_URL
-    os.environ["COGNIEDA_OPENAI_API_KEY"] = str(api_key)
+    return ModelConfig(model_name=model_name, base_url=base_url, api_key=api_key)
