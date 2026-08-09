@@ -200,11 +200,13 @@ changed after rejected lineage validation.
 
 ## Role and authority boundaries
 
-Planner remains the only human-facing agent. For the MVP it will inspect the
-active `SessionFrame`, understand Objective and Assumptions, inspect the active
-DataProfile and prior Evidence, create bounded Tasks, select a capability,
-invoke the dispatcher, consume `PlannerWorkOutcome`, coordinate authorized
-state updates, and respond to the human.
+Planner remains the only human-facing agent. At the bounded M1-B library
+boundary it inspects the active typed `SessionFrame`, understands the latest
+request, establishes or replaces the active Objective, records planning-only
+Assumptions, creates bounded Tasks, selects a typed capability, invokes the
+injected dispatcher, consumes `PlannerWorkOutcome`, returns a successor frame,
+and responds to the human. This does not persist or retain the frame across
+runtime turns; that composition remains **Deferred** to M5-A.
 
 Planner does not read a dataframe, run pandas or analytical code, mutate a
 dataset, or author authoritative Evidence directly. Dataset work belongs
@@ -248,10 +250,12 @@ Capability
   -> reusable provider instance
 ```
 
-One provider may expose multiple compatible capabilities. The current
-PydanticAI integration exposes capability invocation to the model as tools,
-while `ExecutorDispatcher` remains the architectural dispatch boundary.
-PydanticAI is an adapter, not part of the canonical architecture.
+One provider may expose multiple compatible capabilities. The bounded
+PydanticAI data-capability adapter remains available as a tested internal seam,
+but the M1-B Planner does not compose it as a model tool. Typed request
+understanding proposes work, deterministic Planner code constructs and tracks
+the canonical Task, and only then invokes `ExecutorDispatcher`. PydanticAI
+remains an adapter, not part of the canonical architecture.
 
 `DATA_TRANSFORMATION` must preserve immutable dataset-state semantics:
 
@@ -278,9 +282,46 @@ Application coordination projects the Planner-facing subset into
 work identifier, status, semantic summary, authoritative references,
 limitations, blockers, permitted next actions, and result digest.
 
-This is an architectural target. Current S0 implements a minimum normalization
-seam over shared transport metadata; semantic projection and Planner
-consumption remain **Deferred**.
+S0 implements the minimum normalization seam over shared transport metadata.
+M1-B consumption is **Implemented** at the bounded Planner library boundary:
+the Planner verifies Task identity, preserves the normalized digest,
+limitations, blockers, and permitted next actions, and applies a terminal Task
+status. The outcome is not admitted as Evidence.
+
+## Bounded M1-B Planner behavior
+
+The active M1-B graph is:
+
+```text
+START
+  -> understand_request
+  -> apply_planning_state
+  -> dispatch_work
+  -> compose_response
+  -> END
+```
+
+Request understanding uses a finite typed action contract for answering from
+state, setting or refining the Objective, adding an Assumption, creating and
+running bounded data work, summarizing state, or returning an unsupported
+action. Natural language is the primary model-backed interface. The small
+explicit command surface maps into the same typed actions and unknown commands
+fail without state mutation or dispatch.
+
+Deterministic orchestration constructs Objective, Assumption, and Task values
+through `SessionFrame` successor seams. Semantic Objective refinement receives
+a new identity; semantic Task change creates a new Task; lifecycle change
+retains Task identity and instruction. Tracked data work follows:
+
+```text
+PENDING -> RUNNING -> COMPLETED  on SUCCEEDED
+PENDING -> RUNNING -> FAILED     on FAILED, BLOCKED, or dispatch failure
+```
+
+Successful work before M3-A is reported only as executor-boundary completion.
+Failed or blocked work surfaces controlled diagnostics. Neither path creates
+Evidence. Answers that claim empirical support receive an evidence-only typed
+input from admitted `SessionFrame.evidences`; planning Assumptions are excluded.
 
 ## Explicit MVP non-goals
 
@@ -308,7 +349,7 @@ part of the canonical architecture and must not be described as removed.
 | S0 | executor capability stabilization | **Implemented** at the bounded S0 library surface |
 | D0 | MVP and canonical documentation reconciliation | **Implemented** by this documentation boundary |
 | M1-A | MVP research-state core: Objective, Assumption, Task, Evidence, DataProfile, and SessionFrame | **Implemented** |
-| M1-B | MVP Planner behavior, including `PlannerWorkOutcome` consumption | **Deferred** |
+| M1-B | MVP Planner behavior, including `PlannerWorkOutcome` consumption | **Implemented** at the bounded library behavior surface |
 | M3-A | MVP Data Explorer plus Evidence and real tool execution | **Deferred** |
 | M5-A | single-session runtime composition | **Deferred** |
 | MVP-I | vertical integration | **Deferred** |
