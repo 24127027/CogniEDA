@@ -8,6 +8,7 @@ from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import ExecutorContext
 from cognieda.schemas.artifacts import SessionFrame
 
+from .context import PlanningContext
 from .dependencies import PlannerDeps
 from .graph import build_graph
 from .model import PlannerDecisionModel, PlannerModel
@@ -74,7 +75,11 @@ class Planner:
         state = State(
             query=query,
             session_frame=frame,
-            message_history=tuple(message_history),
+            planning_context=PlanningContext.from_frame(
+                latest_request=query,
+                frame=frame,
+                message_history=message_history,
+            ),
             execution_context=execution_context or ExecutorContext(),
         )
         context = Context(planner_model=self.model, dispatcher=self.deps.dispatcher)

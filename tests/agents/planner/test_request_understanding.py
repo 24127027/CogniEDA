@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from pydantic_ai.messages import ModelMessage
 
 from cognieda.agents.planner.agent import Planner
+from cognieda.agents.planner.context import PlanningContext
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.model import PlannerModelResult
 from cognieda.agents.planner.types import (
@@ -90,6 +91,20 @@ def test_natural_language_understanding_receives_latest_request_and_typed_state(
     assert model_input.assumptions == (assumption,)
     assert model_input.tasks == (task,)
     assert dispatcher.requests == []
+
+
+def test_planning_context_is_a_distinct_ephemeral_per_run_projection() -> None:
+    objective = Objective(text="Understand customer retention.")
+    frame = SessionFrame(objective=objective)
+
+    first = PlanningContext.from_frame(latest_request="First request", frame=frame)
+    second = PlanningContext.from_frame(latest_request="Second request", frame=frame)
+
+    assert first is not second
+    assert first.latest_request == "First request"
+    assert second.latest_request == "Second request"
+    assert first.objective is objective
+    assert "planning_context" not in SessionFrame.model_fields
 
 
 def test_explicit_and_natural_language_objective_requests_reach_same_typed_action() -> None:

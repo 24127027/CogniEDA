@@ -16,6 +16,8 @@ from cognieda.schemas.artifacts import (
     Task,
 )
 
+from .context import PlanningContext
+
 
 class PlannerAction(StrEnum):
     """Small finite action space owned by the MVP Planner."""
@@ -120,18 +122,14 @@ class PlannerModelInput(BaseModel):
     evidences: tuple[Evidence, ...] = ()
 
     @classmethod
-    def from_frame(
-        cls,
-        latest_request: str,
-        frame: SessionFrame,
-    ) -> PlannerModelInput:
+    def from_context(cls, context: PlanningContext) -> PlannerModelInput:
         return cls(
-            latest_request=latest_request,
-            objective=frame.objective,
-            assumptions=frame.assumptions,
-            tasks=frame.tasks,
-            data_profile=frame.data_profile,
-            evidences=frame.evidences,
+            latest_request=context.latest_request,
+            objective=context.objective,
+            assumptions=context.assumptions,
+            tasks=context.tasks,
+            data_profile=context.data_profile,
+            evidences=context.evidences,
         )
 
 
@@ -161,7 +159,7 @@ class State(BaseModel):
 
     query: str = Field(min_length=1)
     session_frame: SessionFrame
-    message_history: tuple[ModelMessage, ...] = ()
+    planning_context: PlanningContext
     new_messages: tuple[ModelMessage, ...] = ()
     execution_context: ExecutorContext = Field(default_factory=ExecutorContext)
     decision: PlannerDecision | None = None
