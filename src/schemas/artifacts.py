@@ -10,23 +10,12 @@ from uuid import UUID, uuid4
 from pydantic import Field, JsonValue, NonNegativeInt, field_validator, model_validator
 
 from schemas.common import (
-    AssumptionContextSummary,
     CogniEDABaseModel,
     ColumnProfile,
-    DataProfileContextSummary,
-    DeadEndSummary,
     DiscoveryClaim,
-    DiscoveryContextSummary,
-    EvidenceContextSummary,
     EvidenceProvenance,
-    HypothesisContextSummary,
     ImmutableCogniEDABaseModel,
-    InvalidationRule,
     NonEmptyStr,
-    StaleContextMarker,
-    TaskContextSummary,
-    ToolResultCacheSummary,
-    UserDecisionContextSummary,
     ValidityBasis,
     utc_now,
 )
@@ -34,7 +23,6 @@ from schemas.enums import (
     DiscoveryEpistemicStatus,
     DiscoveryLifecycleState,
     HypothesisStatus,
-    SessionFrameStatus,
     TaskStatus,
     UserDecisionStatus,
     UserDecisionType,
@@ -184,37 +172,70 @@ class UserDecision(CogniEDABaseModel):
 
 
 class SessionFrame(CogniEDABaseModel):
-    """Concrete active-context frame for session continuity and handoff."""
+    """Authoritative typed research state for the single active MVP session."""
 
-    session_frame_id: UUID = Field(default_factory=uuid4)
-    frame_topic: NonEmptyStr
-    frame_status: SessionFrameStatus = SessionFrameStatus.ACTIVE
-    objective_snapshot: NonEmptyStr
-    frame_outcome: str | None = None
-    objective_summary: str | None = None
-    branch_key: str | None = None
-    checkpoint_label: str | None = None
-    parent_session_frame_id: UUID | None = None
-    handoff_summary: str | None = None
-    data_profile_summaries: list[DataProfileContextSummary] = Field(default_factory=list)
-    active_data_profile_refs: list[UUID] = Field(default_factory=list)
-    active_tasks: list[TaskContextSummary] = Field(default_factory=list)
-    active_task_refs: list[UUID] = Field(default_factory=list)
-    active_assumptions: list[AssumptionContextSummary] = Field(default_factory=list)
-    active_assumption_refs: list[UUID] = Field(default_factory=list)
-    active_hypotheses: list[HypothesisContextSummary] = Field(default_factory=list)
-    active_hypothesis_refs: list[UUID] = Field(default_factory=list)
-    relevant_discoveries: list[DiscoveryContextSummary] = Field(default_factory=list)
-    relevant_discovery_refs: list[UUID] = Field(default_factory=list)
-    supporting_evidence: list[EvidenceContextSummary] = Field(default_factory=list)
-    supporting_evidence_refs: list[UUID] = Field(default_factory=list)
-    recent_user_decisions: list[UserDecisionContextSummary] = Field(default_factory=list)
-    recent_user_decision_refs: list[UUID] = Field(default_factory=list)
-    pending_tasks: list[NonEmptyStr] = Field(default_factory=list)
-    open_questions: list[NonEmptyStr] = Field(default_factory=list)
-    key_warnings: list[NonEmptyStr] = Field(default_factory=list)
-    stale_context: list[StaleContextMarker] = Field(default_factory=list)
-    dead_ends: list[DeadEndSummary] = Field(default_factory=list)
-    cached_tool_results: list[ToolResultCacheSummary] = Field(default_factory=list)
-    frame_invalidation_rules: list[InvalidationRule] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=utc_now)
+    objective: Objective | None = None
+    assumptions: list[Assumption] = Field(default_factory=list)
+    tasks: list[Task] = Field(default_factory=list)
+    evidences: list[Evidence] = Field(default_factory=list)
+    data_profile: DataProfile | None = None
+
+    @model_validator(mode="after")
+    def _validate_research_state(self) -> SessionFrame:
+        self._reject_duplicate_ids(
+            [assumption.assumption_id for assumption in self.assumptions],
+            object_name="Assumption",
+        )
+        self._reject_duplicate_ids(
+            [task.task_id for task in self.tasks],
+            object_name="Task",
+        )
+        self._reject_duplicate_ids(
+            [evidence.evidence_id for evidence in self.evidences],
+            object_name="Evidence",
+        )
+
+        task_ids = {task.task_id for task in self.tasks}
+        for evidence in self.evidences:
+            if evidence.task_id not in task_ids:
+                raise ValueError("SessionFrame rejects orphan Evidence without its Task.")
+            if self.data_profile is None:
+                raise ValueError("SessionFrame cannot retain Evidence without a DataProfile.")
+            if evidence.data_profile_id != self.data_profile.data_profile_id:
+                raise ValueError("Evidence must reference the active SessionFrame DataProfile.")
+        return self
+
+    @staticmethod
+    def _reject_duplicate_ids(ids: list[UUID], *, object_name: str) -> None:
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"SessionFrame rejects duplicate {object_name} IDs.")
+
+    def set_objective(self, objective: Objective | None) -> None:
+        self.objective = objective
+
+    def add_assumption(self, assumption: Assumption) -> None:
+        if any(item.assumption_id == assumption.assumption_id for item in self.assumptions):
+            raise ValueError("SessionFrame rejects duplicate Assumption IDs.")
+        self.assumptions.append(assumption)
+
+    def add_task(self, task: Task) -> None:
+        if any(item.task_id == task.task_id for item in self.tasks):
+            raise ValueError("SessionFrame rejects duplicate Task IDs.")
+        self.tasks.append(task)
+
+    def set_task_status(self, task_id: UUID, status: TaskStatus) -> None:
+        for task in self.tasks:
+            if task.task_id == task_id:
+                task.status = status
+                return
+        raise ValueError("SessionFrame cannot update a Task it does not contain.")
+
+    def add_evidence(self, evidence: Evidence) -> None:
+        candidate = self.model_copy(update={"evidences": [*self.evidences, evidence]})
+        candidate._validate_research_state()
+        self.evidences.append(evidence)
+
+    def set_data_profile(self, data_profile: DataProfile | None) -> None:
+        candidate = self.model_copy(update={"data_profile": data_profile})
+        candidate._validate_research_state()
+        self.data_profile = data_profile
