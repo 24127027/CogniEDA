@@ -1,6 +1,6 @@
 # Limitations and bottlenecks
 
-These are verified constraints of the M1-A implementation, not a sprint
+These are verified constraints of the bounded MVP implementation, not a sprint
 backlog. [Current state](current-state.md) owns capability detail.
 
 ## Architectural gap
@@ -18,18 +18,20 @@ backlog. [Current state](current-state.md) owns capability detail.
 
 ## Implementation gap
 
-- M1-B Planner behavior, M3-A real Data Explorer-to-Evidence integration, and
-  M5-A single-session composition are **Deferred**.
+- M1-B Planner behavior is **Implemented** at a bounded library surface. M3-A
+  real Data Explorer-to-Evidence integration and M5-A retained single-session
+  composition are **Deferred**.
 - `PlanRevision`, `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
   and `GovernanceDecision` have no supported implementation.
 - Hypothesis Analyst and Graph Miner remain unregistered scaffolds. Discovery
   and Hypothesis remain canonical FCO names but have no active MVP runtime.
-- Objective and Assumption update behavior is **Deferred** to M1-B. Task
-  persistence supports status change only. Active Task values are immutable;
-  changing Task meaning requires a new identity, while status change produces
-  a replacement with the same identity and instruction.
+- Planner successor-state Objective replacement and Assumption addition are
+  **Implemented**. Durable Objective and Assumption persistence updates remain
+  **Deferred**. Task persistence supports status change only. Active Task
+  values are immutable; changing Task meaning requires a new identity, while
+  status change produces a replacement with the same identity and instruction.
 - Evidence creation from Data Explorer output and sole application-authority
   admission are not implemented. The active frame and SQLite repository
   boundaries admit Evidence only for a `COMPLETED` Task; incomplete or failed
@@ -67,8 +69,10 @@ backlog. [Current state](current-state.md) owns capability detail.
   blocked until successor dataset and DataProfile semantics exist.
 - `DATA_TRANSFORMATION` remains blocked until immutable successor dataset state
   and successor DataProfile handling exist.
-- Planner-to-dispatch adapter tests use a registered fake provider; they do not
-  prove model-selected real Data Explorer work.
+- M1-B Planner tests use deterministic fake model and dispatcher boundaries;
+  they prove typed capability selection, tracked Task lifecycle, outcome
+  consumption, and fail-closed behavior without claiming model-selected real
+  Data Explorer filesystem execution.
 - Workspace path selection and initialization are **Implemented**, but
   automatic dataset discovery or admission is **Unsupported**. The
   conventional `data/` directory does not itself establish a DataProfile.
@@ -88,13 +92,12 @@ backlog. [Current state](current-state.md) owns capability detail.
 
 ## Verification gap
 
-- Full pytest collection is interrupted by three pre-existing M1-B Planner
-  donor mismatches involving `TaskManagementDraft`, `route_intent`,
-  `understand_request`, `ChildTaskProposalDraft`, and `manage_tasks`.
-- Excluding exactly those three modules, the PR #36 layer-boundary run recorded
-  136 passes and 57 explicit deferred-donor skips.
+- Full pytest collection includes the rewritten M1-B Planner tests. The three
+  former donor import blockers were removed rather than restored as
+  compatibility APIs.
 - No end-to-end user-to-Planner-to-real-Data Explorer-to-Evidence-to-
-  SessionFrame-to-response test exists; that is not an M1-A completion claim.
+  SessionFrame-to-response test exists; bounded M1-B library completion does
+  not establish that M3-A/M5-A path.
 - No production performance envelope, non-SQLite validation, or external
   integration test exists. The first-party documentation regression is
   intentionally limited to internal Markdown links, relative anchors, and

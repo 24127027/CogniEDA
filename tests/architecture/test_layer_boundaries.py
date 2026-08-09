@@ -41,6 +41,30 @@ def test_planner_cannot_access_dataset_implementation_directly() -> None:
     assert violations == []
 
 
+def test_mvp_planner_does_not_import_deferred_scientific_or_plan_contracts() -> None:
+    forbidden_symbols = {
+        "Discovery",
+        "EvidenceRequest",
+        "GovernanceDecision",
+        "Hypothesis",
+        "InvestigationProtocol",
+        "PlanRevision",
+    }
+    violations: list[str] = []
+    for path in _python_files("agents/planner"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom):
+                continue
+            imported = forbidden_symbols.intersection(alias.name for alias in node.names)
+            if imported:
+                violations.append(
+                    f"{path.relative_to(PROJECT_ROOT)} imports {sorted(imported)}"
+                )
+
+    assert violations == []
+
+
 def test_inward_layers_do_not_depend_on_cli() -> None:
     violations = [
         f"{path.relative_to(PROJECT_ROOT)} imports {module}"
