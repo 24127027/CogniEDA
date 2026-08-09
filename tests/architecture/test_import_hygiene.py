@@ -7,7 +7,7 @@ from pathlib import Path
 from cognieda.agents.executor import Capability
 from cognieda.agents.executor.capabilities import Capability as CapabilityOwner
 from cognieda.agents.planner.agent import Planner
-from cognieda.cli import Renderer
+from cognieda.cli.renderer import Renderer
 from cognieda.data import DatasetProfiler
 from cognieda.db import create_db_engine
 from cognieda.memory import SessionFrameBuilder

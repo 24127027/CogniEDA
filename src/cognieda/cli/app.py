@@ -6,11 +6,20 @@ import asyncio
 from argparse import ArgumentParser, Namespace
 from collections.abc import Sequence
 from pathlib import Path
-
-from cognieda.runtime import bootstrap_application
+from typing import TYPE_CHECKING
 
 from .main import repl
 from .renderer import Renderer
+
+if TYPE_CHECKING:
+    from cognieda.runtime import Application
+
+
+def bootstrap_application(workspace_path: Path) -> Application:
+    """Load runtime composition only after command-line parsing succeeds."""
+    from cognieda.runtime import bootstrap_application as bootstrap
+
+    return bootstrap(workspace_path)
 
 
 def build_parser() -> ArgumentParser:
