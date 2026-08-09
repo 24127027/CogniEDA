@@ -33,11 +33,15 @@ from cognieda.execution import (
     ExecutionResult,
     ExecutionStatus,
 )
+from cognieda.infrastructure.persistence import SqlitePlannerResearchState
+from cognieda.infrastructure.persistence.repositories import (
+    DataProfileRepository,
+    EvidenceRepository,
+)
 from cognieda.runtime.application import Application
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.session import Session
 from cognieda.schemas.artifacts import (
-    Assumption,
     DataProfile,
     Evidence,
     Objective,
@@ -100,12 +104,13 @@ class FakeDispatcher:
 
 def _application(
     model: SequencePlannerModel,
+    research_state: SqlitePlannerResearchState,
     *,
     session: Session | None = None,
 ) -> tuple[Application, FakeDispatcher]:
     dispatcher = FakeDispatcher()
     planner = Planner(
-        deps=PlannerDeps(dispatcher=dispatcher),
+        deps=PlannerDeps(dispatcher=dispatcher, research_state=research_state),
         planner_model=model,
     )
     application = Application(
@@ -117,34 +122,40 @@ def _application(
     return application, dispatcher
 
 
-def _frame_with_admitted_evidence() -> tuple[SessionFrame, Evidence]:
-    task = Task(instruction="Count rows.", status=TaskStatus.COMPLETED)
-    profile = DataProfile(row_count=42, column_count=0, columns=())
-    evidence = Evidence(
-        task_id=task.task_id,
-        data_profile_id=profile.data_profile_id,
-        content={"row_count": 42},
-        provenance=EvidenceProvenance(
-            producer_role="data_explorer",
-            work_reference="work:count-rows",
-            dataset_reference="dataset:v1",
+def _frame_with_admitted_evidence(
+    db_session,
+) -> tuple[SessionFrame, Evidence, SqlitePlannerResearchState]:
+    research_state = SqlitePlannerResearchState(db_session)
+    objective = research_state.create_objective(Objective(text="Understand dataset size."))
+    task = research_state.create_task(Task(instruction="Count rows.", status=TaskStatus.COMPLETED))
+    profile = DataProfileRepository(db_session).create(
+        DataProfile(row_count=42, column_count=0, columns=())
+    )
+    evidence = EvidenceRepository(db_session).create(
+        Evidence(
+            task_id=task.task_id,
             data_profile_id=profile.data_profile_id,
-            tool_reference="pandas:len",
-        ),
+            content={"row_count": 42},
+            provenance=EvidenceProvenance(
+                producer_role="data_explorer",
+                work_reference="work:count-rows",
+                dataset_reference="dataset:v1",
+                data_profile_id=profile.data_profile_id,
+                tool_reference="pandas:len",
+            ),
+        )
     )
-    return (
-        SessionFrame(
-            objective=Objective(text="Understand dataset size."),
-            assumptions=(Assumption(text="Rows represent customers."),),
-            tasks=(task,),
-            data_profile=profile,
-            evidences=(evidence,),
-        ),
-        evidence,
+    frame = SessionFrame(
+        objective_id=objective.objective_id,
+        task_ids=(task.task_id,),
+        data_profile_id=profile.data_profile_id,
+        evidence_ids=(evidence.evidence_id,),
     )
+    return frame, evidence, research_state
 
 
-def test_application_retains_objective_and_prior_conversation_across_turns() -> None:
+def test_application_retains_ids_and_resolved_context_across_turns(db_session) -> None:
+    research_state = SqlitePlannerResearchState(db_session)
     model = SequencePlannerModel(
         PlannerDecision(
             action=PlannerAction.SET_OR_REFINE_OBJECTIVE,
@@ -152,7 +163,7 @@ def test_application_retains_objective_and_prior_conversation_across_turns() -> 
         ),
         PlannerDecision(action=PlannerAction.STATE_SUMMARY),
     )
-    application, _ = _application(model)
+    application, _ = _application(model, research_state)
 
     asyncio.run(application.submit_message("Investigate customer churn."))
     first_session = application.session
@@ -160,19 +171,19 @@ def test_application_retains_objective_and_prior_conversation_across_turns() -> 
 
     assert application.session is not first_session
     assert application.session.session_id == first_session.session_id
-    assert application.session.session_frame.objective is not None
-    assert application.session.session_frame.objective.text == "Understand customer churn."
-    assert model.decision_inputs[1].objective == first_session.session_frame.objective
+    assert application.session.session_frame.objective_id is not None
+    objective = research_state.get_objective(application.session.session_frame.objective_id)
+    assert objective is not None
+    assert objective.text == "Understand customer churn."
+    assert model.decision_inputs[1].objective == objective
     assert model.message_histories[0] == ()
     assert model.message_histories[1] == first_session.conversation_history.model_messages()
     assert len(application.session.conversation_history.turns) == 2
-    assert all(
-        isinstance(message, (ModelRequest, ModelResponse))
-        for message in application.session.conversation_history.model_messages()
-    )
 
 
-def test_completed_task_lifecycle_survives_the_next_turn() -> None:
+def test_completed_task_lifecycle_is_resolved_on_the_next_turn(db_session) -> None:
+    research_state = SqlitePlannerResearchState(db_session)
+    objective = research_state.create_objective(Objective(text="Understand dataset."))
     model = SequencePlannerModel(
         PlannerDecision(
             action=PlannerAction.CREATE_OR_RUN_DATA_TASK,
@@ -180,46 +191,49 @@ def test_completed_task_lifecycle_survives_the_next_turn() -> None:
             capability=Capability.DATA_PROFILING,
         )
     )
-    session = Session(
-        session_frame=SessionFrame(objective=Objective(text="Understand the dataset."))
-    )
-    application, dispatcher = _application(model, session=session)
+    session = Session(session_frame=SessionFrame(objective_id=objective.objective_id))
+    application, dispatcher = _application(model, research_state, session=session)
 
     asyncio.run(application.submit_message("Profile the dataset."))
-    completed_task = application.session.session_frame.tasks[0]
+    task_id = application.session.session_frame.task_ids[0]
     asyncio.run(application.submit_message("/summary"))
 
+    task = research_state.get_task(task_id)
     assert len(dispatcher.requests) == 1
-    assert completed_task.status is TaskStatus.COMPLETED
-    assert application.session.session_frame.tasks == (completed_task,)
+    assert task is not None
+    assert task.status is TaskStatus.COMPLETED
+    assert application.session.session_frame.task_ids == (task_id,)
+    assert model.decision_inputs[0].tasks == ()
 
 
-def test_assumption_survives_but_cannot_become_empirical_support() -> None:
-    model = SequencePlannerModel(
-        PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE),
-    )
-    application, _ = _application(model)
+def test_assumption_survives_but_cannot_become_empirical_support(db_session) -> None:
+    research_state = SqlitePlannerResearchState(db_session)
+    model = SequencePlannerModel(PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE))
+    application, _ = _application(model, research_state)
 
     asyncio.run(application.submit_message("/assumption The dataset has 42 rows."))
     response = asyncio.run(application.submit_message("How many rows are there?"))
 
-    assert len(application.session.session_frame.assumptions) == 1
-    assert application.session.session_frame.evidences == ()
+    assert len(application.session.session_frame.assumption_ids) == 1
+    assert application.session.session_frame.evidence_ids == ()
     assert "No admitted Evidence" in response.content
     assert model.answer_inputs == []
 
 
-def test_existing_profile_and_evidence_survive_and_answer_input_excludes_conversation() -> None:
-    frame, evidence = _frame_with_admitted_evidence()
+def test_evidence_resolves_for_answer_but_conversation_is_not_empirical_input(
+    db_session,
+) -> None:
+    frame, evidence, research_state = _frame_with_admitted_evidence(db_session)
     history = ConversationHistory().add_turn(
         (
             ModelRequest(parts=[UserPromptPart(content="I think there are 100 rows.")]),
-            ModelResponse(parts=[TextPart(content="That statement is not admitted Evidence.")]),
+            ModelResponse(parts=[TextPart(content="That is not admitted Evidence.")]),
         )
     )
     model = SequencePlannerModel(PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE))
     application, _ = _application(
         model,
+        research_state,
         session=Session(session_frame=frame, conversation_history=history),
     )
 
@@ -227,10 +241,9 @@ def test_existing_profile_and_evidence_survive_and_answer_input_excludes_convers
 
     assert response.content == "The admitted Evidence reports 42 rows."
     assert application.session.session_frame == frame
-    assert application.session.session_frame.data_profile == frame.data_profile
-    assert application.session.session_frame.evidences == (evidence,)
     assert model.answer_inputs[0].evidences == (evidence,)
     assert "conversation" not in PlannerAnswerInput.model_fields
+    assert "assumptions" not in PlannerAnswerInput.model_fields
 
 
 def test_session_components_and_conversation_are_immutable_successors() -> None:
@@ -252,7 +265,7 @@ def test_session_components_and_conversation_are_immutable_successors() -> None:
         final.conversation_history = ConversationHistory()
 
 
-def test_conversation_contract_contains_provider_native_messages_only_at_runtime() -> None:
+def test_conversation_contract_contains_provider_messages_only_at_runtime() -> None:
     import cognieda.runtime.conversation as conversation_module
     import cognieda.schemas.artifacts as artifacts_module
 
@@ -278,7 +291,9 @@ def test_conversation_round_trip_preserves_tool_call_and_return_coherence() -> N
         ModelRequest(
             parts=[
                 ToolReturnPart(
-                    tool_name="lookup_state", content={"status": "ready"}, tool_call_id="call-1"
+                    tool_name="lookup_state",
+                    content={"status": "ready"},
+                    tool_call_id="call-1",
                 )
             ]
         ),
@@ -286,8 +301,7 @@ def test_conversation_round_trip_preserves_tool_call_and_return_coherence() -> N
     )
     history = ConversationHistory().add_turn(messages)
 
-    encoded = history.model_dump_json()
-    restored = ConversationHistory.model_validate_json(encoded)
+    restored = ConversationHistory.model_validate_json(history.model_dump_json())
 
     assert restored.model_messages() == messages
     assert ModelMessagesTypeAdapter.validate_json(

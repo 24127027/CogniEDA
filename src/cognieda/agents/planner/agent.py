@@ -8,7 +8,7 @@ from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import ExecutorContext
 from cognieda.schemas.artifacts import SessionFrame
 
-from .context import PlanningContext
+from .context import BuildPlanningContext, PlanningContextResolutionError
 from .dependencies import PlannerDeps
 from .graph import build_graph
 from .model import PlannerDecisionModel, PlannerModel
@@ -52,6 +52,7 @@ class Planner:
             )
 
         self.deps = deps
+        self.context_builder = BuildPlanningContext(deps.research_state)
         self.graph = build_graph()
 
     async def run(
@@ -72,17 +73,31 @@ class Planner:
             )
             return PlannerOutput(response=error.message, session_frame=frame, error=error)
 
-        state = State(
-            query=query,
-            session_frame=frame,
-            planning_context=PlanningContext.from_frame(
+        try:
+            planning_context = self.context_builder.build(
                 latest_request=query,
                 frame=frame,
                 message_history=message_history,
-            ),
+            )
+        except PlanningContextResolutionError as exc:
+            error = PlannerControlledError(
+                code=PlannerErrorCode.CONTEXT_RESOLUTION_FAILED,
+                message=f"Planner context resolution failed closed: {exc}",
+            )
+            return PlannerOutput(response=error.message, session_frame=frame, error=error)
+
+        state = State(
+            query=query,
+            session_frame=frame,
+            planning_context=planning_context,
             execution_context=execution_context or ExecutorContext(),
         )
-        context = Context(planner_model=self.model, dispatcher=self.deps.dispatcher)
+        context = Context(
+            planner_model=self.model,
+            dispatcher=self.deps.dispatcher,
+            research_state=self.deps.research_state,
+            context_builder=self.context_builder,
+        )
         result = await self.graph.ainvoke(state, context=context)
         final_state = State.model_validate(result)
 
@@ -99,9 +114,7 @@ class Planner:
             session_frame=final_state.session_frame,
             decision=final_state.decision,
             created_task_ids=(
-                (final_state.created_task_id,)
-                if final_state.created_task_id is not None
-                else ()
+                (final_state.created_task_id,) if final_state.created_task_id is not None else ()
             ),
             selected_capability=final_state.selected_capability,
             work_outcome=final_state.work_outcome,

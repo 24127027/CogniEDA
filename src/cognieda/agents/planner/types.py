@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
 
+from cognieda.application.ports import PlannerResearchStatePort
 from cognieda.execution import Capability, ExecutorContext, PlannerWorkOutcome
 from cognieda.schemas.artifacts import (
     Assumption,
@@ -16,7 +17,7 @@ from cognieda.schemas.artifacts import (
     Task,
 )
 
-from .context import PlanningContext
+from .context import BuildPlanningContext, PlanningContext
 
 
 class PlannerAction(StrEnum):
@@ -41,6 +42,7 @@ class PlannerErrorCode(StrEnum):
     INVALID_SUCCESSOR_STATE = "invalid_successor_state"
     NO_ADMITTED_EVIDENCE = "no_admitted_evidence"
     RESPONSE_FAILED = "response_failed"
+    CONTEXT_RESOLUTION_FAILED = "context_resolution_failed"
 
 
 class PlannerControlledError(BaseModel):
@@ -177,6 +179,8 @@ class Context(BaseModel):
 
     planner_model: object
     dispatcher: object
+    research_state: PlannerResearchStatePort
+    context_builder: BuildPlanningContext
 
 
 class PlannerOutput(BaseModel):

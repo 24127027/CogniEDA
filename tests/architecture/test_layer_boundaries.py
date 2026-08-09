@@ -42,6 +42,16 @@ def test_planner_cannot_access_dataset_implementation_directly() -> None:
     assert violations == []
 
 
+def test_planner_uses_application_state_port_not_persistence_implementation() -> None:
+    violations = [
+        f"{path.relative_to(PROJECT_ROOT)} imports {module}"
+        for path, module in _imports(_python_files("agents/planner"))
+        if module.startswith("cognieda.infrastructure.persistence") or module == "sqlmodel"
+    ]
+
+    assert violations == []
+
+
 def test_mvp_planner_does_not_import_deferred_scientific_or_plan_contracts() -> None:
     forbidden_symbols = {
         "Discovery",
@@ -59,9 +69,7 @@ def test_mvp_planner_does_not_import_deferred_scientific_or_plan_contracts() -> 
                 continue
             imported = forbidden_symbols.intersection(alias.name for alias in node.names)
             if imported:
-                violations.append(
-                    f"{path.relative_to(PROJECT_ROOT)} imports {sorted(imported)}"
-                )
+                violations.append(f"{path.relative_to(PROJECT_ROOT)} imports {sorted(imported)}")
 
     assert violations == []
 
@@ -88,11 +96,7 @@ def test_removed_ownership_packages_have_no_python_source() -> None:
         "tools",
     )
 
-    assert {
-        path
-        for path in removed
-        if any((SOURCE_ROOT / path).rglob("*.py"))
-    } == set()
+    assert {path for path in removed if any((SOURCE_ROOT / path).rglob("*.py"))} == set()
 
 
 def test_specialist_roles_are_peer_packages() -> None:
@@ -124,9 +128,7 @@ def test_data_explorer_has_no_dynamic_code_execution() -> None:
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
             and node.func.id in {"exec", "eval"}
-            for node in ast.walk(
-                ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-            )
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"), filename=str(path)))
         )
     ]
 
