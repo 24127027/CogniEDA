@@ -198,9 +198,11 @@ only shared metadata; full Planner consumption remains **Deferred**.
 Data Explorer is registered for `DATA_ANALYSIS`, `DATA_PROFILING`, and
 `DATA_TRANSFORMATION`. The first two have a bounded donor implementation when
 given the active M1-A Task instruction and a local dataset path. Profiling
-returns the typed M1-A DataProfile. Transformation returns
-a typed blocked result until it can create a successor dataset and DataProfile;
-it never establishes in-place mutation as valid behavior.
+returns the typed M1-A DataProfile through a Data Explorer-owned tool boundary
+and pure deterministic computation. It does not drop duplicate rows, all-null
+rows, or missing values and does not mutate the active frame. Transformation
+returns a typed blocked result until it can create a successor dataset and
+DataProfile; it never establishes in-place mutation as valid behavior.
 
 Canonical `DataWorkOrder`, `ScientificInvestigationInput`,
 `GraphInquiryRequest`, and complete role-native admission contracts remain

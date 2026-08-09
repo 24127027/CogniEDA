@@ -60,3 +60,5 @@ reference, design decisions, and current-status tracks.
 The [MVP runtime subset](docs/architecture/mvp-runtime-subset.md) defines the
 approved executable vertical slice and distinguishes it from the complete
 canonical architecture. The end-to-end MVP remains a design target.
+Contributors changing package ownership should also read the
+[source layout](docs/development/source-layout.md).

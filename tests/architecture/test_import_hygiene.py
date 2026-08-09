@@ -4,18 +4,18 @@ import ast
 from collections.abc import Iterator
 from pathlib import Path
 
-from cognieda.agents.executor import Capability
-from cognieda.agents.executor.capabilities import Capability as CapabilityOwner
+from cognieda.agents.data_explorer.analysis import DatasetProfiler
 from cognieda.agents.planner.agent import Planner
 from cognieda.cli.renderer import Renderer
-from cognieda.data import DatasetProfiler
-from cognieda.db import create_db_engine
-from cognieda.memory import SessionFrameBuilder
-from cognieda.repositories import TaskRepository
+from cognieda.execution import Capability
+from cognieda.execution.capabilities import Capability as CapabilityOwner
+from cognieda.infrastructure.agent_tooling import AgentTooling
+from cognieda.infrastructure.persistence import create_db_engine
+from cognieda.infrastructure.persistence.repositories import TaskRepository
+from cognieda.retrieval import is_allowed_in_context
 from cognieda.runtime import Application
 from cognieda.schemas import Task
 from cognieda.schemas.artifacts import Task as TaskOwner
-from cognieda.tools import ToolManager
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 LEGACY_IMPORT_ROOTS = frozenset(
@@ -110,10 +110,10 @@ def test_major_package_boundaries_import_from_cognieda() -> None:
             Renderer,
             DatasetProfiler,
             create_db_engine,
-            SessionFrameBuilder,
+            is_allowed_in_context,
             TaskRepository,
             Application,
-            ToolManager,
+            AgentTooling,
         )
     )
 

@@ -20,7 +20,10 @@ from cognieda.agents.planner.types import (
     TaskCreateDraft,
     parse_explicit_command,
 )
-from cognieda.repositories import PlannerOperationRepository, TaskRepository
+from cognieda.infrastructure.persistence.repositories import (
+    PlannerOperationRepository,
+    TaskRepository,
+)
 from cognieda.schemas.enums import PlannerOperationApprovalState
 
 

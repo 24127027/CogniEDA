@@ -7,9 +7,9 @@ This documentation is for researchers evaluating the model, product and engineer
 ## Documentation availability
 
 All canonical tracks listed below are **Available**. Markdown files elsewhere
-in the repository may be supporting material, compatibility notices, package
-instructions, or internal development guidance. They do not compete with the
-owner pages linked here.
+in the repository may be supporting material, package instructions, or
+internal development guidance. They do not compete with the owner pages linked
+here.
 
 Implementation-status claims must distinguish supported behavior from design
 targets.
@@ -42,6 +42,7 @@ Concept pages own meaning. They must explain epistemic roles and lifecycle conse
 | Specialist dispatch and execution boundaries | [Executor and dispatch](architecture/executor-and-dispatch.md) | **Available** |
 | Persistence, admission, and transaction ownership | [Persistence and admission](architecture/persistence-and-admission.md) | **Available** |
 | End-to-end operational flow | [End-to-end flow](architecture/end-to-end-flow.md) | **Available** |
+| Current Python package ownership | [Source layout](development/source-layout.md) | **Available** |
 
 Architecture pages may define implementation-neutral contracts and authority boundaries. They must not promote a current package layout into architectural meaning.
 

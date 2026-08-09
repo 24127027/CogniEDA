@@ -1,8 +1,7 @@
 from collections.abc import Sequence
 
-from cognieda.tools.builtin import AvailableBuiltinTools
+from cognieda.application.ports import AgentFactoryPort, AgentTool, ModelConfig
 
-from ..llm import ModelConfig, create_agent
 from .dependencies import PlannerDeps
 from .types import PlannerPlan
 
@@ -11,12 +10,14 @@ class PlannerModel:
     def __init__(
         self,
         deps: PlannerDeps,
-        builtin_tools: Sequence[AvailableBuiltinTools],
+        agent_factory: AgentFactoryPort,
+        model_config: ModelConfig,
+        builtin_tools: Sequence[AgentTool],
     ) -> None:
         self.deps = deps
-        self._agent = create_agent(
+        self._agent = agent_factory.create_agent(
             worker="planner",
-            config=ModelConfig(),
+            config=model_config,
             deps_type=PlannerDeps,
             builtin_tools=builtin_tools,
         )

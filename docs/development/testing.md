@@ -5,7 +5,7 @@ The repository declares:
 ```powershell
 uv run pytest
 uv run ruff check .
-uv run mypy src
+uv run mypy src/cognieda
 ```
 
 `pyproject.toml` configures pytest for `tests/` and README doctests. Command

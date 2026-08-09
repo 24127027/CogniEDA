@@ -203,50 +203,40 @@ use and preserves why that changed.
 
 ## Dependency inversion and role boundaries
 
-The target architecture separates dependency contracts from their implementations
-so that:
+The target architecture separates dependency contracts from implementations:
 
-1. **Core agents know contracts, not adapters.** Planner, Data Explorer,
-   Hypothesis Analyst, and Graph Miner depend on typed protocols (e.g.,
-   `TerminalPrinter`, `ExecutorDispatcher`) defined in an inward-facing ports
-   layer, not on concrete runtime adapters like `RichTerminalPrinter` or
-   `runtime.terminal`.
+1. **Core agents know contracts, not adapters.** Planner and Data Explorer
+   consume dispatcher and model-factory contracts defined in the inward-facing
+   application ports layer. They do not construct providers, mutable global
+   tooling, persistence adapters, or CLI presentation.
 
-2. **Bootstrap wires concrete implementations.** Application authority (bootstrap
-   or application entry point) knows both contracts and implementations. It
-   constructs `PlannerDeps`, `ExecutorDispatcher`, and other dependency holders
-   with concrete adapters and injects them into agents.
+2. **Bootstrap wires concrete implementations.** Runtime bootstrap knows both
+   contracts and implementations. It constructs `PlannerDeps`, the execution
+   registry and dispatcher, agent tooling, and the model factory, then injects
+   them into the agents.
 
-3. **Agents remain testable and composable.** Each agent accepts dependencies
-   as protocol types. Tests can substitute mock or alternate implementations
-   without modifying agent code.
+3. **Agents remain testable and composable.** Each active agent accepts
+   dependencies as protocol types. Tests can substitute mock implementations
+   without changing agent code.
 
-4. **Adapter layer lives outward.** Concrete implementations (`RichTerminalPrinter`,
-   CLI adapters, external integrations) live in boundary packages, not in core
-   agent modules.
+4. **Adapters live outward.** Concrete dataset, persistence, LLM, MCP, skills,
+   and agent-tooling implementations live under `infrastructure`. Terminal
+   rendering lives under `cli`, not runtime core or specialist agents.
 
-Example target structure:
+The current implementation uses:
 
-```
-core/ports/
-  ├── terminal.py          # TerminalPrinter protocol
-  ├── dispatcher.py        # ExecutorDispatcher protocol
-  └── ...
-
-agents/planner/
-  ├── dependencies.py      # PlannerDeps with protocol types
-  ├── agent.py
-  └── ...
-
-runtime/bootstrap.py       # Wires concrete adapters
-cli/
-  ├── terminal.py          # RichTerminalPrinter implementation
-  └── ...
+```text
+application/ports/       # dispatcher and model-factory contracts
+agents/planner/          # PlannerDeps and Planner-owned delegation
+infrastructure/          # concrete persistence, dataset, and model adapters
+runtime/bootstrap.py     # explicit concrete composition
+cli/                     # command parsing, REPL, and presentation
 ```
 
-This separation is a design target and not yet implemented. Current main has
-agents depending on concrete runtime classes; refactoring to ports and
-dependency injection will occur after MVP tool calling is validated.
+**Partially implemented.** The execution and model/tooling composition paths
+follow this boundary. Application services still depend on the concrete
+SQLite persistence implementation, so complete persistence-port inversion
+remains a design target.
 
 ## Implementation status
 

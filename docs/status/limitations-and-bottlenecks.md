@@ -41,13 +41,14 @@ backlog. [Current state](current-state.md) owns capability detail.
 
 ## Donor isolation limitation
 
-- Canonical-heavy donor tests for old persistence, scientific attempts,
-  Discovery retrieval, and context projections are explicitly skipped after
-  the hard cutover. They remain as historical design/test material and are not
-  compatibility authority for active schemas.
-- The unregistered Hypothesis Analyst, legacy context builder, Planner
-  operation contracts, and scientific repositories still contain deferred
-  field references. They are not composed into the active M1-A path.
+- Canonical-heavy donor tests for scientific attempts and Discovery retrieval
+  are explicitly skipped after the hard cutover. They remain design/test
+  material and are not compatibility authority for active schemas.
+- The obsolete SessionFrame/context builder was removed; the active M1-A
+  SessionFrame schema is the only executable owner. The unregistered
+  Hypothesis Analyst, Planner operation contracts, deferred retrieval engine,
+  and scientific repositories still contain deferred field references. They
+  are not composed into the active M1-A path.
 - Fresh SQLite metadata reflects M1-A mappings. Upgrading an existing donor
   database to the hard-cutover schema is **Unsupported**; no production data
   migration is included in this milestone.
@@ -61,6 +62,9 @@ backlog. [Current state](current-state.md) owns capability detail.
 - The local Data Explorer donor path can execute bounded analysis or profiling
   from a direct request. It is not a production sandbox and is not connected
   to Evidence admission.
+- Profiling describes the active dataset without duplicate removal, null-row
+  removal, or input mutation. Actual cleaning and transformation remain
+  blocked until successor dataset and DataProfile semantics exist.
 - `DATA_TRANSFORMATION` remains blocked until immutable successor dataset state
   and successor DataProfile handling exist.
 - Planner-to-dispatch adapter tests use a registered fake provider; they do not
@@ -80,12 +84,14 @@ backlog. [Current state](current-state.md) owns capability detail.
 - Full pytest collection is interrupted by three pre-existing M1-B Planner
   donor mismatches involving `TaskManagementDraft`, `route_intent`,
   `understand_request`, `ChildTaskProposalDraft`, and `manage_tasks`.
-- Excluding exactly those three modules, the package/CLI broad run recorded
-  124 passes and 72 explicit deferred-donor skips.
+- Excluding exactly those three modules, the PR #36 layer-boundary run recorded
+  136 passes and 57 explicit deferred-donor skips.
 - No end-to-end user-to-Planner-to-real-Data Explorer-to-Evidence-to-
   SessionFrame-to-response test exists; that is not an M1-A completion claim.
-- No production performance envelope, non-SQLite validation, external
-  integration test, or first-party Markdown link-check command exists.
+- No production performance envelope, non-SQLite validation, or external
+  integration test exists. The first-party documentation regression is
+  intentionally limited to internal Markdown links, relative anchors, and
+  compatibility-only redirect language.
 
 ## Unsupported feature
 
@@ -101,5 +107,5 @@ backlog. [Current state](current-state.md) owns capability detail.
 
 - Current status is a dated source/test audit and can drift when runtime code
   changes. Capability changes must update this status track in the same change.
-- Compatibility notices preserve old inbound paths but do not redefine the
-  canonical target or the executable MVP subset.
+- Source-layout documentation describes implementation ownership only and does
+  not redefine the canonical target or executable MVP subset.
