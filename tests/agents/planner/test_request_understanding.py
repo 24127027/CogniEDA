@@ -1,254 +1,168 @@
 from __future__ import annotations
 
 import asyncio
-from typing import cast
-from uuid import UUID
 
 import pytest
-from langgraph.runtime import Runtime
-from pydantic_ai.messages import ModelRequest, UserPromptPart
+from pydantic import ValidationError
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.nodes import TaskManagementDraft, route_intent, understand_request
+from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.types import (
-    COMMAND_TO_INTENT,
-    Context,
+    PlannerAction,
+    PlannerAnswerInput,
     PlannerDecision,
-    RequestUnderstanding,
-    RequestUnderstandingModel,
-    State,
-    TaskCreateDraft,
-    parse_explicit_command,
+    PlannerErrorCode,
+    PlannerModelInput,
+    PlannerResponseDraft,
 )
-from cognieda.infrastructure.persistence.repositories import (
-    PlannerOperationRepository,
-    TaskRepository,
-)
-from cognieda.schemas.enums import PlannerOperationApprovalState
+from cognieda.execution import ExecutionRequest
+from cognieda.schemas.artifacts import Assumption, Objective, SessionFrame, Task
 
 
-class FakeRequestUnderstandingModel(RequestUnderstandingModel):
-    def __init__(self, result: object) -> None:
-        self.result = result
-        self.prompts: list[str] = []
-
-    def understand(self, prompt: str) -> RequestUnderstanding:
-        self.prompts.append(prompt)
-        return cast(RequestUnderstanding, self.result)
-
-
-class FixedTaskManagementModel:
+class NeverDispatcher:
     def __init__(self) -> None:
-        self.prompts: list[str] = []
+        self.requests: list[ExecutionRequest] = []
 
-    def draft(self, prompt: str) -> TaskManagementDraft:
-        self.prompts.append(prompt)
-        return TaskManagementDraft(
-            task_create_payloads=[
-                TaskCreateDraft(
-                    title="Review missing values",
-                    description="Inspect missing-value patterns before execution.",
-                    variables=["monthly_spend"],
-                    evidence_expectation="A missingness profile.",
-                )
-            ]
-        )
+    async def dispatch(self, request: ExecutionRequest):
+        self.requests.append(request)
+        raise AssertionError("This request must not dispatch executor work.")
 
 
-def runtime_with(model: RequestUnderstandingModel | None = None) -> Runtime[Context]:
-    return Runtime(context=Context(request_understanding_model=model))
+class FakePlannerModel:
+    def __init__(self, decision: PlannerDecision) -> None:
+        self.decision = decision
+        self.decision_inputs: list[PlannerModelInput] = []
+        self.answer_inputs: list[PlannerAnswerInput] = []
+
+    async def decide(self, model_input: PlannerModelInput) -> PlannerDecision:
+        self.decision_inputs.append(model_input)
+        return self.decision
+
+    async def answer(self, answer_input: PlannerAnswerInput) -> PlannerResponseDraft:
+        self.answer_inputs.append(answer_input)
+        return PlannerResponseDraft(text="grounded answer")
 
 
-@pytest.mark.parametrize(
-    ("query", "intent", "request_text"),
-    [
-        ("/answer What was discovered?", "answer", "What was discovered?"),
-        ("/manage_task create a profiling task", "manage_task", "create a profiling task"),
-        ("   /objective refine the objective", "objective", "refine the objective"),
-        ("/ANSWER What was discovered?", "answer", "What was discovered?"),
-        ("/answer", "answer", ""),
-    ],
-)
-def test_explicit_commands_bypass_the_model(
-    query: str,
-    intent: str,
-    request_text: str,
-) -> None:
-    model = FakeRequestUnderstandingModel(
-        RequestUnderstanding(intent="suggest", request_text="unexpected", source="llm")
+def _planner(model: FakePlannerModel, dispatcher: NeverDispatcher) -> Planner:
+    return Planner(
+        deps=PlannerDeps(dispatcher=dispatcher),
+        planner_model=model,
     )
 
-    result = understand_request(State(query=query), runtime_with(model))
 
-    assert result.request_understanding == RequestUnderstanding(
-        intent=intent,
-        request_text=request_text,
-        source="explicit_command",
-        explicit_command=intent,
-    )
-    assert model.prompts == []
+def test_natural_language_understanding_receives_latest_request_and_typed_state() -> None:
+    objective = Objective(text="Understand customer retention.")
+    assumption = Assumption(text="Rows represent customers.")
+    task = Task(instruction="Profile the active dataset.")
+    frame = SessionFrame(objective=objective, assumptions=(assumption,), tasks=(task,))
+    model = FakePlannerModel(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
+    dispatcher = NeverDispatcher()
 
-
-def test_parse_explicit_command_preserves_payload_and_normalizes_command() -> None:
-    result = parse_explicit_command("  /MANAGE_TASK  retain   inner whitespace  ")
-
-    assert result is not None
-    assert result.command == "manage_task"
-    assert result.original_command == "/MANAGE_TASK"
-    assert result.request_text == "retain   inner whitespace"
-
-
-def test_request_model_receives_only_the_latest_query() -> None:
-    query = "Create a new task to inspect missing values."
-    model = FakeRequestUnderstandingModel(
-        RequestUnderstanding(
-            intent="manage_task",
-            request_text="inspect missing values",
-            source="llm",
+    output = asyncio.run(
+        _planner(model, dispatcher).run(
+            "Summarize the active research state.",
+            session_frame=frame,
         )
     )
 
-    result = understand_request(
-        State(
-            query=query,
-            history=[ModelRequest(parts=[UserPromptPart(content="history-only-secret")])],
-        ),
-        runtime_with(model),
+    assert output.decision is not None
+    assert output.decision.action is PlannerAction.STATE_SUMMARY
+    assert output.session_frame == frame
+    assert len(model.decision_inputs) == 1
+    model_input = model.decision_inputs[0]
+    assert model_input.latest_request == "Summarize the active research state."
+    assert model_input.objective == objective
+    assert model_input.assumptions == (assumption,)
+    assert model_input.tasks == (task,)
+    assert dispatcher.requests == []
+
+
+def test_explicit_and_natural_language_objective_requests_reach_same_typed_action() -> None:
+    natural_model = FakePlannerModel(
+        PlannerDecision(
+            action=PlannerAction.SET_OR_REFINE_OBJECTIVE,
+            objective_text="Understand customer churn.",
+        )
+    )
+    explicit_model = FakePlannerModel(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
+    dispatcher = NeverDispatcher()
+
+    natural = asyncio.run(
+        _planner(natural_model, dispatcher).run("Investigate customer churn.")
+    )
+    explicit = asyncio.run(
+        _planner(explicit_model, dispatcher).run(
+            "/objective Understand customer churn."
+        )
     )
 
-    assert result.request_understanding is not None
-    assert result.request_understanding.intent == "manage_task"
-    assert len(model.prompts) == 1
-    assert query in model.prompts[0]
-    assert "history-only-secret" not in model.prompts[0]
+    assert natural.decision is not None
+    assert explicit.decision is not None
+    assert natural.decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE
+    assert explicit.decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE
+    assert natural.session_frame.objective is not None
+    assert explicit.session_frame.objective is not None
+    assert natural.session_frame.objective.text == explicit.session_frame.objective.text
+    assert explicit_model.decision_inputs == []
 
 
-def test_unknown_command_requires_correction_without_model_fallback() -> None:
-    model = FakeRequestUnderstandingModel(
-        RequestUnderstanding(intent="answer", request_text="unexpected", source="llm")
+def test_objective_semantic_refinement_allocates_new_identity_without_mutation() -> None:
+    original = Objective(text="Understand churn.")
+    frame = SessionFrame(objective=original)
+    model = FakePlannerModel(
+        PlannerDecision(
+            action=PlannerAction.SET_OR_REFINE_OBJECTIVE,
+            objective_text="Understand churn drivers.",
+        )
     )
 
-    result = understand_request(State(query="/unknown remove everything"), runtime_with(model))
-
-    understanding = result.request_understanding
-    assert understanding is not None
-    assert understanding.intent is None
-    assert understanding.source == "invalid_command"
-    assert understanding.requires_user_correction is True
-    assert understanding.supported_commands == tuple(f"/{key}" for key in COMMAND_TO_INTENT)
-    assert model.prompts == []
-    assert route_intent(result, runtime_with(model)) == "invalid_request"
-
-
-def test_task_proposal_commits_only_after_matching_approval(db_session) -> None:
-    database_url = str(db_session.get_bind().url)
-    context = Context(
-        session_id="task-proposal-session",
-        task_management_model=FixedTaskManagementModel(),
+    output = asyncio.run(
+        _planner(model, NeverDispatcher()).run(
+            "Refine the objective to focus on drivers.",
+            session_frame=frame,
+        )
     )
-    planner = Planner(database_url=database_url)
 
-    first = asyncio.run(
-        planner.run("/manage_task create a missing-value review task", context)
-    ).payload
+    assert output.session_frame is not frame
+    assert output.session_frame.objective is not None
+    assert output.session_frame.objective.objective_id != original.objective_id
+    assert output.session_frame.objective.text == "Understand churn drivers."
+    assert original.text == "Understand churn."
 
-    assert first.pending_interaction is not None
-    assert first.pending_interaction.kind == "planner_operation_approval"
-    assert first.committed_operation_ids == []
-    assert len(first.pending_interaction.operation_ids) == 1
-    assert TaskRepository(db_session).list() == []
 
-    operation_id = first.pending_interaction.operation_ids[0]
-    persisted = PlannerOperationRepository(db_session).get_by_id(UUID(operation_id))
-    assert persisted is not None
-    assert persisted.approval_state == PlannerOperationApprovalState.PENDING
-    assert persisted.target_object_id is None
-    assert "task_id" not in persisted.payload
+def test_unknown_explicit_command_fails_without_model_fallback_or_state_change() -> None:
+    frame = SessionFrame(objective=Objective(text="Keep this Objective."))
+    model = FakePlannerModel(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
+    dispatcher = NeverDispatcher()
 
-    tampered = asyncio.run(
-        planner.run(
-            "/approve",
-            context,
-            decision=PlannerDecision(
-                action="approve",
-                proposal_id="tampered-proposal",
-                selected_ids=first.pending_interaction.operation_ids,
-            ),
+    output = asyncio.run(
+        _planner(model, dispatcher).run(
+            "/unknown remove everything",
+            session_frame=frame,
         )
-    ).payload
-
-    assert tampered.committed_operation_ids == []
-    assert TaskRepository(db_session).list() == []
-
-    approved = asyncio.run(
-        planner.run(
-            "/approve",
-            context,
-            decision=PlannerDecision(
-                action="approve",
-                proposal_id=first.pending_interaction.proposal_id,
-                selected_ids=first.pending_interaction.operation_ids,
-            ),
-        )
-    ).payload
-
-    assert approved.commit_result is not None
-    assert approved.commit_result.succeeded
-    assert approved.committed_operation_ids == approved.commit_result.committed_operation_ids
-    assert len(TaskRepository(db_session).list()) == 1
-
-    replay = asyncio.run(
-        planner.run(
-            "/approve",
-            context,
-            decision=PlannerDecision(
-                action="approve",
-                proposal_id=first.pending_interaction.proposal_id,
-                selected_ids=first.pending_interaction.operation_ids,
-            ),
-        )
-    ).payload
-
-    assert replay.controlled_error is not None
-    assert replay.controlled_error.code == "invalid_planner_operation_proposal"
-    assert len(TaskRepository(db_session).list()) == 1
-
-
-def test_task_proposal_resume_rejects_wrong_session_and_missing_ids(db_session) -> None:
-    database_url = str(db_session.get_bind().url)
-    context = Context(
-        session_id="task-proposal-session",
-        task_management_model=FixedTaskManagementModel(),
     )
-    planner = Planner(database_url=database_url)
-    proposed = asyncio.run(planner.run("/manage_task create a review task", context)).payload
 
-    assert proposed.pending_interaction is not None
+    assert output.error is not None
+    assert output.error.code is PlannerErrorCode.INVALID_COMMAND
+    assert output.session_frame == frame
+    assert output.created_task_ids == ()
+    assert model.decision_inputs == []
+    assert dispatcher.requests == []
 
-    wrong_session = asyncio.run(
-        planner.run(
-            "/approve",
-            Context(session_id="other-session"),
-            decision=PlannerDecision(
-                action="approve",
-                proposal_id=proposed.pending_interaction.proposal_id,
-                selected_ids=proposed.pending_interaction.operation_ids,
-            ),
+
+def test_planner_decision_rejects_untyped_or_mixed_core_changes() -> None:
+    with pytest.raises(ValidationError):
+        PlannerDecision.model_validate(
+            {
+                "action": PlannerAction.CREATE_OR_RUN_DATA_TASK,
+                "task_instruction": "Profile the dataset.",
+                "capability": "not_a_capability",
+            }
         )
-    ).payload
-    missing_ids = asyncio.run(
-        planner.run(
-            "/approve",
-            context,
-            decision=PlannerDecision(
-                action="approve",
-                proposal_id=proposed.pending_interaction.proposal_id,
-            ),
-        )
-    ).payload
 
-    assert wrong_session.controlled_error is not None
-    assert wrong_session.controlled_error.code == "invalid_planner_operation_proposal"
-    assert missing_ids.controlled_error is not None
-    assert missing_ids.controlled_error.code == "planner_operation_resume_unavailable"
-    assert TaskRepository(db_session).list() == []
+    with pytest.raises(ValidationError):
+        PlannerDecision(
+            action=PlannerAction.ADD_ASSUMPTION,
+            assumption_text="Rows are customers.",
+            task_instruction="Profile the dataset.",
+        )

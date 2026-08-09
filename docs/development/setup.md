@@ -39,7 +39,9 @@ COGNIEDA_DB_ECHO=false
 
 Database behavior:
 
-- If `COGNIEDA_DB_URL` is empty, the default SQLite URL points to `.local/cognieda_graph.sqlite3`.
+- If `COGNIEDA_DB_URL` is empty, the provisional persistence helper resolves a
+  package-local SQLite path. Runtime bootstrap does not bind this helper to the
+  selected Workspace.
 - SQLite foreign keys are enabled on connect.
 - `init_db()` creates all SQLModel tables.
 
@@ -78,12 +80,19 @@ This command is **Partially implemented** as a development Planner REPL
 boundary. The supported end-to-end product CLI remains **Unsupported** because
 Planner-to-Data Explorer-to-Evidence-to-SessionFrame composition is deferred.
 
-The selected workspace owns `.cognieda/project.toml` and workspace-local
-state. Optional agent, MCP, and skill configuration is read only from
-workspace-local `.cognieda/agents.toml`, `.cognieda/mcp.toml`, and
-`.cognieda/skills.toml` when those files exist. Root `config/*.toml` files are
-development examples; installed startup does not require the source repository
-as the working directory.
+The resolved selected path is the user research Workspace root. Initialization
+creates `.cognieda/project.toml` for CogniEDA-private configuration and `data/`
+as the conventional user-managed dataset directory. Optional `data/raw/` and
+`data/derived/` directories, plus private `.cognieda/state/` and
+`.cognieda/sessions/`, are created lazily by their eventual owners.
+
+Datasets may also remain at explicit external paths; being inside `data/` does
+not admit a DataProfile, and opening a Workspace does not ingest or copy data.
+Optional agent, MCP, and skill configuration is read only from Workspace-local
+`.cognieda/agents.toml`, `.cognieda/mcp.toml`, and `.cognieda/skills.toml` when
+those files exist. Root `config/*.toml` files are development examples;
+installed startup does not require the source repository as the working
+directory. See [Workspace ownership](workspace-layout.md).
 
 ## Verification commands
 

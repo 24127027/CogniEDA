@@ -33,6 +33,13 @@ Scientific lineage and Evidence refer to the applicable DataProfile. This
 allows a later validity review to determine which observations and claims
 depend on a changed or invalidated data state.
 
+Physical location does not establish dataset identity or admission. A
+Workspace conventionally owns user-visible datasets under `data/`, but a
+dataset may also remain at an explicitly admitted external path. In either
+case, filesystem presence is not a DataProfile, and changed data requires a
+successor physical dataset plus a successor DataProfile rather than an
+in-place identity rewrite. See [Workspace ownership](../../development/workspace-layout.md).
+
 ## Objective scope
 
 Each Task and scientific investigation is governed within one Objective. One

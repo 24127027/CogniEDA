@@ -24,6 +24,17 @@ class EvidenceRepository:
         self._session = session
 
     def create(self, evidence: Evidence) -> Evidence:
+        self.add(evidence)
+        self._session.commit()
+        record = self._session.get(EvidenceRecord, evidence.evidence_id)
+        if record is None:
+            raise RuntimeError("Committed Evidence could not be reloaded.")
+        self._session.refresh(record)
+        return record_to_schema(Evidence, record)
+
+    def add(self, evidence: Evidence) -> None:
+        """Stage validated Evidence without committing the caller's transaction."""
+
         task = self._session.get(TaskRecord, evidence.task_id)
         if task is None:
             raise ValueError("Evidence requires an existing Task.")
@@ -35,9 +46,6 @@ class EvidenceRepository:
             **schema_to_record_payload(evidence, json_fields=EVIDENCE_JSON_FIELDS)
         )
         self._session.add(record)
-        self._session.commit()
-        self._session.refresh(record)
-        return record_to_schema(Evidence, record)
 
     def get_by_id(self, evidence_id: UUID) -> Evidence | None:
         record = self._session.get(EvidenceRecord, evidence_id)

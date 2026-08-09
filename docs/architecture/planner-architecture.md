@@ -4,8 +4,9 @@ The Planner is CogniEDA's control plane and sole human-facing agent boundary.
 It coordinates research work without acquiring scientific operationalization,
 execution, governance, or durable-admission authority.
 
-This page defines the target Planner architecture. Current main implements
-only part of this design.
+This page defines the target Planner architecture. The bounded M1-B library
+implements only the MVP subset described below; canonical planning remains a
+target.
 
 ## Planner responsibility
 
@@ -178,37 +179,45 @@ scientific proposal.
 
 ## Implementation status
 
-**Partially implemented.** The active Planner graph contains one model-backed
-`create_plan` node and returns a `PlannerPlan` through `PlannerOutput`.
-Separate repository and application services provide durable
-`PlannerOperation` approval records, exact-ID resume checks, and atomic commit
-for a bounded set of operations; the active Planner graph does not compose
-those services.
+**Partially implemented.** The active bounded M1-B graph is:
 
-The bounded S0 infrastructure surface is **Implemented**:
+```text
+START
+  -> understand_request
+  -> apply_planning_state
+  -> dispatch_work
+  -> compose_response
+  -> END
+```
 
-- Planner accepts `PlannerDeps` dependency injection for the terminal printer
-  and executor dispatcher;
-- PydanticAI tool registration exposes terminal and data-capability adapters to
-  `PlannerModel`;
-- built-in tools are selected through `AvailableBuiltinTools`;
-- dependency protocols expose shared terminal and dispatcher services; and
-- focused tests validate the data-capability adapter through the dispatcher to
-  a registered provider without requiring a model endpoint.
+At that library boundary, typed model output selects one finite MVP action;
+deterministic code constructs successor Objective, Assumption, and Task state;
+tracked data work transitions `PENDING -> RUNNING -> COMPLETED|FAILED`; and the
+injected dispatcher remains the only active execution path. The Planner
+normalizes and identity-checks `PlannerWorkOutcome`, preserves its digest and
+diagnostics, creates no Evidence, and gives empirical answer drafting an input
+containing admitted Evidence but no Assumptions. `PlannerOutput` exposes the
+human response, successor `SessionFrame`, typed decision, created Task IDs,
+selected `Capability`, work outcome, and controlled error.
 
-The canonical request-understanding, routing, question-answering, suggestion,
-Task-management, Task-selection, execution-preparation, execution-review, and
-commit nodes are absent from the active graph. Some pre-existing donor tests
-still import missing Planner symbols; that debt belongs to M1-B unless it
-blocks M1-A collection earlier.
+The direct PydanticAI data-capability adapter remains a bounded tested seam but
+is not composed as an M1-B Planner tool. This prevents model tool calls from
+dispatching work before a canonical Task enters typed state. Planner receives
+its model and dispatcher dependencies explicitly; it constructs no persistence
+or provider infrastructure.
+
+The former donor request-understanding and decomposition tests were rewritten
+against active M1-A/M1-B contracts, and the obsolete PlannerOperation
+persistence module was removed. No compatibility `TaskManagementDraft`,
+`ChildTaskProposalDraft`, `manage_tasks`, or approval-resume API was restored.
 
 Canonical `PlanRevision` and plan-binding records are not implemented, and the
-current runtime Task-kind vocabulary does not yet implement `DATA`,
-`SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`. The full approval-policy model,
-capability-safe execution behavior, `PlannerWorkOutcome` consumption,
-SessionFrame and GeneratedView coordination, and the end-to-end recovery model
-remain target design. The [MVP runtime subset](mvp-runtime-subset.md) owns the
-delivery sequence and milestone boundary.
+current MVP Task does not yet implement canonical `DATA`, `SCIENTIFIC`,
+`GRAPH`, and `SYNTHESIS`. The full approval-policy model, PlanRevision and Task
+DAG behavior, GeneratedView coordination, durable SessionFrame composition,
+and the end-to-end recovery model remain **Deferred** target design. The
+[MVP runtime subset](mvp-runtime-subset.md) owns the delivery sequence and
+milestone boundary.
 
 Continue with [Executor and dispatch](executor-and-dispatch.md) or follow the
 complete sequence in [End-to-end flow](end-to-end-flow.md).

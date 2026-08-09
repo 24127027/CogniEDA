@@ -48,7 +48,7 @@ def test_create_agent_forwards_agent_owned_builtin_tools(
 
 
 def test_concrete_agent_classes_own_their_builtin_tool_selections() -> None:
-    assert Planner.builtin_tools == (invoke_data_capability,)
+    assert Planner.builtin_tools == ()
     assert DataExplorer.builtin_tools == ()
     assert GraphMiner.builtin_tools == ()
     assert HypothesisAnalyst.builtin_tools == ()

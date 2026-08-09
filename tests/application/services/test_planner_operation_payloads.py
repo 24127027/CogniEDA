@@ -18,7 +18,9 @@ from cognieda.schemas.enums import (
 )
 from cognieda.schemas.planner_operations import PlannerOperation, TaskUpdateOperationPayload
 
-pytestmark = pytest.mark.skip(reason="Planner mutation behavior is deferred to M1-B.")
+pytestmark = pytest.mark.skip(
+    reason="PlannerOperation approval mutation belongs to deferred canonical M1-C."
+)
 
 
 def _task() -> Task:

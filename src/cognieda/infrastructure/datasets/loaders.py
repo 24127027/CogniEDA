@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from enum import StrEnum
+from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
@@ -21,8 +23,15 @@ class LoadedDataset:
     """Loaded dataset payload with normalized path metadata."""
 
     path: Path
+    dataset_digest: str
     dataset_format: SupportedDatasetFormat
     dataframe: pd.DataFrame
+
+
+def sha256_dataset_digest(content: bytes) -> str:
+    """Return the canonical identity for exact physical dataset bytes."""
+
+    return f"sha256:{hashlib.sha256(content).hexdigest()}"
 
 
 def _resolve_dataset_path(path: str | Path) -> Path:
@@ -47,9 +56,11 @@ def load_csv_dataset(path: str | Path) -> LoadedDataset:
     """Load a CSV dataset into a deterministic DataFrame wrapper."""
 
     resolved_path = _resolve_dataset_path(path)
-    dataframe = pd.read_csv(resolved_path)
+    content = resolved_path.read_bytes()
+    dataframe = pd.read_csv(BytesIO(content))
     return LoadedDataset(
         path=resolved_path,
+        dataset_digest=sha256_dataset_digest(content),
         dataset_format=SupportedDatasetFormat.CSV,
         dataframe=dataframe,
     )
@@ -59,9 +70,13 @@ def load_parquet_dataset(path: str | Path) -> LoadedDataset:
     """Load a Parquet dataset into a deterministic DataFrame wrapper."""
 
     resolved_path = _resolve_dataset_path(path)
-    dataframe = pd.read_parquet(resolved_path)
+    content = resolved_path.read_bytes()
+    dataframe = pd.read_parquet(BytesIO(content))
     return LoadedDataset(
-        path=resolved_path, dataset_format=SupportedDatasetFormat.PARQUET, dataframe=dataframe
+        path=resolved_path,
+        dataset_digest=sha256_dataset_digest(content),
+        dataset_format=SupportedDatasetFormat.PARQUET,
+        dataframe=dataframe,
     )
 
 
