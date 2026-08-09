@@ -8,6 +8,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import Field, JsonValue, NonNegativeInt, field_validator, model_validator
+from pydantic_ai.messages import ModelMessage
 
 from cognieda.schemas.common import (
     CogniEDABaseModel,
@@ -19,6 +20,7 @@ from cognieda.schemas.common import (
     ValidityBasis,
     utc_now,
 )
+from cognieda.schemas.conversation import ConversationHistory
 from cognieda.schemas.enums import (
     DiscoveryEpistemicStatus,
     DiscoveryLifecycleState,
@@ -221,7 +223,7 @@ class UserDecision(CogniEDABaseModel):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
-class SessionFrame(ImmutableCogniEDABaseModel):
+class SessionFrame(CogniEDABaseModel):
     """Authoritative typed research state for the single active MVP session."""
 
     objective: Objective | None = None
@@ -229,6 +231,7 @@ class SessionFrame(ImmutableCogniEDABaseModel):
     tasks: tuple[Task, ...] = ()
     evidences: tuple[Evidence, ...] = ()
     data_profile: DataProfile | None = None
+    conversation: ConversationHistory = Field(default_factory=ConversationHistory)
 
     @model_validator(mode="after")
     def _validate_research_state(self) -> SessionFrame:
@@ -249,17 +252,32 @@ class SessionFrame(ImmutableCogniEDABaseModel):
             object_name="Evidence",
         )
 
-        tasks_by_id = {task.task_id: task for task in self.tasks}
+        tasks_by_id = {
+            task.task_id: task
+            for task in self.tasks
+        }
+
         for evidence in self.evidences:
             task = tasks_by_id.get(evidence.task_id)
-            if task is None:
-                raise ValueError("SessionFrame rejects orphan Evidence without its Task.")
-            if task.status is not TaskStatus.COMPLETED:
-                raise ValueError("SessionFrame accepts Evidence only for COMPLETED Tasks.")
-            if self.data_profile is None:
-                raise ValueError("SessionFrame cannot retain Evidence without a DataProfile.")
-            if evidence.data_profile_id != self.data_profile.data_profile_id:
-                raise ValueError("Evidence must reference the active SessionFrame DataProfile.")
+
+            # MVP integrity check:
+            # only validate the Task when it is present in the frame.
+            if task is not None and task.status is not TaskStatus.COMPLETED:
+                raise ValueError(
+                    "Selected Evidence cannot reference "
+                    "a selected non-completed Task."
+                )
+
+            # Same principle for DataProfile.
+            if (
+                self.data_profile is not None
+                and evidence.data_profile_id
+                != self.data_profile.data_profile_id
+            ):
+                raise ValueError(
+                    "Selected Evidence and selected DataProfile "
+                    "must refer to the same dataset state."
+                )
 
     @staticmethod
     def _reject_duplicate_ids(ids: list[UUID], *, object_name: str) -> None:
@@ -273,6 +291,7 @@ class SessionFrame(ImmutableCogniEDABaseModel):
             "tasks": self.tasks,
             "evidences": self.evidences,
             "data_profile": self.data_profile,
+            "conversation": self.conversation,
         }
         values.update(updates)
         return SessionFrame.model_validate(values)
