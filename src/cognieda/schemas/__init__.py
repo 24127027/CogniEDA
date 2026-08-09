@@ -7,7 +7,6 @@ from cognieda.schemas.artifacts import (
     Evidence,
     Hypothesis,
     Objective,
-    SessionFrame,
     Task,
     UserDecision,
 )
@@ -139,7 +138,6 @@ __all__ = [
     "QualityFlag",
     "QualityFlagSeverity",
     "SchemaSummary",
-    "SessionFrame",
     "SessionFrameStatus",
     "StaleContextMarker",
     "Task",

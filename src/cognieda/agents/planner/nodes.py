@@ -20,7 +20,16 @@ async def create_plan(
         return state
 
     try:
-        state.plan = await model.plan(state.query)  # type: ignore
+        result = await model.plan( #type: ignore
+            state.query,
+            message_history=runtime.context.planning_context.
+            conversation_history
+            .model_messages()
+        )
+
+        state.plan = result.plan
+        state.new_messages = result.new_messages
+
     except Exception as exc:
         state.error = f"Planner failed: {exc}"
 

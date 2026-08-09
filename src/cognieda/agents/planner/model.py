@@ -1,9 +1,19 @@
 from collections.abc import Sequence
+from dataclasses import dataclass
+from pydantic_ai.messages import ModelMessage
 
 from cognieda.application.ports import AgentFactoryPort, AgentTool, ModelConfig
 
 from .dependencies import PlannerDeps
 from .types import PlannerPlan
+
+
+@dataclass(frozen=True)
+class PlannerModelResult:
+    """Result of one Planner model invocation."""
+
+    plan: PlannerPlan
+    new_messages: tuple[ModelMessage, ...]
 
 
 class PlannerModel:
@@ -22,7 +32,12 @@ class PlannerModel:
             builtin_tools=builtin_tools,
         )
 
-    async def plan(self, query: str) -> PlannerPlan:
+    async def plan(
+        self,
+        query: str,
+        *,
+        message_history: Sequence[ModelMessage] = (),
+    ) -> PlannerModelResult:
         prompt = (
             "Analyze the user's request and produce a bounded research plan.\n"
             "Do not claim that any analysis has already been performed.\n"
@@ -34,6 +49,10 @@ class PlannerModel:
             prompt,
             output_type=PlannerPlan,
             deps=self.deps,
+            message_history=list(message_history),
         )
 
-        return PlannerPlan.model_validate(result.output)
+        return PlannerModelResult(
+            plan=PlannerPlan.model_validate(result.output),
+            new_messages=tuple(result.new_messages()),
+        )
