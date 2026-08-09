@@ -1,8 +1,8 @@
 # Current state
 
 This page answers one question: **what is supported by the current
-implementation?** It describes the M1-A source checkpoint
-`a75cc5d5ba50a41f3c5adcda6a2e3674a7b11d16`, based on `main` commit
+implementation?** It describes the M1-A corrective source checkpoint
+`cf9f82ce8ba561b9b3f151dd7b95d9a95d4806bb`, based on `main` commit
 `d7348144b4678a83de8f08c43e9af14305bbc9be` and inspected on 2026-08-09.
 A schema, table, interface, stub, fixture, or configuration entry is not a
 supported workflow by itself.
@@ -19,11 +19,11 @@ contracts remain authoritative targets.
 | --- | --- | --- |
 | M1-A research-state contracts | **Implemented** | The active `Objective`, `Assumption`, `Task`, `DataProfile`, `Evidence`, and `SessionFrame` schemas implement the approved executable MVP subset. No parallel MVP FCO family exists. |
 | Objective and Assumption | **Implemented** | `Objective` and planning-only `Assumption` each have stable UUID identity and non-empty text. M1-A implements typed state, not Planner behavior for changing either object. |
-| Task lifecycle | **Implemented** | Active Task has `task_id`, non-empty `instruction`, and exactly `PENDING`, `RUNNING`, `COMPLETED`, or `FAILED`. Legacy Task taxonomy and scientific fields are not accepted by the active schema. |
-| DataProfile and deterministic profiling | **Implemented** | Immutable DataProfile has `data_profile_id`, row and column counts, and ordered typed columns. Numeric non-boolean columns are `CONTINUOUS`; boolean and supported non-numeric columns are `DISCRETE`. Continuous summaries are finite descriptive statistics; discrete summaries use complete bounded counts or deterministic top-N values. Profiling is local and model-free. |
+| Task lifecycle | **Implemented** | Active Task has immutable `task_id` and non-empty `instruction`, plus exactly `PENDING`, `RUNNING`, `COMPLETED`, or `FAILED`. A status transition produces a validated replacement Task with the same identity and instruction. Legacy Task taxonomy and scientific fields are not accepted by the active schema. |
+| DataProfile and deterministic profiling | **Implemented** | Immutable DataProfile has `data_profile_id`, row and column counts, and ordered typed columns. Numeric non-boolean columns are `CONTINUOUS`; boolean and supported non-numeric columns are `DISCRETE`. Continuous summaries reject non-finite values; profiling excludes non-finite source observations from descriptive calculations and emits JSON-safe finite values or `None`. Discrete summaries retain complete bounded counts or deterministic top-N values. Profiling is local and model-free. |
 | Direct MVP Evidence | **Implemented** | Immutable Evidence retains structured JSON-safe content, artifact references, bounded producer/work/dataset/tool provenance, and real `task_id` plus `data_profile_id` lineage. Unsupported live pandas, NumPy scalar, non-finite, and arbitrary Python values fail validation. Evidence does not require Hypothesis, AnalysisFrame, or canonical ExecutionRun. |
-| MVP SessionFrame | **Implemented** | The active typed container retains one optional Objective, ordered Assumptions, Tasks, Evidence, and one optional active DataProfile. It rejects duplicate IDs, orphan Evidence, Evidence without a DataProfile, and Evidence for a different profile. A failed Task does not create or require Evidence. |
-| Bounded persistence | **Verified on SQLite** | Minimum Objective, Assumption, Task, DataProfile, Evidence, and SessionFrame mappings round-trip on fresh SQLite state. Task persistence mutates status only. Evidence persistence fails closed unless the referenced Task and DataProfile exist. Objective and Assumption behavioral updates are explicitly **Deferred** to M1-B. Durable restart/recovery is not claimed. |
+| MVP SessionFrame | **Implemented** | The frozen active-state envelope retains one optional Objective, ordered read-only Assumption, Task, and Evidence collections, and one optional active DataProfile. Controlled seams return validated successor frames. It rejects duplicate IDs, orphan Evidence, Evidence for any Task not exactly `COMPLETED`, Evidence without a DataProfile, and Evidence for a different profile. Direct collection mutation cannot bypass validation. |
+| Bounded persistence | **Verified on SQLite** | Minimum Objective, Assumption, Task, DataProfile, Evidence, and SessionFrame mappings round-trip on fresh SQLite state. Task persistence changes status only. Evidence persistence independently fails closed unless the referenced Task is `COMPLETED` and the referenced DataProfile exists. Objective and Assumption behavioral updates are explicitly **Deferred** to M1-B. Durable restart/recovery is not claimed. |
 | Executor registry and dispatch | **Implemented** | The S0 library boundary retains one typed `Capability`, explicit dependency-aware provider factories, provider reuse, typed async dispatch, fail-closed missing registration, controlled provider errors, and role-native results. |
 | Data Explorer | **Partially implemented** | The bounded local provider consumes the active Task contract and can return role-native analysis observations or an M1-A DataProfile candidate from a direct capability request. It does not create or admit Evidence. Transformation remains a typed blocker until successor dataset state exists. |
 | Planner behavior and `PlannerWorkOutcome` consumption | **Deferred** | The active Planner graph remains a donor scaffold. M1-B owns typed-state inspection, Task creation, capability selection, result consumption, authorized state updates, and user response behavior. |
@@ -75,11 +75,10 @@ as supported consumers of the M1-A schemas.
 
 At the M1-A source checkpoint:
 
-- the dedicated schema suite recorded **34 passes**;
-- the executor suite recorded **18 passes**;
-- bounded SQLite repository and fail-closed lineage checks recorded **5 passes**;
+- the requested nine-module M1-A schema, profiling, repository, and executor
+  suite recorded **95 passes**;
 - the broad suite excluding exactly three pre-existing Planner collection
-  modules recorded **82 passes and 72 explicit skips**.
+  modules recorded **116 passes and 72 explicit skips**.
 
 Full collection still stops on the three baseline Planner donor mismatches:
 

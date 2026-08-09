@@ -27,10 +27,17 @@ backlog. [Current state](current-state.md) owns capability detail.
 - Hypothesis Analyst and Graph Miner remain unregistered scaffolds. Discovery
   and Hypothesis remain canonical FCO names but have no active MVP runtime.
 - Objective and Assumption update behavior is **Deferred** to M1-B. Task
-  persistence supports status change only; changing Task meaning requires a
-  new identity rather than an in-place instruction update.
+  persistence supports status change only. Active Task values are immutable;
+  changing Task meaning requires a new identity, while status change produces
+  a replacement with the same identity and instruction.
 - Evidence creation from Data Explorer output and sole application-authority
-  admission are not implemented. A failed execution produces no Evidence.
+  admission are not implemented. The active frame and SQLite repository
+  boundaries admit Evidence only for a `COMPLETED` Task; incomplete or failed
+  work cannot produce admitted MVP Evidence.
+- Non-finite source numbers are excluded from continuous descriptive
+  calculations, and non-finite computed statistics become `None`. This is a
+  **Known limitation** of bounded profiling, not data-quality governance or
+  canonical preprocessing lineage.
 
 ## Donor isolation limitation
 
@@ -72,7 +79,7 @@ backlog. [Current state](current-state.md) owns capability detail.
 - Full pytest collection is interrupted by three pre-existing M1-B Planner
   donor mismatches involving `TaskManagementDraft`, `route_intent`,
   `understand_request`, `ChildTaskProposalDraft`, and `manage_tasks`.
-- Excluding exactly those three modules, the M1-A broad run recorded 82 passes
+- Excluding exactly those three modules, the M1-A broad run recorded 116 passes
   and 72 explicit deferred-donor skips.
 - No end-to-end user-to-Planner-to-real-Data Explorer-to-Evidence-to-
   SessionFrame-to-response test exists; that is not an M1-A completion claim.
