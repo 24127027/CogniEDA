@@ -2,7 +2,7 @@
 
 This page answers one question: **what is supported by the current
 implementation?** It describes the M1-A source checkpoint
-`2d5bb45942e34f401c6a4462601c571c260a36e3`, based on `main` commit
+`a75cc5d5ba50a41f3c5adcda6a2e3674a7b11d16`, based on `main` commit
 `d7348144b4678a83de8f08c43e9af14305bbc9be` and inspected on 2026-08-09.
 A schema, table, interface, stub, fixture, or configuration entry is not a
 supported workflow by itself.
