@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from collections import Counter
 from collections.abc import Iterable
 from uuid import UUID, uuid4
 
 from pydantic import Field, model_validator
-from pydantic_ai.messages import ModelMessage, ToolCallPart, ToolReturnPart
+from pydantic_ai.messages import (
+    ModelMessage,
+    RetryPromptPart,
+    ToolCallPart,
+    ToolReturnPart,
+)
 
 from cognieda.schemas.common import ImmutableCogniEDABaseModel
 
@@ -23,21 +27,37 @@ class ConversationSegment(ImmutableCogniEDABaseModel):
         if not self.messages:
             raise ValueError("ConversationSegment requires at least one ModelMessage.")
 
-        calls = Counter(
-            (part.tool_call_id, part.tool_name)
-            for message in self.messages
-            for part in message.parts
-            if isinstance(part, ToolCallPart)
-        )
-        returns = Counter(
-            (part.tool_call_id, part.tool_name)
-            for message in self.messages
-            for part in message.parts
-            if isinstance(part, ToolReturnPart)
-        )
-        if calls != returns:
+        pending_calls: dict[str, str] = {}
+        for message in self.messages:
+            for part in message.parts:
+                if isinstance(part, ToolCallPart):
+                    if part.tool_call_id in pending_calls:
+                        raise ValueError(
+                            "ConversationSegment rejects ambiguous duplicate pending "
+                            "tool-call identities."
+                        )
+                    pending_calls[part.tool_call_id] = part.tool_name
+                    continue
+                if isinstance(part, ToolReturnPart | RetryPromptPart):
+                    call_name = pending_calls.get(part.tool_call_id)
+                    if call_name is None:
+                        if isinstance(part, RetryPromptPart) and part.tool_name is None:
+                            continue
+                        raise ValueError(
+                            "ConversationSegment must retain coherent tool-call/tool-return "
+                            "or tool-call/retry-prompt protocol pairs."
+                        )
+                    if part.tool_name is not None and part.tool_name != call_name:
+                        raise ValueError(
+                            "ConversationSegment must retain coherent tool-call/tool-return "
+                            "or tool-call/retry-prompt protocol pairs."
+                        )
+                    del pending_calls[part.tool_call_id]
+
+        if pending_calls:
             raise ValueError(
-                "ConversationSegment must retain matching tool-call/tool-return pairs."
+                "ConversationSegment must retain coherent tool-call/tool-return "
+                "or tool-call/retry-prompt protocol pairs."
             )
         return self
 

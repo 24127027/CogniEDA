@@ -12,6 +12,7 @@ from pydantic_ai.messages import (
     ModelMessagesTypeAdapter,
     ModelRequest,
     ModelResponse,
+    RetryPromptPart,
     TextPart,
     ToolCallPart,
     ToolReturnPart,
@@ -428,6 +429,81 @@ def test_conversation_round_trip_preserves_tool_call_and_return_coherence() -> N
     ) == list(messages)
     assert len(restored.turns) == 1
     assert len(restored.turns[0].segments) == 1
+
+
+def test_conversation_round_trip_preserves_retry_capable_tool_protocol() -> None:
+    messages: tuple[ModelMessage, ...] = (
+        ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="final_result",
+                    args={"row_count": "invalid"},
+                    tool_call_id="call-invalid",
+                )
+            ]
+        ),
+        ModelRequest(
+            parts=[
+                RetryPromptPart(
+                    content="row_count must be an integer",
+                    tool_name="final_result",
+                    tool_call_id="call-invalid",
+                )
+            ]
+        ),
+        ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="final_result",
+                    args={"row_count": 42},
+                    tool_call_id="call-valid",
+                )
+            ]
+        ),
+        ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_name="final_result",
+                    content="Final output processed.",
+                    tool_call_id="call-valid",
+                )
+            ]
+        ),
+    )
+    segment = ConversationSegment(messages=messages)
+
+    restored = ConversationSegment.model_validate_json(segment.model_dump_json())
+
+    assert restored.messages == messages
+    assert ModelMessagesTypeAdapter.validate_json(
+        ModelMessagesTypeAdapter.dump_json(list(restored.messages))
+    ) == list(messages)
+
+
+def test_conversation_segment_rejects_retry_for_different_tool_call_identity() -> None:
+    with pytest.raises(ValidationError, match="tool-call/retry-prompt"):
+        ConversationSegment(
+            messages=(
+                ModelResponse(
+                    parts=[
+                        ToolCallPart(
+                            tool_name="final_result",
+                            args={"row_count": "invalid"},
+                            tool_call_id="call-original",
+                        )
+                    ]
+                ),
+                ModelRequest(
+                    parts=[
+                        RetryPromptPart(
+                            content="row_count must be an integer",
+                            tool_name="final_result",
+                            tool_call_id="call-other",
+                        )
+                    ]
+                ),
+            )
+        )
 
 
 def test_deterministic_turn_retains_surface_without_fake_model_messages() -> None:
