@@ -79,7 +79,7 @@ rejected.
 
 | Source | Target | Canonical cardinality | Consequence |
 | --- | --- | --- | --- |
-| eligible feasible leaf `SCIENTIFIC` Task | Hypothesis | zero or one; **at most one** | infeasible or terminated Tasks may have none |
+| eligible feasible leaf `SCIENTIFIC` Task | Hypothesis | exactly one | infeasible or otherwise ineligible Tasks have none; feasible work cannot fork into competing Hypotheses |
 | parent Task | Hypothesis | zero | parent Tasks cannot enter scientific commitment |
 | parent Task | Discovery | zero | parent summaries are GeneratedViews, not Discoveries |
 | ScientificInvestigationRun | EvidenceRequest | zero or many | multiple bounded observation rounds are allowed |

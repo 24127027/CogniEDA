@@ -1,43 +1,82 @@
-# MVP runtime subset
+# MVP-v2: minimum complete scientific research loop
 
-## Purpose and status
+## Purpose and authority
 
-This page owns the approved **MVP executable subset** of CogniEDA. It defines
-the deliberately smaller vertical slice that the MVP milestones will compose.
-It is a **Design target**, not a claim that the end-to-end MVP is implemented
-on current `main`.
+This page is the single normative definition of **MVP-v2**. MVP-v2 is the
+minimum complete scientific research loop for CogniEDA. It is a **Design
+target**, not a claim that the loop is implemented on current `main`.
 
-The MVP narrows what is executable first. It does not replace, remove, or
-redefine the [canonical architecture](system-overview.md). Current support is
-reported separately in [Current state](../status/current-state.md).
+The earlier definition of MVP as a small executable path containing Planner,
+Data Explorer, direct Task-to-Evidence admission, and an in-memory
+`SessionFrame` is superseded by this page. That bounded path remains useful
+current implementation evidence, but it is not the MVP-v2 target and does not
+move canonical scientific, governance, graph, or restart behavior beyond MVP.
 
-## Canonical architecture versus executable MVP
+Keep these three levels separate:
 
-The canonical FCO set remains exactly:
+| Level | Owner | Meaning |
+| --- | --- | --- |
+| canonical architecture | [System overview](system-overview.md) and canonical concept owners | the complete long-term authority and research-state model |
+| MVP-v2 | this page | the minimum complete subset of the canonical architecture that must work end to end |
+| current implementation | [Current state](../status/current-state.md) | dated, source- and test-qualified behavior that exists now |
+
+## Product thesis and priorities
+
+CogniEDA is validity-preserving research-state infrastructure for
+multi-session data investigation. It is not merely an EDA chatbot.
+
+MVP-v2 decisions follow this priority order:
+
+1. conclusion validity and traceability;
+2. context type safety;
+3. multi-session continuity;
+4. speed and convenience.
+
+Missing authority, identity, lineage, scope, validity, admission state, or
+contract version fails closed. Conversation, model output, planning support,
+retrieval relevance, and cached results do not become scientific authority by
+being useful or available.
+
+## Definition of Done
+
+MVP-v2 is complete only when one supported end-to-end workflow demonstrates:
 
 ```text
-Objective
-DataProfile
-Assumption
-Task
-Hypothesis
-Evidence
-Discovery
-SessionFrame
+Workspace
+  -> dataset adopted
+  -> active DataProfile
+  -> Human request through Planner
+  -> Objective
+  -> approved and active PlanRevision
+  -> eligible leaf SCIENTIFIC Task
+  -> Hypothesis Analyst feasibility
+  -> exactly one Hypothesis for the feasible Task
+  -> locked InvestigationProtocol
+  -> one or more bounded EvidenceRequests
+  -> Data Explorer deterministic execution
+  -> ExecutionRun and AnalysisFrame provenance
+  -> authoritative Evidence admission
+  -> Hypothesis Analyst protected evaluation
+  -> typed scientific outcome
+  -> DiscoveryProposal when the outcome is eligible
+  -> GovernanceDecision
+  -> Discovery admission when approved
+  -> semantic Knowledge Graph updated and queryable
+  -> Planner response
+  -> process restart
+  -> authoritative state restored
+  -> follow-up uses retained eligible research state correctly
 ```
 
-The canonical semantic Knowledge Graph remains exactly:
+The workflow may validly stop at a typed non-Discovery outcome. Completion
+does not require fabricating a Hypothesis, Evidence, or Discovery when its
+admission conditions are not met. The demonstrated happy path must nevertheless
+include one governance-approved Discovery so the complete authority chain,
+semantic graph projection, restart, and follow-up behavior are exercised.
 
-```text
-Objective
-Hypothesis
-Evidence
-Discovery
-```
+## Required canonical research chain
 
-The canonical architecture continues to include the complete planning,
-scientific-investigation, execution, governance, admission, validity, and
-presentation sequence:
+MVP-v2 implements a narrow but real instance of the canonical chain:
 
 ```text
 Objective
@@ -57,409 +96,333 @@ Objective
   -> GeneratedView
 ```
 
-The MVP runtime subset is defined to execute only:
+These records are not interchangeable. In particular:
+
+```text
+proposal != approval
+execution output != Evidence
+evaluation outcome != Discovery
+SessionFrame membership != operation context eligibility
+conversation != research authority
+```
+
+Application/domain authority validates and admits durable state at the
+required transitions. A controlled admission may occur within one logical
+Planner interaction when the admitted object is required by the next step; it
+need not be postponed until the entire interaction ends.
+
+## Fixed object and graph boundaries
+
+The FCO set is exactly:
 
 ```text
 Objective
+DataProfile
 Assumption
 Task
-DataProfile
+Hypothesis
 Evidence
+Discovery
 SessionFrame
-Planner
-Data Explorer
-ExecutorDispatcher
 ```
 
-`Hypothesis` and `Discovery` remain canonical FCOs. They are **Deferred** from
-the executable MVP, not deleted from CogniEDA.
-
-## Operating constraints
-
-The MVP is intentionally constrained to:
+The semantic Knowledge Graph contains exactly:
 
 ```text
-1 process
-1 active session
-1 Planner
-1 Data Explorer
-1 active dataset
-1 active DataProfile
-1 active Objective
+Objective
+Hypothesis
+Evidence
+Discovery
 ```
 
-These constraints do not supersede the canonical decision allowing multiple
-Objectives per Workspace or the longer-term continuity model. They only bound
-the first executable vertical slice.
+`PlanRevision`, `ScientificInvestigationRun`, `InvestigationPlan`,
+`InvestigationProtocol`, `EvidenceRequest`, `ExecutionRun`, `AnalysisFrame`,
+`EvaluationBundle`, `DiscoveryProposal`, `GovernanceDecision`,
+`GeneratedView`, and recovery records are important non-FCO state. They do
+not become semantic graph nodes merely because MVP-v2 requires them.
 
-## Minimum research-state thesis
+## Planning and Task requirements
 
-The MVP must prove a typed research-state path rather than a chatbot-with-tools
-path:
+Planning is an active, approval-bound loop:
 
 ```text
-User message
-  -> Planner
-  -> Task
-  -> Capability
-  -> ExecutorDispatcher
-  -> Data Explorer
-  -> dataset/tool execution
-  -> Evidence
-  -> SessionFrame
-  -> Planner
-  -> response
+user request
+  -> Planner drafts a high-level plan
+  -> gaps identified
+  -> bounded Graph Miner or Data Explorer planning support when needed
+  -> plan revised
+  -> Human reviews
+  -> PlanRevision approved and activated
+  -> eligible Task DAG work executes
 ```
 
-Every data-derived response must remain traceable through:
+Planning-support observations are not Evidence. `PlanRevision` represents the
+full approved Task DAG. A Task is an independently governed semantic work
+unit; PlanRevision owns membership, dependencies, assignment, ordering, and
+approval metadata.
+
+Canonical Task kinds are exactly:
 
 ```text
-data-derived response
-  -> Evidence
-  -> Task
-  -> DataProfile
-  -> dataset/tool execution
+DATA
+SCIENTIFIC
+GRAPH
+SYNTHESIS
 ```
 
-Chat history may support conversational continuity, but chat history is not
-authoritative research state. Follow-up reasoning must use typed state retained
-in the active `SessionFrame`, including prior Evidence, instead of reconstructing
-research truth from the transcript.
+New authoritative state accepts only canonical Task meanings; legacy shapes do
+not become fallback authority. A semantic Task change creates a successor
+identity. A coordination-only change belongs in a PlanRevision. Proposed Tasks
+cannot execute.
 
-## MVP object semantics
+Only an eligible feasible leaf `SCIENTIFIC` Task may enter scientific
+investigation. A feasible leaf produces exactly one Hypothesis; an infeasible
+or otherwise ineligible Task produces none and ends with a typed outcome. A
+parent Task produces neither a Hypothesis nor a Discovery.
 
-This section fixes minimum meaning for M1-A without freezing implementation
-schemas.
+## Authority boundaries
 
-### Objective
+The Human communicates only with Planner. Planner is the control plane and
+owns Objective interaction, high-level planning, PlanRevision coordination,
+Task DAG decomposition, routing, replanning, session coordination,
+GeneratedViews, and the Human approval boundary.
 
-The minimum semantic payload is the Objective text, with internal identity as
-needed. Exactly one Objective is active in an MVP session.
+Planner does not author scientific feasibility, Hypotheses, methods,
+parameters, decision rules, random seeds, variable bindings, protocols,
+Evidence obligations, protected evaluation, or DiscoveryProposal content. It
+does not directly access datasets or admit Evidence or Discovery.
 
-### Assumption
+Data Explorer is the exclusive dataset operator. It performs authorized,
+bounded profiling, inspection, transformation, and deterministic analysis. It
+returns observations and provenance material; it does not scientifically
+evaluate a Hypothesis or admit Evidence or Discovery.
 
-The minimum semantic payload is the Assumption text. An Assumption supports
-planning only:
+Hypothesis Analyst is the scientific investigation controller. It owns
+feasibility, Hypothesis formalization, InvestigationPlan,
+InvestigationProtocol, Evidence obligations, diagnostics, robustness,
+falsification, contradiction handling, stopping rules, protected evaluation,
+and exact DiscoveryProposal content. It may issue multiple bounded
+EvidenceRequests but never accesses datasets directly or admits a Discovery.
+
+Graph Miner is read-only over Objective, Hypothesis, Evidence, and Discovery.
+It may return typed references, paths, gaps, conflicts, and validity
+information. It does not access datasets, mutate the graph or SessionFrame,
+perform governance, or admit semantic state.
+
+Governance approves, rejects, holds, or requests correction, more Evidence,
+or conflict review without rewriting scientific content. Application/domain
+authority owns identity, validation, admission, persistence, atomic
+transitions, validity propagation, replay safety, and fail-closed enforcement.
+
+## Assumption quarantine and protected evaluation
+
+An Assumption is planning state or a planning constraint. It is not Evidence
+and cannot enter protected evaluation or Discovery support as an inference
+premise. If a user-provided Assumption is reasonably testable, Planner warns
+and proposes a `SCIENTIFIC` Task. Otherwise it remains planning state.
+
+Protected evaluation belongs to Hypothesis Analyst and consumes only a closed,
+validated `EvaluationBundle` containing the applicable Hypothesis, locked
+protocol and authorized revisions, admitted Evidence, ExecutionRun and
+AnalysisFrame lineage, precommitted decision rules, diagnostics, uncertainty,
+robustness, falsification, and stopping state.
+
+Scientific support excludes raw conversation, planning Assumptions, Planner
+opinion, unadmitted Data Explorer output, arbitrary retrieval, unrelated prior
+Discoveries, and caches whose authority and validity have not been established.
+
+## Scientific outcomes and Discovery eligibility
+
+A Hypothesis produces at most one Discovery. The eligible outcome classes are:
 
 ```text
-Assumption != Evidence
+SUPPORTED
+CONTRADICTED
+VALUABLE_INCONCLUSIVE
 ```
 
-The full testability and scientific-quarantine workflow is **Deferred**, but
-the MVP must not use an Assumption as empirical support.
+`VALUABLE_INCONCLUSIVE` requires protocol completion or governed stopping,
+genuine added knowledge, a narrowly scoped claim, and wording that does not
+assert absence merely because Evidence was weak. Every durable Discovery
+requires a GovernanceDecision and application-authority admission.
 
-### Task
-
-An MVP Task is a bounded EDA work unit with, at minimum, a `task_id` and
-instruction. A simple `PENDING`, `RUNNING`, `COMPLETED`, or `FAILED` lifecycle
-may support the vertical slice. Semantic change must create a successor or new
-Task identity; it must not silently rewrite existing work meaning.
-
-The M1-A boundary is **Implemented** as an immutable Task value. Lifecycle
-change returns a validated replacement with the same `task_id` and instruction;
-neither semantic field can be changed in place.
-
-### DataProfile
-
-The active dataset description must contain enough typed context for Planner
-and Data Explorer. At minimum it describes `data_profile_id`, row count, column
-count, and columns. Each column profile describes name, dtype, variable type,
-distinct count, missing count, and summary. MVP variable type is `DISCRETE` or
-`CONTINUOUS`.
-
-M1-A continuous statistics are **Implemented** as finite, JSON-safe values.
-Direct schema construction rejects non-finite statistics. Profiling excludes
-non-finite source observations from continuous descriptive calculations and
-uses `None` if a computed statistic is non-finite.
-
-The bounded M3-A authority surface is **Implemented** with a separate non-FCO
-`DataProfileDatasetBinding`. Initial candidate admission atomically persists
-the immutable DataProfile plus its normalized physical dataset reference and a
-SHA-256 digest of the exact loaded file bytes. Both path and digest define the
-MVP physical dataset state: same content at another path does not inherit an
-existing binding, and changed content at the same path is rejected before
-Evidence admission. Admission does not activate the profile.
-
-### Evidence
-
-MVP Evidence is typed research state produced from successful real dataset
-work. At minimum it links `evidence_id`, `task_id`, `data_profile_id`, content,
-provenance, and artifact references.
-
-This direct Task-to-Evidence MVP linkage is an executable-subset contract, not
-the complete canonical scientific Evidence contract. It must not fabricate a
-Hypothesis or set `hypothesis_id = task_id`. M1-A schema and repository guards,
-plus the bounded M3-A application service, are **Implemented** to require the
-referenced Task to be exactly `COMPLETED`; `PENDING`, `RUNNING`, and `FAILED`
-work cannot produce admitted MVP Evidence. The later canonical
-scientific cutover must introduce its real Hypothesis, EvidenceRequest,
-ExecutionRun, AnalysisFrame, and admission lineage rather than aliasing their
-identities.
-
-### SessionFrame
-
-The MVP active context contains the Objective, Assumptions, Tasks, Evidence,
-and active DataProfile. Evidence must remain typed and retained in the frame so
-follow-up work does not depend on transcript reconstruction.
-
-M1-A SessionFrame state is **Implemented** with ordered, read-only collections.
-Its controlled seams return validated successor frames, so callers cannot
-append Tasks or Evidence directly or leave the original frame partially
-changed after rejected lineage validation.
-
-## Role and authority boundaries
-
-Planner remains the only human-facing agent. At the bounded M1-B library
-boundary it inspects the active typed `SessionFrame`, understands the latest
-request, establishes or replaces the active Objective, records planning-only
-Assumptions, creates bounded Tasks, selects a typed capability, invokes the
-injected dispatcher, consumes `PlannerWorkOutcome`, returns a successor frame,
-and responds to the human. This does not persist or retain the frame across
-runtime turns; that composition remains **Deferred** to M5-A.
-
-Planner does not read a dataframe, run pandas or analytical code, mutate a
-dataset, or author authoritative Evidence directly. Dataset work belongs
-exclusively to Data Explorer.
-
-Data Explorer may read the active dataset, profile it, compute descriptive
-statistics, perform bounded EDA, execute admitted analytical tools, and return
-role-native observations and provenance material. It does not answer the
-human, evaluate a scientific Hypothesis, author a Discovery, perform
-governance, or admit durable state. Application/runtime authority owns
-validation and admission where the MVP contract requires them.
-
-The bounded M3-A library surface separates three contracts:
+Typed non-Discovery endings include:
 
 ```text
-DataProfileCandidate or DataExplorerResult   non-authoritative specialist output
-DataProfile plus dataset binding, Evidence   authoritative application state
-PlannerWorkOutcome                           Planner-facing projection
+NOT_TESTABLE
+INSUFFICIENT_DATA
+INSUFFICIENT_EVIDENCE
+PROTOCOL_EXHAUSTED
+OUT_OF_SCOPE
+CANCELLED
+INVALIDATED
+SUPERSEDED
+CANCELLED_BY_REPLAN
 ```
 
-Initial profiling may produce a task-free `DataProfileCandidate`. Filesystem
-presence never admits or activates it; application authority performs the
-separate atomic profile-and-binding admission. Profiling an already admitted
-profile returns observation material instead of creating another candidate.
-Evidence admission requires the authoritative binding and checks both the
-requested and actually executed dataset identity against it.
+Fail-to-reject and inconclusive results must not be strengthened into absence
+claims. A safe form is: “available evidence is insufficient to reject
+independence within scope S using method M on DataProfile V.”
 
-## Capability and dispatch model
+## Dataset and Evidence requirements
 
-`Capability` identifies an executable ability exposed by a specialist. The
-current S0 data capabilities are:
+Raw or admitted dataset states are immutable. Cleaning or transformation that
+changes data creates successor dataset state and a successor DataProfile with
+explicit lineage. External dataset admission and active DataProfile switching
+are authority-sensitive; filesystem presence alone grants neither.
+
+Canonical scientific Evidence must follow:
 
 ```text
-DATA_ANALYSIS
-DATA_PROFILING
-DATA_TRANSFORMATION
+SCIENTIFIC Task
+  -> ScientificInvestigationRun
+  -> Hypothesis
+  -> locked InvestigationProtocol
+  -> EvidenceRequest
+  -> DataWorkOrder
+  -> ExecutionRun
+  -> AnalysisFrame
+  -> Evidence admission
 ```
 
-Planner selects the capability. `ExecutorDispatcher` owns capability-to-provider
-routing through an explicit registry:
+Evidence admission verifies exact identity, Objective and DataProfile scope,
+protocol and request binding, executed capability, role-native output,
+provenance, contract version, and current-use eligibility. Missing or
+mismatched lineage creates zero Evidence.
+
+## SessionFrame, context, and conversation
+
+In the canonical MVP-v2 direction, SessionFrame is structured
+research-session membership and state. It tracks authoritative references
+such as Objective, Assumption, Task, DataProfile, and Evidence identities, the
+active Objective and DataProfile, and supported Hypothesis or Discovery
+references where appropriate.
+
+Three boundaries remain distinct:
 
 ```text
-Planner
-  -> capability invocation
-  -> ExecutorDispatcher
-  -> ExecutorRegistry
-  -> provider
+historically referenced by SessionFrame
+  != selected into an operation-specific context
+  != authorized as scientific support
 ```
 
-A request carries the capability, not a redundant `executor_id`. Registry
-composition is intentionally:
+Referenced dependencies do not automatically become SessionFrame membership.
+Operation-specific planning, answer, scientific-control, evaluation, graph,
+and recovery contexts apply their own purpose, scope, authority, lifecycle,
+validity, and lineage rules.
+
+Conversation is a non-authoritative continuity surface. Native provider
+history may be retained to preserve coherent model interaction, but raw chat
+does not become SessionFrame membership, Evidence, protected-evaluation input,
+or recovery authority. MVP-v2 restart succeeds from durable typed state, not
+by asking a model to reconstruct authority from a transcript.
+
+## Workspace, sessions, and cross-Objective behavior
+
+One Workspace may contain multiple Objectives. Different sessions may proceed
+concurrently when bound to different Objectives. During the current
+architecture phase, at most one active Planner session may coordinate a given
+Objective. This is not a one-active-Objective-per-Workspace rule.
+
+Generic cross-Objective relation admission is not active. Related Objectives
+may motivate an inert composite-Objective proposal, but creation requires
+Human approval and no automatic aggregation occurs.
+
+Cross-Objective Evidence reuse requires explicit
+`CrossObjectiveEvidenceReuseAdmission` and exact equality over the versioned
+canonical typed obligation and lineage representations. Similarity, model
+judgment, shared Workspace membership, or graph proximity grants no authority.
+
+Canonicalization is structural only: finite typed validation, deterministic
+ordering, duplicate rejection, fixed serialization, schema-version binding,
+and digest computation. It does not infer synonyms, units, variable mappings,
+method compatibility, scope containment, or semantic equivalence.
+
+## Approval modes
+
+MVP-v2 supports the canonical Human-boundary modes:
 
 ```text
-Capability
-  -> provider factory
-  -> reusable provider instance
+ALWAYS_ASK
+POLICY_GUARDED  (default)
+ALWAYS_ACCEPT
 ```
 
-One provider may expose multiple compatible capabilities. The bounded
-PydanticAI data-capability adapter remains available as a tested internal seam,
-but the M1-B Planner does not compose it as a model tool. Typed request
-understanding proposes work, deterministic Planner code constructs and tracks
-the canonical Task, and only then invokes `ExecutorDispatcher`. PydanticAI
-remains an adapter, not part of the canonical architecture.
+An approval mode never overrides validity, lineage, authority, or
+traceability.
 
-For `DATA_ANALYSIS`, role-neutral `ExecutorContext` carries only the explicit
-absolute `dataset_path` and exact `data_profile_id`; the typed role-specific
-`DataExplorerInput` carries the matching authoritative DataProfile projection.
-Planner creates the Task and selects `DATA_ANALYSIS`;
-Data Explorer owns translation of that bounded Task instruction into its
-role-specific `DataAnalysisPlan` through a typed planning port. The plan
-contains one allowlisted operation, exact column names, and only the bounded
-parameters admitted for that operation. Neither Planner nor runtime constructs
-the plan. M3-A supports:
+## Retrieval staging
+
+Retrieval evolves only after authority and durable state make it useful:
+
+| Capability | MVP-v2 relationship |
+| --- | --- |
+| deterministic bounded typed context | required |
+| session-local typed retrieval after meaningful durable history exists | optional unless the MVP-v2 demonstration needs it |
+| semantic inquiry through Graph Miner and the semantic Knowledge Graph | required for the bounded graph-query portion of the MVP-v2 demonstration |
+| embeddings or hybrid ranking justified by evaluation | **Deferred** beyond MVP-v2 |
+
+Every stage applies authority, scope, lifecycle, validity, and lineage filters
+before relevance ranking. Embeddings are not an MVP-v2 requirement.
+
+## Explicit non-goals
+
+MVP-v2 does not require:
+
+- embeddings or hybrid retrieval;
+- generic cross-Objective relations or automatic Objective aggregation;
+- more than one active Planner session for the same Objective;
+- arbitrary generated Python or unbounded dataset execution;
+- a production UI, public service API, deployment platform, or supported
+  product CLI;
+- distributed scale, generalized multi-database support, or performance work
+  that weakens validity and traceability.
+
+These are non-goals of the minimum demonstration, not permission to violate
+the canonical authority model.
+
+## Current transitional foundation
+
+**Partially implemented.** Current `main` provides valuable bounded
+foundations: typed research-state values, bounded Planner behavior,
+deterministic Data Explorer execution and direct Evidence admission, in-process
+conversation continuity, multi-provider model configuration, SQLite
+persistence seams, and execution infrastructure.
+
+The current direct path is transitional:
 
 ```text
-ROW_COUNT
-COLUMN_SUMMARY
-MISSINGNESS
-VALUE_COUNTS
-DESCRIPTIVE_STATISTICS
-GROUP_SUMMARY
-CORRELATION (PEARSON or SPEARMAN)
+Task -> Data Explorer -> Evidence
 ```
 
-The Data Explorer model adapter may propose only this typed plan from the Task
-instruction and supplied DataProfile/schema. Deterministic code validates the
-proposal against the exact loaded dataset and computes the result. Invalid or
-unsupported proposals fail with typed zero-observation results; there is no
-fallback operation or fuzzy column repair. A model does not author numeric
-output. Arbitrary generated Python is **Unsupported**, and there is no
-environment or repository-root dataset fallback. `DataAnalysisPlan`,
-`DataAnalysisOperation`, and `CorrelationMethod` are owned by Data Explorer;
-the role-neutral `execution` package retains only shared dispatch contracts.
+It is not canonical scientific Evidence lineage and does not satisfy MVP-v2.
+The complete loop still requires the real scientific investigation, protocol,
+request, execution, AnalysisFrame, protected evaluation, governance,
+Discovery, semantic graph, and restart boundaries. See
+[Current state](../status/current-state.md) for the exact dated boundary.
 
-`DATA_TRANSFORMATION` must preserve immutable dataset-state semantics:
+## What the MVP-v2 demonstration must show
 
-```text
-current dataset state
-  -> DATA_TRANSFORMATION
-  -> new dataset state
-  -> successor DataProfile
-```
+The product capability is demonstrated only when a reader can trace and
+observe, at minimum:
 
-It must never mutate the active dataset in place. The current M3-A provider
-correctly returns a typed blocker because successor dataset and DataProfile
-creation are not implemented.
-
-## Result boundary
-
-Specialists retain role-native results, for example `DataExplorerResult`,
-`HypothesisAnalystResult`, and `GraphInquiryResult`. A generic semantic
-mega-result with optional fields from every specialist is not an approved
-contract.
-
-Application coordination projects the Planner-facing subset into
-`PlannerWorkOutcome`. Its conceptual fields are source role, Task identifier,
-work identifier, status, semantic summary, authoritative references,
-limitations, blockers, permitted next actions, and result digest.
-
-S0 implements the minimum normalization seam over shared transport metadata.
-M1-B consumption is **Implemented** at the bounded Planner library boundary:
-the Planner verifies Task identity, preserves the normalized digest,
-limitations, blockers, and permitted next actions, and applies a terminal Task
-status. The outcome is not admitted as Evidence.
-
-M3-A adds an application-owned admission seam after `DataExplorerResult`.
-Admission verifies successful status, source role, Task identity and persisted
-`COMPLETED` state, capability, authoritative DataProfile identity, authoritative
-normalized path and content-digest binding, role-native plan/tool/provenance
-agreement, one non-empty JSON-safe result, and bounded lineage. The Evidence
-identity includes the verified dataset digest. It then commits one immutable
-Evidence whose content is
-the validated operation, parameters, and deterministic result. Exact replay
-returns the same Evidence; conflicting reuse of a work reference fails closed.
-The resulting application projection contains the real Evidence reference.
-
-## Bounded M1-B Planner behavior
-
-The active M1-B graph is:
-
-```text
-START
-  -> understand_request
-  -> apply_planning_state
-  -> dispatch_work
-  -> compose_response
-  -> END
-```
-
-Request understanding uses a finite typed action contract for answering from
-state, setting or refining the Objective, adding an Assumption, creating and
-running bounded data work, summarizing state, or returning an unsupported
-action. Natural language is the primary model-backed interface. The small
-explicit command surface maps into the same typed actions and unknown commands
-fail without state mutation or dispatch.
-
-Deterministic orchestration constructs Objective, Assumption, and Task values
-through `SessionFrame` successor seams. Semantic Objective refinement receives
-a new identity; semantic Task change creates a new Task; lifecycle change
-retains Task identity and instruction. Tracked data work follows:
-
-```text
-PENDING -> RUNNING -> COMPLETED  on SUCCEEDED
-PENDING -> RUNNING -> FAILED     on FAILED, BLOCKED, or dispatch failure
-```
-
-The M1-B Planner still reports direct dispatcher completion and does not author
-or admit Evidence. Failed or blocked work surfaces controlled diagnostics.
-The separate M3-A application service admits eligible successful work for
-later composition; failed or blocked work cannot pass that service. Answers
-that claim empirical support receive an evidence-only typed input from admitted
-`SessionFrame.evidences`; planning Assumptions are excluded.
-
-## Explicit MVP non-goals
-
-The following canonical or operational capabilities are **Deferred** from the
-MVP runtime:
-
-- Hypothesis Analyst and Hypothesis runtime;
-- Discovery and Graph Miner runtime;
-- PlanRevision and a Task DAG;
-- InvestigationPlan, InvestigationProtocol, and EvidenceRequest;
-- the canonical AnalysisFrame and ExecutionRun authority model;
-- GovernanceDecision, Discovery admission, and validity propagation;
-- human-in-the-loop approval flows;
-- restart-safe coordination and multi-session continuity;
-- multi-Objective concurrency and semantic Knowledge Graph retrieval;
-- streaming, distributed queues, and DVC.
-
-UI implementation is outside the backend MVP scope. Deferred components remain
-part of the canonical architecture and must not be described as removed.
-
-## Milestone ownership
-
-| Milestone | Ownership | Status relative to this page |
-| --- | --- | --- |
-| S0 | executor capability stabilization | **Implemented** at the bounded S0 library surface |
-| D0 | MVP and canonical documentation reconciliation | **Implemented** by this documentation boundary |
-| M1-A | MVP research-state core: Objective, Assumption, Task, Evidence, DataProfile, and SessionFrame | **Implemented** |
-| M1-B | MVP Planner behavior, including `PlannerWorkOutcome` consumption | **Implemented** at the bounded library behavior surface |
-| M3-A | MVP Data Explorer plus Evidence and real tool execution | **Implemented** at the bounded library/data-authority surface |
-| M5-A | single-session runtime composition | **Deferred** |
-| MVP-I | vertical integration | **Deferred** |
-| MVP-V | final MVP verification | **Deferred** |
-
-Post-MVP ownership is:
-
-| Milestone | Ownership | Status |
-| --- | --- | --- |
-| M1-C | full canonical planning cutover: PlanRevision, Task DAG, canonical routing, activation, and approval semantics | **Deferred** |
-| M2 | scientific authority: Hypothesis Analyst, Hypothesis, ScientificInvestigationRun, InvestigationPlan, InvestigationProtocol, and evaluation | **Deferred** |
-| M3-B | canonical execution and Evidence authority: EvidenceRequest, DataWorkOrder, ExecutionRun, AnalysisFrame, and Evidence admission | **Deferred** |
-| M4 | governance, Discovery, and validity: EvaluationBundle, DiscoveryProposal, GovernanceDecision, Discovery admission, and validity propagation | **Deferred** |
-| M5-B | durable runtime and recovery: restart, resume, claims, leases, idempotency, and multi-Objective durable coordination | **Deferred** |
-
-Graph Miner remains **Deferred** until an explicit runtime-provider milestone
-is scheduled. Hypothesis Analyst, Graph Miner, governance, and Discovery do not
-belong to M5-A.
-
-## MVP Definition of Done
-
-The backend MVP is complete only when this path is demonstrated:
-
-```text
-dataset loaded
-  -> DataProfile generated
-  -> SessionFrame initialized
-  -> user prompt
-  -> Planner
-  -> Task
-  -> Capability
-  -> ExecutorDispatcher
-  -> Data Explorer
-  -> real dataset tool
-  -> Evidence
-  -> SessionFrame
-  -> PlannerWorkOutcome
-  -> Planner response
-  -> follow-up uses the same typed state
-```
-
-Verification must prove real dataset access by Data Explorer, real tool
-execution, Evidence linkage to Task and DataProfile, retained provenance,
-typed-state reuse on follow-up, no transcript reconstruction as research-state
-authority, no fabricated Evidence after failure, and runtime-configurable model
-configuration.
+- one real dataset is explicitly adopted and bound to an active DataProfile;
+- one Human request passes only through Planner;
+- one full approved PlanRevision and Task DAG is retained;
+- only an eligible feasible leaf `SCIENTIFIC` Task creates one Hypothesis;
+- the protocol is locked before Evidence-producing execution;
+- Data Explorer alone reads the dataset and executes deterministic work;
+- failed, blocked, invalid, or mismatched work creates zero Evidence;
+- admitted Evidence retains the complete canonical scientific and execution
+  lineage;
+- protected evaluation excludes conversation and Assumptions;
+- a Discovery-eligible outcome receives governance and exact admission;
+- a non-Discovery outcome remains typed without a fabricated claim;
+- the semantic graph exposes only Objective, Hypothesis, Evidence, and
+  Discovery;
+- process restart restores authoritative state and permitted next actions;
+- follow-up uses retained eligible research state rather than transcript
+  reconstruction;
+- Objective isolation and one-active-Planner-session-per-Objective enforcement
+  fail closed;
+- no approval mode bypasses authority, validity, lineage, or traceability.

@@ -97,16 +97,14 @@ protocol revision; a raw frame or retrieval result cannot substitute for it.
 
 ## Implementation status
 
-**Partially implemented.** Current `SessionContextBuilder` projects planning,
-answer, conclusion, and discovery-synthesis bundles. The protected synthesis
-projection excludes Assumptions, Tasks, prior Discoveries, user decisions,
-pending questions, stale context, dead ends, and cached tool summaries, and it
-filters profile and Evidence lifecycle. A separate pure retrieval policy
-rejects unknown types and unsafe lifecycle/mode combinations.
+**Partially implemented.** The current Planner receives the bounded
+materialized Objective, Assumptions, Tasks, Evidence, and DataProfile in a
+planning context while native conversation history is carried separately.
+Empirical answer drafting receives admitted Evidence and excludes Assumptions.
+This protects one important type boundary but is not a general context system.
 
-The current mode vocabulary does not cover planning consultation, scientific
-investigation control, Graph Miner inquiry, recovery, or validity review as
-first-class modes. Objective identity and full scientific lineage are not
-bound by the current SessionFrame projection, and current conclusion handling
-is a legacy alias for discovery synthesis rather than the canonical
-EvaluationBundle.
+Planning consultation, scientific investigation control, protected
+EvaluationBundle construction, Graph Miner inquiry, recovery, validity review,
+Objective isolation, and complete scientific-lineage eligibility remain
+**Deferred**. Uncomposed donor context and retrieval modules do not establish
+current runtime support.

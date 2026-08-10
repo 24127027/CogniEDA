@@ -26,14 +26,16 @@ remains presentation.
 
 ## SessionFrame
 
-`SessionFrame` is the FCO that records a governed active-context selection. It
-is outside the semantic Knowledge Graph, whose membership remains exactly
-Objective, Hypothesis, Evidence, and Discovery.
+`SessionFrame` is the FCO that records structured research-session membership
+and active selectors. It is outside the semantic Knowledge Graph, whose
+membership remains exactly Objective, Hypothesis, Evidence, and Discovery.
 
 A SessionFrame is not conversation history, a chat summary, a vector-search
 result, a GeneratedView, a semantic graph node, scientific authority, or
-universal memory. It selects references and bounded context; selected objects
-retain their own type, lifecycle, validity, scope, and authority.
+universal memory. Historical membership is an input to later context
+construction, not the context itself. An operation selects an eligible bounded
+subset, and selected objects retain their own type, lifecycle, validity, scope,
+and authority.
 
 ## Context modes
 
@@ -79,8 +81,8 @@ at a time; this is not a one-session-per-Workspace rule.
 
 ## Continue reading
 
-- [SessionFrame](session-frame.md) owns its identity, scope, lifecycle, and
-  non-authority.
+- [SessionFrame](session-frame.md) owns structured session membership, active
+  selectors, continuity, and non-authority.
 - [Context type safety](context-type-safety.md) owns mode-specific eligibility
   and exclusion rules.
 - [Retrieval strategy](retrieval-strategy.md) owns eligibility-first retrieval,
@@ -92,13 +94,14 @@ at a time; this is not a one-session-per-Workspace rule.
 
 ## Implementation status
 
-**Partially implemented.** Current source persists append-only SessionFrame
-snapshots, builds bounded summaries, projects planning, answer, conclusion, and
-discovery-synthesis bundles, applies a pure lifecycle/type retrieval policy,
-and provides bounded planning-only Discovery retrieval with deterministic
-lexical ranking.
+**Partially implemented.** Current source has a bounded materialized
+`SessionFrame` with one optional Objective, ordered Assumptions, Tasks and
+Evidence, and one optional DataProfile. The in-process application passes those
+objects into a planning context and separately retains native conversation
+history for later request understanding.
 
-The current SessionFrame is not explicitly bound by Objective identifier,
-purpose, reasoning mode, scope, lifecycle point, or validity basis. The full
-mode set, exact Objective isolation, recovery projection, Planner-session
-ownership, and end-to-end resume orchestration remain target design.
+The current frame is not the canonical typed-reference membership model and is
+not durably restored by the runtime. Mode-specific context eligibility, exact
+Objective-bound session ownership, validity-aware recovery, and end-to-end
+resume orchestration remain **Deferred**. The uncomposed donor retrieval and
+context modules do not establish current runtime support.

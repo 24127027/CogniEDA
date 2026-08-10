@@ -23,6 +23,13 @@ cannot serve as an inference premise in protected evaluation. A testable claim
 should become proposed scientific work rather than being admitted as an
 Assumption to avoid Evidence requirements.
 
+Keeping an Assumption explicit is still useful: it records the belief or
+constraint that shaped planning, makes uncertainty visible, and lets later
+Evidence trigger review. Quarantine preserves that context without rewarding
+an untested belief with evidential authority. If the claim cannot reasonably be
+tested with available means, it may remain a planning constraint; if it can be
+tested, Planner should propose a `SCIENTIFIC` Task.
+
 After Discovery admission, comparison may flag an Assumption for review. The
 flag is not an automatic rewrite or deletion of either object.
 
@@ -36,6 +43,18 @@ SCIENTIFIC
 GRAPH
 SYNTHESIS
 ```
+
+| Kind | Reader-facing purpose |
+| --- | --- |
+| `DATA` | explore, profile, or create an authorized successor data state through Data Explorer |
+| `SCIENTIFIC` | govern one scientific investigation through Hypothesis Analyst |
+| `GRAPH` | ask a bounded read-only question about semantic research-state relationships |
+| `SYNTHESIS` | let Planner derive a GeneratedView from eligible admitted state |
+
+A Task is an independently managed deliverable. A short planning consultation
+with Data Explorer or Graph Miner is not automatically a Task; it becomes one
+only when the plan needs a governed work unit with its own identity and
+lifecycle.
 
 `PlanRevision` is the non-FCO version of an entire proposed or approved Task
 DAG, including membership, dependencies, assignment, ordering, approval, and
@@ -59,7 +78,7 @@ for the complete authority split.
 
 ## Eligibility for scientific investigation
 
-Only an eligible feasible leaf `SCIENTIFIC` Task can source at most one
+Only an eligible feasible leaf `SCIENTIFIC` Task can source exactly one
 Hypothesis. Parent, proposed, unapproved, and infeasible Tasks source none. The
 canonical owner of eligibility, feasibility outcomes, investigation records,
 and scientific contracts is [Scientific authority](../scientific-lifecycle/scientific-authority.md).

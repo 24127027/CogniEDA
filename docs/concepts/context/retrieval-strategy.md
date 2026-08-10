@@ -31,9 +31,10 @@ scientific investigation control, protected evaluation, Graph Miner inquiry,
 answer generation, recovery, or validity review. Without a known purpose and
 reasoning mode, the system cannot determine which epistemic types are safe.
 
-Purpose also determines whether the result is a SessionFrame selection, an
+Purpose also determines whether the result is a planning or answer context, an
 EvaluationBundle input, a read-only inquiry result, a recovery projection, or
-a GeneratedView source set. These are not interchangeable outputs.
+a GeneratedView source set. SessionFrame membership may bound the candidates,
+but it is not interchangeable with any of these operation-specific outputs.
 
 ## Objective and scope binding
 
@@ -70,14 +71,31 @@ records exclusions or blockers rather than returning unsafe context.
 ## Ranking after eligibility
 
 Ranking chooses among already eligible candidates. It may consider recency,
-explicit SessionFrame selection, exact typed relationships, query overlap, or
-other explainable signals appropriate to the purpose.
+SessionFrame membership, exact typed relationships, query overlap, or other
+explainable signals appropriate to the purpose. Membership is only a ranking
+or bounding signal after eligibility; it is never authority.
 
 Vector search may support ranking only after eligibility filtering. A vector
 score is never an admission check, a validity determination, a cross-Objective
 reuse contract, or scientific authority. Implementations must not broaden the
 candidate pool after structural filtering by adding semantically similar but
 ineligible records.
+
+## Capability grows in stages
+
+Retrieval should become more sophisticated only when authoritative state and
+demonstrated need justify it:
+
+```text
+deterministic bounded typed context
+  -> session-local typed retrieval when required
+  -> semantic graph inquiry through Graph Miner
+  -> embeddings or hybrid ranking only when evaluation shows value
+```
+
+This order keeps memory subordinate to research authority. Embeddings are not
+a defining feature of CogniEDA and are not required merely because a session
+has history.
 
 ## Graph Miner
 
@@ -120,15 +138,9 @@ lineage, not a generic search result.
 
 ## Implementation status
 
-**Partially implemented.** An important scope limitation remains. Current source
-has a pure policy that filters known object and lifecycle combinations by four
-legacy modes. A bounded planning-only `DiscoveryRetrievalEngine` filters
-Discovery lifecycle before deterministic lexical ranking and can prioritize
-references already present in a SessionFrame. No vector retrieval is used.
-
-The current retrieval request and SessionFrame do not bind an Objective
-identifier, and the engine can enumerate Workspace-local Discoveries before
-ranking. It therefore does not establish canonical Objective isolation or
-cross-Objective admission and must not be described as the complete target
-retrieval boundary. Full authority, validity-event, scientific-contract, and
-lineage filtering remain incomplete.
+**Unsupported.** No retrieval engine or Graph Miner inquiry is composed into
+the current bounded runtime. Deferred donor policies and a planning-only
+Discovery retrieval module remain in the source tree, but their presence does
+not establish a supported context-selection capability. The current Planner
+receives the materialized bounded frame plus separate in-process conversation
+history; canonical eligibility-first retrieval remains **Deferred**.

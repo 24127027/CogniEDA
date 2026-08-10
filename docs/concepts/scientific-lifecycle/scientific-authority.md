@@ -15,13 +15,14 @@ investigation and become the source of a Hypothesis.
 
 ```text
 eligible feasible leaf SCIENTIFIC Task
-  -> at most one Hypothesis
+  -> exactly one Hypothesis
 ```
 
 The application must reject scientific initiation when the Task is a parent,
 is merely proposed or unapproved, is not eligible to execute, or is not of
 canonical kind `SCIENTIFIC`. A parent Task produces no Hypothesis and no
-Discovery. A Task description, user statement, or planning assumption is not
+Discovery. An infeasible Task produces no Hypothesis and ends with a typed
+outcome. A Task description, user statement, or planning assumption is not
 an admitted Hypothesis.
 
 Task meaning is immutable across scientific lineage. If a proposed change
@@ -47,6 +48,13 @@ Hypothesis candidate. Hypothesis Analyst may propose that candidate;
 application authority validates its identity, lineage, cardinality, and typed
 contracts before admission. Planner does not author the scientific Hypothesis,
 and application authority does not invent its content.
+
+Hypothesis Analyst is not trying to “prove” the Hypothesis. It commits the
+investigation to a reviewable protocol, requests the observations that
+protocol requires, and evaluates the admitted Evidence against precommitted
+rules. The result may support the Hypothesis, contradict it, remain valuably
+inconclusive, or end without completion. Scientific restraint is part of the
+role, not a failure of it.
 
 ## ScientificInvestigationRun
 
@@ -164,13 +172,11 @@ observation and provenance boundary.
 
 ## Implementation status
 
-**Design target.** M1-A removed legacy scientific fields from the active Task
-and made Hypothesis independent of the executable MVP state. The donor
-Hypothesis repository and placeholder Hypothesis Analyst remain **Deferred**;
-they are not composed with the M1-A Task contract and do not establish a
-supported scientific workflow. Canonical feasibility outcomes,
-`ScientificInvestigationRun`, InvestigationPlan, InvestigationProtocol,
-Evidence obligations, EvidenceRequest, and application-authority admission are
-not implemented. The placeholder Hypothesis Analyst is not runnable and still
-declares a dataset tool, which is a known deviation from the canonical
-no-dataset-access boundary.
+**Design target.** Current bounded Task state does not carry an active
+scientific contract. Hypothesis and Discovery schemas and donor repositories
+exist, and an import-safe Hypothesis Analyst scaffold is present, but they are
+not composed into a supported scientific workflow. Canonical feasibility,
+`ScientificInvestigationRun`, Hypothesis admission, InvestigationPlan,
+InvestigationProtocol, Evidence obligations, EvidenceRequest, protected
+evaluation, and application-authority transitions remain **Deferred**. The
+scaffold does not establish dataset access or scientific runtime support.

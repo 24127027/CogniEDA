@@ -203,52 +203,31 @@ use and preserves why that changed.
 
 ## Dependency inversion and role boundaries
 
-The target architecture separates dependency contracts from implementations:
-
-1. **Core agents know contracts, not adapters.** Planner and Data Explorer
-   consume dispatcher and model-factory contracts defined in the inward-facing
-   application ports layer. They do not construct providers, mutable global
-   tooling, persistence adapters, or CLI presentation.
-
-2. **Bootstrap wires concrete implementations.** Runtime bootstrap knows both
-   contracts and implementations. It constructs `PlannerDeps`, the execution
-   registry and dispatcher, agent tooling, and the model factory, then injects
-   them into the agents.
-
-3. **Agents remain testable and composable.** Each active agent accepts
-   dependencies as protocol types. Tests can substitute mock implementations
-   without changing agent code.
-
-4. **Adapters live outward.** Concrete dataset, persistence, LLM, MCP, skills,
-   and agent-tooling implementations live under `infrastructure`. Terminal
-   rendering lives under `cli`, not runtime core or specialist agents.
-
-The current implementation uses:
-
-```text
-application/ports/       # dispatcher and model-factory contracts
-agents/planner/          # PlannerDeps and Planner-owned delegation
-infrastructure/          # concrete persistence, dataset, and model adapters
-runtime/bootstrap.py     # explicit concrete composition
-cli/                     # command parsing, REPL, and presentation
-```
+The target architecture keeps role meaning independent from technical
+adapters. Planner and specialists depend on bounded capabilities; they do not
+construct model providers, persistence, mutable global tooling, or user
+presentation. Application composition supplies those capabilities from the
+outside, which preserves the authority boundaries even when storage, model, or
+tool implementations change.
 
 **Partially implemented.** The execution and model/tooling composition paths
 follow this boundary. Application services still depend on the concrete
 SQLite persistence implementation, so complete persistence-port inversion
-remains a design target.
+remains a **Design target**. [Source layout](../development/source-layout.md)
+owns the implementation-level package map.
 
 ## Implementation status
 
-**Partially implemented.** The current implementation includes typed provenance records,
-durable PlannerOperation approval state, an atomic commit function for a bounded
-operation set, paired execution-attempt and outbox admission, database-backed
-leases and fencing epochs, retry lineage, and idempotency fields.
+**Partially implemented.** Current source includes typed provenance and
+operational records plus bounded transaction, attempt, outbox, lease, fencing,
+retry, and idempotency seams. These donor and infrastructure surfaces are not
+composed into the complete canonical workflow and do not establish restart or
+scientific admission by themselves.
 
-The bounded M3-A SQLite surface is **Verified on SQLite** for atomic initial
+The bounded current surface is **Verified on SQLite** for atomic initial
 DataProfile admission with an immutable one-to-one physical dataset binding.
 The binding stores `data_profile_id`, normalized dataset reference, and the
-`sha256:<hex>` digest of exact loaded file bytes. M3-A Evidence admission fails
+`sha256:<hex>` digest of exact loaded file bytes. Direct Evidence admission fails
 closed unless request path, observed execution path, observed digest, and
 provenance profile identity all match that authoritative binding. This is a
 non-FCO provenance/authority record and does not expand the semantic graph.

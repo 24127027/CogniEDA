@@ -18,7 +18,7 @@ There are exactly eight canonical First-Class Objects:
 | `Hypothesis` | bounded scientific commitment | yes | created only for an eligible feasible leaf `SCIENTIFIC` Task |
 | `Evidence` | admitted observation-backed scientific record | yes | immutable and bound to scientific lineage and provenance |
 | `Discovery` | governed evidence-bound claim | yes | requires explicit claim, scope, validity basis, and admission |
-| `SessionFrame` | governed active context for a purpose and scope | no | not conversation history or generic memory summary |
+| `SessionFrame` | structured research-session membership and active selectors | no | membership is not operation context, conversation memory, or scientific authority |
 
 No other record is an FCO. In particular, `Workspace`, `Question`,
 `PlanRevision`, `InvestigationProtocol`, `AnalysisFrame`, `ExecutionRun`,
@@ -39,7 +39,7 @@ It contains epistemic research objects: the scope under investigation, the
 scientific commitment, the admitted observation, and the governed claim. It is
 not a universal persistence graph. `DataProfile`, `Assumption`, `Task`, and
 `SessionFrame` remain FCOs outside the semantic graph because data state,
-planning constraints, workflow state, and active context have different
+planning constraints, workflow state, and session membership have different
 epistemic roles.
 
 ## Independent properties
@@ -80,15 +80,17 @@ eight first-class domain identities.
 This list is representative rather than exhaustive. Adding a durable record to
 one of these families does not promote it to FCO or semantic-graph status.
 
-## Generated views and active context
+## Generated views and session membership
 
 `GeneratedView` and `SessionFrame` solve different problems. A `GeneratedView`
 is a derived presentation surface and can be regenerated when its sources or
 validity change. It is neither an FCO nor authoritative scientific state.
 
-`SessionFrame` is an FCO because a governed active-context selection must be
-addressable across sessions. It still does not author a claim. The selected
-objects retain the authority and eligibility rules of their own types.
+`SessionFrame` is an FCO because structured session membership and active
+selectors must remain addressable across interactions and restarts. It still
+does not author a claim or replace operation-specific context construction.
+Referenced objects retain the authority and eligibility rules of their own
+types.
 
 ## Where to go next
 

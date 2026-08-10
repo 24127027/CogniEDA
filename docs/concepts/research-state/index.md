@@ -95,9 +95,11 @@ scientific content. Application authority admits only the authorized resulting
 state.
 
 Validity then controls current eligibility without erasing the historical
-record. A later `SessionFrame` selects a bounded context for a particular
-purpose and scope. A `GeneratedView` may present current valid state, but the
-view does not become authoritative scientific state.
+record. A later `SessionFrame` preserves structured session membership and
+active selectors. Each operation constructs its own bounded eligible context
+from authoritative state; membership alone grants no scientific authority. A
+`GeneratedView` may present current valid state, but the view does not become
+authoritative scientific state.
 
 ## Continuity without category collapse
 

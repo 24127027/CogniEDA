@@ -73,11 +73,12 @@ to persistence, or interact directly with the human.
 ### Hypothesis Analyst
 
 Hypothesis Analyst is the scientific investigation controller. It owns
-scientific feasibility; at most one Hypothesis for an eligible feasible leaf
-`SCIENTIFIC` Task; the `InvestigationPlan`, `InvestigationProtocol`, Evidence
-obligations, EvidenceRequest construction, governed protocol revision, and
-protected final evaluation. Its final scientific act is a
-`DiscoveryProposal` or a typed non-completion.
+scientific feasibility and exactly one Hypothesis for each eligible feasible
+leaf `SCIENTIFIC` Task; infeasible work receives none. It also owns the
+`InvestigationPlan`, `InvestigationProtocol`, Evidence obligations,
+EvidenceRequest construction, governed protocol revision, and protected final
+evaluation. Its final scientific act is a `DiscoveryProposal` or a typed
+non-completion.
 
 It cannot access datasets directly, bypass Data Explorer, persist
 authoritatively, self-approve governance, or interact directly with the human.
