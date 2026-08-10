@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
@@ -44,7 +44,7 @@ def create_de_agent(config: ModelConfig, agent_factory: AgentFactoryPort) -> Age
 
 @dataclass(slots=True)
 class DataExplorerConfig:
-    model: ModelConfig = field(default_factory=ModelConfig)
+    model: ModelConfig | None = None
 
 
 class DataExplorer:
@@ -59,11 +59,16 @@ class DataExplorer:
         agent_factory: AgentFactoryPort | None = None,
         analysis_planner: DataAnalysisPlannerPort | None = None,
     ) -> None:
-        self.config = config or ModelConfig()
+        if agent_factory is not None and config is None:
+            raise ValueError(
+                "Model configuration is required when an agent factory is provided."
+            )
+
+        self.config = config
         self.agent_factory = agent_factory
         self.analysis_planner = analysis_planner or (
-            ModelDataAnalysisPlanner(config=self.config, agent_factory=agent_factory)
-            if agent_factory is not None
+            ModelDataAnalysisPlanner(config=config, agent_factory=agent_factory)
+            if agent_factory is not None and config is not None
             else None
         )
 

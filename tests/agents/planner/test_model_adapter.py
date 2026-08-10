@@ -58,7 +58,11 @@ def test_planner_model_passes_native_history_and_returns_new_messages() -> None:
     model = PlannerModel(
         deps=PlannerDeps(dispatcher=object()),  # type: ignore[arg-type]
         agent_factory=RecordingFactory(agent),  # type: ignore[arg-type]
-        model_config=ModelConfig(model_name="test"),
+        model_config=ModelConfig(
+            provider="openai",
+            model_name="test",
+            api_key="test-key",
+        ),
     )
 
     result = asyncio.run(

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import toml
+
 from cognieda.runtime.workspace import Workspace
 
 
@@ -26,6 +28,14 @@ def test_workspace_initialization_creates_only_required_ownership_roots(tmp_path
     assert not (workspace.data_dir / "derived").exists()
     assert not workspace.state_dir.exists()
     assert not workspace.session_dir.exists()
+
+
+def test_workspace_initialization_writes_canonical_google_provider(tmp_path: Path) -> None:
+    workspace = Workspace.open(tmp_path / "canonical-provider")
+    config_path = workspace.root / ".cognieda" / "project.toml"
+
+    assert toml.load(config_path)["model"]["provider"] == "google"
+    assert 'provider = "gemini"' not in config_path.read_text(encoding="utf-8")
 
 
 def test_explicit_workspace_is_independent_of_current_working_directory(
