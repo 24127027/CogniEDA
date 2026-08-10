@@ -124,11 +124,12 @@ lineage, not a generic search result.
 
 **Partially implemented.** The active Planner has a bounded deterministic
 selector, not a general retrieval engine. It selects the active Objective and
-DataProfile, finite recent Assumption/Task/Evidence candidates, and whole recent
-or exact-term-matching conversation segments before authoritative resolution.
+DataProfile, finite recent Assumption/Task/Evidence candidates, and recent or
+exact-term-matching Human/Planner surface turns before authoritative resolution.
 Historical Evidence is narrowed to the active DataProfile, and selected
 Evidence expands to required Task and DataProfile dependencies without changing
-SessionFrame membership. No vector retrieval is used.
+SessionFrame membership. Native model-execution segments are retained but are
+not retrieval candidates for a fresh top-level turn. No vector retrieval is used.
 
 A separate donor `DiscoveryRetrievalEngine` and its legacy modes remain
 **Deferred** and are not composed into the MVP runtime. The active selector does

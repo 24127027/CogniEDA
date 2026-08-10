@@ -135,16 +135,18 @@ Session = SessionFrame + ConversationHistory
 `Session` is a non-FCO in-process lifetime aggregate. `ConversationHistory`
 retains the complete Human/Planner surface interaction while
 `ConversationSegment` units preserve native PydanticAI `ModelMessage` history
-as indivisible retention and pruning units. CogniEDA does not revalidate
+as exact model-execution retention units. CogniEDA does not revalidate
 PydanticAI's tool or retry protocol inside those segments.
 `SessionFrame` contains cumulative typed FCO IDs plus active Objective and
 DataProfile selectors. Runtime `Application` separately selects bounded
-conversation turns and a bounded `PlannerContextSelection` of research-state
-references. The application `PlannerContextPreparer` then resolves
+surface conversation turns and a bounded `PlannerContextSelection` of
+research-state references. The application `PlannerContextPreparer` then resolves
 authoritative FCOs, expands Evidence dependencies, and materializes one
-ephemeral `PlanningContext` before calling `Planner.run`. Native messages are
-derived from the selected turns and enter PydanticAI `message_history`;
-empirical answer context remains Evidence-only.
+ephemeral `PlanningContext` before calling `Planner.run`. That context contains
+the latest request, authoritative typed state, and selected non-authoritative
+surface discourse. Native messages from completed prior top-level Planner
+executions are not replayed into the fresh turn; empirical answer context
+remains Evidence-only.
 Resolved dependencies and context acquired later through an authorized role
 seam are not automatically persisted into `SessionFrame`.
 

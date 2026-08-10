@@ -127,12 +127,14 @@ from that run. Dangling selected references, missing dependencies, and
 non-`COMPLETED` Evidence Tasks fail closed.
 
 Request understanding receives the latest request, the materialized planning
-projection, and selected native PydanticAI `ModelMessage` history through the
-adapter's `message_history` channel. Conversation remains non-authoritative
-discourse context. The separate empirical answer input accepts admitted
-selected Evidence and excludes conversation and Assumptions. A pure retrieval
-policy also rejects unknown types and unsafe lifecycle/mode combinations at
-its isolated library surface.
+projection, and selected Human/Planner surface discourse. Conversation remains
+non-authoritative discourse context. Native PydanticAI `ModelMessage` history
+from completed prior top-level executions is retained separately and does not
+enter `PlanningContext` or the fresh-turn model call. The separate empirical
+answer input accepts admitted selected Evidence and excludes conversation,
+Assumptions, and native model messages. A pure retrieval policy also rejects
+unknown types and unsafe lifecycle/mode combinations at its isolated library
+surface.
 
 Planning consultation, scientific-investigation control, Graph Miner inquiry,
 protected EvaluationBundle construction, recovery, and validity review remain

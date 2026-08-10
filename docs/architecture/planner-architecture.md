@@ -213,18 +213,20 @@ containing admitted Evidence but no Assumptions. `PlannerOutput` exposes the
 human response, successor `SessionFrame`, typed decision, created Task IDs,
 selected `Capability`, work outcome, and controlled error.
 
-Selected native PydanticAI `ModelMessage` history reaches request understanding
-through the adapter's `message_history` argument rather than typed prompt prose.
 Selected Human/Planner surface turns reach the same request-understanding step
-through a separate typed field explicitly restricted to non-authoritative
+through a typed field explicitly restricted to non-authoritative
 discourse and reference resolution. The complete surface history remains
 outside SessionFrame; coherent model interactions are stored in indivisible
 `ConversationSegment` retention units, while deterministic turns may have no
-native segment. Selected native messages are derived from the selected turns,
-not stored as a duplicate selected representation. CogniEDA validates segment
-identity, non-emptiness, and aggregate ID uniqueness but leaves PydanticAI tool
-and retry protocol validity to PydanticAI. Empirical answer composition receives
-no conversation history.
+native segment. Native messages from a completed top-level execution are retained
+exactly for execution history but are not passed as `message_history` to a new
+Human turn. CogniEDA validates segment identity, non-emptiness, and aggregate ID
+uniqueness but leaves PydanticAI tool and retry protocol validity to PydanticAI.
+Empirical answer composition receives no conversation history.
+
+Future continuation, checkpoint, or resume of the same unfinished model
+execution may require its native messages. That recovery contract is
+**Deferred** and is not pre-implemented by the fresh-turn Planner API.
 
 The direct PydanticAI data-capability adapter remains a bounded tested seam but
 is not composed as an M1-B Planner tool. This prevents model tool calls from

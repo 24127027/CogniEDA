@@ -131,10 +131,12 @@ selectors may change. Context reconstruction applies current validity and
 eligibility when selecting a bounded run projection; being omitted from one run
 does not delete a historical reference or conversation segment.
 
-The bounded runtime's `ConversationSegment` is an indivisible history and
-context-selection boundary compatible with future interruption work. It is not
-a durable execution checkpoint. Full interrupted-run state, leases, and resume
-protocol remain separate recovery machinery.
+The bounded runtime's `ConversationSegment` retains the exact native messages
+from one completed model execution. A fresh top-level Human turn does not replay
+segments from completed prior turns. Future continuation, checkpoint, or resume
+of the same unfinished execution may require native message continuity, but a
+segment is not yet a durable execution checkpoint. Full interrupted-run state,
+leases, and resume protocol remain separate recovery machinery.
 
 ## Fail-closed recovery
 
@@ -156,8 +158,9 @@ model to infer intent.
 
 **Partially implemented.** The retained in-process `Session` now preserves
 cumulative SessionFrame successors and complete ConversationHistory while
-selecting surface discourse and whole coherent native segments for each
-request. Deterministic turns need no fabricated model history. This is not
+selecting bounded surface discourse for each fresh request. Exact native
+execution segments are retained but are not replayed across completed top-level
+turns. Deterministic turns need no fabricated model history. This is not
 restart-safe continuity or an interruption engine. Other operational
 foundations include
 append-only SessionFrame snapshots; durable PlannerOperation approval and
