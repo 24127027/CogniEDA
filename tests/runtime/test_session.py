@@ -604,6 +604,21 @@ def test_completed_turn_keeps_all_internal_native_messages_in_order() -> None:
     assert conversation_response_text(history.turns[0]) == "The active state is ready."
 
 
+def test_turn_completion_does_not_duplicate_existing_human_or_planner_text() -> None:
+    native_messages: tuple[ModelMessage, ...] = (
+        ModelRequest(parts=[UserPromptPart(content="Summarize the current state.")]),
+        ModelResponse(parts=[TextPart(content="The current state is ready.")]),
+    )
+
+    completed = complete_turn_messages(
+        human_message="Summarize the current state.",
+        planner_response="The current state is ready.",
+        native_messages=native_messages,
+    )
+
+    assert completed == native_messages
+
+
 def test_conversation_round_trip_preserves_tool_call_and_return_coherence() -> None:
     messages: tuple[ModelMessage, ...] = (
         ModelRequest(parts=[UserPromptPart(content="Inspect the active state.")]),
