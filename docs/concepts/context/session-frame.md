@@ -82,7 +82,11 @@ Session
 authority. `ConversationHistory` retains the complete Human-to-Planner surface
 transcript separately from native model interaction. Each
 `ConversationSegment` is one indivisible native PydanticAI `ModelMessage` unit,
-so context pruning cannot split coherent tool-call/tool-return protocol.
+so context pruning cannot split coherent native tool protocol. A tool call is
+complete when a later result with the same `tool_call_id` is either a
+`ToolReturnPart` or a retry-capable `RetryPromptPart`; when the result exposes a
+tool name, that name must also match. A genuinely dangling call still fails
+closed.
 Deterministic turns may contain no segment; the runtime does not fabricate
 model messages for them.
 
@@ -170,13 +174,18 @@ materialized objects and imports no PydanticAI types.
 The bounded `PlannerContextSelector` selects the active Objective and
 DataProfile plus the 20 most recent Assumption, Task, and Evidence candidates.
 Conversation selection separately chooses surface turns and whole native
-segments by four-turn recency plus exact lexical overlap after deterministic
-NFKC normalization, case folding, and Unicode-aware word extraction.
+segments from the four most recent turns plus at most the four most recent
+older turns with exact lexical overlap. The final selection is chronological.
+Matching uses deterministic NFKC normalization, case folding, and Unicode-aware
+word extraction. This is a hard-bounded lexical policy, not semantic retrieval.
 `BuildPlanningContext` resolves only the bounded FCO selection and expands a
 selected Evidence item's authoritative Task and DataProfile even when those
 dependency IDs were not directly selected. Missing dependencies and
 non-`COMPLETED` Evidence Tasks fail closed. Historical Evidence for another
 DataProfile remains stored but is not materialized into an active-profile run.
+If the bounded candidate window contains no eligible Evidence, the Planner
+reports only absence from the current bounded context; it does not claim that
+no historical Evidence exists.
 
 A separate in-process runtime `Session` retains the successor frame and the
 complete `ConversationHistory`. Surface Human/Planner text and native model
