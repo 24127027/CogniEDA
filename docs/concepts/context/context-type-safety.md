@@ -95,49 +95,18 @@ The protected EvaluationBundle is distinct from SessionFrame. Application
 authority constructs or validates the closed bundle for one investigation and
 protocol revision; a raw frame or retrieval result cannot substitute for it.
 
-## Initial context and context acquired during a run
-
-A build-context step creates a role- and purpose-specific initial projection; it
-is not a universal `AgentContext`. The projection may combine eligible retained
-state with non-authoritative interaction context when the role needs discourse
-continuity.
-
-An authorized role may acquire more context during a run through a bounded role
-seam, such as a future Graph Miner inquiry or Data Explorer planning
-consultation. Access does not imply selection or persistence:
-
-```text
-initial context != all context accessible during the run
-accessible during the run != persisted in SessionFrame
-```
-
-Every acquired item retains its original authority, scope, lifecycle, and
-permitted use.
-
 ## Implementation status
 
-**Partially implemented.** Runtime/application prepares one immutable
-`PlanningContext` before each bounded Planner run. Separate selection seams
-choose active and finite recent FCO references and bounded conversation turns;
-the runtime `PlannerContextPreparer` performs authoritative resolution through
-the concrete SQLite gateway,
-Evidence dependency expansion, lineage checks, and materialization. A
-dependency resolved for safe use does not become SessionFrame membership.
-Historical Evidence outside the active DataProfile is retained but omitted
-from that run. Dangling selected references, missing dependencies, and
-non-`COMPLETED` Evidence Tasks fail closed.
+**Partially implemented.** Current `SessionContextBuilder` projects planning,
+answer, conclusion, and discovery-synthesis bundles. The protected synthesis
+projection excludes Assumptions, Tasks, prior Discoveries, user decisions,
+pending questions, stale context, dead ends, and cached tool summaries, and it
+filters profile and Evidence lifecycle. A separate pure retrieval policy
+rejects unknown types and unsafe lifecycle/mode combinations.
 
-Request understanding receives the latest request, the materialized planning
-projection, and bounded native PydanticAI `ModelMessage` history selected as
-whole top-level turns. Conversation remains non-authoritative discourse
-context and does not enter `PlanningContext`. Historical run instructions are
-removed only from the derived replay copy; the current authoritative planning
-projection is supplied as new run instructions. The separate empirical answer
-input accepts admitted selected Evidence and excludes conversation,
-Assumptions, and native model messages. A pure retrieval policy also rejects
-unknown types and unsafe lifecycle/mode combinations at its isolated library
-surface.
-
-Planning consultation, scientific-investigation control, Graph Miner inquiry,
-protected EvaluationBundle construction, recovery, and validity review remain
-**Deferred**. No universal context contract is implemented.
+The current mode vocabulary does not cover planning consultation, scientific
+investigation control, Graph Miner inquiry, recovery, or validity review as
+first-class modes. Objective identity and full scientific lineage are not
+bound by the current SessionFrame projection, and current conclusion handling
+is a legacy alias for discovery synthesis rather than the canonical
+EvaluationBundle.

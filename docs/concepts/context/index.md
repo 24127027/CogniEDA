@@ -26,8 +26,7 @@ remains presentation.
 
 ## SessionFrame
 
-`SessionFrame` is the FCO that records cumulative session FCO-reference history
-plus governed active selectors. A separate bounded step selects run context. It
+`SessionFrame` is the FCO that records a governed active-context selection. It
 is outside the semantic Knowledge Graph, whose membership remains exactly
 Objective, Hypothesis, Evidence, and Discovery.
 

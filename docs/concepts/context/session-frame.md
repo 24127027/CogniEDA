@@ -1,18 +1,16 @@
 # SessionFrame
 
-`SessionFrame` is the First-Class Object for cumulative structured
-FCO-reference history within a session, plus explicit active selectors. It
-preserves what genuinely entered that session's research history without
-turning membership or current activity into scientific authority.
+`SessionFrame` is the First-Class Object for a governed active-context
+selection. It makes a bounded working set durable and auditable across a
+specific operation, handoff, pause, or resume without turning the selection
+itself into scientific knowledge.
 
 This page defines the **target design** for SessionFrame identity, scope,
 lifecycle, and non-authority. Exact fields and storage layout remain unfrozen.
 
 ## Identity and binding
 
-A canonical SessionFrame is bound to a session and preserves historical
-membership separately from active selection. A complete target frame also
-binds the applicable:
+A canonical SessionFrame is bound to a specific:
 
 - Objective;
 - purpose;
@@ -21,10 +19,10 @@ binds the applicable:
 - lifecycle point;
 - validity basis.
 
-It records cumulative references and explicit active selectors, plus the
-exclusions, restrictions, provenance, and eligibility posture needed to audit
-or reconstruct context. Historical membership, active selection, and the
-bounded subset selected for one Planner run are distinct.
+It records selected references, explicit exclusions or restrictions needed for
+the purpose, selection reasons, provenance, and the eligibility posture needed
+to audit or reconstruct the frame. It is a governed selection, not a copied
+knowledge base.
 
 The identity must make it possible to distinguish a planning frame from a
 protected-evaluation frame even when both refer to the same Objective. A change
@@ -62,55 +60,10 @@ SessionFrame is not:
 A frame may carry bounded summaries for presentation or efficiency, but those
 summaries do not replace the referenced authoritative records.
 
-## Runtime Session and conversation
-
-The bounded runtime keeps `SessionFrame` separate from interaction memory:
-
-```text
-Session
-  +-- SessionFrame
-  |   +-- cumulative FCO references
-  |   `-- active selectors
-  `-- ConversationHistory
-      `-- ConversationTurn
-          +-- turn_id
-          `-- native ModelMessage[]
-```
-
-`Session` is the in-process chat lifetime aggregate, not an FCO or scientific
-authority. `ConversationHistory` is the complete canonical ordered PydanticAI
-`ModelMessage` history. Each `ConversationTurn` adds only a top-level Human
-interaction boundary; Human and Planner text are derived from its messages
-rather than persisted in parallel fields. Completed `result.new_messages()`
-sequences are retained faithfully; CogniEDA does not reconstruct or
-independently validate PydanticAI's tool-call, return, or retry state machine.
-Deterministic commands are stored in the same history using application-created
-`ModelRequest` and `ModelResponse` values with origin metadata and no invented
-provider identity.
-
-Runtime/application first selects bounded historical FCO references and
-complete conversation turns. Selected messages become bounded effective
-PydanticAI `message_history` for intent and reference resolution. Historical
-run-scoped instructions are removed from that derived copy, while the retained
-messages remain unchanged. The runtime
-`PlannerContextPreparer` resolves FCO references through the concrete SQLite
-gateway, expands required Evidence Task and DataProfile dependencies, validates
-lineage needed for safe use, and materializes the ephemeral run context before
-`Planner.run`. The current `PlanningContext` reaches request understanding as
-new run-scoped instructions and supersedes historical typed state. Dependency
-resolution does not add SessionFrame membership. Conversation cannot become
-Evidence or an empirical premise.
-
-Initial invocation context is not a closed reasoning universe. An authorized
-role may later acquire additional purpose-specific context during its run.
-Information accessible during a run is not automatically selected into or
-persisted in `SessionFrame`.
-
 ## Selection without authority transfer
 
-Frame membership records cumulative session history; it does not itself select
-a reference for the current Planner run. Once selected for an authorized
-purpose, each record retains:
+Frame membership means only that a reference is selected for an authorized
+purpose. Each selected record retains:
 
 - its epistemic type;
 - its original author and admission authority;
@@ -125,11 +78,10 @@ protected evaluation. Selecting an execution result does not admit Evidence.
 
 ## Objective isolation
 
-An active SessionFrame run selection remains Objective-scoped unless a specific
-authorized operation explicitly permits otherwise. Cumulative history may
-retain prior Objective IDs; inactive membership does not silently enter current
-authority. Related work from another Objective may be presented as a suggestion
-to create or investigate a new Objective.
+A SessionFrame remains Objective-scoped unless a specific authorized operation
+explicitly permits otherwise. Related work from another Objective may be
+presented as a suggestion to create or investigate a new Objective; it is not
+silently imported as current authority.
 
 Cross-Objective Evidence reuse requires explicit admission and exact equality
 over the relevant versioned canonical typed obligations. A frame cannot prove
@@ -165,49 +117,15 @@ raw SessionFrame as a substitute.
 
 ## Implementation status
 
-**Partially implemented.** The active MVP `SessionFrame` is one frozen typed
-reference manifest with cumulative ordered Objective, Assumption, Task,
-DataProfile, and Evidence IDs plus `active_objective_id` and
-`active_data_profile_id`. Active selectors must reference historical members;
-duplicate historical IDs fail validation. Successors retain prior membership
-when an active Objective or DataProfile changes. The frame stores no
-materialized objects and imports no PydanticAI types.
+**Partially implemented.** A known target gap remains. Current source defines and
+persists append-only SessionFrame snapshots with compact DataProfile, Task,
+Assumption, Hypothesis, Discovery, Evidence, and user-decision summaries plus
+warnings, stale context, dead ends, cached-result summaries, invalidation
+rules, and parent-frame identity. Builders project mode-specific bundles.
 
-The bounded pure `select_planner_context` policy selects the active Objective
-and DataProfile plus the 20 most recent Assumption, Task, and Evidence
-candidates into a typed `PlannerContextSelection`.
-The external pure conversation-selection policy chooses complete turns from the
-four most recent turns plus at most the four most recent
-older turns with exact lexical overlap. The final selection is chronological.
-Matching uses deterministic NFKC normalization, case folding, and Unicode-aware
-word extraction. This is a hard-bounded lexical policy, not semantic retrieval.
-The application `PlannerContextPreparer` resolves only the bounded FCO
-selection and expands a selected Evidence item's authoritative Task and
-DataProfile even when those dependency IDs were not directly selected. Missing
-dependencies and non-`COMPLETED` Evidence Tasks fail closed. Historical Evidence for another
-DataProfile remains stored but is not materialized into an active-profile run.
-If the bounded candidate window contains no eligible Evidence, the Planner
-reports only absence from the current bounded context; it does not claim that
-no historical Evidence exists.
-
-A separate in-process runtime `Session` retains the successor frame and the
-complete canonical `ConversationHistory`. Request understanding receives the
-selected native messages plus the current materialized `PlanningContext`; no
-parallel surface transcript or `PlanningContext.surface_discourse` channel is
-stored. Historical instructions are omitted only from effective replay.
-Empirical answer composition still excludes conversation, Assumptions, and
-native model messages. `STATE_SUMMARY` uses cumulative SessionFrame
-membership for historical counts and the authoritatively resolved active
-Objective for its descriptive text; bounded `PlanningContext` counts are not
-presented as whole-session totals.
-
-The active schema does not encode the complete canonical purpose, reasoning
-mode, Objective-isolation, validity, or item-level eligibility model. Runtime
-Session continuity is not restart-safe, and persisted snapshots are not composed
-into durable resume or concurrency control. Therefore the bounded MVP surface is
-not the complete canonical SessionFrame or continuity model.
-
-Native execution history may be needed later to continue, checkpoint, or resume
-the same unfinished model execution. Retention alone is not that durable
-recovery lifecycle, which is
-**Deferred**; it is not ordinary cross-turn conversational memory.
+The current schema stores an Objective snapshot string rather than an explicit
+Objective identifier and does not encode the full canonical purpose, reasoning
+mode, scope, lifecycle point, validity basis, or item-level eligibility record.
+Repository `get_latest` and recent-frame queries are Workspace-wide rather than
+Objective-bound. Therefore the current snapshot surface is not the complete
+canonical SessionFrame or concurrency model.

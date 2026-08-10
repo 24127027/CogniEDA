@@ -253,19 +253,6 @@ closed unless request path, observed execution path, observed digest, and
 provenance profile identity all match that authoritative binding. This is a
 non-FCO provenance/authority record and does not expand the semantic graph.
 
-The bounded Planner/runtime surface is also **Verified on SQLite** for
-cumulative ID-only SessionFrame round-trip, active selectors, and authoritative
-Objective, Assumption, Task, DataProfile, and Evidence reference resolution.
-Runtime bootstrap binds the concrete research-state gateway to the selected Workspace's
-`.cognieda/state/cognieda.sqlite3`. Bounded selection precedes
-runtime-owned `PlannerContextPreparer` materialization; dependency
-expansion does not add SessionFrame members, and materialized objects are not
-cached as a second authority. Planner receives only the prepared context plus a
-narrow application mutation/lifecycle port; it does not depend on SQLModel or
-the SQLite adapter. Runtime owns the concrete composition.
-SessionFrame and ConversationHistory runtime successors are
-still process-local and are not automatically persisted for recovery.
-
 The complete target boundary is not implemented. Canonical PlanRevision
 activation, durable role-native result inbox processing, complete replay
 coordination, scientific Evidence admission from `EvidenceRequest`, governance

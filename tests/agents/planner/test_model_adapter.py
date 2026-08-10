@@ -71,4 +71,3 @@ def test_planner_model_passes_native_history_and_returns_new_messages() -> None:
     assert result.output == decision
     assert result.new_messages == new_messages
     assert agent.calls[0]["message_history"] == list(prior_messages)
-

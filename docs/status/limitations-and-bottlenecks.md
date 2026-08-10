@@ -10,37 +10,30 @@ backlog. [Current state](current-state.md) owns capability detail.
 - Active MVP Task has no PlanRevision membership, dependencies, assignment,
   ordering, approval, parent/leaf semantics, or canonical Task kind. Those
   contracts are **Deferred** to M1-C rather than represented by legacy fields.
-- The MVP SessionFrame retains cumulative Objective and DataProfile histories
-  with one active selector for each, but does not implement Workspace-wide
-  multi-Objective isolation.
+- The MVP SessionFrame supports one active Objective and one active
+  DataProfile but does not implement Workspace-wide multi-Objective isolation.
 - Direct Task-to-Evidence linkage is executable MVP state. Canonical
   Hypothesis, EvidenceRequest, ExecutionRun, AnalysisFrame, evaluation, and
   admission lineage remain **Deferred** to M2/M3-B.
 
 ## Implementation gap
 
-- M1-B Planner behavior and M3-A deterministic Data Explorer-to-Evidence
-  admission are **Implemented** at bounded library surfaces. M5-A is
-  **Partially implemented** for retained in-process cumulative ID-only
-  SessionFrame, one canonical native PydanticAI conversation history, bounded
-  whole-turn selection and effective replay, required dependency expansion,
-  and workspace-local
-  SQLite research-object composition.
-  Authoritative dataset execution context, Evidence admission composition,
-  persisted Session recovery, and restart recovery remain **Deferred**.
+- M1-B Planner behavior, append-only native model conversation history, and
+  M3-A deterministic Data Explorer-to-Evidence admission are **Implemented**
+  at bounded library surfaces. The in-process Application retains its current
+  successor SessionFrame and model-backed conversation turns, but durable
+  restart/recovery and full M5-A single-session composition are **Deferred**.
 - `PlanRevision`, `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
   and `GovernanceDecision` have no supported implementation.
 - Hypothesis Analyst and Graph Miner remain unregistered scaffolds. Discovery
   and Hypothesis remain canonical FCO names but have no active MVP runtime.
-- Planner successor-state active Objective change and Assumption addition are
-  **Implemented** through the application `PlannerStateMutationPort`: new objects are
-  persisted before their IDs enter the successor frame. In-place Objective and
-  Assumption updates remain **Deferred**. Task persistence supports status
-  change only. Active Task values are immutable; changing Task meaning requires
-  a new identity, while status change preserves the same identity and
-  instruction and is observed on the next context build.
+- Planner successor-state Objective replacement and Assumption addition are
+  **Implemented**. Durable Objective and Assumption persistence updates remain
+  **Deferred**. Task persistence supports status change only. Active Task
+  values are immutable; changing Task meaning requires a new identity, while
+  status change produces a replacement with the same identity and instruction.
 - Application-authority Evidence admission is **Implemented** for the direct
   M3-A Task-to-Evidence contract and **Verified on SQLite**. It is not the
   canonical scientific M3-B admission contract and does not fabricate
@@ -65,13 +58,8 @@ backlog. [Current state](current-state.md) owns capability detail.
 - Canonical-heavy donor tests for scientific attempts and Discovery retrieval
   are explicitly skipped after the hard cutover. They remain design/test
   material and are not compatibility authority for active schemas.
-- The stale pre-M1-B duplicate SessionFrame and `create_plan` context path remain
-  removed. The active M1-A SessionFrame schema is the only executable frame
-  owner and stores cumulative FCO IDs plus active selectors. The runtime Session
-  keeps complete segmented conversation separate, while the current selector
-  bounds references before the runtime `PlannerContextPreparer` resolves
-  authoritative objects and required dependencies for the four-node Planner
-  graph. The unregistered
+- The obsolete SessionFrame/context builder was removed; the active M1-A
+  SessionFrame schema is the only executable owner. The unregistered
   Hypothesis Analyst, Planner operation contracts, deferred retrieval engine,
   and scientific repositories still contain deferred field references. They
   are not composed into the active M1-A path.
@@ -81,11 +69,12 @@ backlog. [Current state](current-state.md) owns capability detail.
 
 ## Operational limitation
 
-- Bootstrap composes the in-process S0 dispatcher, bounded Data Explorer, and
-  retained runtime Session. The installable `cognieda [PATH]` command reaches
-  the development Planner REPL and is **Partially implemented**; session state
-  is process-local, and no supported end-to-end Evidence workflow, worker,
-  service API, or product CLI exists.
+- Bootstrap composes the in-process S0 dispatcher and bounded Data Explorer.
+  The installable `cognieda [PATH]` command reaches the development Planner
+  REPL and is **Partially implemented**. Its Application retains successor
+  MVP SessionFrame state and complete native-message model turns only for the
+  current process; no durable recovery, supported end-to-end application
+  runtime, worker, service API, or product CLI exists.
 - The local Data Explorer path executes only finite validated deterministic
   operations from an explicit absolute CSV or Parquet path. General-purpose
   Python, generated code, `exec`, `eval`, fuzzy column resolution, implicit
@@ -118,12 +107,10 @@ backlog. [Current state](current-state.md) owns capability detail.
   migration are outside M1-A.
 - SessionFrame snapshots use an internal serialized SQLite envelope; this is a
   bounded round-trip seam, not M5-A/M5-B durable runtime authority.
-- Runtime bootstrap composes the concrete research-state gateway at
-  `<workspace>/.cognieda/state/cognieda.sqlite3`. The standalone persistence
-  helper still retains a provisional package-local default when used outside
-  bootstrap without an explicit `COGNIEDA_DB_URL`. Runtime SessionFrame and
-  ConversationHistory successors are not automatically persisted, so this
-  workspace binding does not establish restart-safe continuity.
+- The persistence helper is not composed with `Workspace`; without an explicit
+  `COGNIEDA_DB_URL`, it retains a provisional package-local SQLite default.
+  Binding authoritative persistence under `<workspace>/.cognieda/state/` is
+  **Deferred** to the runtime/persistence phase rather than implied here.
 - No non-SQLite database is tested.
 
 ## Verification gap
@@ -135,18 +122,6 @@ backlog. [Current state](current-state.md) owns capability detail.
   and application Evidence admission. No composed user-to-Planner-to-real-Data
   Explorer-to-Evidence-to-SessionFrame-to-response test exists; M3-A library
   completion does not establish M5-A or MVP-I.
-- Focused runtime tests prove cumulative ID-only SessionFrame retention,
-  active-selector invariants, authoritative object re-resolution and dependency
-  expansion, native `ModelMessage` serialization including coherent tool
-  call/return and tool-call/retry structure, deterministic Unicode-aware
-  selection of four recent turns plus at most four recent older lexical matches
-  without deleting durable history, bounded native `message_history` replay,
-  stale historical instruction removal from the effective copy,
-  cumulative SessionFrame summary counts, bounded Evidence-absence wording, and
-  conversation/Assumption exclusion from empirical answer input. They do not
-  prove semantic retrieval, restart-safe Session persistence, or runtime
-  Evidence admission composition. Checkpoint/resume use of native history
-  remains **Deferred**.
 - No production performance envelope, non-SQLite validation, or external
   integration test exists. The first-party documentation regression is
   intentionally limited to internal Markdown links, relative anchors, and

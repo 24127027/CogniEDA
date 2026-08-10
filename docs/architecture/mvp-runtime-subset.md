@@ -126,32 +126,6 @@ authoritative research state. Follow-up reasoning must use typed state retained
 in the active `SessionFrame`, including prior Evidence, instead of reconstructing
 research truth from the transcript.
 
-The bounded runtime represents that separation explicitly:
-
-```text
-Session = SessionFrame + ConversationHistory
-```
-
-`Session` is a non-FCO in-process lifetime aggregate. `ConversationHistory`
-retains one complete ordered PydanticAI `ModelMessage` history, grouped only by
-top-level `ConversationTurn` boundaries. A turn stores `turn_id` and
-`messages`; it has no duplicated Human/Planner surface fields or segment
-wrapper. CogniEDA does not revalidate PydanticAI's tool or retry protocol.
-`SessionFrame` contains cumulative typed FCO IDs plus active Objective and
-DataProfile selectors. Runtime `Application` separately selects bounded
-complete conversation turns and a bounded `PlannerContextSelection` of
-research-state references. The runtime `PlannerContextPreparer` then resolves
-authoritative FCOs through the concrete SQLite gateway, expands Evidence
-dependencies, and materializes one ephemeral `PlanningContext` before calling
-`Planner.run`. Selected messages are copied into bounded effective
-`message_history`; historical run-scoped instructions are removed from that
-copy without changing retained history. The current authoritative
-`PlanningContext` is supplied as new run-scoped instructions and the Human
-request remains the user prompt. Planner receives no research-state read
-dependency. Empirical answer context remains Evidence-only.
-Resolved dependencies and context acquired later through an authorized role
-seam are not automatically persisted into `SessionFrame`.
-
 ## MVP object semantics
 
 This section fixes minimum meaning for M1-A without freezing implementation
@@ -224,39 +198,24 @@ identities.
 
 ### SessionFrame
 
-The MVP frame is a cumulative typed reference manifest: ordered Objective,
-Assumption, Task, DataProfile, and Evidence IDs plus optional active Objective
-and DataProfile selectors. It does not copy materialized FCO payloads. Changing
-an active selector preserves historical membership. Follow-up work rebuilds a
-bounded `PlanningContext` from selected authoritative objects, so a Task status
-change is visible without replacing its ID in the frame. Frame membership is
-continuity metadata, not current-run selection, eligibility, or authority.
+The MVP active context contains the Objective, Assumptions, Tasks, Evidence,
+and active DataProfile. Evidence must remain typed and retained in the frame so
+follow-up work does not depend on transcript reconstruction.
 
-M1-A SessionFrame state is **Implemented** with ordered, read-only ID
-collections, active-selector membership validation, and successor seams that
-preserve history and reject duplicate IDs. The bounded selector considers the
-active identities plus finite recent history. The application
-`PlannerContextPreparer` can expand a selected Evidence reference to its
-authoritative Task and DataProfile without adding those dependencies to the
-frame. Evidence admission remains the owner of the underlying lineage
-invariant.
+M1-A SessionFrame state is **Implemented** with ordered, read-only collections.
+Its controlled seams return validated successor frames, so callers cannot
+append Tasks or Evidence directly or leave the original frame partially
+changed after rejected lineage validation.
 
 ## Role and authority boundaries
 
 Planner remains the only human-facing agent. At the bounded M1-B library
-boundary it consumes the materialized `PlanningContext` and effective native
-message history prepared by runtime; it does not inspect the durable
-`ConversationHistory` aggregate or build its initial context from
-`SessionFrame`. It understands the latest request, establishes or changes the
-active Objective while retaining prior Objective IDs, records planning-only
-Assumptions, creates
-bounded Tasks, selects a typed capability, invokes the injected dispatcher,
-consumes `PlannerWorkOutcome`, returns a successor frame, and responds to the
-human. This does not persist or retain the frame across process restarts. The
-runtime `Application` does retain one coherent successor `SessionFrame` and
-append-only `ConversationHistory` across in-process turns.
-Restart-safe persistence and full M3-A-to-Planner Evidence composition remain
-**Deferred**.
+boundary it inspects the active typed `SessionFrame`, understands the latest
+request, establishes or replaces the active Objective, records planning-only
+Assumptions, creates bounded Tasks, selects a typed capability, invokes the
+injected dispatcher, consumes `PlannerWorkOutcome`, returns a successor frame,
+and responds to the human. This does not persist or retain the frame across
+runtime turns; that composition remains **Deferred** to M5-A.
 
 Planner does not read a dataframe, run pandas or analytical code, mutate a
 dataset, or author authoritative Evidence directly. Dataset work belongs
@@ -414,14 +373,10 @@ action. Natural language is the primary model-backed interface. The small
 explicit command surface maps into the same typed actions and unknown commands
 fail without state mutation or dispatch.
 
-Deterministic orchestration persists Objective, Assumption, and Task values
-through the application `PlannerStateMutationPort`, then records their IDs
-through `SessionFrame` successor seams. The port contains only current
-mutation and Task-lifecycle operations; context reads remain at the runtime
-composition boundary. Semantic Objective refinement receives a new identity;
-semantic Task change creates a new Task; lifecycle change updates the
-authoritative Task while retaining its frame ID and instruction. Tracked data
-work follows:
+Deterministic orchestration constructs Objective, Assumption, and Task values
+through `SessionFrame` successor seams. Semantic Objective refinement receives
+a new identity; semantic Task change creates a new Task; lifecycle change
+retains Task identity and instruction. Tracked data work follows:
 
 ```text
 PENDING -> RUNNING -> COMPLETED  on SUCCEEDED
@@ -432,9 +387,8 @@ The M1-B Planner still reports direct dispatcher completion and does not author
 or admit Evidence. Failed or blocked work surfaces controlled diagnostics.
 The separate M3-A application service admits eligible successful work for
 later composition; failed or blocked work cannot pass that service. Answers
-that claim empirical support receive an evidence-only typed input from Evidence
-resolved into the current `PlanningContext`; planning Assumptions and
-conversation are excluded.
+that claim empirical support receive an evidence-only typed input from admitted
+`SessionFrame.evidences`; planning Assumptions are excluded.
 
 ## Explicit MVP non-goals
 
@@ -464,7 +418,7 @@ part of the canonical architecture and must not be described as removed.
 | M1-A | MVP research-state core: Objective, Assumption, Task, Evidence, DataProfile, and SessionFrame | **Implemented** |
 | M1-B | MVP Planner behavior, including `PlannerWorkOutcome` consumption | **Implemented** at the bounded library behavior surface |
 | M3-A | MVP Data Explorer plus Evidence and real tool execution | **Implemented** at the bounded library/data-authority surface |
-| M5-A | single-session runtime composition | **Partially implemented** for in-process SessionFrame and ConversationHistory continuity; dataset execution context and Evidence admission composition remain **Deferred** |
+| M5-A | single-session runtime composition | **Deferred** |
 | MVP-I | vertical integration | **Deferred** |
 | MVP-V | final MVP verification | **Deferred** |
 

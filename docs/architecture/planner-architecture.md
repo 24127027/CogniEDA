@@ -130,14 +130,11 @@ approved plan in place.
 
 ## SessionFrame and GeneratedView coordination
 
-Runtime/application owns the cumulative `SessionFrame` research history and
-its explicit active selectors. For each Planner run, a separate selection seam
-chooses bounded historical references; application authority resolves them,
-expands required dependencies, validates safe use, and supplies an ephemeral
-`PlanningContext`. The Planner reasons over that prepared context and may
-return decisions that produce an authorized successor frame. Historical
-membership, active selection, run selection, and materialized context are
-distinct.
+The Planner coordinates a `SessionFrame` as the governed active context for a
+specific purpose, Objective, and scope. It requests inclusion and exclusion of
+eligible state; application authority validates and persists the frame.
+SessionFrame construction must respect context type safety, validity, and
+Objective boundaries.
 
 The Planner may also coordinate a `GeneratedView` for an answer, table, report,
 or synthesis. A view references its sources and carries limitations and
@@ -194,59 +191,31 @@ START
 ```
 
 At that library boundary, typed model output selects one finite MVP action;
-runtime `Application` uses the pure `select_planner_context` policy to choose
-active and finite recent SessionFrame references. The runtime
-`PlannerContextPreparer` resolves that typed `PlannerContextSelection` through
-the concrete SQLite research-state gateway composed at the runtime boundary,
-expands selected Evidence to required Task and DataProfile dependencies, and
-creates one ephemeral materialized context before `Planner.run` begins. No
-research-state read dependency enters Planner. Planner graph nodes do not
-repeat session selection or materialization during the run; they update the
-run-local context only from authoritative objects returned by current-run
-operations.
-Deterministic code persists successor Objective, Assumption, and Task objects
-through the narrow application `PlannerStateMutationPort` before retaining
-their IDs; tracked data work transitions
-`PENDING -> RUNNING -> COMPLETED|FAILED` through the same lifecycle boundary
-while the SessionFrame Task ID remains stable; and the injected dispatcher
-remains the only active execution path. The Planner
+deterministic code constructs successor Objective, Assumption, and Task state;
+tracked data work transitions `PENDING -> RUNNING -> COMPLETED|FAILED`; and the
+injected dispatcher remains the only active execution path. The Planner
 normalizes and identity-checks `PlannerWorkOutcome`, preserves its digest and
 diagnostics, creates no Evidence, and gives empirical answer drafting an input
 containing admitted Evidence but no Assumptions. `PlannerOutput` exposes the
 human response, successor `SessionFrame`, typed decision, created Task IDs,
 selected `Capability`, work outcome, and controlled error.
 
-Selected complete `ConversationTurn` values reach the same request-understanding
-step as bounded native `message_history`, explicitly restricted to
-non-authoritative discourse and reference resolution. `ConversationHistory`
-stores one canonical ordered `ModelMessage` history outside SessionFrame; a
-turn contains only `turn_id` and `messages`. Deterministic commands use
-application-created `ModelRequest(UserPromptPart(...))` and
-`ModelResponse(TextPart(...))` values with application-origin metadata and no
-invented provider identity. Native tool, retry, structured-output, and internal
-traffic remains intact.
-
-Effective replay is derived without mutating retention. Runtime selects whole
-turns, clears historical `ModelRequest.instructions` on the replay copy, and
-passes the resulting messages through PydanticAI `message_history`. The current
-authoritative `PlanningContext` is serialized only into the new run's
-instructions, so stale historical typed state cannot become current authority.
-Empirical answer composition receives no conversation history.
-
-Future continuation, checkpoint, or resume of an unfinished model execution
-requires additional recovery state beyond retained messages. That recovery
-contract is **Deferred** and is not pre-implemented by the fresh-turn Planner
-API.
+The bounded runtime also implements non-authoritative conversation continuity
+for model-backed Planner runs. `PlanningContext` materializes the current MVP
+research objects plus an append-only `ConversationHistory`. Each
+`ConversationTurn` contains the native PydanticAI `ModelMessage` values from
+one complete Planner/LangGraph run; the flattened history is passed unchanged
+to the next request-understanding model invocation. Conversation is not
+Evidence, does not alter SessionFrame authority, and is excluded from the
+Evidence-only answer input. The in-process `Application` retains history and
+the successor MVP SessionFrame, but does not durably persist or reconstruct
+either one after restart.
 
 The direct PydanticAI data-capability adapter remains a bounded tested seam but
 is not composed as an M1-B Planner tool. This prevents model tool calls from
 dispatching work before a canonical Task enters typed state. Planner receives
-its model, dispatcher, and application mutation/lifecycle port explicitly; it
-constructs no concrete persistence or provider infrastructure. Runtime retains
-the same stateful Planner control-plane object across turns in the active
-Session. That object owns model, dispatcher/runtime dependencies, and run-local
-graph state; it is not the durable source of truth for Objective, Task,
-DataProfile, or Evidence state.
+its model and dispatcher dependencies explicitly; it constructs no persistence
+or provider infrastructure.
 
 The former donor request-understanding and decomposition tests were rewritten
 against active M1-A/M1-B contracts, and the obsolete PlannerOperation
