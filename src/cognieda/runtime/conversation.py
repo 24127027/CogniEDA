@@ -15,6 +15,9 @@ from pydantic_ai.messages import (
 
 from cognieda.schemas.common import ImmutableCogniEDABaseModel
 
+DEFAULT_RECENT_TURN_LIMIT = 4
+DEFAULT_OLDER_LEXICAL_MATCH_LIMIT = 4
+
 
 class ConversationSegment(ImmutableCogniEDABaseModel):
     """One indivisible, coherent native model-history unit."""
@@ -136,26 +139,41 @@ class ConversationHistory(ImmutableCogniEDABaseModel):
         )
 
     def select_for_request_understanding(
-        self, latest_request: str, *, recent_turn_limit: int = 4
+        self,
+        latest_request: str,
+        *,
+        recent_turn_limit: int = DEFAULT_RECENT_TURN_LIMIT,
+        older_lexical_match_limit: int = DEFAULT_OLDER_LEXICAL_MATCH_LIMIT,
     ) -> SelectedConversationContext:
         """Select surface discourse and whole native segments without deleting history."""
 
         if recent_turn_limit < 1:
             raise ValueError("recent_turn_limit must be positive.")
+        if older_lexical_match_limit < 0:
+            raise ValueError("older_lexical_match_limit cannot be negative.")
         request_terms = self._selection_terms(latest_request)
         recent_start = max(0, len(self.turns) - recent_turn_limit)
-        selected_turns: list[ConversationTurn] = []
-        selected_segments: list[ConversationSegment] = []
-        for index, turn in enumerate(self.turns):
-            surface_terms = self._selection_terms(
-                f"{turn.human_message} {turn.planner_response}"
-            )
-            if index >= recent_start or request_terms.intersection(surface_terms):
-                selected_turns.append(turn)
-                selected_segments.extend(turn.segments)
+        older_match_indexes: list[int] = []
+        if older_lexical_match_limit:
+            for index in range(recent_start - 1, -1, -1):
+                turn = self.turns[index]
+                surface_terms = self._selection_terms(
+                    f"{turn.human_message} {turn.planner_response}"
+                )
+                if request_terms.intersection(surface_terms):
+                    older_match_indexes.append(index)
+                    if len(older_match_indexes) == older_lexical_match_limit:
+                        break
+
+        selected_indexes = sorted(
+            (*older_match_indexes, *range(recent_start, len(self.turns)))
+        )
+        selected_turns = tuple(self.turns[index] for index in selected_indexes)
         return SelectedConversationContext(
-            surface_turns=tuple(selected_turns),
-            model_segments=tuple(selected_segments),
+            surface_turns=selected_turns,
+            model_segments=tuple(
+                segment for turn in selected_turns for segment in turn.segments
+            ),
         )
 
     @staticmethod

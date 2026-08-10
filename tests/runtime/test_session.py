@@ -578,6 +578,59 @@ def test_context_selection_omits_and_later_reselects_only_whole_segments() -> No
     assert later.model_messages()[0:2] == (*segments[0].messages,)
 
 
+def test_context_selection_hard_bounds_old_matches_and_preserves_chronology() -> None:
+    history = ConversationHistory()
+    for index in range(12):
+        first_messages: tuple[ModelMessage, ...] = (
+            ModelRequest(parts=[UserPromptPart(content=f"Discuss task {index}")]),
+            ModelResponse(parts=[TextPart(content=f"Recorded task {index}")]),
+        )
+        second_messages: tuple[ModelMessage, ...] = (
+            ModelRequest(parts=[UserPromptPart(content=f"Clarify task {index}")]),
+            ModelResponse(parts=[TextPart(content=f"Clarified task {index}")]),
+        )
+        history = history.add_turn(
+            human_message=f"Discuss task {index}",
+            planner_response=f"Recorded task {index}",
+            message_segments=(first_messages, second_messages),
+        )
+    for index in range(4):
+        history = history.add_turn(
+            human_message=f"Recent topic {index}",
+            planner_response=f"Recorded recent topic {index}",
+        )
+
+    selected = history.select_for_request_understanding(
+        "What about that task?",
+        recent_turn_limit=4,
+        older_lexical_match_limit=3,
+    )
+    selected_again = history.select_for_request_understanding(
+        "What about that task?",
+        recent_turn_limit=4,
+        older_lexical_match_limit=3,
+    )
+    default_selected = history.select_for_request_understanding("What about that task?")
+
+    assert selected == selected_again
+    assert selected.surface_turns == (
+        *history.turns[9:12],
+        *history.turns[12:16],
+    )
+    assert len(selected.surface_turns) == 7
+    assert selected.model_segments == tuple(
+        segment for turn in selected.surface_turns for segment in turn.segments
+    )
+    assert all(
+        len(turn.segments) == 2 for turn in selected.surface_turns[:3]
+    )
+    assert history.turns[8] not in selected.surface_turns
+    assert len(history.turns) == 16
+    assert len(history.turns[8].segments) == 2
+    assert default_selected.surface_turns == history.turns[8:16]
+    assert len(default_selected.surface_turns) == 8
+
+
 def test_unicode_selection_normalizes_and_reselects_old_vietnamese_turn() -> None:
     old_messages: tuple[ModelMessage, ...] = (
         ModelRequest(
