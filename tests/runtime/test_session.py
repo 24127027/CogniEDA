@@ -146,9 +146,11 @@ def _frame_with_admitted_evidence(
         )
     )
     frame = SessionFrame(
-        objective_id=objective.objective_id,
+        objective_ids=(objective.objective_id,),
+        active_objective_id=objective.objective_id,
         task_ids=(task.task_id,),
-        data_profile_id=profile.data_profile_id,
+        data_profile_ids=(profile.data_profile_id,),
+        active_data_profile_id=profile.data_profile_id,
         evidence_ids=(evidence.evidence_id,),
     )
     return frame, evidence, research_state
@@ -171,8 +173,10 @@ def test_application_retains_ids_and_resolved_context_across_turns(db_session) -
 
     assert application.session is not first_session
     assert application.session.session_id == first_session.session_id
-    assert application.session.session_frame.objective_id is not None
-    objective = research_state.get_objective(application.session.session_frame.objective_id)
+    assert application.session.session_frame.active_objective_id is not None
+    objective = research_state.get_objective(
+        application.session.session_frame.active_objective_id
+    )
     assert objective is not None
     assert objective.text == "Understand customer churn."
     assert model.decision_inputs[1].objective == objective
@@ -202,7 +206,12 @@ def test_completed_task_lifecycle_is_resolved_on_the_next_turn(db_session) -> No
             capability=Capability.DATA_PROFILING,
         )
     )
-    session = Session(session_frame=SessionFrame(objective_id=objective.objective_id))
+    session = Session(
+        session_frame=SessionFrame(
+            objective_ids=(objective.objective_id,),
+            active_objective_id=objective.objective_id,
+        )
+    )
     application, dispatcher = _application(model, research_state, session=session)
 
     asyncio.run(application.submit_message("Profile the dataset."))
@@ -348,3 +357,49 @@ def test_deterministic_turn_retains_surface_without_fake_model_messages() -> Non
     assert history.presentation_transcript() == (("/summary", "No active Objective."),)
     assert history.turns[0].segments == ()
     assert history.model_messages() == ()
+
+
+def test_context_selection_omits_and_later_reselects_only_whole_segments() -> None:
+    history = ConversationHistory()
+    segments: list[ConversationSegment] = []
+    for index, topic in enumerate(("churn", "pricing", "quality", "schema", "rows", "summary")):
+        messages: tuple[ModelMessage, ...] = (
+            ModelRequest(parts=[UserPromptPart(content=f"Discuss {topic}")]),
+            ModelResponse(parts=[TextPart(content=f"Recorded {topic} turn {index}")]),
+        )
+        history = history.add_turn(
+            human_message=f"Discuss {topic}",
+            planner_response=f"Recorded {topic} turn {index}",
+            message_segments=(messages,),
+        )
+        segments.append(history.turns[-1].segments[0])
+
+    current = history.select_for_request_understanding("Continue the current summary")
+    later = history.select_for_request_understanding("Return to the churn discussion")
+
+    assert segments[0] not in current
+    assert tuple(segment.segment_id for segment in current) == tuple(
+        segment.segment_id for segment in segments[-4:]
+    )
+    assert segments[0] in later
+    assert history.turns[0].segments == (segments[0],)
+    assert tuple(message for segment in later for message in segment.messages)[0:2] == (
+        *segments[0].messages,
+    )
+
+
+def test_conversation_segment_rejects_split_tool_protocol() -> None:
+    with pytest.raises(ValidationError, match="tool-call/tool-return"):
+        ConversationSegment(
+            messages=(
+                ModelResponse(
+                    parts=[
+                        ToolCallPart(
+                            tool_name="lookup_state",
+                            args={"scope": "active"},
+                            tool_call_id="call-split",
+                        )
+                    ]
+                ),
+            )
+        )

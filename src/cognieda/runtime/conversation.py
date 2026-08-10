@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Iterable
 from uuid import UUID, uuid4
@@ -99,10 +100,27 @@ class ConversationHistory(ImmutableCogniEDABaseModel):
             for message in segment.messages
         )
 
-    def select_for_request_understanding(self) -> tuple[ModelMessage, ...]:
-        """Return complete retained segments until the policy selector is applied."""
+    def select_for_request_understanding(
+        self, latest_request: str, *, recent_turn_limit: int = 4
+    ) -> tuple[ConversationSegment, ...]:
+        """Select whole recent or lexically relevant segments without deleting history."""
 
-        return self.model_messages()
+        if recent_turn_limit < 1:
+            raise ValueError("recent_turn_limit must be positive.")
+        request_terms = self._selection_terms(latest_request)
+        recent_start = max(0, len(self.turns) - recent_turn_limit)
+        selected: list[ConversationSegment] = []
+        for index, turn in enumerate(self.turns):
+            surface_terms = self._selection_terms(
+                f"{turn.human_message} {turn.planner_response}"
+            )
+            if index >= recent_start or request_terms.intersection(surface_terms):
+                selected.extend(turn.segments)
+        return tuple(selected)
+
+    @staticmethod
+    def _selection_terms(text: str) -> set[str]:
+        return {term for term in re.findall(r"[a-z0-9_]+", text.casefold()) if len(term) >= 4}
 
     def presentation_transcript(self) -> tuple[tuple[str, str], ...]:
         """Return the non-authoritative Human/Planner surface transcript."""

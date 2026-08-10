@@ -17,7 +17,7 @@ from cognieda.schemas.artifacts import (
     Task,
 )
 
-from .context import BuildPlanningContext, PlanningContext
+from .context import BuildPlanningContext, PlannerContextSelector, PlanningContext
 
 
 class PlannerAction(StrEnum):
@@ -180,6 +180,7 @@ class Context(BaseModel):
     planner_model: object
     dispatcher: object
     research_state: PlannerResearchStatePort
+    context_selector: PlannerContextSelector
     context_builder: BuildPlanningContext
 
 

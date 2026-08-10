@@ -117,7 +117,10 @@ def _planner(
 
 def _objective_frame(research_state: SqlitePlannerResearchState, text: str) -> SessionFrame:
     objective = research_state.create_objective(Objective(text=text))
-    return SessionFrame(objective_id=objective.objective_id)
+    return SessionFrame(
+        objective_ids=(objective.objective_id,),
+        active_objective_id=objective.objective_id,
+    )
 
 
 def _data_decision(
@@ -275,8 +278,8 @@ def test_clear_data_request_establishes_objective_before_creating_task(db_sessio
         )
     )
 
-    assert output.session_frame.objective_id is not None
-    objective = research_state.get_objective(output.session_frame.objective_id)
+    assert output.session_frame.active_objective_id is not None
+    objective = research_state.get_objective(output.session_frame.active_objective_id)
     task = research_state.get_task(output.session_frame.task_ids[0])
     assert objective is not None
     assert objective.text == "Understand the active dataset schema and quality."
@@ -291,7 +294,8 @@ def test_semantic_task_change_creates_new_identity_without_rewriting_existing(
     objective = research_state.create_objective(Objective(text="Understand dataset."))
     existing = research_state.create_task(Task(instruction="Profile the dataset."))
     frame = SessionFrame(
-        objective_id=objective.objective_id,
+        objective_ids=(objective.objective_id,),
+        active_objective_id=objective.objective_id,
         task_ids=(existing.task_id,),
     )
     dispatcher = FakeDispatcher(ExecutionStatus.SUCCEEDED)
@@ -361,9 +365,11 @@ def _frame_with_admitted_evidence(
         )
     )
     frame = SessionFrame(
-        objective_id=objective.objective_id,
+        objective_ids=(objective.objective_id,),
+        active_objective_id=objective.objective_id,
         task_ids=(task.task_id,),
-        data_profile_id=profile.data_profile_id,
+        data_profile_ids=(profile.data_profile_id,),
+        active_data_profile_id=profile.data_profile_id,
         evidence_ids=(evidence.evidence_id,),
     )
     return frame, evidence, research_state
@@ -395,7 +401,8 @@ def test_assumption_only_claim_cannot_support_empirical_answer(db_session) -> No
     objective = research_state.create_objective(Objective(text="Understand dataset size."))
     assumption = research_state.create_assumption(Assumption(text="The dataset has 42 rows."))
     frame = SessionFrame(
-        objective_id=objective.objective_id,
+        objective_ids=(objective.objective_id,),
+        active_objective_id=objective.objective_id,
         assumption_ids=(assumption.assumption_id,),
     )
     model = FakePlannerModel(PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE))

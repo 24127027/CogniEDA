@@ -33,11 +33,12 @@ def _error(code: PlannerErrorCode, message: str) -> PlannerControlledError:
 
 
 def _refresh_planning_context(state: State, runtime: Runtime[Context]) -> None:
-    state.planning_context = runtime.context.context_builder.build(
+    selection = runtime.context.context_selector.select(
         latest_request=state.query,
         frame=state.session_frame,
         message_history=state.planning_context.message_history,
     )
+    state.planning_context = runtime.context.context_builder.build(selection=selection)
 
 
 def _explicit_decision(
@@ -147,7 +148,7 @@ async def apply_planning_state(state: State, runtime: Runtime[Context]) -> State
                 objective = runtime.context.research_state.create_objective(
                     Objective(text=decision.objective_text)
                 )
-                state.session_frame = state.session_frame.set_objective_id(objective.objective_id)
+                state.session_frame = state.session_frame.add_objective_id(objective.objective_id)
         elif decision.action is PlannerAction.ADD_ASSUMPTION:
             assert decision.assumption_text is not None
             assumption = runtime.context.research_state.create_assumption(
@@ -167,7 +168,7 @@ async def apply_planning_state(state: State, runtime: Runtime[Context]) -> State
                 objective = runtime.context.research_state.create_objective(
                     Objective(text=decision.objective_text)
                 )
-                state.session_frame = state.session_frame.set_objective_id(objective.objective_id)
+                state.session_frame = state.session_frame.add_objective_id(objective.objective_id)
             task = Task(instruction=decision.task_instruction, status=TaskStatus.PENDING)
             task = runtime.context.research_state.create_task(task)
             state.session_frame = state.session_frame.add_task_id(task.task_id)

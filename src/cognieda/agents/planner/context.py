@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import Never
+from uuid import UUID
 
 from pydantic import ConfigDict, Field
 from pydantic_ai.messages import ModelMessage
@@ -33,28 +34,65 @@ class PlanningContext(CogniEDABaseModel):
     message_history: tuple[ModelMessage, ...] = ()
 
 
-class PlanningContextResolutionError(ValueError):
-    """A SessionFrame reference could not be resolved into eligible run context."""
+class PlannerContextSelection(CogniEDABaseModel):
+    """Bounded references and whole-segment messages selected before materialization."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    latest_request: str = Field(min_length=1)
+    objective_id: UUID | None = None
+    assumption_ids: tuple[UUID, ...] = ()
+    task_ids: tuple[UUID, ...] = ()
+    active_data_profile_id: UUID | None = None
+    evidence_candidate_ids: tuple[UUID, ...] = ()
+    message_history: tuple[ModelMessage, ...] = ()
 
 
-class BuildPlanningContext:
-    """Resolve one SessionFrame reference manifest through authoritative repositories."""
+class PlannerContextSelector:
+    """Apply the conservative finite MVP policy to cumulative session history."""
 
-    def __init__(self, research_state: PlannerResearchStatePort) -> None:
-        self._research_state = research_state
+    def __init__(self, *, recent_reference_limit: int = 20) -> None:
+        if recent_reference_limit < 1:
+            raise ValueError("recent_reference_limit must be positive.")
+        self._recent_reference_limit = recent_reference_limit
 
-    def build(
+    def select(
         self,
         *,
         latest_request: str,
         frame: SessionFrame,
         message_history: Sequence[ModelMessage] = (),
-    ) -> PlanningContext:
+    ) -> PlannerContextSelection:
+        """Select active refs plus bounded recent candidates without resolving them."""
+
+        limit = self._recent_reference_limit
+        return PlannerContextSelection(
+            latest_request=latest_request,
+            objective_id=frame.active_objective_id,
+            assumption_ids=frame.assumption_ids[-limit:],
+            task_ids=frame.task_ids[-limit:],
+            active_data_profile_id=frame.active_data_profile_id,
+            evidence_candidate_ids=frame.evidence_ids[-limit:],
+            message_history=tuple(message_history),
+        )
+
+
+class PlanningContextResolutionError(ValueError):
+    """A selected reference could not be resolved into eligible run context."""
+
+
+class BuildPlanningContext:
+    """Resolve selected refs, expand required dependencies, and materialize context."""
+
+    def __init__(self, research_state: PlannerResearchStatePort) -> None:
+        self._research_state = research_state
+
+    def build(self, *, selection: PlannerContextSelection) -> PlanningContext:
         objective = None
-        if frame.objective_id is not None:
-            objective = self._research_state.get_objective(frame.objective_id)
+        if selection.objective_id is not None:
+            objective = self._research_state.get_objective(selection.objective_id)
             if objective is None:
-                self._missing("Objective", frame.objective_id)
+                self._missing("Objective", selection.objective_id)
 
         assumptions = tuple(
             self._required(
@@ -62,52 +100,72 @@ class BuildPlanningContext:
                 assumption_id,
                 self._research_state.get_assumption(assumption_id),
             )
-            for assumption_id in frame.assumption_ids
+            for assumption_id in selection.assumption_ids
         )
-        tasks = tuple(
+        selected_tasks = [
             self._required("Task", task_id, self._research_state.get_task(task_id))
-            for task_id in frame.task_ids
+            for task_id in selection.task_ids
+        ]
+
+        active_profile = None
+        if selection.active_data_profile_id is not None:
+            active_profile = self._research_state.get_data_profile(
+                selection.active_data_profile_id
+            )
+            if active_profile is None:
+                self._missing("DataProfile", selection.active_data_profile_id)
+
+        evidence_candidates = [
+            self._required(
+                "Evidence",
+                evidence_id,
+                self._research_state.get_evidence(evidence_id),
+            )
+            for evidence_id in selection.evidence_candidate_ids
+        ]
+        selected_profile_id = (
+            active_profile.data_profile_id
+            if active_profile is not None
+            else (
+                evidence_candidates[-1].data_profile_id if evidence_candidates else None
+            )
         )
-        tasks_by_id = {task.task_id: task for task in tasks}
-
-        data_profile = None
-        if frame.data_profile_id is not None:
-            data_profile = self._research_state.get_data_profile(frame.data_profile_id)
-            if data_profile is None:
-                self._missing("DataProfile", frame.data_profile_id)
-
         evidences = tuple(
-            self._required("Evidence", evidence_id, self._research_state.get_evidence(evidence_id))
-            for evidence_id in frame.evidence_ids
+            evidence
+            for evidence in evidence_candidates
+            if evidence.data_profile_id == selected_profile_id
         )
+
+        tasks_by_id = {task.task_id: task for task in selected_tasks}
+        data_profile = active_profile
         for evidence in evidences:
-            task = tasks_by_id.get(evidence.task_id)
+            task = self._research_state.get_task(evidence.task_id)
             if task is None:
-                raise PlanningContextResolutionError(
-                    "PlanningContext rejects Evidence whose authoritative Task is not "
-                    "referenced by SessionFrame."
-                )
+                self._missing("Evidence Task dependency", evidence.task_id)
             if task.status is not TaskStatus.COMPLETED:
                 raise PlanningContextResolutionError(
                     "PlanningContext accepts Evidence only for an authoritative COMPLETED Task."
                 )
+            tasks_by_id.setdefault(task.task_id, task)
+
+            evidence_profile = self._research_state.get_data_profile(evidence.data_profile_id)
+            if evidence_profile is None:
+                self._missing("Evidence DataProfile dependency", evidence.data_profile_id)
             if data_profile is None:
+                data_profile = evidence_profile
+            elif evidence_profile.data_profile_id != data_profile.data_profile_id:
                 raise PlanningContextResolutionError(
-                    "PlanningContext cannot select Evidence without a referenced DataProfile."
-                )
-            if evidence.data_profile_id != data_profile.data_profile_id:
-                raise PlanningContextResolutionError(
-                    "PlanningContext Evidence must match the referenced DataProfile."
+                    "Selected Evidence dependencies must share the materialized DataProfile."
                 )
 
         return PlanningContext(
-            latest_request=latest_request,
+            latest_request=selection.latest_request,
             objective=objective,
             assumptions=assumptions,
-            tasks=tasks,
+            tasks=tuple(tasks_by_id.values()),
             evidences=evidences,
             data_profile=data_profile,
-            message_history=tuple(message_history),
+            message_history=selection.message_history,
         )
 
     @staticmethod
@@ -119,5 +177,5 @@ class BuildPlanningContext:
     @staticmethod
     def _missing(object_name: str, object_id: object) -> Never:
         raise PlanningContextResolutionError(
-            f"SessionFrame contains a missing {object_name} reference: {object_id}."
+            f"Context selection contains a missing {object_name} reference: {object_id}."
         )

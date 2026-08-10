@@ -8,7 +8,11 @@ from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import ExecutorContext
 from cognieda.schemas.artifacts import SessionFrame
 
-from .context import BuildPlanningContext, PlanningContextResolutionError
+from .context import (
+    BuildPlanningContext,
+    PlannerContextSelector,
+    PlanningContextResolutionError,
+)
 from .dependencies import PlannerDeps
 from .graph import build_graph
 from .model import PlannerDecisionModel, PlannerModel
@@ -52,6 +56,7 @@ class Planner:
             )
 
         self.deps = deps
+        self.context_selector = PlannerContextSelector()
         self.context_builder = BuildPlanningContext(deps.research_state)
         self.graph = build_graph()
 
@@ -74,11 +79,12 @@ class Planner:
             return PlannerOutput(response=error.message, session_frame=frame, error=error)
 
         try:
-            planning_context = self.context_builder.build(
+            selection = self.context_selector.select(
                 latest_request=query,
                 frame=frame,
                 message_history=message_history,
             )
+            planning_context = self.context_builder.build(selection=selection)
         except PlanningContextResolutionError as exc:
             error = PlannerControlledError(
                 code=PlannerErrorCode.CONTEXT_RESOLUTION_FAILED,
@@ -96,6 +102,7 @@ class Planner:
             planner_model=self.model,
             dispatcher=self.deps.dispatcher,
             research_state=self.deps.research_state,
+            context_selector=self.context_selector,
             context_builder=self.context_builder,
         )
         result = await self.graph.ainvoke(state, context=context)

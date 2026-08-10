@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from pydantic_ai.messages import ModelMessage
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.context import BuildPlanningContext
+from cognieda.agents.planner.context import BuildPlanningContext, PlannerContextSelector
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.model import PlannerModelResult
 from cognieda.agents.planner.types import (
@@ -78,7 +78,8 @@ def test_natural_language_understanding_receives_latest_materialized_state(db_se
     assumption = research_state.create_assumption(Assumption(text="Rows are customers."))
     task = research_state.create_task(Task(instruction="Profile the active dataset."))
     frame = SessionFrame(
-        objective_id=objective.objective_id,
+        objective_ids=(objective.objective_id,),
+        active_objective_id=objective.objective_id,
         assumption_ids=(assumption.assumption_id,),
         task_ids=(task.task_id,),
     )
@@ -106,11 +107,19 @@ def test_natural_language_understanding_receives_latest_materialized_state(db_se
 def test_planning_context_is_a_distinct_ephemeral_per_run_projection(db_session) -> None:
     research_state = SqlitePlannerResearchState(db_session)
     objective = research_state.create_objective(Objective(text="Understand retention."))
-    frame = SessionFrame(objective_id=objective.objective_id)
+    frame = SessionFrame(
+        objective_ids=(objective.objective_id,),
+        active_objective_id=objective.objective_id,
+    )
     builder = BuildPlanningContext(research_state)
 
-    first = builder.build(latest_request="First request", frame=frame)
-    second = builder.build(latest_request="Second request", frame=frame)
+    selector = PlannerContextSelector()
+    first = builder.build(
+        selection=selector.select(latest_request="First request", frame=frame)
+    )
+    second = builder.build(
+        selection=selector.select(latest_request="Second request", frame=frame)
+    )
 
     assert first is not second
     assert first.latest_request == "First request"
@@ -143,10 +152,14 @@ def test_explicit_and_natural_objective_requests_reach_same_typed_action(db_sess
     assert explicit.decision is not None
     assert natural.decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE
     assert explicit.decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE
-    assert natural.session_frame.objective_id is not None
-    assert explicit.session_frame.objective_id is not None
-    natural_objective = research_state.get_objective(natural.session_frame.objective_id)
-    explicit_objective = research_state.get_objective(explicit.session_frame.objective_id)
+    assert natural.session_frame.active_objective_id is not None
+    assert explicit.session_frame.active_objective_id is not None
+    natural_objective = research_state.get_objective(
+        natural.session_frame.active_objective_id
+    )
+    explicit_objective = research_state.get_objective(
+        explicit.session_frame.active_objective_id
+    )
     assert natural_objective is not None
     assert explicit_objective is not None
     assert natural_objective.text == explicit_objective.text
@@ -156,7 +169,10 @@ def test_explicit_and_natural_objective_requests_reach_same_typed_action(db_sess
 def test_objective_semantic_refinement_allocates_new_authoritative_identity(db_session) -> None:
     research_state = SqlitePlannerResearchState(db_session)
     original = research_state.create_objective(Objective(text="Understand churn."))
-    frame = SessionFrame(objective_id=original.objective_id)
+    frame = SessionFrame(
+        objective_ids=(original.objective_id,),
+        active_objective_id=original.objective_id,
+    )
     model = FakePlannerModel(
         PlannerDecision(
             action=PlannerAction.SET_OR_REFINE_OBJECTIVE,
@@ -172,9 +188,11 @@ def test_objective_semantic_refinement_allocates_new_authoritative_identity(db_s
     )
 
     assert output.session_frame is not frame
-    assert output.session_frame.objective_id != original.objective_id
-    assert output.session_frame.objective_id is not None
-    replacement = research_state.get_objective(output.session_frame.objective_id)
+    assert output.session_frame.objective_ids[0] == original.objective_id
+    assert len(output.session_frame.objective_ids) == 2
+    assert output.session_frame.active_objective_id != original.objective_id
+    assert output.session_frame.active_objective_id is not None
+    replacement = research_state.get_objective(output.session_frame.active_objective_id)
     assert replacement is not None
     assert replacement.text == "Understand churn drivers."
     assert research_state.get_objective(original.objective_id) == original
@@ -182,7 +200,11 @@ def test_objective_semantic_refinement_allocates_new_authoritative_identity(db_s
 
 def test_dangling_reference_fails_closed_before_graph_execution(db_session) -> None:
     research_state = SqlitePlannerResearchState(db_session)
-    frame = SessionFrame(objective_id=uuid4())
+    missing_id = uuid4()
+    frame = SessionFrame(
+        objective_ids=(missing_id,),
+        active_objective_id=missing_id,
+    )
     model = FakePlannerModel(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
 
     output = asyncio.run(
@@ -202,7 +224,10 @@ def test_unknown_explicit_command_fails_without_model_fallback_or_state_change(
 ) -> None:
     research_state = SqlitePlannerResearchState(db_session)
     objective = research_state.create_objective(Objective(text="Keep this Objective."))
-    frame = SessionFrame(objective_id=objective.objective_id)
+    frame = SessionFrame(
+        objective_ids=(objective.objective_id,),
+        active_objective_id=objective.objective_id,
+    )
     model = FakePlannerModel(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
     dispatcher = NeverDispatcher()
 

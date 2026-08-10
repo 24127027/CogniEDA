@@ -77,7 +77,8 @@ def test_data_profile_evidence_and_session_frame_round_trip_with_direct_lineage(
     persisted = EvidenceRepository(db_session).create(evidence)
     frame = SessionFrame(
         task_ids=(task.task_id,),
-        data_profile_id=profile.data_profile_id,
+        data_profile_ids=(profile.data_profile_id,),
+        active_data_profile_id=profile.data_profile_id,
         evidence_ids=(persisted.evidence_id,),
     )
     persisted_frame = SessionFrameRepository(db_session).create(frame)

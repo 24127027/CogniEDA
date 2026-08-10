@@ -23,10 +23,17 @@ class Application:
         self.session = session or Session()
 
     async def submit_message(self, message: str) -> Message:
+        selected_segments = self.session.conversation_history.select_for_request_understanding(
+            message
+        )
         planner_output = await self.planner_agent.run(
             message,
             session_frame=self.session.session_frame,
-            message_history=(self.session.conversation_history.select_for_request_understanding()),
+            message_history=tuple(
+                native_message
+                for segment in selected_segments
+                for native_message in segment.messages
+            ),
         )
         segments = tuple(
             ConversationSegment(messages=messages)

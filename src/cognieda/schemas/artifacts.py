@@ -222,28 +222,38 @@ class UserDecision(CogniEDABaseModel):
 
 
 class SessionFrame(ImmutableCogniEDABaseModel):
-    """Durable typed FCO-reference manifest for the single active MVP session."""
+    """Cumulative typed FCO-reference history plus explicit active selectors."""
 
-    objective_id: UUID | None = None
+    objective_ids: tuple[UUID, ...] = ()
+    active_objective_id: UUID | None = None
     assumption_ids: tuple[UUID, ...] = ()
     task_ids: tuple[UUID, ...] = ()
+    data_profile_ids: tuple[UUID, ...] = ()
+    active_data_profile_id: UUID | None = None
     evidence_ids: tuple[UUID, ...] = ()
-    data_profile_id: UUID | None = None
 
     @model_validator(mode="after")
     def _validate_research_state(self) -> SessionFrame:
-        self._reject_duplicate_ids(
-            self.assumption_ids,
-            object_name="Assumption",
-        )
-        self._reject_duplicate_ids(
-            self.task_ids,
-            object_name="Task",
-        )
-        self._reject_duplicate_ids(
-            self.evidence_ids,
-            object_name="Evidence",
-        )
+        for ids, object_name in (
+            (self.objective_ids, "Objective"),
+            (self.assumption_ids, "Assumption"),
+            (self.task_ids, "Task"),
+            (self.data_profile_ids, "DataProfile"),
+            (self.evidence_ids, "Evidence"),
+        ):
+            self._reject_duplicate_ids(ids, object_name=object_name)
+        if (
+            self.active_objective_id is not None
+            and self.active_objective_id not in self.objective_ids
+        ):
+            raise ValueError("active_objective_id must reference an Objective history member.")
+        if (
+            self.active_data_profile_id is not None
+            and self.active_data_profile_id not in self.data_profile_ids
+        ):
+            raise ValueError(
+                "active_data_profile_id must reference a DataProfile history member."
+            )
         return self
 
     @staticmethod
@@ -253,17 +263,27 @@ class SessionFrame(ImmutableCogniEDABaseModel):
 
     def _validated_copy(self, **updates: object) -> SessionFrame:
         values: dict[str, object] = {
-            "objective_id": self.objective_id,
+            "objective_ids": self.objective_ids,
+            "active_objective_id": self.active_objective_id,
             "assumption_ids": self.assumption_ids,
             "task_ids": self.task_ids,
+            "data_profile_ids": self.data_profile_ids,
+            "active_data_profile_id": self.active_data_profile_id,
             "evidence_ids": self.evidence_ids,
-            "data_profile_id": self.data_profile_id,
         }
         values.update(updates)
         return SessionFrame.model_validate(values)
 
-    def set_objective_id(self, objective_id: UUID | None) -> SessionFrame:
-        return self._validated_copy(objective_id=objective_id)
+    def add_objective_id(self, objective_id: UUID, *, make_active: bool = True) -> SessionFrame:
+        if objective_id in self.objective_ids:
+            raise ValueError("SessionFrame rejects duplicate Objective IDs.")
+        return self._validated_copy(
+            objective_ids=(*self.objective_ids, objective_id),
+            active_objective_id=(objective_id if make_active else self.active_objective_id),
+        )
+
+    def set_active_objective_id(self, objective_id: UUID | None) -> SessionFrame:
+        return self._validated_copy(active_objective_id=objective_id)
 
     def add_assumption_id(self, assumption_id: UUID) -> SessionFrame:
         if assumption_id in self.assumption_ids:
@@ -275,10 +295,22 @@ class SessionFrame(ImmutableCogniEDABaseModel):
             raise ValueError("SessionFrame rejects duplicate Task IDs.")
         return self._validated_copy(task_ids=(*self.task_ids, task_id))
 
+    def add_data_profile_id(
+        self, data_profile_id: UUID, *, make_active: bool = True
+    ) -> SessionFrame:
+        if data_profile_id in self.data_profile_ids:
+            raise ValueError("SessionFrame rejects duplicate DataProfile IDs.")
+        return self._validated_copy(
+            data_profile_ids=(*self.data_profile_ids, data_profile_id),
+            active_data_profile_id=(
+                data_profile_id if make_active else self.active_data_profile_id
+            ),
+        )
+
+    def set_active_data_profile_id(self, data_profile_id: UUID | None) -> SessionFrame:
+        return self._validated_copy(active_data_profile_id=data_profile_id)
+
     def add_evidence_id(self, evidence_id: UUID) -> SessionFrame:
         if evidence_id in self.evidence_ids:
             raise ValueError("SessionFrame rejects duplicate Evidence IDs.")
         return self._validated_copy(evidence_ids=(*self.evidence_ids, evidence_id))
-
-    def set_data_profile_id(self, data_profile_id: UUID | None) -> SessionFrame:
-        return self._validated_copy(data_profile_id=data_profile_id)
