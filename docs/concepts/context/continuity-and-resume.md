@@ -129,13 +129,14 @@ requires a new proposal and the applicable approval.
 SessionFrame successors preserve cumulative historical membership while active
 selectors may change. Context reconstruction applies current validity and
 eligibility when selecting a bounded run projection; being omitted from one run
-does not delete a historical reference or conversation segment.
+does not delete a historical reference or conversation turn.
 
-The bounded runtime's `ConversationSegment` retains the exact native messages
-from one completed model execution. A fresh top-level Human turn does not replay
-segments from completed prior turns. Future continuation, checkpoint, or resume
-of the same unfinished execution may require native message continuity, but a
-segment is not yet a durable execution checkpoint. Full interrupted-run state,
+The bounded runtime's `ConversationHistory` retains the exact ordered native
+messages across completed top-level turns. A fresh Human turn receives only
+selected whole turns through a derived effective history whose historical run
+instructions are cleared. Future continuation, checkpoint, or resume of the
+same unfinished execution may require native message continuity, but retained
+messages are not a durable execution checkpoint. Full interrupted-run state,
 leases, and resume protocol remain separate recovery machinery.
 
 ## Fail-closed recovery
@@ -157,11 +158,13 @@ model to infer intent.
 ## Implementation status
 
 **Partially implemented.** The retained in-process `Session` now preserves
-cumulative SessionFrame successors and complete ConversationHistory while
-selecting bounded surface discourse for each fresh request. Exact native
-execution segments are retained but are not replayed across completed top-level
-turns. Deterministic turns need no fabricated model history. This is not
-restart-safe continuity or an interruption engine. Other operational
+cumulative SessionFrame successors and complete canonical `ModelMessage`
+history while selecting bounded complete turns for each fresh request. Exact
+native traffic is retained; effective replay removes stale historical run
+instructions and combines the selected messages with the current authoritative
+`PlanningContext`. Deterministic turns are represented by application-created
+native message values. This is not restart-safe continuity or an interruption
+engine. Other operational
 foundations include
 append-only SessionFrame snapshots; durable PlannerOperation approval and
 resume checks; atomic commit for a bounded operation set; paired

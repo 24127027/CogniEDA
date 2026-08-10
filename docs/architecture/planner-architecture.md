@@ -216,20 +216,27 @@ containing admitted Evidence but no Assumptions. `PlannerOutput` exposes the
 human response, successor `SessionFrame`, typed decision, created Task IDs,
 selected `Capability`, work outcome, and controlled error.
 
-Selected Human/Planner surface turns reach the same request-understanding step
-through a typed field explicitly restricted to non-authoritative
-discourse and reference resolution. The complete surface history remains
-outside SessionFrame; coherent model interactions are stored in indivisible
-`ConversationSegment` retention units, while deterministic turns may have no
-native segment. Native messages from a completed top-level execution are retained
-exactly for execution history but are not passed as `message_history` to a new
-Human turn. CogniEDA validates segment identity, non-emptiness, and aggregate ID
-uniqueness but leaves PydanticAI tool and retry protocol validity to PydanticAI.
+Selected complete `ConversationTurn` values reach the same request-understanding
+step as bounded native `message_history`, explicitly restricted to
+non-authoritative discourse and reference resolution. `ConversationHistory`
+stores one canonical ordered `ModelMessage` history outside SessionFrame; a
+turn contains only `turn_id` and `messages`. Deterministic commands use
+application-created `ModelRequest(UserPromptPart(...))` and
+`ModelResponse(TextPart(...))` values with application-origin metadata and no
+invented provider identity. Native tool, retry, structured-output, and internal
+traffic remains intact.
+
+Effective replay is derived without mutating retention. Runtime selects whole
+turns, clears historical `ModelRequest.instructions` on the replay copy, and
+passes the resulting messages through PydanticAI `message_history`. The current
+authoritative `PlanningContext` is serialized only into the new run's
+instructions, so stale historical typed state cannot become current authority.
 Empirical answer composition receives no conversation history.
 
-Future continuation, checkpoint, or resume of the same unfinished model
-execution may require its native messages. That recovery contract is
-**Deferred** and is not pre-implemented by the fresh-turn Planner API.
+Future continuation, checkpoint, or resume of an unfinished model execution
+requires additional recovery state beyond retained messages. That recovery
+contract is **Deferred** and is not pre-implemented by the fresh-turn Planner
+API.
 
 The direct PydanticAI data-capability adapter remains a bounded tested seam but
 is not composed as an M1-B Planner tool. This prevents model tool calls from

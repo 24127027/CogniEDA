@@ -73,30 +73,31 @@ Session
   |   `-- active selectors
   `-- ConversationHistory
       `-- ConversationTurn
-          +-- Human/Planner surface interaction
-          `-- ConversationSegment[]
-              `-- native ModelMessage[]
+          +-- turn_id
+          `-- native ModelMessage[]
 ```
 
 `Session` is the in-process chat lifetime aggregate, not an FCO or scientific
-authority. `ConversationHistory` retains the complete Human-to-Planner surface
-transcript separately from native model interaction. Each
-`ConversationSegment` is one indivisible native PydanticAI `ModelMessage`
-execution-history retention unit. Completed `result.new_messages()` sequences are
-retained faithfully; CogniEDA does not reconstruct or independently validate
-PydanticAI's tool-call, return, or retry state machine.
-Deterministic turns may contain no segment; the runtime does not fabricate
-model messages for them.
+authority. `ConversationHistory` is the complete canonical ordered PydanticAI
+`ModelMessage` history. Each `ConversationTurn` adds only a top-level Human
+interaction boundary; Human and Planner text are derived from its messages
+rather than persisted in parallel fields. Completed `result.new_messages()`
+sequences are retained faithfully; CogniEDA does not reconstruct or
+independently validate PydanticAI's tool-call, return, or retry state machine.
+Deterministic commands are stored in the same history using application-created
+`ModelRequest` and `ModelResponse` values with origin metadata and no invented
+provider identity.
 
 Runtime/application first selects bounded historical FCO references and
-surface conversation turns. Surface discourse is projected through an explicitly
-non-authoritative typed field for intent and reference resolution. Native
-messages from completed previous top-level executions remain stored in their
-segments and are not replayed into the new Human turn. The runtime
+complete conversation turns. Selected messages become bounded effective
+PydanticAI `message_history` for intent and reference resolution. Historical
+run-scoped instructions are removed from that derived copy, while the retained
+messages remain unchanged. The runtime
 `PlannerContextPreparer` resolves FCO references through the concrete SQLite
 gateway, expands required Evidence Task and DataProfile dependencies, validates
 lineage needed for safe use, and materializes the ephemeral run context before
-`Planner.run`. Dependency
+`Planner.run`. The current `PlanningContext` reaches request understanding as
+new run-scoped instructions and supersedes historical typed state. Dependency
 resolution does not add SessionFrame membership. Conversation cannot become
 Evidence or an empirical premise.
 
@@ -175,7 +176,7 @@ materialized objects and imports no PydanticAI types.
 The bounded pure `select_planner_context` policy selects the active Objective
 and DataProfile plus the 20 most recent Assumption, Task, and Evidence
 candidates into a typed `PlannerContextSelection`.
-The external pure conversation-selection policy chooses surface turns from the
+The external pure conversation-selection policy chooses complete turns from the
 four most recent turns plus at most the four most recent
 older turns with exact lexical overlap. The final selection is chronological.
 Matching uses deterministic NFKC normalization, case folding, and Unicode-aware
@@ -190,10 +191,10 @@ reports only absence from the current bounded context; it does not claim that
 no historical Evidence exists.
 
 A separate in-process runtime `Session` retains the successor frame and the
-complete `ConversationHistory`. Surface Human/Planner text and native model
-segments are both retained with distinct responsibilities. Request understanding
-receives selected surface discourse through its non-authoritative typed input;
-it does not replay native segments from completed prior top-level executions.
+complete canonical `ConversationHistory`. Request understanding receives the
+selected native messages plus the current materialized `PlanningContext`; no
+parallel surface transcript or `PlanningContext.surface_discourse` channel is
+stored. Historical instructions are omitted only from effective replay.
 Empirical answer composition still excludes conversation, Assumptions, and
 native model messages. `STATE_SUMMARY` uses cumulative SessionFrame
 membership for historical counts and the authoritatively resolved active
@@ -207,5 +208,6 @@ into durable resume or concurrency control. Therefore the bounded MVP surface is
 not the complete canonical SessionFrame or continuity model.
 
 Native execution history may be needed later to continue, checkpoint, or resume
-the same unfinished model execution. That durable recovery lifecycle is
+the same unfinished model execution. Retention alone is not that durable
+recovery lifecycle, which is
 **Deferred**; it is not ordinary cross-turn conversational memory.

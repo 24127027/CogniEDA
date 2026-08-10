@@ -22,9 +22,9 @@ backlog. [Current state](current-state.md) owns capability detail.
 - M1-B Planner behavior and M3-A deterministic Data Explorer-to-Evidence
   admission are **Implemented** at bounded library surfaces. M5-A is
   **Partially implemented** for retained in-process cumulative ID-only
-  SessionFrame, selected surface-conversation continuity, segmented native
-  PydanticAI execution-history retention, bounded pre-build selection, required
-  dependency expansion, and workspace-local
+  SessionFrame, one canonical native PydanticAI conversation history, bounded
+  whole-turn selection and effective replay, required dependency expansion,
+  and workspace-local
   SQLite research-object composition.
   Authoritative dataset execution context, Evidence admission composition,
   persisted Session recovery, and restart recovery remain **Deferred**.
@@ -137,16 +137,16 @@ backlog. [Current state](current-state.md) owns capability detail.
   completion does not establish M5-A or MVP-I.
 - Focused runtime tests prove cumulative ID-only SessionFrame retention,
   active-selector invariants, authoritative object re-resolution and dependency
-  expansion, native `ModelMessage` segment serialization including coherent tool
+  expansion, native `ModelMessage` serialization including coherent tool
   call/return and tool-call/retry structure, deterministic Unicode-aware
   selection of four recent turns plus at most four recent older lexical matches
-  without deleting durable history, selected typed surface discourse without
-  cross-turn native `message_history` replay,
+  without deleting durable history, bounded native `message_history` replay,
+  stale historical instruction removal from the effective copy,
   cumulative SessionFrame summary counts, bounded Evidence-absence wording, and
   conversation/Assumption exclusion from empirical answer input. They do not
   prove semantic retrieval, restart-safe Session persistence, or runtime
-  Evidence admission composition. Same-execution checkpoint/resume use of native
-  history remains **Deferred**.
+  Evidence admission composition. Checkpoint/resume use of native history
+  remains **Deferred**.
 - No production performance envelope, non-SQLite validation, or external
   integration test exists. The first-party documentation regression is
   intentionally limited to internal Markdown links, relative anchors, and

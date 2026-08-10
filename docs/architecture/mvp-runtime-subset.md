@@ -133,21 +133,22 @@ Session = SessionFrame + ConversationHistory
 ```
 
 `Session` is a non-FCO in-process lifetime aggregate. `ConversationHistory`
-retains the complete Human/Planner surface interaction while
-`ConversationSegment` units preserve native PydanticAI `ModelMessage` history
-as exact model-execution retention units. CogniEDA does not revalidate
-PydanticAI's tool or retry protocol inside those segments.
+retains one complete ordered PydanticAI `ModelMessage` history, grouped only by
+top-level `ConversationTurn` boundaries. A turn stores `turn_id` and
+`messages`; it has no duplicated Human/Planner surface fields or segment
+wrapper. CogniEDA does not revalidate PydanticAI's tool or retry protocol.
 `SessionFrame` contains cumulative typed FCO IDs plus active Objective and
 DataProfile selectors. Runtime `Application` separately selects bounded
-surface conversation turns and a bounded `PlannerContextSelection` of
+complete conversation turns and a bounded `PlannerContextSelection` of
 research-state references. The runtime `PlannerContextPreparer` then resolves
 authoritative FCOs through the concrete SQLite gateway, expands Evidence
 dependencies, and materializes one ephemeral `PlanningContext` before calling
-`Planner.run`. That context contains the latest request, authoritative typed
-state, and selected non-authoritative surface discourse. Planner receives no
-research-state read dependency. Native messages from completed prior top-level
-Planner executions are not replayed into the fresh turn; empirical answer
-context remains Evidence-only.
+`Planner.run`. Selected messages are copied into bounded effective
+`message_history`; historical run-scoped instructions are removed from that
+copy without changing retained history. The current authoritative
+`PlanningContext` is supplied as new run-scoped instructions and the Human
+request remains the user prompt. Planner receives no research-state read
+dependency. Empirical answer context remains Evidence-only.
 Resolved dependencies and context acquired later through an authorized role
 seam are not automatically persisted into `SessionFrame`.
 
@@ -243,8 +244,9 @@ invariant.
 ## Role and authority boundaries
 
 Planner remains the only human-facing agent. At the bounded M1-B library
-boundary it consumes the materialized `PlanningContext` prepared by runtime;
-it does not inspect `ConversationHistory` or build its initial context from
+boundary it consumes the materialized `PlanningContext` and effective native
+message history prepared by runtime; it does not inspect the durable
+`ConversationHistory` aggregate or build its initial context from
 `SessionFrame`. It understands the latest request, establishes or changes the
 active Objective while retaining prior Objective IDs, records planning-only
 Assumptions, creates
