@@ -115,9 +115,9 @@ cardinality expectation.
 
 ## Implementation status
 
-**Design target.** Current source has a partial context-safety seam that can build a
-discovery-synthesis context that excludes Assumptions, existing Discoveries,
-Tasks, decisions, stale context, dead ends, and caches. It does not implement
-the canonical EvaluationBundle, full admitted contract/digest binding,
-protected decision-rule execution, canonical scientific outcomes, or a
-complete Hypothesis Analyst investigation controller.
+**Design target.** Current bounded Planner answer drafting excludes Assumptions
+from its Evidence-only empirical input, but that is not protected scientific
+evaluation. The canonical EvaluationBundle, exact contract and digest binding,
+protected decision-rule execution, canonical scientific outcomes, and complete
+Hypothesis Analyst investigation controller remain **Deferred**. Uncomposed
+donor context modules do not establish this capability.

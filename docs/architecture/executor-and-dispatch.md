@@ -119,7 +119,7 @@ persistence, or communicate with the human.
 ## Hypothesis Analyst
 
 Hypothesis Analyst controls scientific feasibility and investigation. For an
-eligible feasible leaf `SCIENTIFIC` Task it owns at most one Hypothesis, the
+eligible feasible leaf `SCIENTIFIC` Task it owns exactly one Hypothesis, the
 InvestigationPlan, InvestigationProtocol, Evidence obligations, repeated
 EvidenceRequest construction, governed protocol revision, and protected final
 evaluation. It returns a `DiscoveryProposal` or typed non-completion.
@@ -222,6 +222,6 @@ Canonical `DataWorkOrder`, `ScientificInvestigationInput`,
 scaffolds. Full Planner-to-real-dataset-to-Evidence-to-Planner execution is
 also **Unsupported**.
 
-See [MVP runtime subset](mvp-runtime-subset.md) for the deliberately smaller
-executable slice and [Persistence and admission](persistence-and-admission.md)
+See [MVP-v2](mvp-runtime-subset.md) for the minimum complete scientific loop
+and [Persistence and admission](persistence-and-admission.md)
 for the canonical durable boundary around attempts and results.

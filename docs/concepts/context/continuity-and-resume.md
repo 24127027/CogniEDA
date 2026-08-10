@@ -149,16 +149,15 @@ model to infer intent.
 
 ## Implementation status
 
-**Partially implemented.** Current operational foundations include
-append-only SessionFrame snapshots; durable PlannerOperation approval and
-resume checks; atomic commit for a bounded operation set; paired
-ExecutionRun/outbox admission; leases, fencing epochs, retry lineage, and
-idempotency fields. These foundations protect some restart and duplicate-
-delivery cases.
+**Partially implemented.** The current application retains its materialized
+SessionFrame and native conversation history only while the process is alive.
+SQLite repositories can round-trip bounded SessionFrame snapshots, and donor
+operational records expose some attempt, outbox, lease, fencing, retry, and
+idempotency fields. Those uncomposed seams do not establish supported restart
+or recovery behavior.
 
-Canonical PlanRevision, ScientificInvestigationRun, protocol and
-EvidenceRequest recovery, complete inbox replay, Objective-bound SessionFrame
-queries, one-active-Planner-session-per-Objective enforcement, governance and
-validity-event reconstruction, and full permitted-next-action projection are
-incomplete or absent. The target continuity flow is not implemented end to
-end.
+Canonical SessionFrame membership, PlanRevision,
+ScientificInvestigationRun, protocol and EvidenceRequest recovery, complete
+result replay, Objective-bound session ownership, governance and validity
+reconstruction, and permitted-next-action projection remain **Deferred**. The
+target continuity flow is not implemented end to end.

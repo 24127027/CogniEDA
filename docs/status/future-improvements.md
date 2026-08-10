@@ -22,8 +22,9 @@ These are established architecture, not speculative enhancements:
 - implement the complete scientific investigation, Evidence request,
   protected evaluation, typed outcome, governance, and application admission
   lifecycle;
-- bind Evidence to exact canonical lineage and enforce at-most-one Hypothesis
-  and Discovery cardinalities at the correct canonical boundaries;
+- bind Evidence to exact canonical lineage, require exactly one Hypothesis for
+  each eligible feasible leaf scientific Task, and enforce at-most-one
+  Discovery per Hypothesis;
 - implement Objective-scoped validity propagation, context eligibility,
   SessionFrame governance, and restart-safe reconstruction;
 - retain hard cutover, structural-only canonicalization, and fail-closed

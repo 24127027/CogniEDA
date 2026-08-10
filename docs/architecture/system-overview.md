@@ -9,9 +9,10 @@ component or flow is implemented today. Current implementation status is
 summarized near the end of the page and belongs in detail to the later status
 track.
 
-The [MVP runtime subset](mvp-runtime-subset.md) deliberately executes less than
-this canonical target. That delivery boundary defers canonical components; it
-does not remove or redefine them.
+The [MVP-v2 baseline](mvp-runtime-subset.md) defines the minimum complete
+scientific research loop within this canonical target. It is broader than the
+bounded implementation currently on `main` and does not claim that the target
+is already supported.
 
 ## Architectural priorities
 
@@ -137,16 +138,18 @@ FCO, not Evidence, not a Discovery, and not an authority record. It must retain
 references to the eligible state from which it was generated and be refreshed
 or withheld when those sources lose current-use eligibility.
 
-A `SessionFrame` is different: it is the governed active-context FCO for a
-particular purpose and scope. It selects eligible state; it does not turn that
-state into a new scientific claim.
+A `SessionFrame` is different: it is the structured research-session
+membership/state FCO. Its historical references and active selectors help
+reconstruct session state, but membership does not select operation-specific
+context, establish current-use eligibility, or turn any record into a new
+scientific claim.
 
 ## Target component map
 
 | Component | Owns | Does not own |
 | --- | --- | --- |
 | Human | research intent, consequential approval, policy choice, and governance participation where required | specialist execution or durable admission |
-| Planner | coordination, plan proposals, routing, approval interaction, replanning, active-context and presentation coordination | scientific operationalization, Evidence authorship, or protected evaluation |
+| Planner | coordination, plan proposals, routing, approval interaction, replanning, session membership, context, and presentation coordination | scientific operationalization, Evidence authorship, or protected evaluation |
 | Data Explorer | exclusive bounded dataset access and observation production | Hypothesis definition, evaluation, Discovery, governance, or persistence |
 | Hypothesis Analyst | scientific feasibility, operationalization, Evidence obligations, protocol revision, and protected final evaluation | dataset access, governance self-approval, or persistence |
 | Graph Miner | read-only research-state inquiry | mutation, dataset operations, Evidence, Discovery, or governance |
@@ -160,26 +163,21 @@ The detailed contracts belong to [Authority boundaries](authority-boundaries.md)
 
 ## Implementation status
 
-**Partially implemented.** Current main includes typed research-state schemas
-and persistence surfaces; Planner operation drafting, durable approval records,
-and an atomic commit boundary for a bounded set of operations; a capability
-registry and dispatcher seam; and database-backed execution-attempt, outbox,
-lease, fencing, retry, and idempotency foundations.
-
-The S0 executor foundation is **Implemented** at its bounded infrastructure
-surface: explicit multi-capability provider registration, lazy provider reuse,
-typed async dispatch, protocol-based Planner dependencies, bootstrap
-composition, a tested PydanticAI delegation adapter, and a role-native
-`DataExplorerResult`. Shared `ExecutionResult` carries only transport metadata.
+**Partially implemented.** Current main provides a bounded typed research-state
+foundation, Planner behavior, deterministic Data Explorer operations, direct
+Task-to-Evidence admission, in-process conversation continuity, model-provider
+configuration, dispatch infrastructure, and SQLite persistence seams. These
+foundations demonstrate important authority and traceability rules, but the
+direct Evidence path is transitional.
 
 The complete target architecture is not yet a supported end-to-end runtime.
-Canonical plan-version records, canonical Task kinds, complete role-native
-work-order and admission contracts, runnable Hypothesis Analyst and Graph Miner
-providers, complete scientific investigation and governance flows, Planner
-consumption of normalized outcomes, and full Evidence and Discovery admission
-remain incomplete or absent.
+Canonical PlanRevision and Task DAG behavior, the scientific investigation and
+protocol chain, canonical Evidence lineage, protected evaluation, governance,
+Discovery admission, semantic graph inquiry, and restart-safe continuity
+remain **Deferred**. [Current state](../status/current-state.md) owns the exact
+dated implementation boundary.
 
-Continue with [MVP runtime subset](mvp-runtime-subset.md) for the bounded
-delivery scope, [Authority boundaries](authority-boundaries.md) for ownership,
+Continue with [MVP-v2](mvp-runtime-subset.md) for the minimum complete-loop
+Definition of Done, [Authority boundaries](authority-boundaries.md) for ownership,
 or [End-to-end flow](end-to-end-flow.md) for the canonical operational
 sequence.
