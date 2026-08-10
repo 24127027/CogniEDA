@@ -162,7 +162,7 @@ class State(BaseModel):
     query: str = Field(min_length=1)
     session_frame: SessionFrame
     planning_context: PlanningContext
-    new_messages: tuple[ModelMessage, ...] = ()
+    new_message_segments: tuple[tuple[ModelMessage, ...], ...] = ()
     execution_context: ExecutorContext = Field(default_factory=ExecutorContext)
     decision: PlannerDecision | None = None
     created_task_id: UUID | None = None
@@ -195,4 +195,4 @@ class PlannerOutput(BaseModel):
     selected_capability: Capability | None = None
     work_outcome: PlannerWorkOutcome | None = None
     error: PlannerControlledError | None = None
-    new_messages: tuple[ModelMessage, ...] = ()
+    new_message_segments: tuple[tuple[ModelMessage, ...], ...] = ()

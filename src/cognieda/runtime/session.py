@@ -3,12 +3,11 @@ from __future__ import annotations
 from uuid import UUID, uuid4
 
 from pydantic import Field
-from pydantic_ai.messages import ModelMessage
 
 from cognieda.schemas.artifacts import SessionFrame
 from cognieda.schemas.common import ImmutableCogniEDABaseModel
 
-from .conversation import ConversationHistory
+from .conversation import ConversationHistory, ConversationSegment
 
 
 class Session(ImmutableCogniEDABaseModel):
@@ -22,12 +21,18 @@ class Session(ImmutableCogniEDABaseModel):
         self,
         *,
         session_frame: SessionFrame,
-        messages: tuple[ModelMessage, ...],
+        human_message: str,
+        planner_response: str,
+        segments: tuple[ConversationSegment, ...],
     ) -> Session:
         """Return the coherent successor after one completed Planner turn."""
 
         return Session(
             session_id=self.session_id,
             session_frame=session_frame,
-            conversation_history=self.conversation_history.add_turn(messages),
+            conversation_history=self.conversation_history.add_turn(
+                human_message=human_message,
+                planner_response=planner_response,
+                message_segments=(segment.messages for segment in segments),
+            ),
         )

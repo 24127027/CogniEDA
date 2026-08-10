@@ -122,7 +122,8 @@ async def understand_request(state: State, runtime: Runtime[Context]) -> State:
             message_history=state.planning_context.message_history,
         )
         state.decision = result.output
-        state.new_messages = (*state.new_messages, *result.new_messages)
+        if result.new_messages:
+            state.new_message_segments = (*state.new_message_segments, result.new_messages)
     except Exception as exc:
         state.error = _error(
             PlannerErrorCode.INVALID_MODEL_DECISION,
@@ -297,7 +298,8 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
                     evidences=state.planning_context.evidences,
                 )
             )
-            state.new_messages = (*state.new_messages, *result.new_messages)
+            if result.new_messages:
+                state.new_message_segments = (*state.new_message_segments, result.new_messages)
             state.response = result.output.text
         except Exception as exc:
             state.error = _error(

@@ -3,7 +3,7 @@ from __future__ import annotations
 from cognieda.agents.planner.agent import Planner
 from cognieda.execution import ExecutorDispatcher
 
-from .conversation import planner_interaction_messages
+from .conversation import ConversationSegment
 from .messages import Message, MessageRole, MessageType
 from .session import Session
 from .workspace import Workspace
@@ -28,16 +28,15 @@ class Application:
             session_frame=self.session.session_frame,
             message_history=(self.session.conversation_history.select_for_request_understanding()),
         )
-        turn_messages = (
-            *planner_output.new_messages,
-            *planner_interaction_messages(
-                human_message=message,
-                planner_message=planner_output.response,
-            ),
+        segments = tuple(
+            ConversationSegment(messages=messages)
+            for messages in planner_output.new_message_segments
         )
         self.session = self.session.advance(
             session_frame=planner_output.session_frame,
-            messages=turn_messages,
+            human_message=message,
+            planner_response=planner_output.response,
+            segments=segments,
         )
 
         return Message(

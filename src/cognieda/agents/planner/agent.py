@@ -119,5 +119,5 @@ class Planner:
             selected_capability=final_state.selected_capability,
             work_outcome=final_state.work_outcome,
             error=final_state.error,
-            new_messages=final_state.new_messages,
+            new_message_segments=final_state.new_message_segments,
         )

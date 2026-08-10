@@ -1,35 +1,63 @@
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Iterable
 from uuid import UUID, uuid4
 
 from pydantic import Field, model_validator
-from pydantic_ai.messages import (
-    ModelMessage,
-    ModelRequest,
-    ModelResponse,
-    TextPart,
-    UserPromptPart,
-)
+from pydantic_ai.messages import ModelMessage, ToolCallPart, ToolReturnPart
 
 from cognieda.schemas.common import ImmutableCogniEDABaseModel
 
 
-class ConversationTurn(ImmutableCogniEDABaseModel):
-    """One retained Planner turn in native PydanticAI protocol form."""
+class ConversationSegment(ImmutableCogniEDABaseModel):
+    """One indivisible, coherent native model-history unit."""
 
-    turn_id: UUID = Field(default_factory=uuid4)
+    segment_id: UUID = Field(default_factory=uuid4)
     messages: tuple[ModelMessage, ...]
 
     @model_validator(mode="after")
-    def _messages_not_empty(self) -> ConversationTurn:
+    def _messages_form_complete_unit(self) -> ConversationSegment:
         if not self.messages:
-            raise ValueError("ConversationTurn requires at least one ModelMessage.")
+            raise ValueError("ConversationSegment requires at least one ModelMessage.")
+
+        calls = Counter(
+            (part.tool_call_id, part.tool_name)
+            for message in self.messages
+            for part in message.parts
+            if isinstance(part, ToolCallPart)
+        )
+        returns = Counter(
+            (part.tool_call_id, part.tool_name)
+            for message in self.messages
+            for part in message.parts
+            if isinstance(part, ToolReturnPart)
+        )
+        if calls != returns:
+            raise ValueError(
+                "ConversationSegment must retain matching tool-call/tool-return pairs."
+            )
+        return self
+
+
+class ConversationTurn(ImmutableCogniEDABaseModel):
+    """One complete Human/Planner surface interaction and its native model runs."""
+
+    turn_id: UUID = Field(default_factory=uuid4)
+    human_message: str = Field(min_length=1)
+    planner_response: str = Field(min_length=1)
+    segments: tuple[ConversationSegment, ...] = ()
+
+    @model_validator(mode="after")
+    def _unique_segment_ids(self) -> ConversationTurn:
+        segment_ids = [segment.segment_id for segment in self.segments]
+        if len(segment_ids) != len(set(segment_ids)):
+            raise ValueError("ConversationTurn rejects duplicate ConversationSegment IDs.")
         return self
 
 
 class ConversationHistory(ImmutableCogniEDABaseModel):
-    """Ordered native interaction history retained by one runtime Session."""
+    """Complete ordered Human/Planner history retained by one runtime Session."""
 
     turns: tuple[ConversationTurn, ...] = ()
 
@@ -38,62 +66,45 @@ class ConversationHistory(ImmutableCogniEDABaseModel):
         turn_ids = [turn.turn_id for turn in self.turns]
         if len(turn_ids) != len(set(turn_ids)):
             raise ValueError("ConversationHistory rejects duplicate ConversationTurn IDs.")
+        segment_ids = [segment.segment_id for turn in self.turns for segment in turn.segments]
+        if len(segment_ids) != len(set(segment_ids)):
+            raise ValueError("ConversationHistory rejects duplicate ConversationSegment IDs.")
         return self
 
-    def add_turn(self, messages: Iterable[ModelMessage]) -> ConversationHistory:
-        """Append one complete, unsplit protocol sequence as an immutable successor."""
+    def add_turn(
+        self,
+        *,
+        human_message: str,
+        planner_response: str,
+        message_segments: Iterable[Iterable[ModelMessage]] = (),
+    ) -> ConversationHistory:
+        """Append one surface turn and each complete native model run as a segment."""
 
-        turn = ConversationTurn(messages=tuple(messages))
+        turn = ConversationTurn(
+            human_message=human_message,
+            planner_response=planner_response,
+            segments=tuple(
+                ConversationSegment(messages=tuple(messages)) for messages in message_segments
+            ),
+        )
         return ConversationHistory(turns=(*self.turns, turn))
 
     def model_messages(self) -> tuple[ModelMessage, ...]:
-        """Flatten only at the PydanticAI invocation boundary."""
+        """Flatten complete segments only at the PydanticAI invocation boundary."""
 
-        return tuple(message for turn in self.turns for message in turn.messages)
+        return tuple(
+            message
+            for turn in self.turns
+            for segment in turn.segments
+            for message in segment.messages
+        )
 
     def select_for_request_understanding(self) -> tuple[ModelMessage, ...]:
-        """Return the currently eligible whole-turn history for request understanding."""
+        """Return complete retained segments until the policy selector is applied."""
 
         return self.model_messages()
 
     def presentation_transcript(self) -> tuple[tuple[str, str], ...]:
-        """Derive non-authoritative Human/Planner text pairs when a turn provides them."""
+        """Return the non-authoritative Human/Planner surface transcript."""
 
-        transcript: list[tuple[str, str]] = []
-        for turn in self.turns:
-            human_message = self._last_user_text(turn.messages)
-            planner_message = self._last_response_text(turn.messages)
-            if human_message is not None and planner_message is not None:
-                transcript.append((human_message, planner_message))
-        return tuple(transcript)
-
-    @staticmethod
-    def _last_user_text(messages: tuple[ModelMessage, ...]) -> str | None:
-        for message in reversed(messages):
-            if not isinstance(message, ModelRequest):
-                continue
-            for part in reversed(message.parts):
-                if isinstance(part, UserPromptPart) and isinstance(part.content, str):
-                    return part.content
-        return None
-
-    @staticmethod
-    def _last_response_text(messages: tuple[ModelMessage, ...]) -> str | None:
-        for message in reversed(messages):
-            if not isinstance(message, ModelResponse):
-                continue
-            for part in reversed(message.parts):
-                if isinstance(part, TextPart):
-                    return part.content
-        return None
-
-
-def planner_interaction_messages(
-    *, human_message: str, planner_message: str
-) -> tuple[ModelMessage, ...]:
-    """Represent a model-free Planner command turn without a lossy custom transcript."""
-
-    return (
-        ModelRequest(parts=[UserPromptPart(content=human_message)]),
-        ModelResponse(parts=[TextPart(content=planner_message)]),
-    )
+        return tuple((turn.human_message, turn.planner_response) for turn in self.turns)

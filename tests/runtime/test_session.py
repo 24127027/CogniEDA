@@ -39,7 +39,7 @@ from cognieda.infrastructure.persistence.repositories import (
     EvidenceRepository,
 )
 from cognieda.runtime.application import Application
-from cognieda.runtime.conversation import ConversationHistory
+from cognieda.runtime.conversation import ConversationHistory, ConversationSegment
 from cognieda.runtime.session import Session
 from cognieda.schemas.artifacts import (
     DataProfile,
@@ -236,10 +236,12 @@ def test_evidence_resolves_for_answer_but_conversation_is_not_empirical_input(
 ) -> None:
     frame, evidence, research_state = _frame_with_admitted_evidence(db_session)
     history = ConversationHistory().add_turn(
-        (
+        human_message="I think there are 100 rows.",
+        planner_response="That is not admitted Evidence.",
+        message_segments=((
             ModelRequest(parts=[UserPromptPart(content="I think there are 100 rows.")]),
             ModelResponse(parts=[TextPart(content="That is not admitted Evidence.")]),
-        )
+        ),),
     )
     model = SequencePlannerModel(PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE))
     application, _ = _application(
@@ -261,11 +263,22 @@ def test_session_components_and_conversation_are_immutable_successors() -> None:
     session = Session()
     successor = session.advance(
         session_frame=session.session_frame,
-        messages=(ModelRequest(parts=[UserPromptPart(content="First")]),),
+        human_message="First",
+        planner_response="First response",
+        segments=(
+            ConversationSegment(
+                messages=(
+                    ModelRequest(parts=[UserPromptPart(content="First")]),
+                    ModelResponse(parts=[TextPart(content="First response")]),
+                )
+            ),
+        ),
     )
     final = successor.advance(
         session_frame=successor.session_frame,
-        messages=(ModelResponse(parts=[TextPart(content="Second response")]),),
+        human_message="/summary",
+        planner_response="Second response",
+        segments=(),
     )
 
     assert session.conversation_history.turns == ()
@@ -310,7 +323,11 @@ def test_conversation_round_trip_preserves_tool_call_and_return_coherence() -> N
         ),
         ModelResponse(parts=[TextPart(content="The active state is ready.")]),
     )
-    history = ConversationHistory().add_turn(messages)
+    history = ConversationHistory().add_turn(
+        human_message="Inspect the active state.",
+        planner_response="The active state is ready.",
+        message_segments=(messages,),
+    )
 
     restored = ConversationHistory.model_validate_json(history.model_dump_json())
 
@@ -319,3 +336,15 @@ def test_conversation_round_trip_preserves_tool_call_and_return_coherence() -> N
         ModelMessagesTypeAdapter.dump_json(list(restored.model_messages()))
     ) == list(messages)
     assert len(restored.turns) == 1
+    assert len(restored.turns[0].segments) == 1
+
+
+def test_deterministic_turn_retains_surface_without_fake_model_messages() -> None:
+    history = ConversationHistory().add_turn(
+        human_message="/summary",
+        planner_response="No active Objective.",
+    )
+
+    assert history.presentation_transcript() == (("/summary", "No active Objective."),)
+    assert history.turns[0].segments == ()
+    assert history.model_messages() == ()
