@@ -57,6 +57,20 @@ class ConversationTurn(ImmutableCogniEDABaseModel):
         return self
 
 
+class SelectedConversationContext(ImmutableCogniEDABaseModel):
+    """Bounded surface discourse and whole native segments selected for one request."""
+
+    surface_turns: tuple[ConversationTurn, ...] = ()
+    model_segments: tuple[ConversationSegment, ...] = ()
+
+    def model_messages(self) -> tuple[ModelMessage, ...]:
+        """Flatten only native segments at the PydanticAI invocation boundary."""
+
+        return tuple(
+            message for segment in self.model_segments for message in segment.messages
+        )
+
+
 class ConversationHistory(ImmutableCogniEDABaseModel):
     """Complete ordered Human/Planner history retained by one runtime Session."""
 
@@ -102,21 +116,26 @@ class ConversationHistory(ImmutableCogniEDABaseModel):
 
     def select_for_request_understanding(
         self, latest_request: str, *, recent_turn_limit: int = 4
-    ) -> tuple[ConversationSegment, ...]:
-        """Select whole recent or lexically relevant segments without deleting history."""
+    ) -> SelectedConversationContext:
+        """Select surface discourse and whole native segments without deleting history."""
 
         if recent_turn_limit < 1:
             raise ValueError("recent_turn_limit must be positive.")
         request_terms = self._selection_terms(latest_request)
         recent_start = max(0, len(self.turns) - recent_turn_limit)
-        selected: list[ConversationSegment] = []
+        selected_turns: list[ConversationTurn] = []
+        selected_segments: list[ConversationSegment] = []
         for index, turn in enumerate(self.turns):
             surface_terms = self._selection_terms(
                 f"{turn.human_message} {turn.planner_response}"
             )
             if index >= recent_start or request_terms.intersection(surface_terms):
-                selected.extend(turn.segments)
-        return tuple(selected)
+                selected_turns.append(turn)
+                selected_segments.extend(turn.segments)
+        return SelectedConversationContext(
+            surface_turns=tuple(selected_turns),
+            model_segments=tuple(selected_segments),
+        )
 
     @staticmethod
     def _selection_terms(text: str) -> set[str]:

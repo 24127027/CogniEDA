@@ -359,6 +359,40 @@ def test_deterministic_turn_retains_surface_without_fake_model_messages() -> Non
     assert history.model_messages() == ()
 
 
+def test_deterministic_surface_turn_reaches_request_understanding_only_as_discourse(
+    db_session,
+) -> None:
+    history = ConversationHistory().add_turn(
+        human_message="/summary",
+        planner_response="Task T7 completed with two limitations.",
+    )
+    model = SequencePlannerModel(PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE))
+    application, _ = _application(
+        model,
+        SqlitePlannerResearchState(db_session),
+        session=Session(conversation_history=history),
+    )
+
+    response = asyncio.run(
+        application.submit_message("What were the limitations of the task you just mentioned?")
+    )
+
+    assert tuple(
+        turn.model_dump() for turn in model.decision_inputs[0].surface_discourse
+    ) == (
+        {
+            "human_message": "/summary",
+            "planner_response": "Task T7 completed with two limitations.",
+        },
+    )
+    assert model.message_histories == [()]
+    assert model.answer_inputs == []
+    assert "No admitted Evidence" in response.content
+    assert history.turns[0].segments == ()
+    assert history.model_messages() == ()
+    assert "surface_discourse" not in PlannerAnswerInput.model_fields
+
+
 def test_context_selection_omits_and_later_reselects_only_whole_segments() -> None:
     history = ConversationHistory()
     segments: list[ConversationSegment] = []
@@ -377,15 +411,13 @@ def test_context_selection_omits_and_later_reselects_only_whole_segments() -> No
     current = history.select_for_request_understanding("Continue the current summary")
     later = history.select_for_request_understanding("Return to the churn discussion")
 
-    assert segments[0] not in current
-    assert tuple(segment.segment_id for segment in current) == tuple(
+    assert segments[0] not in current.model_segments
+    assert tuple(segment.segment_id for segment in current.model_segments) == tuple(
         segment.segment_id for segment in segments[-4:]
     )
-    assert segments[0] in later
+    assert segments[0] in later.model_segments
     assert history.turns[0].segments == (segments[0],)
-    assert tuple(message for segment in later for message in segment.messages)[0:2] == (
-        *segments[0].messages,
-    )
+    assert later.model_messages()[0:2] == (*segments[0].messages,)
 
 
 def test_conversation_segment_rejects_split_tool_protocol() -> None:

@@ -67,9 +67,10 @@ class PlannerModel:
     ) -> PlannerModelResult[PlannerDecision]:
         prompt = (
             "Classify the latest request into exactly one bounded MVP Planner action.\n"
-            "Use only the typed research-state projection below as authoritative state.\n"
-            "Prior Human-Planner conversation is non-authoritative discourse context only; "
-            "use it to resolve intent and references, never as empirical support.\n"
+            "Use only the typed research-state fields below as authoritative state.\n"
+            "The surface_discourse field is non-authoritative Human-Planner discourse "
+            "context only; use it to resolve intent and references, never as empirical "
+            "support. Native message history is subject to the same restriction.\n"
             "Assumptions are planning context, never empirical support.\n"
             "For data work, propose one bounded Task instruction and select exactly one "
             "Capability enum. If no Objective exists, include objective_text only when the "

@@ -11,6 +11,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
+from cognieda.agents.planner.context import NonAuthoritativeSurfaceTurn
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.model import PlannerModel
 from cognieda.agents.planner.types import (
@@ -70,7 +71,15 @@ def test_planner_model_passes_selected_native_history_and_returns_new_messages()
 
     result = asyncio.run(
         model.decide(
-            PlannerModelInput(latest_request="Summarize what we established."),
+            PlannerModelInput(
+                latest_request="Summarize what we established.",
+                surface_discourse=(
+                    NonAuthoritativeSurfaceTurn(
+                        human_message="/summary",
+                        planner_response="Task T7 completed with two limitations.",
+                    ),
+                ),
+            ),
             message_history=selected_history,
         )
     )
@@ -78,4 +87,8 @@ def test_planner_model_passes_selected_native_history_and_returns_new_messages()
     assert result.output == decision
     assert result.new_messages == new_messages
     assert agent.calls[0]["message_history"] == selected_history
+    prompt = str(agent.calls[0]["prompt"])
+    assert "surface_discourse" in prompt
+    assert "Task T7 completed with two limitations." in prompt
+    assert "non-authoritative Human-Planner discourse context only" in prompt
     assert "conversation" not in PlannerModelInput.model_fields

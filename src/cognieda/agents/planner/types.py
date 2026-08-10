@@ -17,7 +17,12 @@ from cognieda.schemas.artifacts import (
     Task,
 )
 
-from .context import BuildPlanningContext, PlannerContextSelector, PlanningContext
+from .context import (
+    BuildPlanningContext,
+    NonAuthoritativeSurfaceTurn,
+    PlannerContextSelector,
+    PlanningContext,
+)
 
 
 class PlannerAction(StrEnum):
@@ -122,6 +127,7 @@ class PlannerModelInput(BaseModel):
     tasks: tuple[Task, ...] = ()
     data_profile: DataProfile | None = None
     evidences: tuple[Evidence, ...] = ()
+    surface_discourse: tuple[NonAuthoritativeSurfaceTurn, ...] = ()
 
     @classmethod
     def from_context(cls, context: PlanningContext) -> PlannerModelInput:
@@ -132,6 +138,7 @@ class PlannerModelInput(BaseModel):
             tasks=context.tasks,
             data_profile=context.data_profile,
             evidences=context.evidences,
+            surface_discourse=context.surface_discourse,
         )
 
 

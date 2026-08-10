@@ -10,6 +10,7 @@ from cognieda.schemas.artifacts import SessionFrame
 
 from .context import (
     BuildPlanningContext,
+    NonAuthoritativeSurfaceTurn,
     PlannerContextSelector,
     PlanningContextResolutionError,
 )
@@ -65,6 +66,7 @@ class Planner:
         query: str,
         *,
         session_frame: SessionFrame | None = None,
+        surface_discourse: Sequence[NonAuthoritativeSurfaceTurn] = (),
         message_history: Sequence[ModelMessage] = (),
         execution_context: ExecutorContext | None = None,
     ) -> PlannerOutput:
@@ -82,6 +84,7 @@ class Planner:
             selection = self.context_selector.select(
                 latest_request=query,
                 frame=frame,
+                surface_discourse=surface_discourse,
                 message_history=message_history,
             )
             planning_context = self.context_builder.build(selection=selection)

@@ -20,6 +20,15 @@ from cognieda.schemas.common import CogniEDABaseModel
 from cognieda.schemas.enums import TaskStatus
 
 
+class NonAuthoritativeSurfaceTurn(CogniEDABaseModel):
+    """Selected Human/Planner discourse usable only for intent and reference resolution."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    human_message: str = Field(min_length=1)
+    planner_response: str = Field(min_length=1)
+
+
 class PlanningContext(CogniEDABaseModel):
     """Ephemeral materialized research context selected for one Planner run."""
 
@@ -31,6 +40,7 @@ class PlanningContext(CogniEDABaseModel):
     tasks: tuple[Task, ...] = ()
     evidences: tuple[Evidence, ...] = ()
     data_profile: DataProfile | None = None
+    surface_discourse: tuple[NonAuthoritativeSurfaceTurn, ...] = ()
     message_history: tuple[ModelMessage, ...] = ()
 
 
@@ -45,6 +55,7 @@ class PlannerContextSelection(CogniEDABaseModel):
     task_ids: tuple[UUID, ...] = ()
     active_data_profile_id: UUID | None = None
     evidence_candidate_ids: tuple[UUID, ...] = ()
+    surface_discourse: tuple[NonAuthoritativeSurfaceTurn, ...] = ()
     message_history: tuple[ModelMessage, ...] = ()
 
 
@@ -61,6 +72,7 @@ class PlannerContextSelector:
         *,
         latest_request: str,
         frame: SessionFrame,
+        surface_discourse: Sequence[NonAuthoritativeSurfaceTurn] = (),
         message_history: Sequence[ModelMessage] = (),
     ) -> PlannerContextSelection:
         """Select active refs plus bounded recent candidates without resolving them."""
@@ -73,6 +85,7 @@ class PlannerContextSelector:
             task_ids=frame.task_ids[-limit:],
             active_data_profile_id=frame.active_data_profile_id,
             evidence_candidate_ids=frame.evidence_ids[-limit:],
+            surface_discourse=tuple(surface_discourse),
             message_history=tuple(message_history),
         )
 
@@ -165,6 +178,7 @@ class BuildPlanningContext:
             tasks=tuple(tasks_by_id.values()),
             evidences=evidences,
             data_profile=data_profile,
+            surface_discourse=selection.surface_discourse,
             message_history=selection.message_history,
         )
 

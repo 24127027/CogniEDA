@@ -36,6 +36,7 @@ def _refresh_planning_context(state: State, runtime: Runtime[Context]) -> None:
     selection = runtime.context.context_selector.select(
         latest_request=state.query,
         frame=state.session_frame,
+        surface_discourse=state.planning_context.surface_discourse,
         message_history=state.planning_context.message_history,
     )
     state.planning_context = runtime.context.context_builder.build(selection=selection)

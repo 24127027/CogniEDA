@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from cognieda.agents.planner.agent import Planner
+from cognieda.agents.planner.context import NonAuthoritativeSurfaceTurn
 from cognieda.execution import ExecutorDispatcher
 
 from .conversation import ConversationSegment
@@ -23,17 +24,20 @@ class Application:
         self.session = session or Session()
 
     async def submit_message(self, message: str) -> Message:
-        selected_segments = self.session.conversation_history.select_for_request_understanding(
+        selected_context = self.session.conversation_history.select_for_request_understanding(
             message
         )
         planner_output = await self.planner_agent.run(
             message,
             session_frame=self.session.session_frame,
-            message_history=tuple(
-                native_message
-                for segment in selected_segments
-                for native_message in segment.messages
+            surface_discourse=tuple(
+                NonAuthoritativeSurfaceTurn(
+                    human_message=turn.human_message,
+                    planner_response=turn.planner_response,
+                )
+                for turn in selected_context.surface_turns
             ),
+            message_history=selected_context.model_messages(),
         )
         segments = tuple(
             ConversationSegment(messages=messages)
