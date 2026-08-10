@@ -63,6 +63,7 @@ from cognieda.schemas.enums import (
     HypothesisStatus,
     ObjectiveStatus,
     QualityFlagSeverity,
+    SessionFrameStatus,
     TaskKind,
     TaskLifecycleState,
     UserDecisionType,
@@ -1729,8 +1730,10 @@ def test_session_frame_repository_round_trip_is_workspace_local(db_session) -> N
     objective = build_objective()
     frame = SessionFrameRepository(db_session).create(
         SessionFrame(
-            objective_ids=(objective.objective_id,),
-            active_objective_id=objective.objective_id,
+            frame_topic="churn-frame",
+            frame_status=SessionFrameStatus.HANDOFF,
+            objective_snapshot=objective.statement,
+            created_at=datetime.now(UTC),
         )
     )
 
