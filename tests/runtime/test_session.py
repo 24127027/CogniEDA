@@ -43,6 +43,7 @@ from cognieda.runtime.application import Application
 from cognieda.runtime.conversation import ConversationHistory, ConversationSegment
 from cognieda.runtime.session import Session
 from cognieda.schemas.artifacts import (
+    Assumption,
     DataProfile,
     Evidence,
     Objective,
@@ -191,10 +192,90 @@ def test_application_retains_ids_and_resolved_context_across_turns(db_session) -
         ),
         (
             "Summarize what we established.",
-            "Active Objective: Understand customer churn.. Planning Assumptions "
-            "(not Evidence): 0. Tasks: 0. Admitted Evidence items: 0.",
+            "Active Objective: Understand customer churn.. Objectives in session history: 1. "
+            "Planning Assumptions in session history (not Evidence): 0. "
+            "Tasks in session history: 0. DataProfiles in session history: 0. "
+            "Evidence items in session history: 0.",
         ),
     )
+
+
+def test_state_summary_reports_cumulative_history_and_active_objective(db_session) -> None:
+    research_state = SqlitePlannerResearchState(db_session)
+    objective_one = research_state.create_objective(Objective(text="Understand churn."))
+    objective_two = research_state.create_objective(
+        Objective(text="Understand churn limitations.")
+    )
+    assumption = research_state.create_assumption(
+        Assumption(text="Rows represent customers.")
+    )
+    tasks = tuple(
+        research_state.create_task(
+            Task(
+                instruction=f"Task {index}",
+                status=(TaskStatus.COMPLETED if index < 2 else TaskStatus.PENDING),
+            )
+        )
+        for index in range(25)
+    )
+    profiles = tuple(
+        DataProfileRepository(db_session).create(
+            DataProfile(row_count=row_count, column_count=0, columns=())
+        )
+        for row_count in (10, 20)
+    )
+    evidences = tuple(
+        EvidenceRepository(db_session).create(
+            Evidence(
+                task_id=tasks[index].task_id,
+                data_profile_id=profile.data_profile_id,
+                content={"row_count": profile.row_count},
+                provenance=EvidenceProvenance(
+                    producer_role="data_explorer",
+                    work_reference=f"work:count-{index}",
+                    dataset_reference=f"dataset:{profile.data_profile_id}",
+                    data_profile_id=profile.data_profile_id,
+                ),
+            )
+        )
+        for index, profile in enumerate(profiles)
+    )
+    frame = SessionFrame(
+        objective_ids=(objective_one.objective_id, objective_two.objective_id),
+        active_objective_id=objective_two.objective_id,
+        assumption_ids=(assumption.assumption_id,),
+        task_ids=tuple(task.task_id for task in tasks),
+        data_profile_ids=tuple(profile.data_profile_id for profile in profiles),
+        active_data_profile_id=profiles[1].data_profile_id,
+        evidence_ids=tuple(evidence.evidence_id for evidence in evidences),
+    )
+    model = SequencePlannerModel()
+    application, _ = _application(
+        model,
+        research_state,
+        session=Session(session_frame=frame),
+    )
+
+    response = asyncio.run(application.submit_message("/summary"))
+
+    assert "Active Objective: Understand churn limitations." in response.content
+    assert "Objectives in session history: 2." in response.content
+    assert "Planning Assumptions in session history (not Evidence): 1." in response.content
+    assert "Tasks in session history: 25." in response.content
+    assert "DataProfiles in session history: 2." in response.content
+    assert "Evidence items in session history: 2." in response.content
+    assert model.decision_inputs == []
+
+    switched_application, _ = _application(
+        SequencePlannerModel(),
+        research_state,
+        session=Session(session_frame=frame.set_active_objective_id(objective_one.objective_id)),
+    )
+    switched = asyncio.run(switched_application.submit_message("/summary"))
+
+    assert "Active Objective: Understand churn." in switched.content
+    assert "Objectives in session history: 2." in switched.content
+    assert switched_application.session.session_frame.objective_ids == frame.objective_ids
 
 
 def test_completed_task_lifecycle_is_resolved_on_the_next_turn(db_session) -> None:

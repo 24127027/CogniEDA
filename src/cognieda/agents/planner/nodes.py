@@ -319,9 +319,12 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
         )
         state.response = (
             f"Active Objective: {objective}. "
-            f"Planning Assumptions (not Evidence): {len(state.planning_context.assumptions)}. "
-            f"Tasks: {len(state.planning_context.tasks)}. "
-            f"Admitted Evidence items: {len(state.planning_context.evidences)}."
+            f"Objectives in session history: {len(state.session_frame.objective_ids)}. "
+            "Planning Assumptions in session history (not Evidence): "
+            f"{len(state.session_frame.assumption_ids)}. "
+            f"Tasks in session history: {len(state.session_frame.task_ids)}. "
+            f"DataProfiles in session history: {len(state.session_frame.data_profile_ids)}. "
+            f"Evidence items in session history: {len(state.session_frame.evidence_ids)}."
         )
     elif decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE:
         assert state.planning_context.objective is not None
