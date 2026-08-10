@@ -42,9 +42,14 @@ from cognieda.infrastructure.persistence.repositories import (
 )
 from cognieda.runtime.application import Application
 from cognieda.runtime.conversation import (
+    APPLICATION_MESSAGE_ORIGIN,
+    APPLICATION_MESSAGE_ORIGIN_KEY,
     ConversationHistory,
-    ConversationSegment,
     _selection_terms,
+    complete_turn_messages,
+    conversation_response_text,
+    conversation_user_text,
+    prepare_effective_message_history,
     select_conversation_context,
 )
 from cognieda.runtime.planner_context import PlannerContextPreparer, select_planner_context
@@ -66,15 +71,20 @@ class SequencePlannerModel:
         self._decisions = iter(decisions)
         self.decision_inputs: list[PlannerModelInput] = []
         self.answer_inputs: list[PlannerAnswerInput] = []
+        self.message_histories: list[tuple[ModelMessage, ...]] = []
 
     async def decide(
         self,
         model_input: PlannerModelInput,
+        *,
+        message_history: tuple[ModelMessage, ...] = (),
     ) -> PlannerModelResult[PlannerDecision]:
         self.decision_inputs.append(model_input)
+        self.message_histories.append(message_history)
         messages = (
             ModelRequest(
-                parts=[UserPromptPart(content=f"Typed input:\n{model_input.model_dump_json()}")]
+                parts=[UserPromptPart(content=model_input.latest_request)],
+                instructions=f"Current typed input:\n{model_input.model_dump_json()}",
             ),
             ModelResponse(parts=[TextPart(content="typed decision")]),
         )
@@ -190,15 +200,10 @@ def test_application_retains_ids_and_resolved_context_across_turns(db_session) -
     assert objective is not None
     assert objective.text == "Understand customer churn."
     assert model.decision_inputs[1].objective == objective
-    assert tuple(
-        turn.model_dump() for turn in model.decision_inputs[1].surface_discourse
-    ) == (
-        {
-            "human_message": "Investigate customer churn.",
-            "planner_response": "Active Objective set to: Understand customer churn.",
-        },
+    assert model.message_histories[1] == prepare_effective_message_history(
+        first_session.conversation_history.turns
     )
-    assert len(first_session.conversation_history.model_messages()) == 2
+    assert len(first_session.conversation_history.model_messages()) == 3
     assert "message_history" not in type(
         PlannerContextPreparer(research_state).build(
             latest_request="Inspect fields",
@@ -207,11 +212,11 @@ def test_application_retains_ids_and_resolved_context_across_turns(db_session) -
     ).model_fields
     assert len(application.session.conversation_history.turns) == 2
     assert "planning_context" not in Session.model_fields
-    assert application.session.conversation_history.presentation_transcript() == (
-        (
-            "Investigate customer churn.",
-            "Active Objective set to: Understand customer churn.",
-        ),
+    assert tuple(
+        (conversation_user_text(turn), conversation_response_text(turn))
+        for turn in application.session.conversation_history.turns
+    ) == (
+        ("Investigate customer churn.", "Active Objective set to: Understand customer churn."),
         (
             "Summarize what we established.",
             "Active Objective: Understand customer churn.. Objectives in session history: 1. "
@@ -222,7 +227,7 @@ def test_application_retains_ids_and_resolved_context_across_turns(db_session) -
     )
 
 
-def test_three_fresh_turns_do_not_recursively_replay_native_model_requests(
+def test_three_turns_replay_selected_native_history_without_stale_instructions(
     db_session,
 ) -> None:
     research_state = SqlitePlannerResearchState(db_session)
@@ -242,16 +247,107 @@ def test_three_fresh_turns_do_not_recursively_replay_native_model_requests(
     asyncio.run(application.submit_message("Summarize that again."))
 
     retained_native_history = before_third_turn.conversation_history.model_messages()
-    second_native_request = retained_native_history[2]
-    assert isinstance(second_native_request, ModelRequest)
-    assert "surface_discourse" in str(second_native_request.parts[0].content)
-    assert "Investigate customer churn." in str(second_native_request.parts[0].content)
-    assert [
-        (turn.human_message, turn.planner_response)
-        for turn in model.decision_inputs[2].surface_discourse
-    ] == list(before_third_turn.conversation_history.presentation_transcript())
-    assert len(model.decision_inputs[2].surface_discourse) == 2
+    assert len(model.message_histories[2]) == len(retained_native_history)
+    assert model.message_histories[2] == prepare_effective_message_history(
+        before_third_turn.conversation_history.turns
+    )
+    assert any(
+        isinstance(message, ModelRequest) and message.instructions is not None
+        for message in retained_native_history
+    )
+    assert all(
+        not isinstance(message, ModelRequest) or message.instructions is None
+        for message in model.message_histories[2]
+    )
     assert not hasattr(ConversationHistory, "select_for_request_understanding")
+
+
+def test_current_authoritative_context_wins_over_stale_retained_instructions(
+    db_session,
+) -> None:
+    research_state = SqlitePlannerResearchState(db_session)
+    old_objective = research_state.create_objective(Objective(text="Old objective."))
+    current_objective = research_state.create_objective(Objective(text="Current objective."))
+    old_task = research_state.create_task(
+        Task(instruction="Old count.", status=TaskStatus.COMPLETED)
+    )
+    current_task = research_state.create_task(
+        Task(instruction="Current count.", status=TaskStatus.COMPLETED)
+    )
+    old_profile = DataProfileRepository(db_session).create(
+        DataProfile(row_count=10, column_count=0, columns=())
+    )
+    current_profile = DataProfileRepository(db_session).create(
+        DataProfile(row_count=42, column_count=0, columns=())
+    )
+    old_evidence = EvidenceRepository(db_session).create(
+        Evidence(
+            task_id=old_task.task_id,
+            data_profile_id=old_profile.data_profile_id,
+            content={"row_count": 10},
+            provenance=EvidenceProvenance(
+                producer_role="data_explorer",
+                work_reference="work:old",
+                dataset_reference="dataset:old",
+                data_profile_id=old_profile.data_profile_id,
+            ),
+        )
+    )
+    current_evidence = EvidenceRepository(db_session).create(
+        Evidence(
+            task_id=current_task.task_id,
+            data_profile_id=current_profile.data_profile_id,
+            content={"row_count": 42},
+            provenance=EvidenceProvenance(
+                producer_role="data_explorer",
+                work_reference="work:current",
+                dataset_reference="dataset:current",
+                data_profile_id=current_profile.data_profile_id,
+            ),
+        )
+    )
+    stale_instructions = (
+        f"objective={old_objective.objective_id};"
+        f"data_profile={old_profile.data_profile_id};evidence={old_evidence.evidence_id}"
+    )
+    history = ConversationHistory().add_turn(
+        messages=(
+            ModelRequest(
+                parts=[UserPromptPart(content="Summarize the old state.")],
+                instructions=stale_instructions,
+            ),
+            ModelResponse(parts=[TextPart(content="Old state summarized.")]),
+        )
+    )
+    frame = SessionFrame(
+        objective_ids=(old_objective.objective_id, current_objective.objective_id),
+        active_objective_id=current_objective.objective_id,
+        task_ids=(old_task.task_id, current_task.task_id),
+        data_profile_ids=(old_profile.data_profile_id, current_profile.data_profile_id),
+        active_data_profile_id=current_profile.data_profile_id,
+        evidence_ids=(old_evidence.evidence_id, current_evidence.evidence_id),
+    )
+    model = SequencePlannerModel(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
+    application, _ = _application(
+        model,
+        research_state,
+        session=Session(session_frame=frame, conversation_history=history),
+    )
+
+    asyncio.run(application.submit_message("Summarize the current state."))
+
+    model_input = model.decision_inputs[0]
+    assert model_input.objective == current_objective
+    assert model_input.data_profile == current_profile
+    assert model_input.evidences == (current_evidence,)
+    assert old_evidence not in model_input.evidences
+    replayed_request = model.message_histories[0][0]
+    assert isinstance(replayed_request, ModelRequest)
+    assert replayed_request.instructions is None
+    stored_request = history.turns[0].messages[0]
+    assert isinstance(stored_request, ModelRequest)
+    assert stored_request.instructions == stale_instructions
+    assert application.session.session_frame == frame
 
 
 def test_application_fails_closed_before_planner_on_dangling_session_reference(
@@ -342,6 +438,11 @@ def test_state_summary_reports_cumulative_history_and_active_objective(db_sessio
     assert "DataProfiles in session history: 2." in response.content
     assert "Evidence items in session history: 2." in response.content
     assert model.decision_inputs == []
+    assert application.session.session_frame == frame
+    summary_turn = application.session.conversation_history.turns[0]
+    assert conversation_user_text(summary_turn) == "/summary"
+    assert conversation_response_text(summary_turn) == response.content
+    assert len(summary_turn.messages) == 2
 
     switched_application, _ = _application(
         SequencePlannerModel(),
@@ -404,12 +505,10 @@ def test_evidence_resolves_for_answer_but_conversation_is_not_empirical_input(
 ) -> None:
     frame, evidence, research_state = _frame_with_admitted_evidence(db_session)
     history = ConversationHistory().add_turn(
-        human_message="I think there are 100 rows.",
-        planner_response="That is not admitted Evidence.",
-        message_segments=((
+        messages=(
             ModelRequest(parts=[UserPromptPart(content="I think there are 100 rows.")]),
             ModelResponse(parts=[TextPart(content="That is not admitted Evidence.")]),
-        ),),
+        ),
     )
     model = SequencePlannerModel(PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE))
     application, _ = _application(
@@ -431,22 +530,17 @@ def test_session_components_and_conversation_are_immutable_successors() -> None:
     session = Session()
     successor = session.advance(
         session_frame=session.session_frame,
-        human_message="First",
-        planner_response="First response",
-        segments=(
-            ConversationSegment(
-                messages=(
-                    ModelRequest(parts=[UserPromptPart(content="First")]),
-                    ModelResponse(parts=[TextPart(content="First response")]),
-                )
-            ),
+        messages=(
+            ModelRequest(parts=[UserPromptPart(content="First")]),
+            ModelResponse(parts=[TextPart(content="First response")]),
         ),
     )
     final = successor.advance(
         session_frame=successor.session_frame,
-        human_message="/summary",
-        planner_response="Second response",
-        segments=(),
+        messages=complete_turn_messages(
+            human_message="/summary",
+            planner_response="Second response",
+        ),
     )
 
     assert session.conversation_history.turns == ()
@@ -468,6 +562,46 @@ def test_conversation_contract_contains_provider_messages_only_at_runtime() -> N
     assert "pydantic_ai" in conversation_source
     assert "ModelMessage" not in artifacts_source
     assert "pydantic_ai" not in artifacts_source
+    assert set(ConversationHistory.model_fields) == {"turns"}
+    assert set(conversation_module.ConversationTurn.model_fields) == {"turn_id", "messages"}
+    assert not hasattr(conversation_module, "ConversationSegment")
+    assert not hasattr(ConversationHistory, "presentation_transcript")
+
+
+def test_completed_turn_keeps_all_internal_native_messages_in_order() -> None:
+    native_messages: tuple[ModelMessage, ...] = (
+        ModelRequest(parts=[UserPromptPart(content="Inspect the active state.")]),
+        ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="lookup_state",
+                    args={"scope": "active"},
+                    tool_call_id="call-internal",
+                )
+            ]
+        ),
+        ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_name="lookup_state",
+                    content={"status": "ready"},
+                    tool_call_id="call-internal",
+                )
+            ]
+        ),
+        ModelResponse(parts=[TextPart(content="Internal typed result")]),
+    )
+
+    messages = complete_turn_messages(
+        human_message="Inspect the active state.",
+        planner_response="The active state is ready.",
+        native_messages=native_messages,
+    )
+    history = ConversationHistory().add_turn(messages=messages)
+
+    assert history.turns[0].messages[: len(native_messages)] == native_messages
+    assert len(history.turns[0].messages) == len(native_messages) + 1
+    assert conversation_response_text(history.turns[0]) == "The active state is ready."
 
 
 def test_conversation_round_trip_preserves_tool_call_and_return_coherence() -> None:
@@ -492,9 +626,7 @@ def test_conversation_round_trip_preserves_tool_call_and_return_coherence() -> N
         ModelResponse(parts=[TextPart(content="The active state is ready.")]),
     )
     history = ConversationHistory().add_turn(
-        human_message="Inspect the active state.",
-        planner_response="The active state is ready.",
-        message_segments=(messages,),
+        messages=messages,
     )
 
     restored = ConversationHistory.model_validate_json(history.model_dump_json())
@@ -504,7 +636,7 @@ def test_conversation_round_trip_preserves_tool_call_and_return_coherence() -> N
         ModelMessagesTypeAdapter.dump_json(list(restored.model_messages()))
     ) == list(messages)
     assert len(restored.turns) == 1
-    assert len(restored.turns[0].segments) == 1
+    assert restored.turns[0].messages == messages
 
 
 def test_conversation_round_trip_preserves_retry_capable_tool_protocol() -> None:
@@ -546,17 +678,17 @@ def test_conversation_round_trip_preserves_retry_capable_tool_protocol() -> None
             ]
         ),
     )
-    segment = ConversationSegment(messages=messages)
+    history = ConversationHistory().add_turn(messages=messages)
 
-    restored = ConversationSegment.model_validate_json(segment.model_dump_json())
+    restored = ConversationHistory.model_validate_json(history.model_dump_json())
 
-    assert restored.messages == messages
+    assert restored.turns[0].messages == messages
     assert ModelMessagesTypeAdapter.validate_json(
-        ModelMessagesTypeAdapter.dump_json(list(restored.messages))
+        ModelMessagesTypeAdapter.dump_json(list(restored.model_messages()))
     ) == list(messages)
 
 
-def test_conversation_segment_does_not_revalidate_native_retry_protocol() -> None:
+def test_conversation_turn_does_not_revalidate_native_retry_protocol() -> None:
     messages: tuple[ModelMessage, ...] = (
         ModelResponse(
             parts=[
@@ -578,28 +710,38 @@ def test_conversation_segment_does_not_revalidate_native_retry_protocol() -> Non
         ),
     )
 
-    segment = ConversationSegment(messages=messages)
+    history = ConversationHistory().add_turn(messages=messages)
 
-    assert segment.messages == messages
+    assert history.turns[0].messages == messages
 
 
-def test_deterministic_turn_retains_surface_without_fake_model_messages() -> None:
+def test_deterministic_turn_uses_application_created_native_messages() -> None:
     history = ConversationHistory().add_turn(
-        human_message="/summary",
-        planner_response="No active Objective.",
+        messages=complete_turn_messages(
+            human_message="/summary",
+            planner_response="No active Objective.",
+        ),
     )
 
-    assert history.presentation_transcript() == (("/summary", "No active Objective."),)
-    assert history.turns[0].segments == ()
-    assert history.model_messages() == ()
+    assert conversation_user_text(history.turns[0]) == "/summary"
+    assert conversation_response_text(history.turns[0]) == "No active Objective."
+    assert len(history.model_messages()) == 2
+    request, response = history.model_messages()
+    assert request.metadata == {APPLICATION_MESSAGE_ORIGIN_KEY: APPLICATION_MESSAGE_ORIGIN}
+    assert response.metadata == {APPLICATION_MESSAGE_ORIGIN_KEY: APPLICATION_MESSAGE_ORIGIN}
+    assert isinstance(response, ModelResponse)
+    assert response.model_name is None
+    assert response.provider_name is None
 
 
-def test_deterministic_surface_turn_reaches_request_understanding_only_as_discourse(
+def test_deterministic_turn_reaches_request_understanding_as_native_history(
     db_session,
 ) -> None:
     history = ConversationHistory().add_turn(
-        human_message="/summary",
-        planner_response="Task T7 completed with two limitations.",
+        messages=complete_turn_messages(
+            human_message="/summary",
+            planner_response="Task T7 completed with two limitations.",
+        ),
     )
     model = SequencePlannerModel(PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE))
     application, _ = _application(
@@ -612,35 +754,23 @@ def test_deterministic_surface_turn_reaches_request_understanding_only_as_discou
         application.submit_message("What were the limitations of the task you just mentioned?")
     )
 
-    assert tuple(
-        turn.model_dump() for turn in model.decision_inputs[0].surface_discourse
-    ) == (
-        {
-            "human_message": "/summary",
-            "planner_response": "Task T7 completed with two limitations.",
-        },
-    )
+    assert model.message_histories[0] == history.model_messages()
     assert model.answer_inputs == []
     assert "current bounded context" in response.content
-    assert history.turns[0].segments == ()
-    assert history.model_messages() == ()
+    assert len(history.turns[0].messages) == 2
     assert "surface_discourse" not in PlannerAnswerInput.model_fields
 
 
-def test_context_selection_omits_and_later_reselects_surface_turns_only() -> None:
+def test_context_selection_omits_and_later_reselects_complete_turns() -> None:
     history = ConversationHistory()
-    segments: list[ConversationSegment] = []
+    retained_messages: list[tuple[ModelMessage, ...]] = []
     for index, topic in enumerate(("churn", "pricing", "quality", "schema", "rows", "summary")):
         messages: tuple[ModelMessage, ...] = (
             ModelRequest(parts=[UserPromptPart(content=f"Discuss {topic}")]),
             ModelResponse(parts=[TextPart(content=f"Recorded {topic} turn {index}")]),
         )
-        history = history.add_turn(
-            human_message=f"Discuss {topic}",
-            planner_response=f"Recorded {topic} turn {index}",
-            message_segments=(messages,),
-        )
-        segments.append(history.turns[-1].segments[0])
+        history = history.add_turn(messages=messages)
+        retained_messages.append(history.turns[-1].messages)
 
     current = select_conversation_context(history, "Continue the current summary")
     later = select_conversation_context(history, "Return to the churn discussion")
@@ -648,7 +778,7 @@ def test_context_selection_omits_and_later_reselects_surface_turns_only() -> Non
     assert history.turns[0] not in current
     assert current == history.turns[-4:]
     assert history.turns[0] in later
-    assert history.turns[0].segments == (segments[0],)
+    assert history.turns[0].messages == retained_messages[0]
 
 
 def test_context_selection_hard_bounds_old_matches_and_preserves_chronology() -> None:
@@ -663,14 +793,14 @@ def test_context_selection_hard_bounds_old_matches_and_preserves_chronology() ->
             ModelResponse(parts=[TextPart(content=f"Clarified task {index}")]),
         )
         history = history.add_turn(
-            human_message=f"Discuss task {index}",
-            planner_response=f"Recorded task {index}",
-            message_segments=(first_messages, second_messages),
+            messages=(*first_messages, *second_messages),
         )
     for index in range(4):
         history = history.add_turn(
-            human_message=f"Recent topic {index}",
-            planner_response=f"Recorded recent topic {index}",
+            messages=complete_turn_messages(
+                human_message=f"Recent topic {index}",
+                planner_response=f"Recorded recent topic {index}",
+            ),
         )
 
     selected = select_conversation_context(
@@ -693,10 +823,10 @@ def test_context_selection_hard_bounds_old_matches_and_preserves_chronology() ->
         *history.turns[12:16],
     )
     assert len(selected) == 7
-    assert all(len(turn.segments) == 2 for turn in selected[:3])
+    assert all(len(turn.messages) == 4 for turn in selected[:3])
     assert history.turns[8] not in selected
     assert len(history.turns) == 16
-    assert len(history.turns[8].segments) == 2
+    assert len(history.turns[8].messages) == 4
     assert default_selected == history.turns[8:16]
     assert len(default_selected) == 8
 
@@ -758,8 +888,10 @@ def test_bounded_evidence_omission_does_not_claim_global_absence(db_session) -> 
         ),
     )
     history = ConversationHistory().add_turn(
-        human_message="The active dataset has 10 rows.",
-        planner_response="That conversation is not admitted Evidence.",
+        messages=complete_turn_messages(
+            human_message="The active dataset has 10 rows.",
+            planner_response="That conversation is not admitted Evidence.",
+        ),
     )
     model = SequencePlannerModel(PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE))
     application, _ = _application(
@@ -803,14 +935,14 @@ def test_unicode_selection_normalizes_and_reselects_old_vietnamese_turn() -> Non
         ),
     )
     history = ConversationHistory().add_turn(
-        human_message="Phân tích nhóm khách hàng đã rời bỏ.",
-        planner_response="Đã ghi nhận phân tích khách hàng rời bỏ.",
-        message_segments=(old_messages,),
+        messages=old_messages,
     )
     for topic in ("pricing", "quality", "schema", "rows", "summary"):
         history = history.add_turn(
-            human_message=f"Discuss {topic}",
-            planner_response=f"Recorded {topic}",
+            messages=complete_turn_messages(
+                human_message=f"Discuss {topic}",
+                planner_response=f"Recorded {topic}",
+            ),
         )
 
     unrelated = select_conversation_context(history, "Continue with pricing")
@@ -821,7 +953,7 @@ def test_unicode_selection_normalizes_and_reselects_old_vietnamese_turn() -> Non
     assert history.turns[0] not in unrelated
     assert history.turns[0] in selected
     assert selected == selected_again
-    assert history.turns[0].segments[0].messages == old_messages
+    assert history.turns[0].messages == old_messages
 
     decomposed = unicodedata.normalize("NFD", "PHÂN TÍCH KHÁCH HÀNG RỜI BỎ")
     assert _selection_terms(decomposed) == {
@@ -833,7 +965,7 @@ def test_unicode_selection_normalizes_and_reselects_old_vietnamese_turn() -> Non
     }
 
 
-def test_conversation_segment_retains_native_messages_without_protocol_parsing() -> None:
+def test_conversation_turn_retains_native_messages_without_protocol_parsing() -> None:
     messages: tuple[ModelMessage, ...] = (
         ModelResponse(
             parts=[
@@ -846,6 +978,6 @@ def test_conversation_segment_retains_native_messages_without_protocol_parsing()
         ),
     )
 
-    segment = ConversationSegment(messages=messages)
+    history = ConversationHistory().add_turn(messages=messages)
 
-    assert segment.messages == messages
+    assert history.turns[0].messages == messages

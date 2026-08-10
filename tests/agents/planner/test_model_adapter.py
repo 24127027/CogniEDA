@@ -12,7 +12,6 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
-from cognieda.agents.planner.context import NonAuthoritativeSurfaceTurn
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.model import PlannerModel
 from cognieda.agents.planner.types import (
@@ -50,12 +49,19 @@ class RecordingFactory:
         return self.agent
 
 
-def test_planner_model_starts_fresh_execution_and_returns_exact_new_messages() -> None:
+def test_planner_model_uses_native_history_and_current_typed_run_instructions() -> None:
     new_messages: tuple[ModelMessage, ...] = (
         ModelRequest(parts=[UserPromptPart(content="Current request")]),
         ModelResponse(parts=[TextPart(content="Current response")]),
     )
     decision = PlannerDecision(action=PlannerAction.STATE_SUMMARY)
+    message_history: tuple[ModelMessage, ...] = (
+        ModelRequest(
+            parts=[UserPromptPart(content="Earlier request")],
+            instructions='Current typed input: {"objective":"stale"}',
+        ),
+        ModelResponse(parts=[TextPart(content="Earlier response")]),
+    )
     agent = RecordingAgent(FakeRunResult(output=decision, messages=new_messages))
     model = PlannerModel(
         deps=PlannerDeps(
@@ -70,22 +76,20 @@ def test_planner_model_starts_fresh_execution_and_returns_exact_new_messages() -
         model.decide(
             PlannerModelInput(
                 latest_request="Summarize what we established.",
-                surface_discourse=(
-                    NonAuthoritativeSurfaceTurn(
-                        human_message="/summary",
-                        planner_response="Task T7 completed with two limitations.",
-                    ),
-                ),
             ),
+            message_history=message_history,
         )
     )
 
     assert result.output == decision
     assert result.new_messages == new_messages
-    assert "message_history" not in agent.calls[0]
-    assert "message_history" not in inspect.signature(PlannerModel.decide).parameters
-    prompt = str(agent.calls[0]["prompt"])
-    assert "surface_discourse" in prompt
-    assert "Task T7 completed with two limitations." in prompt
-    assert "non-authoritative Human-Planner discourse context only" in prompt
+    assert agent.calls[0]["prompt"] == "Summarize what we established."
+    assert agent.calls[0]["message_history"] == message_history
+    assert "message_history" in inspect.signature(PlannerModel.decide).parameters
+    instructions = str(agent.calls[0]["instructions"])
+    assert "Summarize what we established." in instructions
+    assert "current typed input supersedes" in instructions
+    assert "stale" not in instructions
+    assert "Conversation history is non-authoritative" in instructions
     assert "conversation" not in PlannerModelInput.model_fields
+    assert "surface_discourse" not in PlannerModelInput.model_fields

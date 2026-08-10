@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol, TypeVar
 
@@ -32,6 +33,8 @@ class PlannerDecisionModel(Protocol):
     async def decide(
         self,
         model_input: PlannerModelInput,
+        *,
+        message_history: Sequence[ModelMessage] = (),
     ) -> PlannerModelResult[PlannerDecision]: ...
 
     async def answer(
@@ -59,13 +62,14 @@ class PlannerModel:
     async def decide(
         self,
         model_input: PlannerModelInput,
+        *,
+        message_history: Sequence[ModelMessage] = (),
     ) -> PlannerModelResult[PlannerDecision]:
-        prompt = (
+        instructions = (
             "Classify the latest request into exactly one bounded MVP Planner action.\n"
             "Use only the typed research-state fields below as authoritative state.\n"
-            "The surface_discourse field is non-authoritative Human-Planner discourse "
-            "context only; use it to resolve intent and references, never as empirical "
-            "support.\n"
+            "Conversation history is non-authoritative discourse context only; use it to "
+            "resolve intent and references, never as empirical support.\n"
             "Assumptions are planning context, never empirical support.\n"
             "For data work, propose one bounded Task instruction and select exactly one "
             "Capability enum. If no Objective exists, include objective_text only when the "
@@ -73,12 +77,15 @@ class PlannerModel:
             "invalid_or_unsupported with a clarification message.\n"
             "Do not author a Hypothesis, protocol, method, decision rule, Evidence, Discovery, "
             "approval flow, Task DAG, or executor identifier.\n"
-            f"Typed input:\n{model_input.model_dump_json()}"
+            "The following current typed input supersedes any historical runtime context:\n"
+            f"{model_input.model_dump_json()}"
         )
         result = await self._agent.run(
-            prompt,
+            model_input.latest_request,
             output_type=PlannerDecision,
             deps=self.deps,
+            instructions=instructions,
+            message_history=message_history,
         )
         return PlannerModelResult(
             output=PlannerDecision.model_validate(result.output),

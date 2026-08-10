@@ -18,7 +18,7 @@ from cognieda.schemas.artifacts import (
     Task,
 )
 
-from .context import NonAuthoritativeSurfaceTurn, PlanningContext
+from .context import PlanningContext
 
 
 class PlannerAction(StrEnum):
@@ -123,7 +123,6 @@ class PlannerModelInput(BaseModel):
     tasks: tuple[Task, ...] = ()
     data_profile: DataProfile | None = None
     evidences: tuple[Evidence, ...] = ()
-    surface_discourse: tuple[NonAuthoritativeSurfaceTurn, ...] = ()
 
     @classmethod
     def from_context(cls, context: PlanningContext) -> PlannerModelInput:
@@ -134,7 +133,6 @@ class PlannerModelInput(BaseModel):
             tasks=context.tasks,
             data_profile=context.data_profile,
             evidences=context.evidences,
-            surface_discourse=context.surface_discourse,
         )
 
 
@@ -165,7 +163,8 @@ class State(BaseModel):
     query: str = Field(min_length=1)
     session_frame: SessionFrame
     planning_context: PlanningContext
-    new_message_segments: tuple[tuple[ModelMessage, ...], ...] = ()
+    message_history: tuple[ModelMessage, ...] = ()
+    new_messages: tuple[ModelMessage, ...] = ()
     execution_context: ExecutorContext = Field(default_factory=ExecutorContext)
     decision: PlannerDecision | None = None
     created_task_id: UUID | None = None
@@ -196,4 +195,4 @@ class PlannerOutput(BaseModel):
     selected_capability: Capability | None = None
     work_outcome: PlannerWorkOutcome | None = None
     error: PlannerControlledError | None = None
-    new_message_segments: tuple[tuple[ModelMessage, ...], ...] = ()
+    new_messages: tuple[ModelMessage, ...] = ()

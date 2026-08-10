@@ -56,6 +56,8 @@ class FakePlannerModel:
     async def decide(
         self,
         model_input: PlannerModelInput,
+        *,
+        message_history=(),
     ) -> PlannerModelResult[PlannerDecision]:
         self.decision_inputs.append(model_input)
         return PlannerModelResult(output=self.decision, new_messages=())

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import Never
 
 from cognieda.agents.planner.context import (
-    NonAuthoritativeSurfaceTurn,
     PlannerContextSelection,
     PlanningContext,
 )
@@ -46,7 +44,6 @@ class PlannerContextPreparer:
         *,
         latest_request: str,
         selection: PlannerContextSelection,
-        surface_discourse: Sequence[NonAuthoritativeSurfaceTurn] = (),
     ) -> PlanningContext:
         objective = None
         if selection.objective_id is not None:
@@ -125,7 +122,6 @@ class PlannerContextPreparer:
             tasks=tuple(tasks_by_id.values()),
             evidences=evidences,
             data_profile=data_profile,
-            surface_discourse=tuple(surface_discourse),
         )
 
     @staticmethod

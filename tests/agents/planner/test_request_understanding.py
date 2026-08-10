@@ -42,6 +42,8 @@ class FakePlannerModel:
     async def decide(
         self,
         model_input: PlannerModelInput,
+        *,
+        message_history=(),
     ) -> PlannerModelResult[PlannerDecision]:
         self.decision_inputs.append(model_input)
         return PlannerModelResult(output=self.decision, new_messages=())
@@ -137,8 +139,8 @@ def test_planner_run_consumes_prepared_context_not_session_conversation_inputs()
 
     assert parameters["planning_context"].default is inspect.Parameter.empty
     assert "surface_discourse" not in parameters
-    assert "message_history" not in parameters
-    assert "message_history" not in inspect.signature(FakePlannerModel.decide).parameters
+    assert "message_history" in parameters
+    assert "message_history" in inspect.signature(FakePlannerModel.decide).parameters
 
 
 def test_explicit_and_natural_objective_requests_reach_same_typed_action(db_session) -> None:

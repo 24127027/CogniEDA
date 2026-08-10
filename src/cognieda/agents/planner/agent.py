@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pydantic_ai.messages import ModelMessage
+
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import ExecutorContext
 from cognieda.schemas.artifacts import SessionFrame
@@ -57,6 +59,7 @@ class Planner:
         planning_context: PlanningContext,
         session_frame: SessionFrame | None = None,
         execution_context: ExecutorContext | None = None,
+        message_history: tuple[ModelMessage, ...] = (),
     ) -> PlannerOutput:
         """Run one request against explicit typed state and return its validated successor."""
 
@@ -79,6 +82,7 @@ class Planner:
             query=query,
             session_frame=frame,
             planning_context=planning_context,
+            message_history=message_history,
             execution_context=execution_context or ExecutorContext(),
         )
         context = Context(
@@ -107,5 +111,5 @@ class Planner:
             selected_capability=final_state.selected_capability,
             work_outcome=final_state.work_outcome,
             error=final_state.error,
-            new_message_segments=final_state.new_message_segments,
+            new_messages=final_state.new_messages,
         )
