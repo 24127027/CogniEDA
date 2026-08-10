@@ -137,10 +137,12 @@ retains the complete Human/Planner surface interaction while coherent
 `ConversationSegment` units preserve native PydanticAI `ModelMessage` history.
 `SessionFrame` contains cumulative typed FCO IDs plus active Objective and
 DataProfile selectors. A bounded selection step chooses current references and
-whole segments before `BuildPlanningContext` performs authoritative resolution,
-Evidence dependency expansion, and materialization. Empirical answer context
-remains Evidence-only. Resolved dependencies and context acquired later through
-an authorized role seam are not automatically persisted into `SessionFrame`.
+both non-authoritative surface discourse and whole native segments before
+`BuildPlanningContext` performs authoritative FCO resolution, Evidence
+dependency expansion, and materialization. Only native segment messages enter
+PydanticAI `message_history`; empirical answer context remains Evidence-only.
+Resolved dependencies and context acquired later through an authorized role
+seam are not automatically persisted into `SessionFrame`.
 
 ## MVP object semantics
 

@@ -156,9 +156,10 @@ model to infer intent.
 
 **Partially implemented.** The retained in-process `Session` now preserves
 cumulative SessionFrame successors and complete ConversationHistory while
-selecting whole coherent segments for each request. Deterministic turns need no
-fabricated model history. This is not restart-safe continuity or an interruption
-engine. Other operational foundations include
+selecting surface discourse and whole coherent native segments for each
+request. Deterministic turns need no fabricated model history. This is not
+restart-safe continuity or an interruption engine. Other operational
+foundations include
 append-only SessionFrame snapshots; durable PlannerOperation approval and
 resume checks; atomic commit for a bounded operation set; paired
 ExecutionRun/outbox admission; leases, fencing epochs, retry lineage, and

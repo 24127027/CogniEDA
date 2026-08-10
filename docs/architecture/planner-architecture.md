@@ -208,10 +208,12 @@ selected `Capability`, work outcome, and controlled error.
 
 Selected native PydanticAI `ModelMessage` history reaches request understanding
 through the adapter's `message_history` argument rather than typed prompt prose.
-The complete Human/Planner surface history remains outside SessionFrame;
-coherent model interactions are stored in indivisible `ConversationSegment`
-units, while deterministic turns may have no native segment. Empirical answer
-composition receives no conversation history.
+Selected Human/Planner surface turns reach the same request-understanding step
+through a separate typed field explicitly restricted to non-authoritative
+discourse and reference resolution. The complete surface history remains
+outside SessionFrame; coherent model interactions are stored in indivisible
+`ConversationSegment` units, while deterministic turns may have no native
+segment. Empirical answer composition receives no conversation history.
 
 The direct PydanticAI data-capability adapter remains a bounded tested seam but
 is not composed as an M1-B Planner tool. This prevents model tool calls from

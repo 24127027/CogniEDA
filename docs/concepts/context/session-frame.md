@@ -73,8 +73,9 @@ Session
   |   `-- active selectors
   `-- ConversationHistory
       `-- ConversationTurn
-          `-- ConversationSegment
-              `-- ModelMessage[]
+          +-- Human/Planner surface interaction
+          `-- ConversationSegment[]
+              `-- native ModelMessage[]
 ```
 
 `Session` is the in-process chat lifetime aggregate, not an FCO or scientific
@@ -85,13 +86,15 @@ so context pruning cannot split coherent tool-call/tool-return protocol.
 Deterministic turns may contain no segment; the runtime does not fabricate
 model messages for them.
 
-A Planner invocation first selects a bounded set of historical FCO references
-and whole conversation segments. `BuildPlanningContext` then resolves those
-references through authoritative repositories, expands required Evidence Task
-and DataProfile dependencies, validates lineage needed for safe use, and
-materializes the ephemeral run context. Dependency resolution does not add
-SessionFrame membership. Conversation may resolve discourse and references,
-but it cannot become Evidence or an empirical premise.
+A Planner invocation first selects a bounded set of historical FCO references,
+surface discourse turns, and whole conversation segments. Surface discourse is
+passed through an explicitly non-authoritative typed field for intent and
+reference resolution; only native segment messages enter PydanticAI
+`message_history`. `BuildPlanningContext` then resolves FCO references through
+authoritative repositories, expands required Evidence Task and DataProfile
+dependencies, validates lineage needed for safe use, and materializes the
+ephemeral run context. Dependency resolution does not add SessionFrame
+membership. Conversation cannot become Evidence or an empirical premise.
 
 Initial invocation context is not a closed reasoning universe. An authorized
 role may later acquire additional purpose-specific context during its run.
@@ -165,20 +168,26 @@ when an active Objective or DataProfile changes. The frame stores no
 materialized objects and imports no PydanticAI types.
 
 The bounded `PlannerContextSelector` selects the active Objective and
-DataProfile, the 20 most recent Assumption, Task, and Evidence candidates, and
-whole conversation segments chosen by four-turn recency plus exact lexical
-overlap. `BuildPlanningContext` resolves only that bounded selection and
-expands a selected Evidence item's authoritative Task and DataProfile even when
-those dependency IDs were not directly selected. Missing dependencies and
+DataProfile plus the 20 most recent Assumption, Task, and Evidence candidates.
+Conversation selection separately chooses surface turns and whole native
+segments by four-turn recency plus exact lexical overlap after deterministic
+NFKC normalization, case folding, and Unicode-aware word extraction.
+`BuildPlanningContext` resolves only the bounded FCO selection and expands a
+selected Evidence item's authoritative Task and DataProfile even when those
+dependency IDs were not directly selected. Missing dependencies and
 non-`COMPLETED` Evidence Tasks fail closed. Historical Evidence for another
 DataProfile remains stored but is not materialized into an active-profile run.
 
 A separate in-process runtime `Session` retains the successor frame and the
 complete `ConversationHistory`. Surface Human/Planner text and native model
 segments are both retained without semantic duplication. Request understanding
-receives only selected whole-segment history through PydanticAI's
+receives selected surface discourse through its non-authoritative typed input
+and selected whole-segment native history through PydanticAI's
 `message_history` channel; empirical answer composition still excludes
-conversation and Assumptions.
+conversation and Assumptions. `STATE_SUMMARY` uses cumulative SessionFrame
+membership for historical counts and the authoritatively resolved active
+Objective for its descriptive text; bounded `PlanningContext` counts are not
+presented as whole-session totals.
 
 The active schema does not encode the complete canonical purpose, reasoning
 mode, Objective-isolation, validity, or item-level eligibility model. Runtime

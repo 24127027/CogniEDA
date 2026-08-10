@@ -136,10 +136,12 @@ backlog. [Current state](current-state.md) owns capability detail.
 - Focused runtime tests prove cumulative ID-only SessionFrame retention,
   active-selector invariants, authoritative object re-resolution and dependency
   expansion, native `ModelMessage` segment serialization including coherent tool
-  call/return structure, whole-segment selection without deletion, selected-history
-  use only during request understanding, and conversation/Assumption exclusion
-  from empirical answer input. They do not prove restart-safe Session persistence
-  or runtime Evidence admission composition.
+  call/return structure, deterministic Unicode-aware selection of surface
+  discourse and whole segments without deletion, separate typed discourse and
+  native `message_history` channels used only during request understanding,
+  cumulative SessionFrame summary counts, and conversation/Assumption exclusion
+  from empirical answer input. They do not prove restart-safe Session
+  persistence or runtime Evidence admission composition.
 - No production performance envelope, non-SQLite validation, or external
   integration test exists. The first-party documentation regression is
   intentionally limited to internal Markdown links, relative anchors, and
