@@ -1,8 +1,9 @@
 from langgraph.graph import END, START
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 
+from .context import Context
 from .nodes import apply_planning_state, compose_response, dispatch_work, understand_request
-from .types import Context, State
+from .types import State
 
 
 def build_graph() -> CompiledStateGraph[State, Context, State, State]:

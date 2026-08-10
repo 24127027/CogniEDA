@@ -18,9 +18,11 @@ backlog. [Current state](current-state.md) owns capability detail.
 
 ## Implementation gap
 
-- M1-B Planner behavior and M3-A deterministic Data Explorer-to-Evidence
-  admission are **Implemented** at bounded library surfaces. M5-A retained
-  single-session composition is **Deferred**.
+- M1-B Planner behavior, append-only native model conversation history, and
+  M3-A deterministic Data Explorer-to-Evidence admission are **Implemented**
+  at bounded library surfaces. The in-process Application retains its current
+  successor SessionFrame and model-backed conversation turns, but durable
+  restart/recovery and full M5-A single-session composition are **Deferred**.
 - `PlanRevision`, `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
@@ -69,7 +71,9 @@ backlog. [Current state](current-state.md) owns capability detail.
 
 - Bootstrap composes the in-process S0 dispatcher and bounded Data Explorer.
   The installable `cognieda [PATH]` command reaches the development Planner
-  REPL and is **Partially implemented**; no supported end-to-end application
+  REPL and is **Partially implemented**. Its Application retains successor
+  MVP SessionFrame state and complete native-message model turns only for the
+  current process; no durable recovery, supported end-to-end application
   runtime, worker, service API, or product CLI exists.
 - The local Data Explorer path executes only finite validated deterministic
   operations from an explicit absolute CSV or Parquet path. General-purpose

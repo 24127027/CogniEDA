@@ -200,6 +200,17 @@ containing admitted Evidence but no Assumptions. `PlannerOutput` exposes the
 human response, successor `SessionFrame`, typed decision, created Task IDs,
 selected `Capability`, work outcome, and controlled error.
 
+The bounded runtime also implements non-authoritative conversation continuity
+for model-backed Planner runs. `PlanningContext` materializes the current MVP
+research objects plus an append-only `ConversationHistory`. Each
+`ConversationTurn` contains the native PydanticAI `ModelMessage` values from
+one complete Planner/LangGraph run; the flattened history is passed unchanged
+to the next request-understanding model invocation. Conversation is not
+Evidence, does not alter SessionFrame authority, and is excluded from the
+Evidence-only answer input. The in-process `Application` retains history and
+the successor MVP SessionFrame, but does not durably persist or reconstruct
+either one after restart.
+
 The direct PydanticAI data-capability adapter remains a bounded tested seam but
 is not composed as an M1-B Planner tool. This prevents model tool calls from
 dispatching work before a canonical Task enters typed state. Planner receives

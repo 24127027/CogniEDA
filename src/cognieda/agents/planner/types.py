@@ -4,6 +4,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic_ai.messages import ModelMessage
 
 from cognieda.execution import Capability, ExecutorContext, PlannerWorkOutcome
 from cognieda.schemas.artifacts import (
@@ -162,16 +163,8 @@ class State(BaseModel):
     selected_capability: Capability | None = None
     work_outcome: PlannerWorkOutcome | None = None
     response: str | None = None
+    new_messages: tuple[ModelMessage, ...] = ()
     error: PlannerControlledError | None = None
-
-
-class Context(BaseModel):
-    """Injected model and dispatcher boundaries available to graph nodes."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
-
-    planner_model: object
-    dispatcher: object
 
 
 class PlannerOutput(BaseModel):
@@ -185,4 +178,5 @@ class PlannerOutput(BaseModel):
     created_task_ids: tuple[UUID, ...] = ()
     selected_capability: Capability | None = None
     work_outcome: PlannerWorkOutcome | None = None
+    new_messages: tuple[ModelMessage, ...] = ()
     error: PlannerControlledError | None = None

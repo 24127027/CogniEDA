@@ -4,16 +4,11 @@ from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import ExecutorContext
 from cognieda.schemas.artifacts import SessionFrame
 
+from .context import Context, PlanningContext
 from .dependencies import PlannerDeps
 from .graph import build_graph
 from .model import PlannerDecisionModel, PlannerModel
-from .types import (
-    Context,
-    PlannerControlledError,
-    PlannerErrorCode,
-    PlannerOutput,
-    State,
-)
+from .types import PlannerControlledError, PlannerErrorCode, PlannerOutput, State
 
 
 class Planner:
@@ -53,6 +48,7 @@ class Planner:
         self,
         query: str,
         *,
+        planning_context: PlanningContext | None = None,
         session_frame: SessionFrame | None = None,
         execution_context: ExecutorContext | None = None,
     ) -> PlannerOutput:
@@ -71,7 +67,18 @@ class Planner:
             session_frame=frame,
             execution_context=execution_context or ExecutorContext(),
         )
-        context = Context(planner_model=self.model, dispatcher=self.deps.dispatcher)
+        context = Context(
+            planner_model=self.model,
+            dispatcher=self.deps.dispatcher,
+            planning_context=planning_context
+            or PlanningContext(
+                objective=frame.objective,
+                assumptions=frame.assumptions,
+                tasks=frame.tasks,
+                evidences=frame.evidences,
+                data_profile=frame.data_profile,
+            ),
+        )
         result = await self.graph.ainvoke(state, context=context)
         final_state = State.model_validate(result)
 
@@ -94,5 +101,6 @@ class Planner:
             ),
             selected_capability=final_state.selected_capability,
             work_outcome=final_state.work_outcome,
+            new_messages=final_state.new_messages,
             error=final_state.error,
         )

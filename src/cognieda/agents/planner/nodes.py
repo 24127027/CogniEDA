@@ -15,9 +15,9 @@ from cognieda.execution import (
 from cognieda.schemas.artifacts import Assumption, Objective, Task
 from cognieda.schemas.enums import TaskStatus
 
+from .context import Context
 from .model import PlannerDecisionModel
 from .types import (
-    Context,
     PlannerAction,
     PlannerAnswerInput,
     PlannerControlledError,
@@ -109,9 +109,14 @@ async def understand_request(state: State, runtime: Runtime[Context]) -> State:
 
     model = cast(PlannerDecisionModel, runtime.context.planner_model)
     try:
-        state.decision = await model.decide(
-            PlannerModelInput.from_frame(state.query, state.session_frame)
+        result = await model.decide(
+            PlannerModelInput.from_frame(state.query, state.session_frame),
+            message_history=(
+                runtime.context.planning_context.conversation_history.model_messages()
+            ),
         )
+        state.decision = result.output
+        state.new_messages = (*state.new_messages, *result.new_messages)
     except Exception as exc:
         state.error = _error(
             PlannerErrorCode.INVALID_MODEL_DECISION,
@@ -271,7 +276,7 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
             return state
         model = cast(PlannerDecisionModel, runtime.context.planner_model)
         try:
-            draft = await model.answer(
+            result = await model.answer(
                 PlannerAnswerInput(
                     latest_request=state.query,
                     objective=state.session_frame.objective,
@@ -279,7 +284,8 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
                     evidences=state.session_frame.evidences,
                 )
             )
-            state.response = draft.text
+            state.response = result.output.text
+            state.new_messages = (*state.new_messages, *result.new_messages)
         except Exception as exc:
             state.error = _error(
                 PlannerErrorCode.RESPONSE_FAILED,
