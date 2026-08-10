@@ -56,5 +56,5 @@ class SqlitePlannerResearchState:
     def create_task(self, task: Task) -> Task:
         return self._tasks.create(task)
 
-    def update_task_status(self, task_id: UUID, status: TaskStatus) -> Task | None:
+    def transition_task_status(self, task_id: UUID, status: TaskStatus) -> Task | None:
         return self._tasks.update(task_id, TaskUpdate(status=status))

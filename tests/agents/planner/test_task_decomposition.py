@@ -16,7 +16,6 @@ from cognieda.agents.planner.types import (
     PlannerModelInput,
     PlannerResponseDraft,
 )
-from cognieda.application.services import PlannerContextPreparer, select_planner_context
 from cognieda.execution import (
     Capability,
     ExecutionFailure,
@@ -29,6 +28,7 @@ from cognieda.infrastructure.persistence.repositories import (
     DataProfileRepository,
     EvidenceRepository,
 )
+from cognieda.runtime.planner_context import PlannerContextPreparer, select_planner_context
 from cognieda.schemas.artifacts import (
     Assumption,
     DataProfile,
@@ -105,7 +105,7 @@ def _planner(
     research_state: SqlitePlannerResearchState,
 ) -> Planner:
     return Planner(
-        deps=PlannerDeps(dispatcher=dispatcher, research_state=research_state),
+        deps=PlannerDeps(dispatcher=dispatcher, state_mutations=research_state),
         planner_model=model,
     )
 

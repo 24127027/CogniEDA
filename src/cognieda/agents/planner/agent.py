@@ -84,7 +84,7 @@ class Planner:
         context = Context(
             planner_model=self.model,
             dispatcher=self.deps.dispatcher,
-            research_state=self.deps.research_state,
+            state_mutations=self.deps.state_mutations,
         )
         result = await self.graph.ainvoke(state, context=context)
         final_state = State.model_validate(result)

@@ -92,11 +92,11 @@ Runtime/application first selects bounded historical FCO references and
 surface conversation turns. Surface discourse is projected through an explicitly
 non-authoritative typed field for intent and reference resolution. Native
 messages from completed previous top-level executions remain stored in their
-segments and are not replayed into the new Human turn. The application
-`PlannerContextPreparer` resolves FCO
-references through the research-state port, expands required Evidence Task and
-DataProfile dependencies, validates lineage needed for safe use, and
-materializes the ephemeral run context before `Planner.run`. Dependency
+segments and are not replayed into the new Human turn. The runtime
+`PlannerContextPreparer` resolves FCO references through the concrete SQLite
+gateway, expands required Evidence Task and DataProfile dependencies, validates
+lineage needed for safe use, and materializes the ephemeral run context before
+`Planner.run`. Dependency
 resolution does not add SessionFrame membership. Conversation cannot become
 Evidence or an empirical premise.
 

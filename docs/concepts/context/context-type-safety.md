@@ -119,7 +119,8 @@ permitted use.
 **Partially implemented.** Runtime/application prepares one immutable
 `PlanningContext` before each bounded Planner run. Separate selection seams
 choose active and finite recent FCO references and bounded conversation turns;
-the application `PlannerContextPreparer` performs authoritative resolution,
+the runtime `PlannerContextPreparer` performs authoritative resolution through
+the concrete SQLite gateway,
 Evidence dependency expansion, lineage checks, and materialization. A
 dependency resolved for safe use does not become SessionFrame membership.
 Historical Evidence outside the active DataProfile is retained but omitted

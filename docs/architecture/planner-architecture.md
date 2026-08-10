@@ -195,18 +195,21 @@ START
 
 At that library boundary, typed model output selects one finite MVP action;
 runtime `Application` uses the pure `select_planner_context` policy to choose
-active and finite recent SessionFrame references. The application
+active and finite recent SessionFrame references. The runtime
 `PlannerContextPreparer` resolves that typed `PlannerContextSelection` through
-the research-state port, expands selected Evidence to required Task and
-DataProfile dependencies, and creates one ephemeral materialized context before
-`Planner.run` begins. Planner graph nodes do not repeat session selection or
-materialization during the run; they update the run-local context only from
-authoritative objects returned by current-run operations.
+the concrete SQLite research-state gateway composed at the runtime boundary,
+expands selected Evidence to required Task and DataProfile dependencies, and
+creates one ephemeral materialized context before `Planner.run` begins. No
+research-state read dependency enters Planner. Planner graph nodes do not
+repeat session selection or materialization during the run; they update the
+run-local context only from authoritative objects returned by current-run
+operations.
 Deterministic code persists successor Objective, Assumption, and Task objects
-through that port before retaining their IDs; tracked data work transitions
-`PENDING -> RUNNING -> COMPLETED|FAILED` in authoritative storage while the
-SessionFrame Task ID remains stable; and the injected dispatcher remains the
-only active execution path. The Planner
+through the narrow application `PlannerStateMutationPort` before retaining
+their IDs; tracked data work transitions
+`PENDING -> RUNNING -> COMPLETED|FAILED` through the same lifecycle boundary
+while the SessionFrame Task ID remains stable; and the injected dispatcher
+remains the only active execution path. The Planner
 normalizes and identity-checks `PlannerWorkOutcome`, preserves its digest and
 diagnostics, creates no Evidence, and gives empirical answer drafting an input
 containing admitted Evidence but no Assumptions. `PlannerOutput` exposes the
@@ -231,8 +234,12 @@ execution may require its native messages. That recovery contract is
 The direct PydanticAI data-capability adapter remains a bounded tested seam but
 is not composed as an M1-B Planner tool. This prevents model tool calls from
 dispatching work before a canonical Task enters typed state. Planner receives
-its model, dispatcher, and application research-state port explicitly; it
-constructs no concrete persistence or provider infrastructure.
+its model, dispatcher, and application mutation/lifecycle port explicitly; it
+constructs no concrete persistence or provider infrastructure. Runtime retains
+the same stateful Planner control-plane object across turns in the active
+Session. That object owns model, dispatcher/runtime dependencies, and run-local
+graph state; it is not the durable source of truth for Objective, Task,
+DataProfile, or Evidence state.
 
 The former donor request-understanding and decomposition tests were rewritten
 against active M1-A/M1-B contracts, and the obsolete PlannerOperation

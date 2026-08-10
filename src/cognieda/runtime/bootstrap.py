@@ -7,7 +7,6 @@ from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.application.ports import ModelConfig
-from cognieda.application.services import PlannerContextPreparer
 from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
 from cognieda.infrastructure.agent_tooling import AgentTooling
 from cognieda.infrastructure.llm import OpenAICompatibleAgentFactory
@@ -18,6 +17,7 @@ from cognieda.infrastructure.persistence import (
 )
 
 from .application import Application
+from .planner_context import PlannerContextPreparer
 from .workspace import Workspace
 
 
@@ -46,7 +46,7 @@ def bootstrap_application(workspace_path: Path) -> Application:
     init_db(database_url)
     research_state = SqlitePlannerResearchState(get_session(database_url))
     planner = Planner(
-        deps=PlannerDeps(dispatcher=dispatcher, research_state=research_state),
+        deps=PlannerDeps(dispatcher=dispatcher, state_mutations=research_state),
         agent_factory=agent_factory,
         model_config=model_config,
     )

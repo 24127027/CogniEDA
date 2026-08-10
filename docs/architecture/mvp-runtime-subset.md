@@ -140,13 +140,14 @@ PydanticAI's tool or retry protocol inside those segments.
 `SessionFrame` contains cumulative typed FCO IDs plus active Objective and
 DataProfile selectors. Runtime `Application` separately selects bounded
 surface conversation turns and a bounded `PlannerContextSelection` of
-research-state references. The application `PlannerContextPreparer` then resolves
-authoritative FCOs, expands Evidence dependencies, and materializes one
-ephemeral `PlanningContext` before calling `Planner.run`. That context contains
-the latest request, authoritative typed state, and selected non-authoritative
-surface discourse. Native messages from completed prior top-level Planner
-executions are not replayed into the fresh turn; empirical answer context
-remains Evidence-only.
+research-state references. The runtime `PlannerContextPreparer` then resolves
+authoritative FCOs through the concrete SQLite gateway, expands Evidence
+dependencies, and materializes one ephemeral `PlanningContext` before calling
+`Planner.run`. That context contains the latest request, authoritative typed
+state, and selected non-authoritative surface discourse. Planner receives no
+research-state read dependency. Native messages from completed prior top-level
+Planner executions are not replayed into the fresh turn; empirical answer
+context remains Evidence-only.
 Resolved dependencies and context acquired later through an authorized role
 seam are not automatically persisted into `SessionFrame`.
 
@@ -412,9 +413,11 @@ explicit command surface maps into the same typed actions and unknown commands
 fail without state mutation or dispatch.
 
 Deterministic orchestration persists Objective, Assumption, and Task values
-through the application research-state port, then records their IDs through
-`SessionFrame` successor seams. Semantic Objective refinement receives a new
-identity; semantic Task change creates a new Task; lifecycle change updates the
+through the application `PlannerStateMutationPort`, then records their IDs
+through `SessionFrame` successor seams. The port contains only current
+mutation and Task-lifecycle operations; context reads remain at the runtime
+composition boundary. Semantic Objective refinement receives a new identity;
+semantic Task change creates a new Task; lifecycle change updates the
 authoritative Task while retaining its frame ID and instruction. Tracked data
 work follows:
 

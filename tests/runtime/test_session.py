@@ -29,7 +29,6 @@ from cognieda.agents.planner.types import (
     PlannerModelInput,
     PlannerResponseDraft,
 )
-from cognieda.application.services import PlannerContextPreparer, select_planner_context
 from cognieda.execution import (
     Capability,
     ExecutionRequest,
@@ -48,6 +47,7 @@ from cognieda.runtime.conversation import (
     _selection_terms,
     select_conversation_context,
 )
+from cognieda.runtime.planner_context import PlannerContextPreparer, select_planner_context
 from cognieda.runtime.session import Session
 from cognieda.schemas.artifacts import (
     Assumption,
@@ -117,7 +117,7 @@ def _application(
 ) -> tuple[Application, FakeDispatcher]:
     dispatcher = FakeDispatcher()
     planner = Planner(
-        deps=PlannerDeps(dispatcher=dispatcher, research_state=research_state),
+        deps=PlannerDeps(dispatcher=dispatcher, state_mutations=research_state),
         planner_model=model,
     )
     application = Application(
@@ -174,12 +174,14 @@ def test_application_retains_ids_and_resolved_context_across_turns(db_session) -
         PlannerDecision(action=PlannerAction.STATE_SUMMARY),
     )
     application, _ = _application(model, research_state)
+    retained_planner = application.planner_agent
 
     asyncio.run(application.submit_message("Investigate customer churn."))
     first_session = application.session
     asyncio.run(application.submit_message("Summarize what we established."))
 
     assert application.session is not first_session
+    assert application.planner_agent is retained_planner
     assert application.session.session_id == first_session.session_id
     assert application.session.session_frame.active_objective_id is not None
     objective = research_state.get_objective(

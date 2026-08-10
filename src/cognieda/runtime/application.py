@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import NonAuthoritativeSurfaceTurn
-from cognieda.application.services import (
-    PlannerContextPreparer,
-    PlanningContextResolutionError,
-    select_planner_context,
-)
 from cognieda.execution import ExecutorDispatcher
 
 from .conversation import ConversationSegment, select_conversation_context
 from .messages import Message, MessageRole, MessageType
+from .planner_context import (
+    PlannerContextPreparer,
+    PlanningContextResolutionError,
+    select_planner_context,
+)
 from .session import Session
 from .workspace import Workspace
 

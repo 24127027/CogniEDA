@@ -8,7 +8,7 @@ from cognieda.agents.planner.context import (
     PlannerContextSelection,
     PlanningContext,
 )
-from cognieda.application.ports import PlannerResearchStatePort
+from cognieda.infrastructure.persistence import SqlitePlannerResearchState
 from cognieda.schemas.artifacts import SessionFrame
 from cognieda.schemas.enums import TaskStatus
 
@@ -36,9 +36,9 @@ def select_planner_context(
 
 
 class PlannerContextPreparer:
-    """Materialize one Planner run context through authoritative application state."""
+    """Materialize one Planner run context from the runtime's concrete state gateway."""
 
-    def __init__(self, research_state: PlannerResearchStatePort) -> None:
+    def __init__(self, research_state: SqlitePlannerResearchState) -> None:
         self._research_state = research_state
 
     def build(

@@ -18,9 +18,9 @@ from cognieda.agents.planner.types import (
     PlannerModelInput,
     PlannerResponseDraft,
 )
-from cognieda.application.services import PlannerContextPreparer, select_planner_context
 from cognieda.execution import ExecutionRequest
 from cognieda.infrastructure.persistence import SqlitePlannerResearchState
+from cognieda.runtime.planner_context import PlannerContextPreparer, select_planner_context
 from cognieda.schemas.artifacts import Assumption, Objective, SessionFrame, Task
 
 
@@ -62,7 +62,7 @@ def _planner(
     research_state: SqlitePlannerResearchState,
 ) -> Planner:
     return Planner(
-        deps=PlannerDeps(dispatcher=dispatcher, research_state=research_state),
+        deps=PlannerDeps(dispatcher=dispatcher, state_mutations=research_state),
         planner_model=model,
     )
 

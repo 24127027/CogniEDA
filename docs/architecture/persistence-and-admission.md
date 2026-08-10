@@ -256,13 +256,13 @@ non-FCO provenance/authority record and does not expand the semantic graph.
 The bounded Planner/runtime surface is also **Verified on SQLite** for
 cumulative ID-only SessionFrame round-trip, active selectors, and authoritative
 Objective, Assumption, Task, DataProfile, and Evidence reference resolution.
-Runtime bootstrap binds the
-Planner research-state port to the selected Workspace's
+Runtime bootstrap binds the concrete research-state gateway to the selected Workspace's
 `.cognieda/state/cognieda.sqlite3`. Bounded selection precedes
-application-owned `PlannerContextPreparer` materialization; dependency
+runtime-owned `PlannerContextPreparer` materialization; dependency
 expansion does not add SessionFrame members, and materialized objects are not
-cached as a second authority. The port preserves inward dependency direction;
-Planner/application code does not depend on SQLModel or the SQLite adapter.
+cached as a second authority. Planner receives only the prepared context plus a
+narrow application mutation/lifecycle port; it does not depend on SQLModel or
+the SQLite adapter. Runtime owns the concrete composition.
 SessionFrame and ConversationHistory runtime successors are
 still process-local and are not automatically persisted for recovery.
 

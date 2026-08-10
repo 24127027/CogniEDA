@@ -4,11 +4,6 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from cognieda.application.services import (
-    PlannerContextPreparer,
-    PlanningContextResolutionError,
-    select_planner_context,
-)
 from cognieda.infrastructure.persistence import SqlitePlannerResearchState
 from cognieda.infrastructure.persistence.repositories import (
     AssumptionRepository,
@@ -18,6 +13,11 @@ from cognieda.infrastructure.persistence.repositories import (
     SessionFrameRepository,
     TaskRepository,
     TaskUpdate,
+)
+from cognieda.runtime.planner_context import (
+    PlannerContextPreparer,
+    PlanningContextResolutionError,
+    select_planner_context,
 )
 from cognieda.schemas.artifacts import (
     Assumption,

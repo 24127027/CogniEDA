@@ -5,6 +5,8 @@ import importlib
 from collections.abc import Iterable
 from pathlib import Path
 
+from cognieda.application.ports import PlannerStateMutationPort
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = PROJECT_ROOT / "src" / "cognieda"
 
@@ -42,11 +44,56 @@ def test_planner_cannot_access_dataset_implementation_directly() -> None:
     assert violations == []
 
 
-def test_planner_uses_application_state_port_not_persistence_implementation() -> None:
+def test_planner_uses_application_mutation_port_not_persistence_implementation() -> None:
     violations = [
         f"{path.relative_to(PROJECT_ROOT)} imports {module}"
         for path, module in _imports(_python_files("agents/planner"))
         if module.startswith("cognieda.infrastructure.persistence") or module == "sqlmodel"
+    ]
+
+    assert violations == []
+
+
+def test_planner_state_port_contains_only_current_mutation_and_lifecycle_operations() -> None:
+    public_methods = {
+        name
+        for name, value in vars(PlannerStateMutationPort).items()
+        if not name.startswith("_") and callable(value)
+    }
+
+    assert public_methods == {
+        "create_assumption",
+        "create_objective",
+        "create_task",
+        "transition_task_status",
+    }
+
+
+def test_planner_does_not_read_research_objects_or_reconstruct_initial_context() -> None:
+    forbidden_reads = {
+        "get_assumption",
+        "get_data_profile",
+        "get_evidence",
+        "get_objective",
+        "get_task",
+    }
+    violations = [
+        f"{path.relative_to(PROJECT_ROOT)} calls {node.func.attr}"
+        for path in _python_files("agents/planner")
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"), filename=str(path)))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in forbidden_reads
+    ]
+
+    assert violations == []
+
+
+def test_application_layer_does_not_own_planner_context_preparation() -> None:
+    violations = [
+        f"{path.relative_to(PROJECT_ROOT)} imports {module}"
+        for path, module in _imports(_python_files("application"))
+        if module == "cognieda.agents.planner.context"
     ]
 
     assert violations == []

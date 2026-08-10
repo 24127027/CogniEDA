@@ -35,7 +35,7 @@ backlog. [Current state](current-state.md) owns capability detail.
 - Hypothesis Analyst and Graph Miner remain unregistered scaffolds. Discovery
   and Hypothesis remain canonical FCO names but have no active MVP runtime.
 - Planner successor-state active Objective change and Assumption addition are
-  **Implemented** through the application research-state port: new objects are
+  **Implemented** through the application `PlannerStateMutationPort`: new objects are
   persisted before their IDs enter the successor frame. In-place Objective and
   Assumption updates remain **Deferred**. Task persistence supports status
   change only. Active Task values are immutable; changing Task meaning requires
@@ -69,7 +69,7 @@ backlog. [Current state](current-state.md) owns capability detail.
   removed. The active M1-A SessionFrame schema is the only executable frame
   owner and stores cumulative FCO IDs plus active selectors. The runtime Session
   keeps complete segmented conversation separate, while the current selector
-  bounds references before the application `PlannerContextPreparer` resolves
+  bounds references before the runtime `PlannerContextPreparer` resolves
   authoritative objects and required dependencies for the four-node Planner
   graph. The unregistered
   Hypothesis Analyst, Planner operation contracts, deferred retrieval engine,
@@ -118,7 +118,7 @@ backlog. [Current state](current-state.md) owns capability detail.
   migration are outside M1-A.
 - SessionFrame snapshots use an internal serialized SQLite envelope; this is a
   bounded round-trip seam, not M5-A/M5-B durable runtime authority.
-- Runtime bootstrap composes the Planner research-object authority at
+- Runtime bootstrap composes the concrete research-state gateway at
   `<workspace>/.cognieda/state/cognieda.sqlite3`. The standalone persistence
   helper still retains a provisional package-local default when used outside
   bootstrap without an explicit `COGNIEDA_DB_URL`. Runtime SessionFrame and

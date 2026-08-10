@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
 
-from cognieda.application.ports import PlannerResearchStatePort
+from cognieda.application.ports import PlannerStateMutationPort
 from cognieda.execution import Capability, ExecutorContext, PlannerWorkOutcome
 from cognieda.schemas.artifacts import (
     Assumption,
@@ -177,11 +177,11 @@ class State(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class Context:
-    """Injected model and dispatcher boundaries available to graph nodes."""
+    """Injected model, dispatcher, and mutation boundaries available to graph nodes."""
 
     planner_model: object
     dispatcher: object
-    research_state: PlannerResearchStatePort
+    state_mutations: PlannerStateMutationPort
 
 
 class PlannerOutput(BaseModel):

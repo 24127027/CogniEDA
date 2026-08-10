@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 
-from cognieda.application.ports import ExecutorDispatcherPort, PlannerResearchStatePort
+from cognieda.application.ports import ExecutorDispatcherPort, PlannerStateMutationPort
 
 
 @dataclass
 class PlannerDeps:
     dispatcher: ExecutorDispatcherPort
-    research_state: PlannerResearchStatePort
+    state_mutations: PlannerStateMutationPort

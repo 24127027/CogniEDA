@@ -145,7 +145,7 @@ async def apply_planning_state(state: State, runtime: Runtime[Context]) -> State
             assert decision.objective_text is not None
             current = state.planning_context.objective
             if current is None or current.text != decision.objective_text:
-                objective = runtime.context.research_state.create_objective(
+                objective = runtime.context.state_mutations.create_objective(
                     Objective(text=decision.objective_text)
                 )
                 state.session_frame = state.session_frame.add_objective_id(objective.objective_id)
@@ -154,7 +154,7 @@ async def apply_planning_state(state: State, runtime: Runtime[Context]) -> State
                 )
         elif decision.action is PlannerAction.ADD_ASSUMPTION:
             assert decision.assumption_text is not None
-            assumption = runtime.context.research_state.create_assumption(
+            assumption = runtime.context.state_mutations.create_assumption(
                 Assumption(text=decision.assumption_text)
             )
             state.session_frame = state.session_frame.add_assumption_id(assumption.assumption_id)
@@ -171,7 +171,7 @@ async def apply_planning_state(state: State, runtime: Runtime[Context]) -> State
                         "Data work requires a clear active Objective before a Task can run.",
                     )
                     return state
-                objective = runtime.context.research_state.create_objective(
+                objective = runtime.context.state_mutations.create_objective(
                     Objective(text=decision.objective_text)
                 )
                 state.session_frame = state.session_frame.add_objective_id(objective.objective_id)
@@ -179,7 +179,7 @@ async def apply_planning_state(state: State, runtime: Runtime[Context]) -> State
                     update={"objective": objective}
                 )
             task = Task(instruction=decision.task_instruction, status=TaskStatus.PENDING)
-            task = runtime.context.research_state.create_task(task)
+            task = runtime.context.state_mutations.create_task(task)
             state.session_frame = state.session_frame.add_task_id(task.task_id)
             _replace_context_task(state, task)
             state.created_task_id = task.task_id
@@ -217,7 +217,9 @@ async def dispatch_work(state: State, runtime: Runtime[Context]) -> State:
     dispatcher = cast(ExecutorDispatcherPort, runtime.context.dispatcher)
     task_id = state.created_task_id
     try:
-        running = runtime.context.research_state.update_task_status(task_id, TaskStatus.RUNNING)
+        running = runtime.context.state_mutations.transition_task_status(
+            task_id, TaskStatus.RUNNING
+        )
         if running is None:
             raise ValueError("Authoritative Task disappeared before dispatch.")
         _replace_context_task(state, running)
@@ -232,7 +234,7 @@ async def dispatch_work(state: State, runtime: Runtime[Context]) -> State:
         outcome = normalize_for_planner(result)
         state.work_outcome = outcome
         if outcome.task_id != task_id:
-            failed = runtime.context.research_state.update_task_status(
+            failed = runtime.context.state_mutations.transition_task_status(
                 task_id, TaskStatus.FAILED
             )
             if failed is not None:
@@ -248,13 +250,15 @@ async def dispatch_work(state: State, runtime: Runtime[Context]) -> State:
             if outcome.status is ExecutionStatus.SUCCEEDED
             else TaskStatus.FAILED
         )
-        updated = runtime.context.research_state.update_task_status(task_id, terminal_status)
+        updated = runtime.context.state_mutations.transition_task_status(
+            task_id, terminal_status
+        )
         if updated is None:
             raise ValueError("Authoritative Task disappeared during dispatch.")
         _replace_context_task(state, updated)
     except Exception as exc:
         try:
-            failed = runtime.context.research_state.update_task_status(
+            failed = runtime.context.state_mutations.transition_task_status(
                 task_id, TaskStatus.FAILED
             )
             if failed is not None:

@@ -60,7 +60,7 @@ def test_planner_model_starts_fresh_execution_and_returns_exact_new_messages() -
     model = PlannerModel(
         deps=PlannerDeps(
             dispatcher=object(),  # type: ignore[arg-type]
-            research_state=object(),  # type: ignore[arg-type]
+            state_mutations=object(),  # type: ignore[arg-type]
         ),
         agent_factory=RecordingFactory(agent),  # type: ignore[arg-type]
         model_config=ModelConfig(model_name="test"),
