@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import unicodedata
 from collections.abc import Sequence
 
 import pytest
@@ -418,6 +419,47 @@ def test_context_selection_omits_and_later_reselects_only_whole_segments() -> No
     assert segments[0] in later.model_segments
     assert history.turns[0].segments == (segments[0],)
     assert later.model_messages()[0:2] == (*segments[0].messages,)
+
+
+def test_unicode_selection_normalizes_and_reselects_old_vietnamese_turn() -> None:
+    old_messages: tuple[ModelMessage, ...] = (
+        ModelRequest(
+            parts=[UserPromptPart(content="Phân tích nhóm khách hàng đã rời bỏ.")]
+        ),
+        ModelResponse(
+            parts=[TextPart(content="Đã ghi nhận phân tích khách hàng rời bỏ.")]
+        ),
+    )
+    history = ConversationHistory().add_turn(
+        human_message="Phân tích nhóm khách hàng đã rời bỏ.",
+        planner_response="Đã ghi nhận phân tích khách hàng rời bỏ.",
+        message_segments=(old_messages,),
+    )
+    for topic in ("pricing", "quality", "schema", "rows", "summary"):
+        history = history.add_turn(
+            human_message=f"Discuss {topic}",
+            planner_response=f"Recorded {topic}",
+        )
+
+    unrelated = history.select_for_request_understanding("Continue with pricing")
+    request = "Quay lại phân tích KHÁCH HÀNG rời bỏ."
+    selected = history.select_for_request_understanding(request)
+    selected_again = history.select_for_request_understanding(request)
+
+    assert history.turns[0] not in unrelated.surface_turns
+    assert history.turns[0] in selected.surface_turns
+    assert history.turns[0].segments[0] in selected.model_segments
+    assert selected == selected_again
+    assert history.turns[0].segments[0].messages == old_messages
+
+    decomposed = unicodedata.normalize("NFD", "PHÂN TÍCH KHÁCH HÀNG RỜI BỎ")
+    assert ConversationHistory._selection_terms(decomposed) == {
+        "phân",
+        "tích",
+        "khách",
+        "hàng",
+        "rời",
+    }
 
 
 def test_conversation_segment_rejects_split_tool_protocol() -> None:

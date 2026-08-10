@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import Counter
 from collections.abc import Iterable
 from uuid import UUID, uuid4
@@ -139,7 +140,12 @@ class ConversationHistory(ImmutableCogniEDABaseModel):
 
     @staticmethod
     def _selection_terms(text: str) -> set[str]:
-        return {term for term in re.findall(r"[a-z0-9_]+", text.casefold()) if len(term) >= 4}
+        normalized = unicodedata.normalize("NFKC", text).casefold()
+        return {
+            term
+            for term in re.findall(r"\w+", normalized, flags=re.UNICODE)
+            if len(term) >= 3
+        }
 
     def presentation_transcript(self) -> tuple[tuple[str, str], ...]:
         """Return the non-authoritative Human/Planner surface transcript."""
