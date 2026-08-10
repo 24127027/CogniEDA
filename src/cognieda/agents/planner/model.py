@@ -21,7 +21,7 @@ PlannerModelOutputT = TypeVar("PlannerModelOutputT")
 
 @dataclass(frozen=True)
 class PlannerModelResult[PlannerModelOutputT]:
-    """Typed output plus the exact native messages produced by one model run."""
+    """Typed output plus the native messages produced by one model invocation."""
 
     output: PlannerModelOutputT
     new_messages: tuple[ModelMessage, ...]
@@ -65,11 +65,9 @@ class PlannerModel:
         *,
         message_history: Sequence[ModelMessage] = (),
     ) -> PlannerModelResult[PlannerDecision]:
-        instructions = (
+        prompt = (
             "Classify the latest request into exactly one bounded MVP Planner action.\n"
-            "Use only the typed research-state fields below as authoritative state.\n"
-            "Conversation history is non-authoritative discourse context only; use it to "
-            "resolve intent and references, never as empirical support.\n"
+            "Use only the typed research-state projection below as authoritative state.\n"
             "Assumptions are planning context, never empirical support.\n"
             "For data work, propose one bounded Task instruction and select exactly one "
             "Capability enum. If no Objective exists, include objective_text only when the "
@@ -77,15 +75,13 @@ class PlannerModel:
             "invalid_or_unsupported with a clarification message.\n"
             "Do not author a Hypothesis, protocol, method, decision rule, Evidence, Discovery, "
             "approval flow, Task DAG, or executor identifier.\n"
-            "The following current typed input supersedes any historical runtime context:\n"
-            f"{model_input.model_dump_json()}"
+            f"Typed input:\n{model_input.model_dump_json()}"
         )
         result = await self._agent.run(
-            model_input.latest_request,
+            prompt,
             output_type=PlannerDecision,
             deps=self.deps,
-            instructions=instructions,
-            message_history=message_history,
+            message_history=list(message_history),
         )
         return PlannerModelResult(
             output=PlannerDecision.model_validate(result.output),

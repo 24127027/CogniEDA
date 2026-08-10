@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
-from uuid import uuid4
+from collections.abc import Sequence
 
 import pytest
 from pydantic import ValidationError
+from pydantic_ai.messages import ModelMessage
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
@@ -19,8 +19,6 @@ from cognieda.agents.planner.types import (
     PlannerResponseDraft,
 )
 from cognieda.execution import ExecutionRequest
-from cognieda.infrastructure.persistence import SqlitePlannerResearchState
-from cognieda.runtime.planner_context import PlannerContextPreparer, select_planner_context
 from cognieda.schemas.artifacts import Assumption, Objective, SessionFrame, Task
 
 
@@ -38,14 +36,16 @@ class FakePlannerModel:
         self.decision = decision
         self.decision_inputs: list[PlannerModelInput] = []
         self.answer_inputs: list[PlannerAnswerInput] = []
+        self.message_histories: list[tuple[ModelMessage, ...]] = []
 
     async def decide(
         self,
         model_input: PlannerModelInput,
         *,
-        message_history=(),
+        message_history: Sequence[ModelMessage] = (),
     ) -> PlannerModelResult[PlannerDecision]:
         self.decision_inputs.append(model_input)
+        self.message_histories.append(tuple(message_history))
         return PlannerModelResult(output=self.decision, new_messages=())
 
     async def answer(
@@ -58,48 +58,24 @@ class FakePlannerModel:
         )
 
 
-def _planner(
-    model: FakePlannerModel,
-    dispatcher: NeverDispatcher,
-    research_state: SqlitePlannerResearchState,
-) -> Planner:
+def _planner(model: FakePlannerModel, dispatcher: NeverDispatcher) -> Planner:
     return Planner(
-        deps=PlannerDeps(dispatcher=dispatcher, state_mutations=research_state),
+        deps=PlannerDeps(dispatcher=dispatcher),
         planner_model=model,
     )
 
 
-def _planning_context(
-    research_state: SqlitePlannerResearchState,
-    query: str,
-    frame: SessionFrame | None = None,
-):
-    return PlannerContextPreparer(research_state).build(
-        latest_request=query,
-        selection=select_planner_context(frame or SessionFrame()),
-    )
-
-
-def test_natural_language_understanding_receives_latest_materialized_state(db_session) -> None:
-    research_state = SqlitePlannerResearchState(db_session)
-    objective = research_state.create_objective(Objective(text="Understand retention."))
-    assumption = research_state.create_assumption(Assumption(text="Rows are customers."))
-    task = research_state.create_task(Task(instruction="Profile the active dataset."))
-    frame = SessionFrame(
-        objective_ids=(objective.objective_id,),
-        active_objective_id=objective.objective_id,
-        assumption_ids=(assumption.assumption_id,),
-        task_ids=(task.task_id,),
-    )
+def test_natural_language_understanding_receives_latest_request_and_typed_state() -> None:
+    objective = Objective(text="Understand customer retention.")
+    assumption = Assumption(text="Rows represent customers.")
+    task = Task(instruction="Profile the active dataset.")
+    frame = SessionFrame(objective=objective, assumptions=(assumption,), tasks=(task,))
     model = FakePlannerModel(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
     dispatcher = NeverDispatcher()
 
     output = asyncio.run(
-        _planner(model, dispatcher, research_state).run(
+        _planner(model, dispatcher).run(
             "Summarize the active research state.",
-            planning_context=_planning_context(
-                research_state, "Summarize the active research state.", frame
-            ),
             session_frame=frame,
         )
     )
@@ -107,6 +83,7 @@ def test_natural_language_understanding_receives_latest_materialized_state(db_se
     assert output.decision is not None
     assert output.decision.action is PlannerAction.STATE_SUMMARY
     assert output.session_frame == frame
+    assert len(model.decision_inputs) == 1
     model_input = model.decision_inputs[0]
     assert model_input.latest_request == "Summarize the active research state."
     assert model_input.objective == objective
@@ -115,36 +92,7 @@ def test_natural_language_understanding_receives_latest_materialized_state(db_se
     assert dispatcher.requests == []
 
 
-def test_planning_context_is_a_distinct_ephemeral_per_run_projection(db_session) -> None:
-    research_state = SqlitePlannerResearchState(db_session)
-    objective = research_state.create_objective(Objective(text="Understand retention."))
-    frame = SessionFrame(
-        objective_ids=(objective.objective_id,),
-        active_objective_id=objective.objective_id,
-    )
-    preparer = PlannerContextPreparer(research_state)
-    selection = select_planner_context(frame)
-    first = preparer.build(latest_request="First request", selection=selection)
-    second = preparer.build(latest_request="Second request", selection=selection)
-
-    assert first is not second
-    assert first.latest_request == "First request"
-    assert second.latest_request == "Second request"
-    assert first.objective == objective
-    assert "planning_context" not in SessionFrame.model_fields
-
-
-def test_planner_run_consumes_prepared_context_not_session_conversation_inputs() -> None:
-    parameters = inspect.signature(Planner.run).parameters
-
-    assert parameters["planning_context"].default is inspect.Parameter.empty
-    assert "surface_discourse" not in parameters
-    assert "message_history" in parameters
-    assert "message_history" in inspect.signature(FakePlannerModel.decide).parameters
-
-
-def test_explicit_and_natural_objective_requests_reach_same_typed_action(db_session) -> None:
-    research_state = SqlitePlannerResearchState(db_session)
+def test_explicit_and_natural_language_objective_requests_reach_same_typed_action() -> None:
     natural_model = FakePlannerModel(
         PlannerDecision(
             action=PlannerAction.SET_OR_REFINE_OBJECTIVE,
@@ -155,19 +103,11 @@ def test_explicit_and_natural_objective_requests_reach_same_typed_action(db_sess
     dispatcher = NeverDispatcher()
 
     natural = asyncio.run(
-        _planner(natural_model, dispatcher, research_state).run(
-            "Investigate customer churn.",
-            planning_context=_planning_context(
-                research_state, "Investigate customer churn."
-            ),
-        )
+        _planner(natural_model, dispatcher).run("Investigate customer churn.")
     )
     explicit = asyncio.run(
-        _planner(explicit_model, dispatcher, research_state).run(
-            "/objective Understand customer churn.",
-            planning_context=_planning_context(
-                research_state, "/objective Understand customer churn."
-            ),
+        _planner(explicit_model, dispatcher).run(
+            "/objective Understand customer churn."
         )
     )
 
@@ -175,27 +115,15 @@ def test_explicit_and_natural_objective_requests_reach_same_typed_action(db_sess
     assert explicit.decision is not None
     assert natural.decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE
     assert explicit.decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE
-    assert natural.session_frame.active_objective_id is not None
-    assert explicit.session_frame.active_objective_id is not None
-    natural_objective = research_state.get_objective(
-        natural.session_frame.active_objective_id
-    )
-    explicit_objective = research_state.get_objective(
-        explicit.session_frame.active_objective_id
-    )
-    assert natural_objective is not None
-    assert explicit_objective is not None
-    assert natural_objective.text == explicit_objective.text
+    assert natural.session_frame.objective is not None
+    assert explicit.session_frame.objective is not None
+    assert natural.session_frame.objective.text == explicit.session_frame.objective.text
     assert explicit_model.decision_inputs == []
 
 
-def test_objective_semantic_refinement_allocates_new_authoritative_identity(db_session) -> None:
-    research_state = SqlitePlannerResearchState(db_session)
-    original = research_state.create_objective(Objective(text="Understand churn."))
-    frame = SessionFrame(
-        objective_ids=(original.objective_id,),
-        active_objective_id=original.objective_id,
-    )
+def test_objective_semantic_refinement_allocates_new_identity_without_mutation() -> None:
+    original = Objective(text="Understand churn.")
+    frame = SessionFrame(objective=original)
     model = FakePlannerModel(
         PlannerDecision(
             action=PlannerAction.SET_OR_REFINE_OBJECTIVE,
@@ -204,61 +132,27 @@ def test_objective_semantic_refinement_allocates_new_authoritative_identity(db_s
     )
 
     output = asyncio.run(
-        _planner(model, NeverDispatcher(), research_state).run(
+        _planner(model, NeverDispatcher()).run(
             "Refine the objective to focus on drivers.",
-            planning_context=_planning_context(
-                research_state, "Refine the objective to focus on drivers.", frame
-            ),
             session_frame=frame,
         )
     )
 
     assert output.session_frame is not frame
-    assert output.session_frame.objective_ids[0] == original.objective_id
-    assert len(output.session_frame.objective_ids) == 2
-    assert output.session_frame.active_objective_id != original.objective_id
-    assert output.session_frame.active_objective_id is not None
-    replacement = research_state.get_objective(output.session_frame.active_objective_id)
-    assert replacement is not None
-    assert replacement.text == "Understand churn drivers."
-    assert research_state.get_objective(original.objective_id) == original
+    assert output.session_frame.objective is not None
+    assert output.session_frame.objective.objective_id != original.objective_id
+    assert output.session_frame.objective.text == "Understand churn drivers."
+    assert original.text == "Understand churn."
 
 
-def test_dangling_reference_fails_closed_during_application_context_preparation(
-    db_session,
-) -> None:
-    research_state = SqlitePlannerResearchState(db_session)
-    missing_id = uuid4()
-    frame = SessionFrame(
-        objective_ids=(missing_id,),
-        active_objective_id=missing_id,
-    )
-    model = FakePlannerModel(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
-
-    with pytest.raises(ValueError, match="missing Objective"):
-        _planning_context(research_state, "Summarize state.", frame)
-
-    assert model.decision_inputs == []
-
-
-def test_unknown_explicit_command_fails_without_model_fallback_or_state_change(
-    db_session,
-) -> None:
-    research_state = SqlitePlannerResearchState(db_session)
-    objective = research_state.create_objective(Objective(text="Keep this Objective."))
-    frame = SessionFrame(
-        objective_ids=(objective.objective_id,),
-        active_objective_id=objective.objective_id,
-    )
+def test_unknown_explicit_command_fails_without_model_fallback_or_state_change() -> None:
+    frame = SessionFrame(objective=Objective(text="Keep this Objective."))
     model = FakePlannerModel(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
     dispatcher = NeverDispatcher()
 
     output = asyncio.run(
-        _planner(model, dispatcher, research_state).run(
+        _planner(model, dispatcher).run(
             "/unknown remove everything",
-            planning_context=_planning_context(
-                research_state, "/unknown remove everything", frame
-            ),
             session_frame=frame,
         )
     )

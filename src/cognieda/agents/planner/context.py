@@ -1,39 +1,28 @@
 from __future__ import annotations
 
-from uuid import UUID
+from pydantic import BaseModel, ConfigDict, Field
 
-from pydantic import ConfigDict, Field
-
-from cognieda.schemas.artifacts import (
-    Assumption,
-    DataProfile,
-    Evidence,
-    Objective,
-    Task,
-)
+from cognieda.runtime.conversation import ConversationHistory
+from cognieda.schemas.artifacts import Assumption, DataProfile, Evidence, Objective, Task
 from cognieda.schemas.common import CogniEDABaseModel
 
 
 class PlanningContext(CogniEDABaseModel):
-    """Ephemeral materialized research context selected for one Planner run."""
+    """Materialized research knowledge and conversation available to one Planner run."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    latest_request: str = Field(min_length=1)
     objective: Objective | None = None
     assumptions: tuple[Assumption, ...] = ()
     tasks: tuple[Task, ...] = ()
     evidences: tuple[Evidence, ...] = ()
     data_profile: DataProfile | None = None
+    conversation_history: ConversationHistory = Field(default_factory=ConversationHistory)
 
 
-class PlannerContextSelection(CogniEDABaseModel):
-    """Bounded research-state references selected for one Planner run."""
+class Context(BaseModel):
+    """Injected dependencies and PlanningContext available to Planner graph nodes."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
-    objective_id: UUID | None = None
-    assumption_ids: tuple[UUID, ...] = ()
-    task_ids: tuple[UUID, ...] = ()
-    active_data_profile_id: UUID | None = None
-    evidence_candidate_ids: tuple[UUID, ...] = ()
+    planner_model: object
+    dispatcher: object
+    planning_context: PlanningContext = Field(default_factory=PlanningContext)

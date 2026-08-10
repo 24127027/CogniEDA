@@ -1,22 +1,14 @@
 from __future__ import annotations
 
-from pydantic_ai.messages import ModelMessage
-
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import ExecutorContext
 from cognieda.schemas.artifacts import SessionFrame
 
-from .context import PlanningContext
+from .context import Context, PlanningContext
 from .dependencies import PlannerDeps
 from .graph import build_graph
 from .model import PlannerDecisionModel, PlannerModel
-from .types import (
-    Context,
-    PlannerControlledError,
-    PlannerErrorCode,
-    PlannerOutput,
-    State,
-)
+from .types import PlannerControlledError, PlannerErrorCode, PlannerOutput, State
 
 
 class Planner:
@@ -56,10 +48,9 @@ class Planner:
         self,
         query: str,
         *,
-        planning_context: PlanningContext,
+        planning_context: PlanningContext | None = None,
         session_frame: SessionFrame | None = None,
         execution_context: ExecutorContext | None = None,
-        message_history: tuple[ModelMessage, ...] = (),
     ) -> PlannerOutput:
         """Run one request against explicit typed state and return its validated successor."""
 
@@ -71,24 +62,22 @@ class Planner:
             )
             return PlannerOutput(response=error.message, session_frame=frame, error=error)
 
-        if planning_context.latest_request != query:
-            error = PlannerControlledError(
-                code=PlannerErrorCode.CONTEXT_RESOLUTION_FAILED,
-                message="Planner context resolution failed closed: latest request mismatch.",
-            )
-            return PlannerOutput(response=error.message, session_frame=frame, error=error)
-
         state = State(
             query=query,
             session_frame=frame,
-            planning_context=planning_context,
-            message_history=message_history,
             execution_context=execution_context or ExecutorContext(),
         )
         context = Context(
             planner_model=self.model,
             dispatcher=self.deps.dispatcher,
-            state_mutations=self.deps.state_mutations,
+            planning_context=planning_context
+            or PlanningContext(
+                objective=frame.objective,
+                assumptions=frame.assumptions,
+                tasks=frame.tasks,
+                evidences=frame.evidences,
+                data_profile=frame.data_profile,
+            ),
         )
         result = await self.graph.ainvoke(state, context=context)
         final_state = State.model_validate(result)
@@ -106,10 +95,12 @@ class Planner:
             session_frame=final_state.session_frame,
             decision=final_state.decision,
             created_task_ids=(
-                (final_state.created_task_id,) if final_state.created_task_id is not None else ()
+                (final_state.created_task_id,)
+                if final_state.created_task_id is not None
+                else ()
             ),
             selected_capability=final_state.selected_capability,
             work_outcome=final_state.work_outcome,
-            error=final_state.error,
             new_messages=final_state.new_messages,
+            error=final_state.error,
         )

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
 from dataclasses import dataclass
 
 from pydantic_ai.messages import (
@@ -14,11 +13,7 @@ from pydantic_ai.messages import (
 
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.model import PlannerModel
-from cognieda.agents.planner.types import (
-    PlannerAction,
-    PlannerDecision,
-    PlannerModelInput,
-)
+from cognieda.agents.planner.types import PlannerAction, PlannerDecision, PlannerModelInput
 from cognieda.application.ports import ModelConfig
 
 
@@ -36,7 +31,7 @@ class RecordingAgent:
         self.result = result
         self.calls: list[dict[str, object]] = []
 
-    async def run(self, prompt: str, **kwargs):
+    async def run(self, prompt: str, **kwargs: object) -> FakeRunResult:
         self.calls.append({"prompt": prompt, **kwargs})
         return self.result
 
@@ -45,51 +40,35 @@ class RecordingFactory:
     def __init__(self, agent: RecordingAgent) -> None:
         self.agent = agent
 
-    def create_agent(self, **_):
+    def create_agent(self, **_: object) -> RecordingAgent:
         return self.agent
 
 
-def test_planner_model_uses_native_history_and_current_typed_run_instructions() -> None:
+def test_planner_model_passes_native_history_and_returns_new_messages() -> None:
+    prior_messages: tuple[ModelMessage, ...] = (
+        ModelRequest(parts=[UserPromptPart(content="Earlier request")]),
+        ModelResponse(parts=[TextPart(content="Earlier response")]),
+    )
     new_messages: tuple[ModelMessage, ...] = (
         ModelRequest(parts=[UserPromptPart(content="Current request")]),
         ModelResponse(parts=[TextPart(content="Current response")]),
     )
     decision = PlannerDecision(action=PlannerAction.STATE_SUMMARY)
-    message_history: tuple[ModelMessage, ...] = (
-        ModelRequest(
-            parts=[UserPromptPart(content="Earlier request")],
-            instructions='Current typed input: {"objective":"stale"}',
-        ),
-        ModelResponse(parts=[TextPart(content="Earlier response")]),
-    )
     agent = RecordingAgent(FakeRunResult(output=decision, messages=new_messages))
     model = PlannerModel(
-        deps=PlannerDeps(
-            dispatcher=object(),  # type: ignore[arg-type]
-            state_mutations=object(),  # type: ignore[arg-type]
-        ),
+        deps=PlannerDeps(dispatcher=object()),  # type: ignore[arg-type]
         agent_factory=RecordingFactory(agent),  # type: ignore[arg-type]
         model_config=ModelConfig(model_name="test"),
     )
 
     result = asyncio.run(
         model.decide(
-            PlannerModelInput(
-                latest_request="Summarize what we established.",
-            ),
-            message_history=message_history,
+            PlannerModelInput(latest_request="Summarize what we established."),
+            message_history=prior_messages,
         )
     )
 
     assert result.output == decision
     assert result.new_messages == new_messages
-    assert agent.calls[0]["prompt"] == "Summarize what we established."
-    assert agent.calls[0]["message_history"] == message_history
-    assert "message_history" in inspect.signature(PlannerModel.decide).parameters
-    instructions = str(agent.calls[0]["instructions"])
-    assert "Summarize what we established." in instructions
-    assert "current typed input supersedes" in instructions
-    assert "stale" not in instructions
-    assert "Conversation history is non-authoritative" in instructions
-    assert "conversation" not in PlannerModelInput.model_fields
-    assert "surface_discourse" not in PlannerModelInput.model_fields
+    assert agent.calls[0]["message_history"] == list(prior_messages)
+

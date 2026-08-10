@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
 
-from cognieda.application.ports import PlannerStateMutationPort
 from cognieda.execution import Capability, ExecutorContext, PlannerWorkOutcome
 from cognieda.schemas.artifacts import (
     Assumption,
@@ -17,8 +15,6 @@ from cognieda.schemas.artifacts import (
     SessionFrame,
     Task,
 )
-
-from .context import PlanningContext
 
 
 class PlannerAction(StrEnum):
@@ -43,7 +39,6 @@ class PlannerErrorCode(StrEnum):
     INVALID_SUCCESSOR_STATE = "invalid_successor_state"
     NO_ADMITTED_EVIDENCE = "no_admitted_evidence"
     RESPONSE_FAILED = "response_failed"
-    CONTEXT_RESOLUTION_FAILED = "context_resolution_failed"
 
 
 class PlannerControlledError(BaseModel):
@@ -113,7 +108,7 @@ class PlannerDecision(BaseModel):
 
 
 class PlannerModelInput(BaseModel):
-    """Typed initial context used for one request-understanding invocation."""
+    """Bounded typed research-state projection used for request understanding."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -125,14 +120,14 @@ class PlannerModelInput(BaseModel):
     evidences: tuple[Evidence, ...] = ()
 
     @classmethod
-    def from_context(cls, context: PlanningContext) -> PlannerModelInput:
+    def from_frame(cls, latest_request: str, frame: SessionFrame) -> PlannerModelInput:
         return cls(
-            latest_request=context.latest_request,
-            objective=context.objective,
-            assumptions=context.assumptions,
-            tasks=context.tasks,
-            data_profile=context.data_profile,
-            evidences=context.evidences,
+            latest_request=latest_request,
+            objective=frame.objective,
+            assumptions=frame.assumptions,
+            tasks=frame.tasks,
+            data_profile=frame.data_profile,
+            evidences=frame.evidences,
         )
 
 
@@ -162,25 +157,14 @@ class State(BaseModel):
 
     query: str = Field(min_length=1)
     session_frame: SessionFrame
-    planning_context: PlanningContext
-    message_history: tuple[ModelMessage, ...] = ()
-    new_messages: tuple[ModelMessage, ...] = ()
     execution_context: ExecutorContext = Field(default_factory=ExecutorContext)
     decision: PlannerDecision | None = None
     created_task_id: UUID | None = None
     selected_capability: Capability | None = None
     work_outcome: PlannerWorkOutcome | None = None
     response: str | None = None
+    new_messages: tuple[ModelMessage, ...] = ()
     error: PlannerControlledError | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class Context:
-    """Injected model, dispatcher, and mutation boundaries available to graph nodes."""
-
-    planner_model: object
-    dispatcher: object
-    state_mutations: PlannerStateMutationPort
 
 
 class PlannerOutput(BaseModel):
@@ -194,5 +178,5 @@ class PlannerOutput(BaseModel):
     created_task_ids: tuple[UUID, ...] = ()
     selected_capability: Capability | None = None
     work_outcome: PlannerWorkOutcome | None = None
-    error: PlannerControlledError | None = None
     new_messages: tuple[ModelMessage, ...] = ()
+    error: PlannerControlledError | None = None
