@@ -3,7 +3,6 @@ from __future__ import annotations
 from uuid import UUID
 
 from pydantic import ConfigDict, Field
-from pydantic_ai.messages import ModelMessage
 
 from cognieda.schemas.artifacts import (
     Assumption,
@@ -36,7 +35,6 @@ class PlanningContext(CogniEDABaseModel):
     evidences: tuple[Evidence, ...] = ()
     data_profile: DataProfile | None = None
     surface_discourse: tuple[NonAuthoritativeSurfaceTurn, ...] = ()
-    message_history: tuple[ModelMessage, ...] = ()
 
 
 class PlannerContextSelection(CogniEDABaseModel):

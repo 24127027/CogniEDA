@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import inspect
 import unicodedata
-from collections.abc import Sequence
 from uuid import uuid4
 
 import pytest
@@ -43,7 +42,12 @@ from cognieda.infrastructure.persistence.repositories import (
     EvidenceRepository,
 )
 from cognieda.runtime.application import Application
-from cognieda.runtime.conversation import ConversationHistory, ConversationSegment
+from cognieda.runtime.conversation import (
+    ConversationHistory,
+    ConversationSegment,
+    _selection_terms,
+    select_conversation_context,
+)
 from cognieda.runtime.session import Session
 from cognieda.schemas.artifacts import (
     Assumption,
@@ -61,19 +65,17 @@ class SequencePlannerModel:
     def __init__(self, *decisions: PlannerDecision) -> None:
         self._decisions = iter(decisions)
         self.decision_inputs: list[PlannerModelInput] = []
-        self.message_histories: list[tuple[ModelMessage, ...]] = []
         self.answer_inputs: list[PlannerAnswerInput] = []
 
     async def decide(
         self,
         model_input: PlannerModelInput,
-        *,
-        message_history: Sequence[ModelMessage] = (),
     ) -> PlannerModelResult[PlannerDecision]:
         self.decision_inputs.append(model_input)
-        self.message_histories.append(tuple(message_history))
         messages = (
-            ModelRequest(parts=[UserPromptPart(content=model_input.latest_request)]),
+            ModelRequest(
+                parts=[UserPromptPart(content=f"Typed input:\n{model_input.model_dump_json()}")]
+            ),
             ModelResponse(parts=[TextPart(content="typed decision")]),
         )
         return PlannerModelResult(output=next(self._decisions), new_messages=messages)
@@ -186,8 +188,21 @@ def test_application_retains_ids_and_resolved_context_across_turns(db_session) -
     assert objective is not None
     assert objective.text == "Understand customer churn."
     assert model.decision_inputs[1].objective == objective
-    assert model.message_histories[0] == ()
-    assert model.message_histories[1] == first_session.conversation_history.model_messages()
+    assert tuple(
+        turn.model_dump() for turn in model.decision_inputs[1].surface_discourse
+    ) == (
+        {
+            "human_message": "Investigate customer churn.",
+            "planner_response": "Active Objective set to: Understand customer churn.",
+        },
+    )
+    assert len(first_session.conversation_history.model_messages()) == 2
+    assert "message_history" not in type(
+        PlannerContextPreparer(research_state).build(
+            latest_request="Inspect fields",
+            selection=select_planner_context(first_session.session_frame),
+        )
+    ).model_fields
     assert len(application.session.conversation_history.turns) == 2
     assert "planning_context" not in Session.model_fields
     assert application.session.conversation_history.presentation_transcript() == (
@@ -203,6 +218,38 @@ def test_application_retains_ids_and_resolved_context_across_turns(db_session) -
             "Evidence items in session history: 0.",
         ),
     )
+
+
+def test_three_fresh_turns_do_not_recursively_replay_native_model_requests(
+    db_session,
+) -> None:
+    research_state = SqlitePlannerResearchState(db_session)
+    model = SequencePlannerModel(
+        PlannerDecision(
+            action=PlannerAction.SET_OR_REFINE_OBJECTIVE,
+            objective_text="Understand customer churn.",
+        ),
+        PlannerDecision(action=PlannerAction.STATE_SUMMARY),
+        PlannerDecision(action=PlannerAction.STATE_SUMMARY),
+    )
+    application, _ = _application(model, research_state)
+
+    asyncio.run(application.submit_message("Investigate customer churn."))
+    asyncio.run(application.submit_message("What did we establish?"))
+    before_third_turn = application.session
+    asyncio.run(application.submit_message("Summarize that again."))
+
+    retained_native_history = before_third_turn.conversation_history.model_messages()
+    second_native_request = retained_native_history[2]
+    assert isinstance(second_native_request, ModelRequest)
+    assert "surface_discourse" in str(second_native_request.parts[0].content)
+    assert "Investigate customer churn." in str(second_native_request.parts[0].content)
+    assert [
+        (turn.human_message, turn.planner_response)
+        for turn in model.decision_inputs[2].surface_discourse
+    ] == list(before_third_turn.conversation_history.presentation_transcript())
+    assert len(model.decision_inputs[2].surface_discourse) == 2
+    assert not hasattr(ConversationHistory, "select_for_request_understanding")
 
 
 def test_application_fails_closed_before_planner_on_dangling_session_reference(
@@ -571,7 +618,6 @@ def test_deterministic_surface_turn_reaches_request_understanding_only_as_discou
             "planner_response": "Task T7 completed with two limitations.",
         },
     )
-    assert model.message_histories == [()]
     assert model.answer_inputs == []
     assert "current bounded context" in response.content
     assert history.turns[0].segments == ()
@@ -579,7 +625,7 @@ def test_deterministic_surface_turn_reaches_request_understanding_only_as_discou
     assert "surface_discourse" not in PlannerAnswerInput.model_fields
 
 
-def test_context_selection_omits_and_later_reselects_only_whole_segments() -> None:
+def test_context_selection_omits_and_later_reselects_surface_turns_only() -> None:
     history = ConversationHistory()
     segments: list[ConversationSegment] = []
     for index, topic in enumerate(("churn", "pricing", "quality", "schema", "rows", "summary")):
@@ -594,16 +640,13 @@ def test_context_selection_omits_and_later_reselects_only_whole_segments() -> No
         )
         segments.append(history.turns[-1].segments[0])
 
-    current = history.select_for_request_understanding("Continue the current summary")
-    later = history.select_for_request_understanding("Return to the churn discussion")
+    current = select_conversation_context(history, "Continue the current summary")
+    later = select_conversation_context(history, "Return to the churn discussion")
 
-    assert history.turns[0] not in current.surface_turns
-    assert current.model_messages() == tuple(
-        message for segment in segments[-4:] for message in segment.messages
-    )
-    assert history.turns[0] in later.surface_turns
+    assert history.turns[0] not in current
+    assert current == history.turns[-4:]
+    assert history.turns[0] in later
     assert history.turns[0].segments == (segments[0],)
-    assert later.model_messages()[0:2] == (*segments[0].messages,)
 
 
 def test_context_selection_hard_bounds_old_matches_and_preserves_chronology() -> None:
@@ -628,39 +671,32 @@ def test_context_selection_hard_bounds_old_matches_and_preserves_chronology() ->
             planner_response=f"Recorded recent topic {index}",
         )
 
-    selected = history.select_for_request_understanding(
+    selected = select_conversation_context(
+        history,
         "What about that task?",
         recent_turn_limit=4,
         older_lexical_match_limit=3,
     )
-    selected_again = history.select_for_request_understanding(
+    selected_again = select_conversation_context(
+        history,
         "What about that task?",
         recent_turn_limit=4,
         older_lexical_match_limit=3,
     )
-    default_selected = history.select_for_request_understanding("What about that task?")
+    default_selected = select_conversation_context(history, "What about that task?")
 
     assert selected == selected_again
-    assert selected.surface_turns == (
+    assert selected == (
         *history.turns[9:12],
         *history.turns[12:16],
     )
-    assert len(selected.surface_turns) == 7
-    assert set(type(selected).model_fields) == {"surface_turns"}
-    assert selected.model_messages() == tuple(
-        message
-        for turn in selected.surface_turns
-        for segment in turn.segments
-        for message in segment.messages
-    )
-    assert all(
-        len(turn.segments) == 2 for turn in selected.surface_turns[:3]
-    )
-    assert history.turns[8] not in selected.surface_turns
+    assert len(selected) == 7
+    assert all(len(turn.segments) == 2 for turn in selected[:3])
+    assert history.turns[8] not in selected
     assert len(history.turns) == 16
     assert len(history.turns[8].segments) == 2
-    assert default_selected.surface_turns == history.turns[8:16]
-    assert len(default_selected.surface_turns) == 8
+    assert default_selected == history.turns[8:16]
+    assert len(default_selected) == 8
 
 
 def test_bounded_evidence_omission_does_not_claim_global_absence(db_session) -> None:
@@ -775,19 +811,18 @@ def test_unicode_selection_normalizes_and_reselects_old_vietnamese_turn() -> Non
             planner_response=f"Recorded {topic}",
         )
 
-    unrelated = history.select_for_request_understanding("Continue with pricing")
+    unrelated = select_conversation_context(history, "Continue with pricing")
     request = "Quay lại phân tích KHÁCH HÀNG rời bỏ."
-    selected = history.select_for_request_understanding(request)
-    selected_again = history.select_for_request_understanding(request)
+    selected = select_conversation_context(history, request)
+    selected_again = select_conversation_context(history, request)
 
-    assert history.turns[0] not in unrelated.surface_turns
-    assert history.turns[0] in selected.surface_turns
-    assert selected.model_messages()[0:2] == old_messages
+    assert history.turns[0] not in unrelated
+    assert history.turns[0] in selected
     assert selected == selected_again
     assert history.turns[0].segments[0].messages == old_messages
 
     decomposed = unicodedata.normalize("NFD", "PHÂN TÍCH KHÁCH HÀNG RỜI BỎ")
-    assert ConversationHistory._selection_terms(decomposed) == {
+    assert _selection_terms(decomposed) == {
         "phân",
         "tích",
         "khách",

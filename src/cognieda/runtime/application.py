@@ -9,7 +9,7 @@ from cognieda.application.services import (
 )
 from cognieda.execution import ExecutorDispatcher
 
-from .conversation import ConversationSegment
+from .conversation import ConversationSegment, select_conversation_context
 from .messages import Message, MessageRole, MessageType
 from .session import Session
 from .workspace import Workspace
@@ -31,15 +31,16 @@ class Application:
         self.session = session or Session()
 
     async def submit_message(self, message: str) -> Message:
-        selected_context = self.session.conversation_history.select_for_request_understanding(
-            message
+        selected_turns = select_conversation_context(
+            self.session.conversation_history,
+            message,
         )
         surface_discourse = tuple(
             NonAuthoritativeSurfaceTurn(
                 human_message=turn.human_message,
                 planner_response=turn.planner_response,
             )
-            for turn in selected_context.surface_turns
+            for turn in selected_turns
         )
         try:
             selection = select_planner_context(self.session.session_frame)
@@ -47,7 +48,6 @@ class Application:
                 latest_request=message,
                 selection=selection,
                 surface_discourse=surface_discourse,
-                message_history=selected_context.model_messages(),
             )
         except PlanningContextResolutionError as exc:
             response = f"Planner context resolution failed closed: {exc}"

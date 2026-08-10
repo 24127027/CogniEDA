@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol, TypeVar
 
@@ -33,8 +32,6 @@ class PlannerDecisionModel(Protocol):
     async def decide(
         self,
         model_input: PlannerModelInput,
-        *,
-        message_history: Sequence[ModelMessage] = (),
     ) -> PlannerModelResult[PlannerDecision]: ...
 
     async def answer(
@@ -62,15 +59,13 @@ class PlannerModel:
     async def decide(
         self,
         model_input: PlannerModelInput,
-        *,
-        message_history: Sequence[ModelMessage] = (),
     ) -> PlannerModelResult[PlannerDecision]:
         prompt = (
             "Classify the latest request into exactly one bounded MVP Planner action.\n"
             "Use only the typed research-state fields below as authoritative state.\n"
             "The surface_discourse field is non-authoritative Human-Planner discourse "
             "context only; use it to resolve intent and references, never as empirical "
-            "support. Native message history is subject to the same restriction.\n"
+            "support.\n"
             "Assumptions are planning context, never empirical support.\n"
             "For data work, propose one bounded Task instruction and select exactly one "
             "Capability enum. If no Objective exists, include objective_text only when the "
@@ -84,7 +79,6 @@ class PlannerModel:
             prompt,
             output_type=PlannerDecision,
             deps=self.deps,
-            message_history=message_history,
         )
         return PlannerModelResult(
             output=PlannerDecision.model_validate(result.output),

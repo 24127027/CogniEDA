@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Sequence
 from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
-from pydantic_ai.messages import ModelMessage
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
@@ -39,17 +37,13 @@ class FakePlannerModel:
     def __init__(self, decision: PlannerDecision) -> None:
         self.decision = decision
         self.decision_inputs: list[PlannerModelInput] = []
-        self.message_histories: list[tuple[ModelMessage, ...]] = []
         self.answer_inputs: list[PlannerAnswerInput] = []
 
     async def decide(
         self,
         model_input: PlannerModelInput,
-        *,
-        message_history: Sequence[ModelMessage] = (),
     ) -> PlannerModelResult[PlannerDecision]:
         self.decision_inputs.append(model_input)
-        self.message_histories.append(tuple(message_history))
         return PlannerModelResult(output=self.decision, new_messages=())
 
     async def answer(
@@ -144,6 +138,7 @@ def test_planner_run_consumes_prepared_context_not_session_conversation_inputs()
     assert parameters["planning_context"].default is inspect.Parameter.empty
     assert "surface_discourse" not in parameters
     assert "message_history" not in parameters
+    assert "message_history" not in inspect.signature(FakePlannerModel.decide).parameters
 
 
 def test_explicit_and_natural_objective_requests_reach_same_typed_action(db_session) -> None:

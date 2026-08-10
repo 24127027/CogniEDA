@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
 from uuid import UUID, uuid4
 
 import pytest
-from pydantic_ai.messages import ModelMessage
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
@@ -53,17 +51,13 @@ class FakePlannerModel:
         self.decision = decision
         self.answer_text = answer
         self.decision_inputs: list[PlannerModelInput] = []
-        self.message_histories: list[tuple[ModelMessage, ...]] = []
         self.answer_inputs: list[PlannerAnswerInput] = []
 
     async def decide(
         self,
         model_input: PlannerModelInput,
-        *,
-        message_history: Sequence[ModelMessage] = (),
     ) -> PlannerModelResult[PlannerDecision]:
         self.decision_inputs.append(model_input)
-        self.message_histories.append(tuple(message_history))
         return PlannerModelResult(output=self.decision, new_messages=())
 
     async def answer(

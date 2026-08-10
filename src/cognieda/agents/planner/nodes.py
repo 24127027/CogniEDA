@@ -121,7 +121,6 @@ async def understand_request(state: State, runtime: Runtime[Context]) -> State:
     try:
         result = await model.decide(
             PlannerModelInput.from_context(state.planning_context),
-            message_history=state.planning_context.message_history,
         )
         state.decision = result.output
         if result.new_messages:

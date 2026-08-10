@@ -37,21 +37,6 @@ class ConversationTurn(ImmutableCogniEDABaseModel):
         return self
 
 
-class SelectedConversationContext(ImmutableCogniEDABaseModel):
-    """Bounded turns selected from retained conversation history for one request."""
-
-    surface_turns: tuple[ConversationTurn, ...] = ()
-    def model_messages(self) -> tuple[ModelMessage, ...]:
-        """Flatten only native segments at the PydanticAI invocation boundary."""
-
-        return tuple(
-            message
-            for turn in self.surface_turns
-            for segment in turn.segments
-            for message in segment.messages
-        )
-
-
 class ConversationHistory(ImmutableCogniEDABaseModel):
     """Complete ordered Human/Planner history retained by one runtime Session."""
 
@@ -95,51 +80,47 @@ class ConversationHistory(ImmutableCogniEDABaseModel):
             for message in segment.messages
         )
 
-    def select_for_request_understanding(
-        self,
-        latest_request: str,
-        *,
-        recent_turn_limit: int = DEFAULT_RECENT_TURN_LIMIT,
-        older_lexical_match_limit: int = DEFAULT_OLDER_LEXICAL_MATCH_LIMIT,
-    ) -> SelectedConversationContext:
-        """Select surface discourse and whole native segments without deleting history."""
-
-        if recent_turn_limit < 1:
-            raise ValueError("recent_turn_limit must be positive.")
-        if older_lexical_match_limit < 0:
-            raise ValueError("older_lexical_match_limit cannot be negative.")
-        request_terms = self._selection_terms(latest_request)
-        recent_start = max(0, len(self.turns) - recent_turn_limit)
-        older_match_indexes: list[int] = []
-        if older_lexical_match_limit:
-            for index in range(recent_start - 1, -1, -1):
-                turn = self.turns[index]
-                surface_terms = self._selection_terms(
-                    f"{turn.human_message} {turn.planner_response}"
-                )
-                if request_terms.intersection(surface_terms):
-                    older_match_indexes.append(index)
-                    if len(older_match_indexes) == older_lexical_match_limit:
-                        break
-
-        selected_indexes = sorted(
-            (*older_match_indexes, *range(recent_start, len(self.turns)))
-        )
-        selected_turns = tuple(self.turns[index] for index in selected_indexes)
-        return SelectedConversationContext(
-            surface_turns=selected_turns,
-        )
-
-    @staticmethod
-    def _selection_terms(text: str) -> set[str]:
-        normalized = unicodedata.normalize("NFKC", text).casefold()
-        return {
-            term
-            for term in re.findall(r"\w+", normalized, flags=re.UNICODE)
-            if len(term) >= 3
-        }
-
     def presentation_transcript(self) -> tuple[tuple[str, str], ...]:
         """Return the non-authoritative Human/Planner surface transcript."""
 
         return tuple((turn.human_message, turn.planner_response) for turn in self.turns)
+
+
+def select_conversation_context(
+    history: ConversationHistory,
+    latest_request: str,
+    *,
+    recent_turn_limit: int = DEFAULT_RECENT_TURN_LIMIT,
+    older_lexical_match_limit: int = DEFAULT_OLDER_LEXICAL_MATCH_LIMIT,
+) -> tuple[ConversationTurn, ...]:
+    """Select bounded surface discourse without mutating retained history."""
+
+    if recent_turn_limit < 1:
+        raise ValueError("recent_turn_limit must be positive.")
+    if older_lexical_match_limit < 0:
+        raise ValueError("older_lexical_match_limit cannot be negative.")
+    request_terms = _selection_terms(latest_request)
+    recent_start = max(0, len(history.turns) - recent_turn_limit)
+    older_match_indexes: list[int] = []
+    if older_lexical_match_limit:
+        for index in range(recent_start - 1, -1, -1):
+            turn = history.turns[index]
+            surface_terms = _selection_terms(
+                f"{turn.human_message} {turn.planner_response}"
+            )
+            if request_terms.intersection(surface_terms):
+                older_match_indexes.append(index)
+                if len(older_match_indexes) == older_lexical_match_limit:
+                    break
+
+    selected_indexes = sorted((*older_match_indexes, *range(recent_start, len(history.turns))))
+    return tuple(history.turns[index] for index in selected_indexes)
+
+
+def _selection_terms(text: str) -> set[str]:
+    normalized = unicodedata.normalize("NFKC", text).casefold()
+    return {
+        term
+        for term in re.findall(r"\w+", normalized, flags=re.UNICODE)
+        if len(term) >= 3
+    }

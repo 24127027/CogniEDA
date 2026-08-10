@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from dataclasses import dataclass
 
 from pydantic_ai.messages import (
@@ -49,11 +50,7 @@ class RecordingFactory:
         return self.agent
 
 
-def test_planner_model_passes_selected_native_history_and_returns_new_messages() -> None:
-    selected_history: tuple[ModelMessage, ...] = (
-        ModelRequest(parts=[UserPromptPart(content="Earlier request")]),
-        ModelResponse(parts=[TextPart(content="Earlier response")]),
-    )
+def test_planner_model_starts_fresh_execution_and_returns_exact_new_messages() -> None:
     new_messages: tuple[ModelMessage, ...] = (
         ModelRequest(parts=[UserPromptPart(content="Current request")]),
         ModelResponse(parts=[TextPart(content="Current response")]),
@@ -80,13 +77,13 @@ def test_planner_model_passes_selected_native_history_and_returns_new_messages()
                     ),
                 ),
             ),
-            message_history=selected_history,
         )
     )
 
     assert result.output == decision
     assert result.new_messages == new_messages
-    assert agent.calls[0]["message_history"] == selected_history
+    assert "message_history" not in agent.calls[0]
+    assert "message_history" not in inspect.signature(PlannerModel.decide).parameters
     prompt = str(agent.calls[0]["prompt"])
     assert "surface_discourse" in prompt
     assert "Task T7 completed with two limitations." in prompt

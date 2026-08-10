@@ -3,8 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Never
 
-from pydantic_ai.messages import ModelMessage
-
 from cognieda.agents.planner.context import (
     NonAuthoritativeSurfaceTurn,
     PlannerContextSelection,
@@ -49,7 +47,6 @@ class PlannerContextPreparer:
         latest_request: str,
         selection: PlannerContextSelection,
         surface_discourse: Sequence[NonAuthoritativeSurfaceTurn] = (),
-        message_history: Sequence[ModelMessage] = (),
     ) -> PlanningContext:
         objective = None
         if selection.objective_id is not None:
@@ -129,7 +126,6 @@ class PlannerContextPreparer:
             evidences=evidences,
             data_profile=data_profile,
             surface_discourse=tuple(surface_discourse),
-            message_history=tuple(message_history),
         )
 
     @staticmethod
