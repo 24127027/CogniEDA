@@ -286,7 +286,8 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
         if not state.planning_context.evidences:
             state.error = _error(
                 PlannerErrorCode.NO_ADMITTED_EVIDENCE,
-                "No admitted Evidence is available to support an empirical answer.",
+                "No eligible admitted Evidence is available in the current bounded "
+                "context to support an empirical answer.",
             )
             state.response = state.error.message
             return state

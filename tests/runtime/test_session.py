@@ -319,7 +319,7 @@ def test_assumption_survives_but_cannot_become_empirical_support(db_session) -> 
 
     assert len(application.session.session_frame.assumption_ids) == 1
     assert application.session.session_frame.evidence_ids == ()
-    assert "No admitted Evidence" in response.content
+    assert "current bounded context" in response.content
     assert model.answer_inputs == []
 
 
@@ -545,7 +545,7 @@ def test_deterministic_surface_turn_reaches_request_understanding_only_as_discou
     )
     assert model.message_histories == [()]
     assert model.answer_inputs == []
-    assert "No admitted Evidence" in response.content
+    assert "current bounded context" in response.content
     assert history.turns[0].segments == ()
     assert history.model_messages() == ()
     assert "surface_discourse" not in PlannerAnswerInput.model_fields
@@ -629,6 +629,98 @@ def test_context_selection_hard_bounds_old_matches_and_preserves_chronology() ->
     assert len(history.turns[8].segments) == 2
     assert default_selected.surface_turns == history.turns[8:16]
     assert len(default_selected.surface_turns) == 8
+
+
+def test_bounded_evidence_omission_does_not_claim_global_absence(db_session) -> None:
+    research_state = SqlitePlannerResearchState(db_session)
+    assumption = research_state.create_assumption(
+        Assumption(text="The active dataset has 10 rows.")
+    )
+    active_task = research_state.create_task(
+        Task(instruction="Count active rows.", status=TaskStatus.COMPLETED)
+    )
+    other_task = research_state.create_task(
+        Task(instruction="Count other rows.", status=TaskStatus.COMPLETED)
+    )
+    active_profile = DataProfileRepository(db_session).create(
+        DataProfile(row_count=10, column_count=0, columns=())
+    )
+    other_profile = DataProfileRepository(db_session).create(
+        DataProfile(row_count=20, column_count=0, columns=())
+    )
+    active_evidence = EvidenceRepository(db_session).create(
+        Evidence(
+            task_id=active_task.task_id,
+            data_profile_id=active_profile.data_profile_id,
+            content={"row_count": 10},
+            provenance=EvidenceProvenance(
+                producer_role="data_explorer",
+                work_reference="work:active-count",
+                dataset_reference="dataset:active",
+                data_profile_id=active_profile.data_profile_id,
+            ),
+        )
+    )
+    other_evidences = tuple(
+        EvidenceRepository(db_session).create(
+            Evidence(
+                task_id=other_task.task_id,
+                data_profile_id=other_profile.data_profile_id,
+                content={"row_count": 20, "sequence": index},
+                provenance=EvidenceProvenance(
+                    producer_role="data_explorer",
+                    work_reference=f"work:other-count-{index}",
+                    dataset_reference="dataset:other",
+                    data_profile_id=other_profile.data_profile_id,
+                ),
+            )
+        )
+        for index in range(20)
+    )
+    frame = SessionFrame(
+        assumption_ids=(assumption.assumption_id,),
+        task_ids=(active_task.task_id, other_task.task_id),
+        data_profile_ids=(active_profile.data_profile_id, other_profile.data_profile_id),
+        active_data_profile_id=active_profile.data_profile_id,
+        evidence_ids=(
+            active_evidence.evidence_id,
+            *(evidence.evidence_id for evidence in other_evidences),
+        ),
+    )
+    history = ConversationHistory().add_turn(
+        human_message="The active dataset has 10 rows.",
+        planner_response="That conversation is not admitted Evidence.",
+    )
+    model = SequencePlannerModel(PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE))
+    application, _ = _application(
+        model,
+        research_state,
+        session=Session(session_frame=frame, conversation_history=history),
+    )
+
+    selection = application.planner_agent.context_selector.select(
+        latest_request="How many rows are in the active dataset?",
+        frame=frame,
+    )
+    bounded_context = application.planner_agent.context_builder.build(selection=selection)
+    response = asyncio.run(
+        application.submit_message("How many rows are in the active dataset?")
+    )
+
+    assert active_evidence.evidence_id not in selection.evidence_candidate_ids
+    assert selection.evidence_candidate_ids == tuple(
+        evidence.evidence_id for evidence in other_evidences
+    )
+    assert bounded_context.data_profile == active_profile
+    assert bounded_context.evidences == ()
+    assert research_state.get_evidence(active_evidence.evidence_id) == active_evidence
+    assert response.content == (
+        "No eligible admitted Evidence is available in the current bounded context "
+        "to support an empirical answer."
+    )
+    assert model.answer_inputs == []
+    assert application.session.session_frame.evidence_ids == frame.evidence_ids
+    assert application.session.conversation_history.turns[0] == history.turns[0]
 
 
 def test_unicode_selection_normalizes_and_reselects_old_vietnamese_turn() -> None:

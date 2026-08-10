@@ -417,6 +417,6 @@ def test_assumption_only_claim_cannot_support_empirical_answer(db_session) -> No
 
     assert output.error is not None
     assert output.error.code is PlannerErrorCode.NO_ADMITTED_EVIDENCE
-    assert "No admitted Evidence" in output.response
+    assert "current bounded context" in output.response
     assert model.answer_inputs == []
     assert dispatcher.requests == []
