@@ -116,15 +116,15 @@ permitted use.
 
 ## Implementation status
 
-**Partially implemented.** The bounded Planner selects context before it
-rebuilds one immutable `PlanningContext` per run. The selection seam chooses
-active and finite recent FCO references plus whole conversation segments;
-`BuildPlanningContext` performs authoritative resolution, Evidence dependency
-expansion, lineage checks, and materialization. A dependency resolved for safe
-use does not become SessionFrame membership. Historical Evidence outside the
-active DataProfile is retained but omitted from that run. Dangling selected
-references, missing dependencies, and non-`COMPLETED` Evidence Tasks fail
-closed.
+**Partially implemented.** Runtime/application prepares one immutable
+`PlanningContext` before each bounded Planner run. Separate selection seams
+choose active and finite recent FCO references and bounded conversation turns;
+the application `PlannerContextPreparer` performs authoritative resolution,
+Evidence dependency expansion, lineage checks, and materialization. A
+dependency resolved for safe use does not become SessionFrame membership.
+Historical Evidence outside the active DataProfile is retained but omitted
+from that run. Dangling selected references, missing dependencies, and
+non-`COMPLETED` Evidence Tasks fail closed.
 
 Request understanding receives the latest request, the materialized planning
 projection, and selected native PydanticAI `ModelMessage` history through the

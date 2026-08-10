@@ -133,14 +133,18 @@ Session = SessionFrame + ConversationHistory
 ```
 
 `Session` is a non-FCO in-process lifetime aggregate. `ConversationHistory`
-retains the complete Human/Planner surface interaction while coherent
-`ConversationSegment` units preserve native PydanticAI `ModelMessage` history.
+retains the complete Human/Planner surface interaction while
+`ConversationSegment` units preserve native PydanticAI `ModelMessage` history
+as indivisible retention and pruning units. CogniEDA does not revalidate
+PydanticAI's tool or retry protocol inside those segments.
 `SessionFrame` contains cumulative typed FCO IDs plus active Objective and
-DataProfile selectors. A bounded selection step chooses current references and
-both non-authoritative surface discourse and whole native segments before
-`BuildPlanningContext` performs authoritative FCO resolution, Evidence
-dependency expansion, and materialization. Only native segment messages enter
-PydanticAI `message_history`; empirical answer context remains Evidence-only.
+DataProfile selectors. Runtime `Application` separately selects bounded
+conversation turns and a bounded `PlannerContextSelection` of research-state
+references. The application `PlannerContextPreparer` then resolves
+authoritative FCOs, expands Evidence dependencies, and materializes one
+ephemeral `PlanningContext` before calling `Planner.run`. Native messages are
+derived from the selected turns and enter PydanticAI `message_history`;
+empirical answer context remains Evidence-only.
 Resolved dependencies and context acquired later through an authorized role
 seam are not automatically persisted into `SessionFrame`.
 
@@ -227,17 +231,19 @@ continuity metadata, not current-run selection, eligibility, or authority.
 M1-A SessionFrame state is **Implemented** with ordered, read-only ID
 collections, active-selector membership validation, and successor seams that
 preserve history and reject duplicate IDs. The bounded selector considers the
-active identities plus finite recent history. `BuildPlanningContext` can expand
-a selected Evidence reference to its authoritative Task and DataProfile without
-adding those dependencies to the frame. Evidence admission remains the owner of
-the underlying lineage invariant.
+active identities plus finite recent history. The application
+`PlannerContextPreparer` can expand a selected Evidence reference to its
+authoritative Task and DataProfile without adding those dependencies to the
+frame. Evidence admission remains the owner of the underlying lineage
+invariant.
 
 ## Role and authority boundaries
 
 Planner remains the only human-facing agent. At the bounded M1-B library
-boundary it builds a materialized `PlanningContext` from the active typed
-`SessionFrame` history, understands the latest request, establishes or changes
-the active Objective while retaining prior Objective IDs, records planning-only
+boundary it consumes the materialized `PlanningContext` prepared by runtime;
+it does not inspect `ConversationHistory` or build its initial context from
+`SessionFrame`. It understands the latest request, establishes or changes the
+active Objective while retaining prior Objective IDs, records planning-only
 Assumptions, creates
 bounded Tasks, selects a typed capability, invokes the injected dispatcher,
 consumes `PlannerWorkOutcome`, returns a successor frame, and responds to the

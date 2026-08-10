@@ -68,8 +68,9 @@ backlog. [Current state](current-state.md) owns capability detail.
   removed. The active M1-A SessionFrame schema is the only executable frame
   owner and stores cumulative FCO IDs plus active selectors. The runtime Session
   keeps complete segmented conversation separate, while the current selector
-  bounds references before `BuildPlanningContext` resolves authoritative objects
-  and required dependencies for the four-node Planner graph. The unregistered
+  bounds references before the application `PlannerContextPreparer` resolves
+  authoritative objects and required dependencies for the four-node Planner
+  graph. The unregistered
   Hypothesis Analyst, Planner operation contracts, deferred retrieval engine,
   and scientific repositories still contain deferred field references. They
   are not composed into the active M1-A path.

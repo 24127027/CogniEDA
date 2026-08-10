@@ -130,11 +130,14 @@ approved plan in place.
 
 ## SessionFrame and GeneratedView coordination
 
-The Planner coordinates cumulative `SessionFrame` research history and its
-explicit active selectors. For each run, a separate selection seam chooses the
-bounded historical references relevant to the request; application authority
-resolves them, expands required dependencies, and validates safe use.
-Historical membership, active selection, and run selection are distinct.
+Runtime/application owns the cumulative `SessionFrame` research history and
+its explicit active selectors. For each Planner run, a separate selection seam
+chooses bounded historical references; application authority resolves them,
+expands required dependencies, validates safe use, and supplies an ephemeral
+`PlanningContext`. The Planner reasons over that prepared context and may
+return decisions that produce an authorized successor frame. Historical
+membership, active selection, run selection, and materialized context are
+distinct.
 
 The Planner may also coordinate a `GeneratedView` for an answer, table, report,
 or synthesis. A view references its sources and carries limitations and
@@ -191,10 +194,14 @@ START
 ```
 
 At that library boundary, typed model output selects one finite MVP action;
-`PlannerContextSelector` first chooses active and finite recent SessionFrame
-references. `BuildPlanningContext` then resolves that selection through the
-application research-state port, expands selected Evidence to required Task and
-DataProfile dependencies, and creates one ephemeral materialized context.
+runtime `Application` uses the pure `select_planner_context` policy to choose
+active and finite recent SessionFrame references. The application
+`PlannerContextPreparer` resolves that typed `PlannerContextSelection` through
+the research-state port, expands selected Evidence to required Task and
+DataProfile dependencies, and creates one ephemeral materialized context before
+`Planner.run` begins. Planner graph nodes do not repeat session selection or
+materialization during the run; they update the run-local context only from
+authoritative objects returned by current-run operations.
 Deterministic code persists successor Objective, Assumption, and Task objects
 through that port before retaining their IDs; tracked data work transitions
 `PENDING -> RUNNING -> COMPLETED|FAILED` in authoritative storage while the
@@ -212,8 +219,12 @@ Selected Human/Planner surface turns reach the same request-understanding step
 through a separate typed field explicitly restricted to non-authoritative
 discourse and reference resolution. The complete surface history remains
 outside SessionFrame; coherent model interactions are stored in indivisible
-`ConversationSegment` units, while deterministic turns may have no native
-segment. Empirical answer composition receives no conversation history.
+`ConversationSegment` retention units, while deterministic turns may have no
+native segment. Selected native messages are derived from the selected turns,
+not stored as a duplicate selected representation. CogniEDA validates segment
+identity, non-emptiness, and aggregate ID uniqueness but leaves PydanticAI tool
+and retry protocol validity to PydanticAI. Empirical answer composition receives
+no conversation history.
 
 The direct PydanticAI data-capability adapter remains a bounded tested seam but
 is not composed as an M1-B Planner tool. This prevents model tool calls from

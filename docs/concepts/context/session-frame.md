@@ -81,24 +81,23 @@ Session
 `Session` is the in-process chat lifetime aggregate, not an FCO or scientific
 authority. `ConversationHistory` retains the complete Human-to-Planner surface
 transcript separately from native model interaction. Each
-`ConversationSegment` is one indivisible native PydanticAI `ModelMessage` unit,
-so context pruning cannot split coherent native tool protocol. A tool call is
-complete when a later result with the same `tool_call_id` is either a
-`ToolReturnPart` or a retry-capable `RetryPromptPart`; when the result exposes a
-tool name, that name must also match. A genuinely dangling call still fails
-closed.
+`ConversationSegment` is one indivisible native PydanticAI `ModelMessage`
+retention and pruning unit. Completed `result.new_messages()` sequences are
+retained faithfully; CogniEDA does not reconstruct or independently validate
+PydanticAI's tool-call, return, or retry state machine.
 Deterministic turns may contain no segment; the runtime does not fabricate
 model messages for them.
 
-A Planner invocation first selects a bounded set of historical FCO references,
-surface discourse turns, and whole conversation segments. Surface discourse is
-passed through an explicitly non-authoritative typed field for intent and
-reference resolution; only native segment messages enter PydanticAI
-`message_history`. `BuildPlanningContext` then resolves FCO references through
-authoritative repositories, expands required Evidence Task and DataProfile
-dependencies, validates lineage needed for safe use, and materializes the
-ephemeral run context. Dependency resolution does not add SessionFrame
-membership. Conversation cannot become Evidence or an empirical premise.
+Runtime/application first selects bounded historical FCO references and
+conversation turns. Surface discourse is projected through an explicitly
+non-authoritative typed field for intent and reference resolution; native
+segment messages are derived from the selected turns for PydanticAI
+`message_history`. The application `PlannerContextPreparer` resolves FCO
+references through the research-state port, expands required Evidence Task and
+DataProfile dependencies, validates lineage needed for safe use, and
+materializes the ephemeral run context before `Planner.run`. Dependency
+resolution does not add SessionFrame membership. Conversation cannot become
+Evidence or an empirical premise.
 
 Initial invocation context is not a closed reasoning universe. An authorized
 role may later acquire additional purpose-specific context during its run.
@@ -107,8 +106,9 @@ persisted in `SessionFrame`.
 
 ## Selection without authority transfer
 
-Frame membership means only that a reference is selected for an authorized
-purpose. Each selected record retains:
+Frame membership records cumulative session history; it does not itself select
+a reference for the current Planner run. Once selected for an authorized
+purpose, each record retains:
 
 - its epistemic type;
 - its original author and admission authority;
@@ -171,17 +171,18 @@ duplicate historical IDs fail validation. Successors retain prior membership
 when an active Objective or DataProfile changes. The frame stores no
 materialized objects and imports no PydanticAI types.
 
-The bounded `PlannerContextSelector` selects the active Objective and
-DataProfile plus the 20 most recent Assumption, Task, and Evidence candidates.
+The bounded pure `select_planner_context` policy selects the active Objective
+and DataProfile plus the 20 most recent Assumption, Task, and Evidence
+candidates into a typed `PlannerContextSelection`.
 Conversation selection separately chooses surface turns and whole native
 segments from the four most recent turns plus at most the four most recent
 older turns with exact lexical overlap. The final selection is chronological.
 Matching uses deterministic NFKC normalization, case folding, and Unicode-aware
 word extraction. This is a hard-bounded lexical policy, not semantic retrieval.
-`BuildPlanningContext` resolves only the bounded FCO selection and expands a
-selected Evidence item's authoritative Task and DataProfile even when those
-dependency IDs were not directly selected. Missing dependencies and
-non-`COMPLETED` Evidence Tasks fail closed. Historical Evidence for another
+The application `PlannerContextPreparer` resolves only the bounded FCO
+selection and expands a selected Evidence item's authoritative Task and
+DataProfile even when those dependency IDs were not directly selected. Missing
+dependencies and non-`COMPLETED` Evidence Tasks fail closed. Historical Evidence for another
 DataProfile remains stored but is not materialized into an active-profile run.
 If the bounded candidate window contains no eligible Evidence, the Planner
 reports only absence from the current bounded context; it does not claim that

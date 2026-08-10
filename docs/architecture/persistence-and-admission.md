@@ -259,9 +259,11 @@ Objective, Assumption, Task, DataProfile, and Evidence reference resolution.
 Runtime bootstrap binds the
 Planner research-state port to the selected Workspace's
 `.cognieda/state/cognieda.sqlite3`. Bounded selection precedes
-`BuildPlanningContext`; dependency expansion does not add SessionFrame members,
-and materialized objects are not cached as a second authority. SessionFrame and
-ConversationHistory runtime successors are
+application-owned `PlannerContextPreparer` materialization; dependency
+expansion does not add SessionFrame members, and materialized objects are not
+cached as a second authority. The port preserves inward dependency direction;
+Planner/application code does not depend on SQLModel or the SQLite adapter.
+SessionFrame and ConversationHistory runtime successors are
 still process-local and are not automatically persisted for recovery.
 
 The complete target boundary is not implemented. Canonical PlanRevision
