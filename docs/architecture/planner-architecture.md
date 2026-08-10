@@ -130,11 +130,11 @@ approved plan in place.
 
 ## SessionFrame and GeneratedView coordination
 
-The Planner coordinates a `SessionFrame` as the governed active context for a
-specific purpose, Objective, and scope. It requests inclusion and exclusion of
-eligible state; application authority validates and persists the frame.
-SessionFrame construction must respect context type safety, validity, and
-Objective boundaries.
+The Planner coordinates cumulative `SessionFrame` research history and its
+explicit active selectors. For each run, a separate selection seam chooses the
+bounded historical references relevant to the request; application authority
+resolves them, expands required dependencies, and validates safe use.
+Historical membership, active selection, and run selection are distinct.
 
 The Planner may also coordinate a `GeneratedView` for an answer, table, report,
 or synthesis. A view references its sources and carries limitations and
@@ -191,8 +191,10 @@ START
 ```
 
 At that library boundary, typed model output selects one finite MVP action;
-`BuildPlanningContext` first resolves retained SessionFrame IDs through the
-application research-state port into one ephemeral materialized context.
+`PlannerContextSelector` first chooses active and finite recent SessionFrame
+references. `BuildPlanningContext` then resolves that selection through the
+application research-state port, expands selected Evidence to required Task and
+DataProfile dependencies, and creates one ephemeral materialized context.
 Deterministic code persists successor Objective, Assumption, and Task objects
 through that port before retaining their IDs; tracked data work transitions
 `PENDING -> RUNNING -> COMPLETED|FAILED` in authoritative storage while the
@@ -206,7 +208,9 @@ selected `Capability`, work outcome, and controlled error.
 
 Selected native PydanticAI `ModelMessage` history reaches request understanding
 through the adapter's `message_history` argument rather than typed prompt prose.
-Full retained conversation remains outside SessionFrame, and empirical answer
+The complete Human/Planner surface history remains outside SessionFrame;
+coherent model interactions are stored in indivisible `ConversationSegment`
+units, while deterministic turns may have no native segment. Empirical answer
 composition receives no conversation history.
 
 The direct PydanticAI data-capability adapter remains a bounded tested seam but

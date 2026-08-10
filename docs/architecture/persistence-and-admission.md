@@ -253,13 +253,15 @@ closed unless request path, observed execution path, observed digest, and
 provenance profile identity all match that authoritative binding. This is a
 non-FCO provenance/authority record and does not expand the semantic graph.
 
-The bounded Planner/runtime surface is also **Verified on SQLite** for ID-only
-SessionFrame round-trip and authoritative Objective, Assumption, Task,
-DataProfile, and Evidence reference resolution. Runtime bootstrap binds the
+The bounded Planner/runtime surface is also **Verified on SQLite** for
+cumulative ID-only SessionFrame round-trip, active selectors, and authoritative
+Objective, Assumption, Task, DataProfile, and Evidence reference resolution.
+Runtime bootstrap binds the
 Planner research-state port to the selected Workspace's
-`.cognieda/state/cognieda.sqlite3`. `BuildPlanningContext` fails closed on
-dangling or inconsistent references; it does not cache materialized objects as
-a second authority. SessionFrame and ConversationHistory runtime successors are
+`.cognieda/state/cognieda.sqlite3`. Bounded selection precedes
+`BuildPlanningContext`; dependency expansion does not add SessionFrame members,
+and materialized objects are not cached as a second authority. SessionFrame and
+ConversationHistory runtime successors are
 still process-local and are not automatically persisted for recovery.
 
 The complete target boundary is not implemented. Canonical PlanRevision

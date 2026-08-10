@@ -31,9 +31,10 @@ scientific investigation control, protected evaluation, Graph Miner inquiry,
 answer generation, recovery, or validity review. Without a known purpose and
 reasoning mode, the system cannot determine which epistemic types are safe.
 
-Purpose also determines whether the result is a SessionFrame selection, an
-EvaluationBundle input, a read-only inquiry result, a recovery projection, or
-a GeneratedView source set. These are not interchangeable outputs.
+Purpose also determines whether the result is a bounded run selection derived
+from SessionFrame history, an EvaluationBundle input, a read-only inquiry
+result, a recovery projection, or a GeneratedView source set. These are not
+interchangeable outputs.
 
 ## Objective and scope binding
 
@@ -42,9 +43,10 @@ population, cohort, protocol, claim, and permitted-use scope before candidate
 selection. A Workspace may contain many active Objectives; Workspace
 membership alone is not sufficient scope.
 
-SessionFrame remains Objective-scoped unless a specific authorized operation
-explicitly permits otherwise. Related prior work may suggest a new Objective,
-but it does not become state in the current Objective.
+An active SessionFrame selection remains Objective-scoped unless a specific
+authorized operation explicitly permits otherwise. Cumulative SessionFrame
+history may retain prior Objective IDs, but inactive membership does not enter
+the current run automatically.
 
 Cross-Objective Evidence reuse requires explicit admission and exact equality
 over the relevant versioned canonical typed obligations. Fuzzy similarity,
@@ -120,15 +122,16 @@ lineage, not a generic search result.
 
 ## Implementation status
 
-**Partially implemented.** An important scope limitation remains. Current source
-has a pure policy that filters known object and lifecycle combinations by four
-legacy modes. A bounded planning-only `DiscoveryRetrievalEngine` filters
-Discovery lifecycle before deterministic lexical ranking and can prioritize
-references already present in a SessionFrame. No vector retrieval is used.
+**Partially implemented.** The active Planner has a bounded deterministic
+selector, not a general retrieval engine. It selects the active Objective and
+DataProfile, finite recent Assumption/Task/Evidence candidates, and whole recent
+or exact-term-matching conversation segments before authoritative resolution.
+Historical Evidence is narrowed to the active DataProfile, and selected
+Evidence expands to required Task and DataProfile dependencies without changing
+SessionFrame membership. No vector retrieval is used.
 
-The current retrieval request and SessionFrame do not bind an Objective
-identifier, and the engine can enumerate Workspace-local Discoveries before
-ranking. It therefore does not establish canonical Objective isolation or
-cross-Objective admission and must not be described as the complete target
-retrieval boundary. Full authority, validity-event, scientific-contract, and
-lineage filtering remain incomplete.
+A separate donor `DiscoveryRetrievalEngine` and its legacy modes remain
+**Deferred** and are not composed into the MVP runtime. The active selector does
+not establish semantic relevance, Graph Miner discovery, cross-Objective reuse,
+complete validity filtering, or scientific-contract eligibility. Those target
+boundaries remain incomplete.

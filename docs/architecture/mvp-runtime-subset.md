@@ -133,13 +133,14 @@ Session = SessionFrame + ConversationHistory
 ```
 
 `Session` is a non-FCO in-process lifetime aggregate. `ConversationHistory`
-contains ordered native PydanticAI `ModelMessage` turns, including provider
-request/response and tool-protocol structure when present. `SessionFrame`
-contains only typed FCO IDs. `BuildPlanningContext` resolves those IDs through
-authoritative repositories for each run, then combines the materialized objects,
-latest request, and purpose-eligible native history. Empirical answer context
-remains Evidence-only. Context acquired later through an authorized role seam
-is not automatically persisted into `SessionFrame`.
+retains the complete Human/Planner surface interaction while coherent
+`ConversationSegment` units preserve native PydanticAI `ModelMessage` history.
+`SessionFrame` contains cumulative typed FCO IDs plus active Objective and
+DataProfile selectors. A bounded selection step chooses current references and
+whole segments before `BuildPlanningContext` performs authoritative resolution,
+Evidence dependency expansion, and materialization. Empirical answer context
+remains Evidence-only. Resolved dependencies and context acquired later through
+an authorized role seam are not automatically persisted into `SessionFrame`.
 
 ## MVP object semantics
 
@@ -213,25 +214,29 @@ identities.
 
 ### SessionFrame
 
-The MVP frame is a typed reference manifest: one optional Objective ID, ordered
-Assumption, Task, and Evidence IDs, and one optional DataProfile ID. It does not
-copy materialized FCO payloads. Follow-up work rebuilds `PlanningContext` from
-the authoritative current objects, so a Task status change is visible without
-replacing its ID in the frame. Frame membership is continuity metadata, not
-proof of current eligibility or scientific authority.
+The MVP frame is a cumulative typed reference manifest: ordered Objective,
+Assumption, Task, DataProfile, and Evidence IDs plus optional active Objective
+and DataProfile selectors. It does not copy materialized FCO payloads. Changing
+an active selector preserves historical membership. Follow-up work rebuilds a
+bounded `PlanningContext` from selected authoritative objects, so a Task status
+change is visible without replacing its ID in the frame. Frame membership is
+continuity metadata, not current-run selection, eligibility, or authority.
 
 M1-A SessionFrame state is **Implemented** with ordered, read-only ID
-collections. Its controlled seams return validated successor manifests and
-reject duplicate IDs. Authoritative Task/DataProfile/Evidence lineage is
-enforced at Evidence admission and rechecked when `BuildPlanningContext`
-resolves a frame; the manifest itself does not manufacture eligibility.
+collections, active-selector membership validation, and successor seams that
+preserve history and reject duplicate IDs. The bounded selector considers the
+active identities plus finite recent history. `BuildPlanningContext` can expand
+a selected Evidence reference to its authoritative Task and DataProfile without
+adding those dependencies to the frame. Evidence admission remains the owner of
+the underlying lineage invariant.
 
 ## Role and authority boundaries
 
 Planner remains the only human-facing agent. At the bounded M1-B library
 boundary it builds a materialized `PlanningContext` from the active typed
-`SessionFrame` references, understands the latest request, establishes or
-replaces the active Objective, records planning-only Assumptions, creates
+`SessionFrame` history, understands the latest request, establishes or changes
+the active Objective while retaining prior Objective IDs, records planning-only
+Assumptions, creates
 bounded Tasks, selects a typed capability, invokes the injected dispatcher,
 consumes `PlannerWorkOutcome`, returns a successor frame, and responds to the
 human. This does not persist or retain the frame across process restarts. The

@@ -116,17 +116,23 @@ permitted use.
 
 ## Implementation status
 
-**Partially implemented.** The bounded Planner rebuilds one `PlanningContext`
-per run. `BuildPlanningContext` resolves the retained `SessionFrame` IDs into
-current Objective, Assumption, Task, DataProfile, and Evidence objects through
-an authoritative repository port; dangling and inconsistent references fail
-closed. Request understanding receives the latest request, the materialized
-planning projection, and purpose-eligible native PydanticAI `ModelMessage`
-history through the model adapter's `message_history` channel. Conversation
-remains non-authoritative discourse context. The separate empirical answer
-input accepts admitted Evidence and excludes conversation and Assumptions. A
-pure retrieval policy also rejects unknown types and unsafe lifecycle/mode
-combinations at its isolated library surface.
+**Partially implemented.** The bounded Planner selects context before it
+rebuilds one immutable `PlanningContext` per run. The selection seam chooses
+active and finite recent FCO references plus whole conversation segments;
+`BuildPlanningContext` performs authoritative resolution, Evidence dependency
+expansion, lineage checks, and materialization. A dependency resolved for safe
+use does not become SessionFrame membership. Historical Evidence outside the
+active DataProfile is retained but omitted from that run. Dangling selected
+references, missing dependencies, and non-`COMPLETED` Evidence Tasks fail
+closed.
+
+Request understanding receives the latest request, the materialized planning
+projection, and selected native PydanticAI `ModelMessage` history through the
+adapter's `message_history` channel. Conversation remains non-authoritative
+discourse context. The separate empirical answer input accepts admitted
+selected Evidence and excludes conversation and Assumptions. A pure retrieval
+policy also rejects unknown types and unsafe lifecycle/mode combinations at
+its isolated library surface.
 
 Planning consultation, scientific-investigation control, Graph Miner inquiry,
 protected EvaluationBundle construction, recovery, and validity review remain

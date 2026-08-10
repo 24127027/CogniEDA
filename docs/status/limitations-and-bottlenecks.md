@@ -10,8 +10,9 @@ backlog. [Current state](current-state.md) owns capability detail.
 - Active MVP Task has no PlanRevision membership, dependencies, assignment,
   ordering, approval, parent/leaf semantics, or canonical Task kind. Those
   contracts are **Deferred** to M1-C rather than represented by legacy fields.
-- The MVP SessionFrame supports one active Objective and one active
-  DataProfile but does not implement Workspace-wide multi-Objective isolation.
+- The MVP SessionFrame retains cumulative Objective and DataProfile histories
+  with one active selector for each, but does not implement Workspace-wide
+  multi-Objective isolation.
 - Direct Task-to-Evidence linkage is executable MVP state. Canonical
   Hypothesis, EvidenceRequest, ExecutionRun, AnalysisFrame, evaluation, and
   admission lineage remain **Deferred** to M2/M3-B.
@@ -20,9 +21,10 @@ backlog. [Current state](current-state.md) owns capability detail.
 
 - M1-B Planner behavior and M3-A deterministic Data Explorer-to-Evidence
   admission are **Implemented** at bounded library surfaces. M5-A is
-  **Partially implemented** for retained in-process ID-only SessionFrame,
-  native PydanticAI conversation continuity, per-run authoritative reference
-  resolution, and workspace-local SQLite research-object composition.
+  **Partially implemented** for retained in-process cumulative ID-only
+  SessionFrame, segmented native PydanticAI conversation continuity, bounded
+  pre-build selection, required dependency expansion, and workspace-local
+  SQLite research-object composition.
   Authoritative dataset execution context, Evidence admission composition,
   persisted Session recovery, and restart recovery remain **Deferred**.
 - `PlanRevision`, `ScientificInvestigationRun`, `InvestigationPlan`,
@@ -31,7 +33,7 @@ backlog. [Current state](current-state.md) owns capability detail.
   and `GovernanceDecision` have no supported implementation.
 - Hypothesis Analyst and Graph Miner remain unregistered scaffolds. Discovery
   and Hypothesis remain canonical FCO names but have no active MVP runtime.
-- Planner successor-state Objective replacement and Assumption addition are
+- Planner successor-state active Objective change and Assumption addition are
   **Implemented** through the application research-state port: new objects are
   persisted before their IDs enter the successor frame. In-place Objective and
   Assumption updates remain **Deferred**. Task persistence supports status
@@ -64,9 +66,10 @@ backlog. [Current state](current-state.md) owns capability detail.
   material and are not compatibility authority for active schemas.
 - The stale pre-M1-B duplicate SessionFrame and `create_plan` context path remain
   removed. The active M1-A SessionFrame schema is the only executable frame
-  owner and stores FCO IDs only. The runtime Session keeps native PydanticAI
-  conversation separate, while the current `BuildPlanningContext` resolves
-  authoritative objects for the bounded four-node Planner graph. The unregistered
+  owner and stores cumulative FCO IDs plus active selectors. The runtime Session
+  keeps complete segmented conversation separate, while the current selector
+  bounds references before `BuildPlanningContext` resolves authoritative objects
+  and required dependencies for the four-node Planner graph. The unregistered
   Hypothesis Analyst, Planner operation contracts, deferred retrieval engine,
   and scientific repositories still contain deferred field references. They
   are not composed into the active M1-A path.
@@ -130,9 +133,10 @@ backlog. [Current state](current-state.md) owns capability detail.
   and application Evidence admission. No composed user-to-Planner-to-real-Data
   Explorer-to-Evidence-to-SessionFrame-to-response test exists; M3-A library
   completion does not establish M5-A or MVP-I.
-- Focused runtime tests prove in-process ID-only SessionFrame retention,
-  authoritative object re-resolution across turns, native `ModelMessage`
-  serialization including coherent tool call/return structure, selected-history
+- Focused runtime tests prove cumulative ID-only SessionFrame retention,
+  active-selector invariants, authoritative object re-resolution and dependency
+  expansion, native `ModelMessage` segment serialization including coherent tool
+  call/return structure, whole-segment selection without deletion, selected-history
   use only during request understanding, and conversation/Assumption exclusion
   from empirical answer input. They do not prove restart-safe Session persistence
   or runtime Evidence admission composition.

@@ -126,10 +126,15 @@ holds preserve the exact proposal or plan version presented for decision. A
 resumed decision applies only to that identity; any substantive change
 requires a new proposal and the applicable approval.
 
-SessionFrame reconstruction uses current validity and context eligibility. The
-pre-pause frame remains historical truth-to-record, while a new or successor
-frame may exclude state that became stale, invalid, superseded, or wrong-scope
-during the pause.
+SessionFrame successors preserve cumulative historical membership while active
+selectors may change. Context reconstruction applies current validity and
+eligibility when selecting a bounded run projection; being omitted from one run
+does not delete a historical reference or conversation segment.
+
+The bounded runtime's `ConversationSegment` is an indivisible history and
+context-selection boundary compatible with future interruption work. It is not
+a durable execution checkpoint. Full interrupted-run state, leases, and resume
+protocol remain separate recovery machinery.
 
 ## Fail-closed recovery
 
@@ -149,7 +154,11 @@ model to infer intent.
 
 ## Implementation status
 
-**Partially implemented.** Current operational foundations include
+**Partially implemented.** The retained in-process `Session` now preserves
+cumulative SessionFrame successors and complete ConversationHistory while
+selecting whole coherent segments for each request. Deterministic turns need no
+fabricated model history. This is not restart-safe continuity or an interruption
+engine. Other operational foundations include
 append-only SessionFrame snapshots; durable PlannerOperation approval and
 resume checks; atomic commit for a bounded operation set; paired
 ExecutionRun/outbox admission; leases, fencing epochs, retry lineage, and
