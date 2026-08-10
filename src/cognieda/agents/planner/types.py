@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
 from uuid import UUID
 
@@ -17,12 +18,7 @@ from cognieda.schemas.artifacts import (
     Task,
 )
 
-from .context import (
-    BuildPlanningContext,
-    NonAuthoritativeSurfaceTurn,
-    PlannerContextSelector,
-    PlanningContext,
-)
+from .context import NonAuthoritativeSurfaceTurn, PlanningContext
 
 
 class PlannerAction(StrEnum):
@@ -179,16 +175,13 @@ class State(BaseModel):
     error: PlannerControlledError | None = None
 
 
-class Context(BaseModel):
+@dataclass(frozen=True, slots=True)
+class Context:
     """Injected model and dispatcher boundaries available to graph nodes."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     planner_model: object
     dispatcher: object
     research_state: PlannerResearchStatePort
-    context_selector: PlannerContextSelector
-    context_builder: BuildPlanningContext
 
 
 class PlannerOutput(BaseModel):

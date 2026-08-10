@@ -18,6 +18,7 @@ from cognieda.agents.planner.types import (
     PlannerModelInput,
     PlannerResponseDraft,
 )
+from cognieda.application.services import PlannerContextPreparer, select_planner_context
 from cognieda.execution import (
     Capability,
     ExecutionFailure,
@@ -115,6 +116,17 @@ def _planner(
     )
 
 
+def _planning_context(
+    research_state: SqlitePlannerResearchState,
+    query: str,
+    frame: SessionFrame | None = None,
+):
+    return PlannerContextPreparer(research_state).build(
+        latest_request=query,
+        selection=select_planner_context(frame or SessionFrame()),
+    )
+
+
 def _objective_frame(research_state: SqlitePlannerResearchState, text: str) -> SessionFrame:
     objective = research_state.create_objective(Objective(text=text))
     return SessionFrame(
@@ -162,7 +174,11 @@ def test_typed_capability_selection_dispatches_one_bounded_canonical_task(
 
     output = asyncio.run(
         _planner(model, dispatcher, research_state).run(
-            "Do the requested bounded data work.", session_frame=frame
+            "Do the requested bounded data work.",
+            planning_context=_planning_context(
+                research_state, "Do the requested bounded data work.", frame
+            ),
+            session_frame=frame,
         )
     )
 
@@ -187,7 +203,11 @@ def test_successful_work_updates_authoritative_task_without_replacing_frame_id(
     frame = _objective_frame(research_state, "Assess dataset quality.")
 
     output = asyncio.run(
-        _planner(model, dispatcher, research_state).run("Check missingness.", session_frame=frame)
+        _planner(model, dispatcher, research_state).run(
+            "Check missingness.",
+            planning_context=_planning_context(research_state, "Check missingness.", frame),
+            session_frame=frame,
+        )
     )
 
     task_id = output.created_task_ids[0]
@@ -214,7 +234,13 @@ def test_failed_or_blocked_work_fails_authoritative_task_without_evidence(
     frame = _objective_frame(research_state, "Prepare data for analysis.")
 
     output = asyncio.run(
-        _planner(model, dispatcher, research_state).run("Transform the data.", session_frame=frame)
+        _planner(model, dispatcher, research_state).run(
+            "Transform the data.",
+            planning_context=_planning_context(
+                research_state, "Transform the data.", frame
+            ),
+            session_frame=frame,
+        )
     )
 
     task = research_state.get_task(output.session_frame.task_ids[-1])
@@ -234,7 +260,11 @@ def test_task_outcome_identity_mismatch_fails_closed(db_session) -> None:
     frame = _objective_frame(research_state, "Understand the data.")
 
     output = asyncio.run(
-        _planner(model, dispatcher, research_state).run("Profile the data.", session_frame=frame)
+        _planner(model, dispatcher, research_state).run(
+            "Profile the data.",
+            planning_context=_planning_context(research_state, "Profile the data.", frame),
+            session_frame=frame,
+        )
     )
 
     assert output.error is not None
@@ -252,7 +282,12 @@ def test_data_work_without_objective_returns_blocker_without_creating_task(
     dispatcher = FakeDispatcher(ExecutionStatus.SUCCEEDED)
     model = FakePlannerModel(_data_decision("Profile the active dataset."))
 
-    output = asyncio.run(_planner(model, dispatcher, research_state).run("Profile it."))
+    output = asyncio.run(
+        _planner(model, dispatcher, research_state).run(
+            "Profile it.",
+            planning_context=_planning_context(research_state, "Profile it."),
+        )
+    )
 
     assert output.error is not None
     assert output.error.code is PlannerErrorCode.MISSING_OBJECTIVE
@@ -274,7 +309,11 @@ def test_clear_data_request_establishes_objective_before_creating_task(db_sessio
 
     output = asyncio.run(
         _planner(model, dispatcher, research_state).run(
-            "Understand this dataset by profiling its schema and quality."
+            "Understand this dataset by profiling its schema and quality.",
+            planning_context=_planning_context(
+                research_state,
+                "Understand this dataset by profiling its schema and quality.",
+            ),
         )
     )
 
@@ -303,7 +342,11 @@ def test_semantic_task_change_creates_new_identity_without_rewriting_existing(
 
     output = asyncio.run(
         _planner(model, dispatcher, research_state).run(
-            "Now inspect missingness.", session_frame=frame
+            "Now inspect missingness.",
+            planning_context=_planning_context(
+                research_state, "Now inspect missingness.", frame
+            ),
+            session_frame=frame,
         )
     )
 
@@ -326,6 +369,9 @@ def test_explicit_assumption_addition_persists_then_retains_only_id(db_session) 
     output = asyncio.run(
         _planner(model, dispatcher, research_state).run(
             "/assumption Rows represent customers.",
+            planning_context=_planning_context(
+                research_state, "/assumption Rows represent customers.", frame
+            ),
             session_frame=frame,
         )
     )
@@ -383,6 +429,9 @@ def test_follow_up_answer_uses_admitted_typed_evidence(db_session) -> None:
     output = asyncio.run(
         _planner(model, dispatcher, research_state).run(
             "How many rows are in the dataset?",
+            planning_context=_planning_context(
+                research_state, "How many rows are in the dataset?", frame
+            ),
             session_frame=frame,
         )
     )
@@ -411,6 +460,9 @@ def test_assumption_only_claim_cannot_support_empirical_answer(db_session) -> No
     output = asyncio.run(
         _planner(model, dispatcher, research_state).run(
             "How many rows are in the dataset?",
+            planning_context=_planning_context(
+                research_state, "How many rows are in the dataset?", frame
+            ),
             session_frame=frame,
         )
     )

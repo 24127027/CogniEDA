@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections.abc import Sequence
 from uuid import uuid4
 
@@ -9,7 +10,6 @@ from pydantic import ValidationError
 from pydantic_ai.messages import ModelMessage
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.context import BuildPlanningContext, PlannerContextSelector
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.model import PlannerModelResult
 from cognieda.agents.planner.types import (
@@ -20,6 +20,7 @@ from cognieda.agents.planner.types import (
     PlannerModelInput,
     PlannerResponseDraft,
 )
+from cognieda.application.services import PlannerContextPreparer, select_planner_context
 from cognieda.execution import ExecutionRequest
 from cognieda.infrastructure.persistence import SqlitePlannerResearchState
 from cognieda.schemas.artifacts import Assumption, Objective, SessionFrame, Task
@@ -72,6 +73,17 @@ def _planner(
     )
 
 
+def _planning_context(
+    research_state: SqlitePlannerResearchState,
+    query: str,
+    frame: SessionFrame | None = None,
+):
+    return PlannerContextPreparer(research_state).build(
+        latest_request=query,
+        selection=select_planner_context(frame or SessionFrame()),
+    )
+
+
 def test_natural_language_understanding_receives_latest_materialized_state(db_session) -> None:
     research_state = SqlitePlannerResearchState(db_session)
     objective = research_state.create_objective(Objective(text="Understand retention."))
@@ -89,6 +101,9 @@ def test_natural_language_understanding_receives_latest_materialized_state(db_se
     output = asyncio.run(
         _planner(model, dispatcher, research_state).run(
             "Summarize the active research state.",
+            planning_context=_planning_context(
+                research_state, "Summarize the active research state.", frame
+            ),
             session_frame=frame,
         )
     )
@@ -111,21 +126,24 @@ def test_planning_context_is_a_distinct_ephemeral_per_run_projection(db_session)
         objective_ids=(objective.objective_id,),
         active_objective_id=objective.objective_id,
     )
-    builder = BuildPlanningContext(research_state)
-
-    selector = PlannerContextSelector()
-    first = builder.build(
-        selection=selector.select(latest_request="First request", frame=frame)
-    )
-    second = builder.build(
-        selection=selector.select(latest_request="Second request", frame=frame)
-    )
+    preparer = PlannerContextPreparer(research_state)
+    selection = select_planner_context(frame)
+    first = preparer.build(latest_request="First request", selection=selection)
+    second = preparer.build(latest_request="Second request", selection=selection)
 
     assert first is not second
     assert first.latest_request == "First request"
     assert second.latest_request == "Second request"
     assert first.objective == objective
     assert "planning_context" not in SessionFrame.model_fields
+
+
+def test_planner_run_consumes_prepared_context_not_session_conversation_inputs() -> None:
+    parameters = inspect.signature(Planner.run).parameters
+
+    assert parameters["planning_context"].default is inspect.Parameter.empty
+    assert "surface_discourse" not in parameters
+    assert "message_history" not in parameters
 
 
 def test_explicit_and_natural_objective_requests_reach_same_typed_action(db_session) -> None:
@@ -140,11 +158,19 @@ def test_explicit_and_natural_objective_requests_reach_same_typed_action(db_sess
     dispatcher = NeverDispatcher()
 
     natural = asyncio.run(
-        _planner(natural_model, dispatcher, research_state).run("Investigate customer churn.")
+        _planner(natural_model, dispatcher, research_state).run(
+            "Investigate customer churn.",
+            planning_context=_planning_context(
+                research_state, "Investigate customer churn."
+            ),
+        )
     )
     explicit = asyncio.run(
         _planner(explicit_model, dispatcher, research_state).run(
-            "/objective Understand customer churn."
+            "/objective Understand customer churn.",
+            planning_context=_planning_context(
+                research_state, "/objective Understand customer churn."
+            ),
         )
     )
 
@@ -183,6 +209,9 @@ def test_objective_semantic_refinement_allocates_new_authoritative_identity(db_s
     output = asyncio.run(
         _planner(model, NeverDispatcher(), research_state).run(
             "Refine the objective to focus on drivers.",
+            planning_context=_planning_context(
+                research_state, "Refine the objective to focus on drivers.", frame
+            ),
             session_frame=frame,
         )
     )
@@ -198,7 +227,9 @@ def test_objective_semantic_refinement_allocates_new_authoritative_identity(db_s
     assert research_state.get_objective(original.objective_id) == original
 
 
-def test_dangling_reference_fails_closed_before_graph_execution(db_session) -> None:
+def test_dangling_reference_fails_closed_during_application_context_preparation(
+    db_session,
+) -> None:
     research_state = SqlitePlannerResearchState(db_session)
     missing_id = uuid4()
     frame = SessionFrame(
@@ -207,15 +238,9 @@ def test_dangling_reference_fails_closed_before_graph_execution(db_session) -> N
     )
     model = FakePlannerModel(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
 
-    output = asyncio.run(
-        _planner(model, NeverDispatcher(), research_state).run(
-            "Summarize state.", session_frame=frame
-        )
-    )
+    with pytest.raises(ValueError, match="missing Objective"):
+        _planning_context(research_state, "Summarize state.", frame)
 
-    assert output.error is not None
-    assert output.error.code is PlannerErrorCode.CONTEXT_RESOLUTION_FAILED
-    assert output.session_frame == frame
     assert model.decision_inputs == []
 
 
@@ -234,6 +259,9 @@ def test_unknown_explicit_command_fails_without_model_fallback_or_state_change(
     output = asyncio.run(
         _planner(model, dispatcher, research_state).run(
             "/unknown remove everything",
+            planning_context=_planning_context(
+                research_state, "/unknown remove everything", frame
+            ),
             session_frame=frame,
         )
     )

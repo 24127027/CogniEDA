@@ -6,12 +6,7 @@ from collections.abc import Iterable
 from uuid import UUID, uuid4
 
 from pydantic import Field, model_validator
-from pydantic_ai.messages import (
-    ModelMessage,
-    RetryPromptPart,
-    ToolCallPart,
-    ToolReturnPart,
-)
+from pydantic_ai.messages import ModelMessage
 
 from cognieda.schemas.common import ImmutableCogniEDABaseModel
 
@@ -20,49 +15,10 @@ DEFAULT_OLDER_LEXICAL_MATCH_LIMIT = 4
 
 
 class ConversationSegment(ImmutableCogniEDABaseModel):
-    """One indivisible, coherent native model-history unit."""
+    """One indivisible native model-history retention and pruning unit."""
 
     segment_id: UUID = Field(default_factory=uuid4)
-    messages: tuple[ModelMessage, ...]
-
-    @model_validator(mode="after")
-    def _messages_form_complete_unit(self) -> ConversationSegment:
-        if not self.messages:
-            raise ValueError("ConversationSegment requires at least one ModelMessage.")
-
-        pending_calls: dict[str, str] = {}
-        for message in self.messages:
-            for part in message.parts:
-                if isinstance(part, ToolCallPart):
-                    if part.tool_call_id in pending_calls:
-                        raise ValueError(
-                            "ConversationSegment rejects ambiguous duplicate pending "
-                            "tool-call identities."
-                        )
-                    pending_calls[part.tool_call_id] = part.tool_name
-                    continue
-                if isinstance(part, ToolReturnPart | RetryPromptPart):
-                    call_name = pending_calls.get(part.tool_call_id)
-                    if call_name is None:
-                        if isinstance(part, RetryPromptPart) and part.tool_name is None:
-                            continue
-                        raise ValueError(
-                            "ConversationSegment must retain coherent tool-call/tool-return "
-                            "or tool-call/retry-prompt protocol pairs."
-                        )
-                    if part.tool_name is not None and part.tool_name != call_name:
-                        raise ValueError(
-                            "ConversationSegment must retain coherent tool-call/tool-return "
-                            "or tool-call/retry-prompt protocol pairs."
-                        )
-                    del pending_calls[part.tool_call_id]
-
-        if pending_calls:
-            raise ValueError(
-                "ConversationSegment must retain coherent tool-call/tool-return "
-                "or tool-call/retry-prompt protocol pairs."
-            )
-        return self
+    messages: tuple[ModelMessage, ...] = Field(min_length=1)
 
 
 class ConversationTurn(ImmutableCogniEDABaseModel):
@@ -82,16 +38,17 @@ class ConversationTurn(ImmutableCogniEDABaseModel):
 
 
 class SelectedConversationContext(ImmutableCogniEDABaseModel):
-    """Bounded surface discourse and whole native segments selected for one request."""
+    """Bounded turns selected from retained conversation history for one request."""
 
     surface_turns: tuple[ConversationTurn, ...] = ()
-    model_segments: tuple[ConversationSegment, ...] = ()
-
     def model_messages(self) -> tuple[ModelMessage, ...]:
         """Flatten only native segments at the PydanticAI invocation boundary."""
 
         return tuple(
-            message for segment in self.model_segments for message in segment.messages
+            message
+            for turn in self.surface_turns
+            for segment in turn.segments
+            for message in segment.messages
         )
 
 
@@ -171,9 +128,6 @@ class ConversationHistory(ImmutableCogniEDABaseModel):
         selected_turns = tuple(self.turns[index] for index in selected_indexes)
         return SelectedConversationContext(
             surface_turns=selected_turns,
-            model_segments=tuple(
-                segment for turn in selected_turns for segment in turn.segments
-            ),
         )
 
     @staticmethod

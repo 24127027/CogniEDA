@@ -7,6 +7,7 @@ from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.application.ports import ModelConfig
+from cognieda.application.services import PlannerContextPreparer
 from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
 from cognieda.infrastructure.agent_tooling import AgentTooling
 from cognieda.infrastructure.llm import OpenAICompatibleAgentFactory
@@ -53,6 +54,7 @@ def bootstrap_application(workspace_path: Path) -> Application:
     return Application(
         workspace=workspace,
         planner_agent=planner,
+        planner_context_preparer=PlannerContextPreparer(research_state),
         dispatcher=dispatcher,
     )
 

@@ -32,14 +32,14 @@ def _error(code: PlannerErrorCode, message: str) -> PlannerControlledError:
     return PlannerControlledError(code=code, message=message)
 
 
-def _refresh_planning_context(state: State, runtime: Runtime[Context]) -> None:
-    selection = runtime.context.context_selector.select(
-        latest_request=state.query,
-        frame=state.session_frame,
-        surface_discourse=state.planning_context.surface_discourse,
-        message_history=state.planning_context.message_history,
+def _replace_context_task(state: State, task: Task) -> None:
+    tasks = tuple(
+        task if existing.task_id == task.task_id else existing
+        for existing in state.planning_context.tasks
     )
-    state.planning_context = runtime.context.context_builder.build(selection=selection)
+    if not any(existing.task_id == task.task_id for existing in state.planning_context.tasks):
+        tasks = (*tasks, task)
+    state.planning_context = state.planning_context.model_copy(update={"tasks": tasks})
 
 
 def _explicit_decision(
@@ -150,12 +150,18 @@ async def apply_planning_state(state: State, runtime: Runtime[Context]) -> State
                     Objective(text=decision.objective_text)
                 )
                 state.session_frame = state.session_frame.add_objective_id(objective.objective_id)
+                state.planning_context = state.planning_context.model_copy(
+                    update={"objective": objective}
+                )
         elif decision.action is PlannerAction.ADD_ASSUMPTION:
             assert decision.assumption_text is not None
             assumption = runtime.context.research_state.create_assumption(
                 Assumption(text=decision.assumption_text)
             )
             state.session_frame = state.session_frame.add_assumption_id(assumption.assumption_id)
+            state.planning_context = state.planning_context.model_copy(
+                update={"assumptions": (*state.planning_context.assumptions, assumption)}
+            )
         elif decision.action is PlannerAction.CREATE_OR_RUN_DATA_TASK:
             assert decision.task_instruction is not None
             assert decision.capability is not None
@@ -170,9 +176,13 @@ async def apply_planning_state(state: State, runtime: Runtime[Context]) -> State
                     Objective(text=decision.objective_text)
                 )
                 state.session_frame = state.session_frame.add_objective_id(objective.objective_id)
+                state.planning_context = state.planning_context.model_copy(
+                    update={"objective": objective}
+                )
             task = Task(instruction=decision.task_instruction, status=TaskStatus.PENDING)
             task = runtime.context.research_state.create_task(task)
             state.session_frame = state.session_frame.add_task_id(task.task_id)
+            _replace_context_task(state, task)
             state.created_task_id = task.task_id
             state.selected_capability = decision.capability
         elif decision.action is PlannerAction.INVALID_OR_UNSUPPORTED:
@@ -180,7 +190,6 @@ async def apply_planning_state(state: State, runtime: Runtime[Context]) -> State
                 PlannerErrorCode.UNSUPPORTED_ACTION,
                 decision.message or "The requested action is unsupported by the MVP Planner.",
             )
-        _refresh_planning_context(state, runtime)
     except (TypeError, ValueError) as exc:
         state.error = _error(
             PlannerErrorCode.INVALID_SUCCESSOR_STATE,
@@ -212,7 +221,7 @@ async def dispatch_work(state: State, runtime: Runtime[Context]) -> State:
         running = runtime.context.research_state.update_task_status(task_id, TaskStatus.RUNNING)
         if running is None:
             raise ValueError("Authoritative Task disappeared before dispatch.")
-        _refresh_planning_context(state, runtime)
+        _replace_context_task(state, running)
         running_task = _task_by_id(state, task_id)
         result = await dispatcher.dispatch(
             ExecutionRequest(
@@ -224,8 +233,11 @@ async def dispatch_work(state: State, runtime: Runtime[Context]) -> State:
         outcome = normalize_for_planner(result)
         state.work_outcome = outcome
         if outcome.task_id != task_id:
-            runtime.context.research_state.update_task_status(task_id, TaskStatus.FAILED)
-            _refresh_planning_context(state, runtime)
+            failed = runtime.context.research_state.update_task_status(
+                task_id, TaskStatus.FAILED
+            )
+            if failed is not None:
+                _replace_context_task(state, failed)
             state.error = _error(
                 PlannerErrorCode.TASK_OUTCOME_MISMATCH,
                 "Executor outcome Task identity did not match the dispatched Task.",
@@ -240,11 +252,14 @@ async def dispatch_work(state: State, runtime: Runtime[Context]) -> State:
         updated = runtime.context.research_state.update_task_status(task_id, terminal_status)
         if updated is None:
             raise ValueError("Authoritative Task disappeared during dispatch.")
-        _refresh_planning_context(state, runtime)
+        _replace_context_task(state, updated)
     except Exception as exc:
         try:
-            runtime.context.research_state.update_task_status(task_id, TaskStatus.FAILED)
-            _refresh_planning_context(state, runtime)
+            failed = runtime.context.research_state.update_task_status(
+                task_id, TaskStatus.FAILED
+            )
+            if failed is not None:
+                _replace_context_task(state, failed)
         except (TypeError, ValueError):
             pass
         state.error = _error(

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Protocol
 from uuid import UUID
 
 from cognieda.schemas.artifacts import (
@@ -13,7 +13,6 @@ from cognieda.schemas.artifacts import (
 from cognieda.schemas.enums import TaskStatus
 
 
-@runtime_checkable
 class PlannerResearchStatePort(Protocol):
     """Authoritative research-object seam used to build and advance Planner context."""
 

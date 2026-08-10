@@ -1,19 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-
-from pydantic_ai.messages import ModelMessage
-
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import ExecutorContext
 from cognieda.schemas.artifacts import SessionFrame
 
-from .context import (
-    BuildPlanningContext,
-    NonAuthoritativeSurfaceTurn,
-    PlannerContextSelector,
-    PlanningContextResolutionError,
-)
+from .context import PlanningContext
 from .dependencies import PlannerDeps
 from .graph import build_graph
 from .model import PlannerDecisionModel, PlannerModel
@@ -57,17 +48,14 @@ class Planner:
             )
 
         self.deps = deps
-        self.context_selector = PlannerContextSelector()
-        self.context_builder = BuildPlanningContext(deps.research_state)
         self.graph = build_graph()
 
     async def run(
         self,
         query: str,
         *,
+        planning_context: PlanningContext,
         session_frame: SessionFrame | None = None,
-        surface_discourse: Sequence[NonAuthoritativeSurfaceTurn] = (),
-        message_history: Sequence[ModelMessage] = (),
         execution_context: ExecutorContext | None = None,
     ) -> PlannerOutput:
         """Run one request against explicit typed state and return its validated successor."""
@@ -80,18 +68,10 @@ class Planner:
             )
             return PlannerOutput(response=error.message, session_frame=frame, error=error)
 
-        try:
-            selection = self.context_selector.select(
-                latest_request=query,
-                frame=frame,
-                surface_discourse=surface_discourse,
-                message_history=message_history,
-            )
-            planning_context = self.context_builder.build(selection=selection)
-        except PlanningContextResolutionError as exc:
+        if planning_context.latest_request != query:
             error = PlannerControlledError(
                 code=PlannerErrorCode.CONTEXT_RESOLUTION_FAILED,
-                message=f"Planner context resolution failed closed: {exc}",
+                message="Planner context resolution failed closed: latest request mismatch.",
             )
             return PlannerOutput(response=error.message, session_frame=frame, error=error)
 
@@ -105,8 +85,6 @@ class Planner:
             planner_model=self.model,
             dispatcher=self.deps.dispatcher,
             research_state=self.deps.research_state,
-            context_selector=self.context_selector,
-            context_builder=self.context_builder,
         )
         result = await self.graph.ainvoke(state, context=context)
         final_state = State.model_validate(result)

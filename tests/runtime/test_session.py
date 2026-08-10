@@ -4,6 +4,7 @@ import asyncio
 import inspect
 import unicodedata
 from collections.abc import Sequence
+from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -29,6 +30,7 @@ from cognieda.agents.planner.types import (
     PlannerModelInput,
     PlannerResponseDraft,
 )
+from cognieda.application.services import PlannerContextPreparer, select_planner_context
 from cognieda.execution import (
     Capability,
     ExecutionRequest,
@@ -119,6 +121,7 @@ def _application(
     application = Application(
         workspace=object(),  # type: ignore[arg-type]
         planner_agent=planner,
+        planner_context_preparer=PlannerContextPreparer(research_state),
         dispatcher=dispatcher,  # type: ignore[arg-type]
         session=session,
     )
@@ -186,6 +189,7 @@ def test_application_retains_ids_and_resolved_context_across_turns(db_session) -
     assert model.message_histories[0] == ()
     assert model.message_histories[1] == first_session.conversation_history.model_messages()
     assert len(application.session.conversation_history.turns) == 2
+    assert "planning_context" not in Session.model_fields
     assert application.session.conversation_history.presentation_transcript() == (
         (
             "Investigate customer churn.",
@@ -199,6 +203,29 @@ def test_application_retains_ids_and_resolved_context_across_turns(db_session) -
             "Evidence items in session history: 0.",
         ),
     )
+
+
+def test_application_fails_closed_before_planner_on_dangling_session_reference(
+    db_session,
+) -> None:
+    missing_id = uuid4()
+    frame = SessionFrame(
+        objective_ids=(missing_id,),
+        active_objective_id=missing_id,
+    )
+    model = SequencePlannerModel(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
+    application, _ = _application(
+        model,
+        SqlitePlannerResearchState(db_session),
+        session=Session(session_frame=frame),
+    )
+
+    response = asyncio.run(application.submit_message("Summarize state."))
+
+    assert "context resolution failed closed" in response.content
+    assert application.session.session_frame == frame
+    assert len(application.session.conversation_history.turns) == 1
+    assert model.decision_inputs == []
 
 
 def test_state_summary_reports_cumulative_history_and_active_objective(db_session) -> None:
@@ -480,30 +507,31 @@ def test_conversation_round_trip_preserves_retry_capable_tool_protocol() -> None
     ) == list(messages)
 
 
-def test_conversation_segment_rejects_retry_for_different_tool_call_identity() -> None:
-    with pytest.raises(ValidationError, match="tool-call/retry-prompt"):
-        ConversationSegment(
-            messages=(
-                ModelResponse(
-                    parts=[
-                        ToolCallPart(
-                            tool_name="final_result",
-                            args={"row_count": "invalid"},
-                            tool_call_id="call-original",
-                        )
-                    ]
-                ),
-                ModelRequest(
-                    parts=[
-                        RetryPromptPart(
-                            content="row_count must be an integer",
-                            tool_name="final_result",
-                            tool_call_id="call-other",
-                        )
-                    ]
-                ),
-            )
-        )
+def test_conversation_segment_does_not_revalidate_native_retry_protocol() -> None:
+    messages: tuple[ModelMessage, ...] = (
+        ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="final_result",
+                    args={"row_count": "invalid"},
+                    tool_call_id="call-original",
+                )
+            ]
+        ),
+        ModelRequest(
+            parts=[
+                RetryPromptPart(
+                    content="row_count must be an integer",
+                    tool_name="final_result",
+                    tool_call_id="call-other",
+                )
+            ]
+        ),
+    )
+
+    segment = ConversationSegment(messages=messages)
+
+    assert segment.messages == messages
 
 
 def test_deterministic_turn_retains_surface_without_fake_model_messages() -> None:
@@ -569,11 +597,11 @@ def test_context_selection_omits_and_later_reselects_only_whole_segments() -> No
     current = history.select_for_request_understanding("Continue the current summary")
     later = history.select_for_request_understanding("Return to the churn discussion")
 
-    assert segments[0] not in current.model_segments
-    assert tuple(segment.segment_id for segment in current.model_segments) == tuple(
-        segment.segment_id for segment in segments[-4:]
+    assert history.turns[0] not in current.surface_turns
+    assert current.model_messages() == tuple(
+        message for segment in segments[-4:] for message in segment.messages
     )
-    assert segments[0] in later.model_segments
+    assert history.turns[0] in later.surface_turns
     assert history.turns[0].segments == (segments[0],)
     assert later.model_messages()[0:2] == (*segments[0].messages,)
 
@@ -618,8 +646,12 @@ def test_context_selection_hard_bounds_old_matches_and_preserves_chronology() ->
         *history.turns[12:16],
     )
     assert len(selected.surface_turns) == 7
-    assert selected.model_segments == tuple(
-        segment for turn in selected.surface_turns for segment in turn.segments
+    assert set(type(selected).model_fields) == {"surface_turns"}
+    assert selected.model_messages() == tuple(
+        message
+        for turn in selected.surface_turns
+        for segment in turn.segments
+        for message in segment.messages
     )
     assert all(
         len(turn.segments) == 2 for turn in selected.surface_turns[:3]
@@ -698,11 +730,11 @@ def test_bounded_evidence_omission_does_not_claim_global_absence(db_session) -> 
         session=Session(session_frame=frame, conversation_history=history),
     )
 
-    selection = application.planner_agent.context_selector.select(
+    selection = select_planner_context(frame)
+    bounded_context = PlannerContextPreparer(research_state).build(
         latest_request="How many rows are in the active dataset?",
-        frame=frame,
+        selection=selection,
     )
-    bounded_context = application.planner_agent.context_builder.build(selection=selection)
     response = asyncio.run(
         application.submit_message("How many rows are in the active dataset?")
     )
@@ -750,7 +782,7 @@ def test_unicode_selection_normalizes_and_reselects_old_vietnamese_turn() -> Non
 
     assert history.turns[0] not in unrelated.surface_turns
     assert history.turns[0] in selected.surface_turns
-    assert history.turns[0].segments[0] in selected.model_segments
+    assert selected.model_messages()[0:2] == old_messages
     assert selected == selected_again
     assert history.turns[0].segments[0].messages == old_messages
 
@@ -764,18 +796,19 @@ def test_unicode_selection_normalizes_and_reselects_old_vietnamese_turn() -> Non
     }
 
 
-def test_conversation_segment_rejects_split_tool_protocol() -> None:
-    with pytest.raises(ValidationError, match="tool-call/tool-return"):
-        ConversationSegment(
-            messages=(
-                ModelResponse(
-                    parts=[
-                        ToolCallPart(
-                            tool_name="lookup_state",
-                            args={"scope": "active"},
-                            tool_call_id="call-split",
-                        )
-                    ]
-                ),
-            )
-        )
+def test_conversation_segment_retains_native_messages_without_protocol_parsing() -> None:
+    messages: tuple[ModelMessage, ...] = (
+        ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="lookup_state",
+                    args={"scope": "active"},
+                    tool_call_id="call-split",
+                )
+            ]
+        ),
+    )
+
+    segment = ConversationSegment(messages=messages)
+
+    assert segment.messages == messages

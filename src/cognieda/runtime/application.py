@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import NonAuthoritativeSurfaceTurn
+from cognieda.application.services import (
+    PlannerContextPreparer,
+    PlanningContextResolutionError,
+    select_planner_context,
+)
 from cognieda.execution import ExecutorDispatcher
 
 from .conversation import ConversationSegment
@@ -15,11 +20,13 @@ class Application:
         self,
         workspace: Workspace,
         planner_agent: Planner,
+        planner_context_preparer: PlannerContextPreparer,
         dispatcher: ExecutorDispatcher,
         session: Session | None = None,
     ) -> None:
         self.workspace = workspace
         self.planner_agent = planner_agent
+        self.planner_context_preparer = planner_context_preparer
         self.dispatcher = dispatcher
         self.session = session or Session()
 
@@ -27,17 +34,35 @@ class Application:
         selected_context = self.session.conversation_history.select_for_request_understanding(
             message
         )
+        surface_discourse = tuple(
+            NonAuthoritativeSurfaceTurn(
+                human_message=turn.human_message,
+                planner_response=turn.planner_response,
+            )
+            for turn in selected_context.surface_turns
+        )
+        try:
+            selection = select_planner_context(self.session.session_frame)
+            planning_context = self.planner_context_preparer.build(
+                latest_request=message,
+                selection=selection,
+                surface_discourse=surface_discourse,
+                message_history=selected_context.model_messages(),
+            )
+        except PlanningContextResolutionError as exc:
+            response = f"Planner context resolution failed closed: {exc}"
+            self.session = self.session.advance(
+                session_frame=self.session.session_frame,
+                human_message=message,
+                planner_response=response,
+                segments=(),
+            )
+            return Message(type=MessageType.TEXT, role=MessageRole.ASSISTANT, content=response)
+
         planner_output = await self.planner_agent.run(
             message,
+            planning_context=planning_context,
             session_frame=self.session.session_frame,
-            surface_discourse=tuple(
-                NonAuthoritativeSurfaceTurn(
-                    human_message=turn.human_message,
-                    planner_response=turn.planner_response,
-                )
-                for turn in selected_context.surface_turns
-            ),
-            message_history=selected_context.model_messages(),
         )
         segments = tuple(
             ConversationSegment(messages=messages)

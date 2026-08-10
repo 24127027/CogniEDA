@@ -4,10 +4,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from cognieda.agents.planner.context import (
-    BuildPlanningContext,
-    PlannerContextSelector,
+from cognieda.application.services import (
+    PlannerContextPreparer,
     PlanningContextResolutionError,
+    select_planner_context,
 )
 from cognieda.infrastructure.persistence import SqlitePlannerResearchState
 from cognieda.infrastructure.persistence.repositories import (
@@ -72,22 +72,28 @@ def _admitted_state(db_session):
 
 
 def _build(db_session, frame: SessionFrame, request: str = "How many rows?"):
-    selection = PlannerContextSelector().select(latest_request=request, frame=frame)
-    return BuildPlanningContext(SqlitePlannerResearchState(db_session)).build(
-        selection=selection
+    selection = select_planner_context(frame)
+    return PlannerContextPreparer(SqlitePlannerResearchState(db_session)).build(
+        latest_request=request, selection=selection
     )
 
 
 def test_selection_precedes_authoritative_materialization(db_session) -> None:
     frame, objective, assumption, task, profile, evidence = _admitted_state(db_session)
-    selector = PlannerContextSelector()
-    selection = selector.select(latest_request="How many rows?", frame=frame)
+    selection = select_planner_context(frame)
 
-    context = BuildPlanningContext(SqlitePlannerResearchState(db_session)).build(
-        selection=selection
+    context = PlannerContextPreparer(SqlitePlannerResearchState(db_session)).build(
+        latest_request="How many rows?", selection=selection
     )
 
     assert selection.objective_id == frame.active_objective_id
+    assert set(type(selection).model_fields) == {
+        "objective_id",
+        "assumption_ids",
+        "task_ids",
+        "active_data_profile_id",
+        "evidence_candidate_ids",
+    }
     assert context.objective == objective
     assert context.assumptions == (assumption,)
     assert context.tasks == (task,)
@@ -100,12 +106,10 @@ def test_selector_bounds_historical_references_before_build(db_session) -> None:
     repository = TaskRepository(db_session)
     tasks = tuple(repository.create(Task(instruction=f"Task {index}")) for index in range(21))
     frame = SessionFrame(task_ids=tuple(task.task_id for task in tasks))
-    selection = PlannerContextSelector(recent_reference_limit=20).select(
-        latest_request="Summarize current work", frame=frame
-    )
+    selection = select_planner_context(frame, recent_reference_limit=20)
 
-    context = BuildPlanningContext(SqlitePlannerResearchState(db_session)).build(
-        selection=selection
+    context = PlannerContextPreparer(SqlitePlannerResearchState(db_session)).build(
+        latest_request="Summarize current work", selection=selection
     )
 
     assert selection.task_ids == tuple(task.task_id for task in tasks[1:])
@@ -187,12 +191,12 @@ def test_missing_required_evidence_dependency_fails_closed(db_session) -> None:
     )
     evidence = _evidence(db_session, task=task, profile=profile, row_count=42)
     frame = SessionFrame(evidence_ids=(evidence.evidence_id,))
-    selection = PlannerContextSelector().select(latest_request="Use evidence", frame=frame)
+    selection = select_planner_context(frame)
 
     with pytest.raises(PlanningContextResolutionError, match="Task dependency"):
-        BuildPlanningContext(
+        PlannerContextPreparer(
             MissingEvidenceTaskState(db_session, missing_task_id=task.task_id)
-        ).build(selection=selection)
+        ).build(latest_request="Use evidence", selection=selection)
 
 
 def test_invalid_authoritative_evidence_task_status_fails_closed(db_session) -> None:
