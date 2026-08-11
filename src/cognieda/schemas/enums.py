@@ -171,18 +171,6 @@ class AssumptionTestability(StrEnum):
     TESTABLE_CLAIM_REJECTED_AS_ASSUMPTION = "testable_claim_rejected_as_assumption"
 
 
-class TaskLifecycleState(StrEnum):
-    """Durable Task lifecycle states."""
-
-    PROPOSED = "proposed"
-    ACTIVE = "active"
-    PAUSED = "paused"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    REJECTED = "rejected"
-    CANCELLED = "cancelled"
-
-
 class TaskStatus(StrEnum):
     """Finite execution lifecycle for an MVP Task."""
 
@@ -307,10 +295,6 @@ class UserDecisionStatus(StrEnum):
 class PlannerOperationType(StrEnum):
     """Typed pending mutations produced by planner nodes."""
 
-    CREATE_TASK = "create_task"
-    UPDATE_TASK = "update_task"
-    DELETE_TASK = "delete_task"
-    CHANGE_TASK_STATE = "change_task_state"
     CREATE_OBJECTIVE_REVISION = "create_objective_revision"
     UPDATE_OBJECTIVE = "update_objective"
     CREATE_ASSUMPTION = "create_assumption"

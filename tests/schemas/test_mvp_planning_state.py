@@ -66,8 +66,6 @@ def test_task_supports_exact_mvp_statuses(status: TaskStatus) -> None:
 def test_task_kind_is_exactly_the_canonical_four_kind_taxonomy() -> None:
     assert {kind.name for kind in TaskKind} == {"DATA", "SCIENTIFIC", "GRAPH", "SYNTHESIS"}
     assert {kind.value for kind in TaskKind} == {"data", "scientific", "graph", "synthesis"}
-    for legacy_name in ("ANALYTICAL", "ORGANIZING", "REVIEW"):
-        assert not hasattr(TaskKind, legacy_name)
 
 
 @pytest.mark.parametrize("kind", list(TaskKind))

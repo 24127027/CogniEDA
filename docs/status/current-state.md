@@ -107,21 +107,20 @@ restart reconstruction remain **Deferred**.
 
 ## Deferred donor isolation
 
-Canonical-heavy donor modules for Planner operations, scientific execution
-attempts, Hypothesis persistence, and Discovery retrieval are not active
-bounded workflows. Relevant scientific and canonical-planning donor tests remain
-explicitly skipped where the hard cutover invalidated their executable
-assumptions. The obsolete context builder and its duplicate SessionFrame
-semantics were removed rather than preserved as an apparent implementation.
+Canonical-heavy donor modules for scientific execution attempts, Hypothesis
+persistence, and Discovery retrieval are not active bounded workflows. Detailed
+permanently skipped donor tests for those deferred contracts were removed rather
+than preserved as apparent specifications. The obsolete context builder and its
+duplicate SessionFrame semantics were likewise removed.
 
 The registered Data Explorer and S0 dispatcher retain their role boundaries at
-their ownership paths. The unregistered Hypothesis Analyst scaffold, Planner
-operation schemas, deferred retrieval engine, and scientific repositories may
-still mention canonical or donor fields; they are **Deferred**, are not
-composed into the bounded runtime, and must not be treated as supported consumers
-of the active schemas. Legacy `ANALYTICAL`, `ORGANIZING`, and `REVIEW` values are
-isolated as `DeferredPlannerTaskKind` inside the unsupported PlannerOperation
-donor surface and are not exported as canonical `TaskKind` values.
+their ownership paths. The unregistered Hypothesis Analyst scaffold, non-Task
+Planner operation schemas, deferred retrieval engine, and scientific
+repositories are **Deferred**, are not composed into the bounded runtime, and
+must not be treated as supported consumers of the active schemas. The old Task
+taxonomy and obsolete Task-specific PlannerOperation mutation machinery have
+been removed. Canonical `TaskKind` is exactly `DATA`, `SCIENTIFIC`, `GRAPH`, and
+`SYNTHESIS`; PlanRevision remains **Deferred**.
 
 ## Verification qualification
 
