@@ -24,14 +24,16 @@ Context selection must consider:
 - freshness;
 - explicit exclusion rules.
 
-Failure to establish a required dimension excludes the candidate. A model may
-not infer missing authority or lineage from prose.
+Failure to establish a required dimension excludes a supplemental candidate or
+prohibits an authority-specific use. It does not hide a retained SessionFrame
+member from Planner. A model may not infer missing authority or lineage from
+prose.
 
 ## Mode-specific eligibility
 
 | Mode | May include | Must preserve or exclude |
 | --- | --- | --- |
-| planning | Objective; approved or proposed PlanRevision state; Tasks; active Assumptions; DataProfiles; valid Discoveries for planning reference; Graph Miner findings; Data Explorer consultation results; limitations and blockers | planning materials remain non-scientific; wrong-Objective or invalid state is excluded or clearly bounded for authorized review |
+| planning | every resolved SessionFrame member; approved or proposed PlanRevision state; authorized Graph Miner findings; Data Explorer consultation results; limitations and blockers | retained history remains visible, while type, validity, lifecycle, scope, lineage, and authority constrain its use; planning materials remain non-scientific |
 | planning consultation | exact consultation request, admitted DataProfile references where applicable, eligible planning context, limitations, blockers | consultation is bounded; output is not automatically a Task, Evidence, or Discovery |
 | scientific investigation control | eligible leaf SCIENTIFIC Task; ScientificInvestigationRun; Hypothesis; active protocol revision; Evidence obligations and requests; admitted Evidence and provenance needed to decide next scientific action | Planner and Assumption content cannot operationalize science; Hypothesis Analyst receives no dataset access |
 | protected evaluation | exact Hypothesis; admitted DataProfile; active protocol revision; Evidence obligations; AnalysisFrame provenance; admitted eligible Evidence; method, parameters, decision rule, uncertainty, limitations, claim scope, validity basis, necessary provenance | closed bundle only; all protected exclusions below apply |
@@ -57,9 +59,10 @@ Protected evaluation must exclude:
   support;
 - cache entries or retrieval scores treated as authority.
 
-These are structural exclusions. Prompt wording, model judgment, relevance
-score, user convenience, or prior inclusion in a SessionFrame cannot override
-them.
+These are structural exclusions from protected evaluation. Prompt wording,
+model judgment, relevance score, user convenience, or inclusion in a
+SessionFrame cannot override them. Exclusion from protected use does not
+authorize removing the object from Planner visibility.
 
 ## Planning is broader, not ungoverned
 
@@ -97,14 +100,15 @@ protocol revision; a raw frame or retrieval result cannot substitute for it.
 
 ## Implementation status
 
-**Partially implemented.** The current Planner receives the bounded
-materialized Objective, Assumptions, Tasks, Evidence, and DataProfile in a
-planning context while native conversation history is carried separately.
+**Partially implemented.** The current Planner receives every materialized
+Objective, Assumption, Task, Evidence, and DataProfile retained in SessionFrame
+through an immutable planning context while native conversation history is
+carried separately.
 Empirical answer drafting receives admitted Evidence and excludes Assumptions.
 This protects one important type boundary but is not a general context system.
 
 Planning consultation, scientific investigation control, protected
 EvaluationBundle construction, Graph Miner inquiry, recovery, validity review,
 Objective isolation, and complete scientific-lineage eligibility remain
-**Deferred**. Uncomposed donor context and retrieval modules do not establish
-current runtime support.
+**Deferred**. The superseded donor retrieval package has been removed and no
+replacement supplemental retrieval system is implemented.

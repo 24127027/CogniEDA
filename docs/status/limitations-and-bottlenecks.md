@@ -8,8 +8,9 @@ These are verified constraints of the bounded current implementation.
 - The active typed research-state foundation is transitional and does not
   implement the minimum complete scientific loop defined by MVP-v2.
 - Active bounded Task has no PlanRevision membership, dependencies, assignment,
-  ordering, approval, parent/leaf semantics, or canonical Task kind. Those
-  contracts are **Deferred** rather than represented by legacy fields.
+  ordering, approval, or parent/leaf semantics. Its four canonical kinds are
+  represented, but only `DATA` is executable; the remaining coordination and
+  execution contracts are **Deferred** rather than represented by legacy fields.
 - The current materialized SessionFrame can hold one Objective and one
   DataProfile but is not the canonical reference-based session-membership FCO
   and does not implement Objective-bound multi-session isolation.
@@ -30,9 +31,11 @@ These are verified constraints of the bounded current implementation.
   and `GovernanceDecision` have no supported implementation.
 - Hypothesis Analyst and Graph Miner remain unregistered scaffolds. Discovery
   and Hypothesis remain canonical FCO names but have no active bounded runtime.
-- Planner successor-state Objective replacement and Assumption addition are
-  **Implemented**. Durable Objective and Assumption persistence updates remain
-  **Deferred**. Task persistence supports status change only. Active Task
+- Planner typed Objective creation/refinement, Assumption addition, and terminal
+  DATA Task results are **Implemented**. Application alone applies those results
+  to its in-memory successor SessionFrame. Durable Objective and Assumption
+  persistence updates remain **Deferred**. Task persistence supports status
+  change only. Active Task
   values are immutable; changing Task meaning requires a new identity, while
   status change produces a replacement with the same identity and instruction.
 - Application-authority Evidence admission is **Implemented** for the direct
@@ -56,14 +59,14 @@ These are verified constraints of the bounded current implementation.
 
 ## Donor isolation limitation
 
-- Canonical-heavy donor tests for scientific attempts and Discovery retrieval
-  are explicitly skipped after the hard cutover. They remain design/test
-  material and are not compatibility authority for active schemas.
-- The obsolete donor context builder is not an active runtime owner; the
-  bounded materialized SessionFrame is the only executable frame. The unregistered
-  Hypothesis Analyst, Planner operation contracts, deferred retrieval engine,
-  and scientific repositories still contain deferred field references. They
-  are not composed into the active bounded path.
+- The superseded generic retrieval package, retrieval-only schemas and enum,
+  and donor policy tests are deleted. Supplemental retrieval remains
+  **Deferred**; no embeddings, semantic ranking, or SessionFrame pruning path
+  replaces it.
+- The bounded materialized SessionFrame is the only executable frame. The
+  unregistered Hypothesis Analyst, Planner operation contracts, and scientific
+  repositories still contain deferred field references. They are not composed
+  into the active bounded path.
 - Fresh SQLite metadata reflects the bounded mappings. Upgrading an existing donor
   database to the hard-cutover schema is **Unsupported**; no production data
   migration is included in this milestone.
@@ -72,8 +75,9 @@ These are verified constraints of the bounded current implementation.
 
 - Bootstrap composes the in-process S0 dispatcher and bounded Data Explorer.
   The installable `cognieda [PATH]` command reaches the development Planner
-  REPL and is **Partially implemented**. Its Application retains successor
-  materialized SessionFrame state and complete native-message model turns only for the
+  REPL and is **Partially implemented**. Its Application owns successor
+  materialized SessionFrame state, exact Planner-context materialization, and
+  complete native-message model turns only for the
   current process; no durable recovery, supported end-to-end application
   runtime, worker, service API, or product CLI exists.
 - The local Data Explorer path executes only finite validated deterministic

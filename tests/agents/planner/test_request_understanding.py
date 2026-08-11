@@ -19,6 +19,8 @@ from cognieda.agents.planner.types import (
     PlannerResponseDraft,
 )
 from cognieda.execution import ExecutionRequest
+from cognieda.runtime.conversation import ConversationHistory
+from cognieda.runtime.planner_context import build_planning_context
 from cognieda.schemas.artifacts import Assumption, Objective, SessionFrame, Task
 from cognieda.schemas.enums import TaskKind
 
@@ -66,6 +68,10 @@ def _planner(model: FakePlannerModel, dispatcher: NeverDispatcher) -> Planner:
     )
 
 
+def _context(frame: SessionFrame | None = None):
+    return build_planning_context(frame or SessionFrame(), ConversationHistory())
+
+
 def test_natural_language_understanding_receives_latest_request_and_typed_state() -> None:
     objective = Objective(text="Understand customer retention.")
     assumption = Assumption(text="Rows represent customers.")
@@ -81,13 +87,15 @@ def test_natural_language_understanding_receives_latest_request_and_typed_state(
     output = asyncio.run(
         _planner(model, dispatcher).run(
             "Summarize the active research state.",
-            session_frame=frame,
+            planning_context=_context(frame),
         )
     )
 
     assert output.decision is not None
     assert output.decision.action is PlannerAction.STATE_SUMMARY
-    assert output.session_frame == frame
+    assert output.created_objective is None
+    assert output.created_assumption is None
+    assert output.created_task is None
     assert len(model.decision_inputs) == 1
     model_input = model.decision_inputs[0]
     assert model_input.latest_request == "Summarize the active research state."
@@ -108,11 +116,15 @@ def test_explicit_and_natural_language_objective_requests_reach_same_typed_actio
     dispatcher = NeverDispatcher()
 
     natural = asyncio.run(
-        _planner(natural_model, dispatcher).run("Investigate customer churn.")
+        _planner(natural_model, dispatcher).run(
+            "Investigate customer churn.",
+            planning_context=_context(),
+        )
     )
     explicit = asyncio.run(
         _planner(explicit_model, dispatcher).run(
-            "/objective Understand customer churn."
+            "/objective Understand customer churn.",
+            planning_context=_context(),
         )
     )
 
@@ -120,9 +132,9 @@ def test_explicit_and_natural_language_objective_requests_reach_same_typed_actio
     assert explicit.decision is not None
     assert natural.decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE
     assert explicit.decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE
-    assert natural.session_frame.objective is not None
-    assert explicit.session_frame.objective is not None
-    assert natural.session_frame.objective.text == explicit.session_frame.objective.text
+    assert natural.created_objective is not None
+    assert explicit.created_objective is not None
+    assert natural.created_objective.text == explicit.created_objective.text
     assert explicit_model.decision_inputs == []
 
 
@@ -139,14 +151,13 @@ def test_objective_semantic_refinement_allocates_new_identity_without_mutation()
     output = asyncio.run(
         _planner(model, NeverDispatcher()).run(
             "Refine the objective to focus on drivers.",
-            session_frame=frame,
+            planning_context=_context(frame),
         )
     )
 
-    assert output.session_frame is not frame
-    assert output.session_frame.objective is not None
-    assert output.session_frame.objective.objective_id != original.objective_id
-    assert output.session_frame.objective.text == "Understand churn drivers."
+    assert output.created_objective is not None
+    assert output.created_objective.objective_id != original.objective_id
+    assert output.created_objective.text == "Understand churn drivers."
     assert original.text == "Understand churn."
 
 
@@ -158,14 +169,15 @@ def test_unknown_explicit_command_fails_without_model_fallback_or_state_change()
     output = asyncio.run(
         _planner(model, dispatcher).run(
             "/unknown remove everything",
-            session_frame=frame,
+            planning_context=_context(frame),
         )
     )
 
     assert output.error is not None
     assert output.error.code is PlannerErrorCode.INVALID_COMMAND
-    assert output.session_frame == frame
-    assert output.created_task_ids == ()
+    assert output.created_objective is None
+    assert output.created_assumption is None
+    assert output.created_task is None
     assert model.decision_inputs == []
     assert dispatcher.requests == []
 

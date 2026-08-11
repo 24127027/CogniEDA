@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import importlib
+import inspect
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -64,6 +65,26 @@ def test_mvp_planner_does_not_import_deferred_scientific_or_plan_contracts() -> 
                 )
 
     assert violations == []
+
+
+def test_planner_has_no_session_frame_dependency_or_result_surface() -> None:
+    planner_files = tuple(_python_files("agents/planner"))
+    violations = [
+        str(path.relative_to(PROJECT_ROOT))
+        for path in planner_files
+        if "SessionFrame" in path.read_text(encoding="utf-8")
+    ]
+
+    from cognieda.agents.planner.agent import Planner
+    from cognieda.agents.planner.types import PlannerOutput, State
+
+    signature = inspect.signature(Planner.run)
+    assert violations == []
+    assert "session_frame" not in signature.parameters
+    assert signature.parameters["planning_context"].default is inspect.Parameter.empty
+    assert inspect.iscoroutinefunction(Planner.reload_model)
+    assert "session_frame" not in State.model_fields
+    assert "session_frame" not in PlannerOutput.model_fields
 
 
 def test_inward_layers_do_not_depend_on_cli() -> None:
