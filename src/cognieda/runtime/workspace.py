@@ -34,12 +34,36 @@ class Workspace:
         return self.root / "data"
 
     @property
+    def cognieda_dir(self) -> Path:
+        return self.root / ".cognieda"
+
+    @property
     def state_dir(self) -> Path:
-        return self.root / ".cognieda" / "state"
+        return self.cognieda_dir / "state"
 
     @property
     def session_dir(self) -> Path:
-        return self.root / ".cognieda" / "sessions"
+        return self.cognieda_dir / "sessions"
+
+    @property
+    def project_config_path(self) -> Path:
+        return self.cognieda_dir / "project.toml"
+
+    @property
+    def agents_config_path(self) -> Path:
+        return self.cognieda_dir / "agents.toml"
+
+    @property
+    def mcp_config_path(self) -> Path:
+        return self.cognieda_dir / "mcp.toml"
+
+    @property
+    def skills_config_path(self) -> Path:
+        return self.cognieda_dir / "skills.toml"
+
+    @property
+    def planner_instruction_path(self) -> Path:
+        return self.cognieda_dir / "agents.md"
 
     @classmethod
     def open(cls, root: Path) -> "Workspace":
