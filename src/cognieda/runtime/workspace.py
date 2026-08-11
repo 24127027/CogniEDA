@@ -81,15 +81,14 @@ class Workspace:
     @classmethod
     def init_workspace(cls, root: Path) -> None:
         root = cls._normalize_root(root)
-        config_path = root / ".cognieda" / "project.toml"
+        cognieda_dir = root / ".cognieda"
 
-        config_path.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+        cognieda_dir.mkdir(parents=True, exist_ok=True)
         (root / "data").mkdir(parents=True, exist_ok=True)
 
-        if not config_path.exists():
+        # Initialize project.toml if it doesn't exist
+        project_config_path = cognieda_dir / "project.toml"
+        if not project_config_path.exists():
             default_config = textwrap.dedent(
                 """\
                 [model]
@@ -100,10 +99,17 @@ class Workspace:
                 """
             )
 
-            config_path.write_text(
+            project_config_path.write_text(
                 default_config,
                 encoding="utf-8",
             )
+
+        # Initialize agents.toml, skills.toml, and mcp.toml if they don't exist
+        additional_configs = ["agents.toml", "skills.toml", "mcp.toml"]
+        for config_filename in additional_configs:
+            file_path = cognieda_dir / config_filename
+            if not file_path.exists():
+                file_path.touch()
 
     @staticmethod
     def _normalize_root(root: Path) -> Path:
