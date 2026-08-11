@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any, Protocol, Literal
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel
 from pydantic_ai import Agent
 
 AgentTool = Callable[..., Any]
 
-ProviderType = Literal["openai", "google", "gemini", "anthropic"]
+ProviderType = Literal["openai", "google", "anthropic"]
+
+
 class ModelConfig(BaseModel):
-    """Resolved configuration for one OpenAI-compatible model endpoint."""
+    """Resolved configuration for one canonical model provider."""
 
     provider: ProviderType
     model_name: str = ""

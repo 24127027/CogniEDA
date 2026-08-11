@@ -69,7 +69,7 @@ class Workspace:
             default_config = textwrap.dedent(
                 """\
                 [model]
-                provider = "gemini"
+                provider = "google"
                 name = "default-model"
                 base_url = ""
                 api_key = "local"
