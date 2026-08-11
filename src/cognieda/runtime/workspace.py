@@ -70,9 +70,6 @@ class Workspace:
                 """\
                 [model]
                 provider = "google"
-                name = "default-model"
-                base_url = ""
-                api_key = "local"
                 """
             )
 

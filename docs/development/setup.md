@@ -31,8 +31,10 @@ project dependency metadata changes.
 Current `.env.example` contains:
 
 ```text
-COGNIEDA_ENV=local
-COGNIEDA_LOG_LEVEL=INFO
+COGNIEDA_MODEL_PROVIDER=google
+COGNIEDA_MODEL_NAME=gemini-3.5-flash
+MODEL_API_KEY=replace-with-your-provider-api-key
+# MODEL_BASE_URL=https://your-provider.example/v1
 COGNIEDA_DB_URL=
 COGNIEDA_DB_ECHO=false
 ```
@@ -47,10 +49,21 @@ Database behavior:
 
 Agent LLM behavior:
 
-- `.cognieda/project.toml` may provide `model.name`, `model.base_url`, and
-  `model.api_key` for the selected workspace.
-- Missing workspace values fall back individually to `COGNIEDA_MODEL_NAME`,
-  `COGNIEDA_OPENAI_BASE_URL`, and `COGNIEDA_OPENAI_API_KEY`.
+- The CLI loads the selected Workspace's `.env` file without overwriting
+  variables already set in the process. Copy `.env.example` to the Workspace
+  root, set `MODEL_API_KEY`, and run `cognieda` from that Workspace (or pass
+  its path explicitly).
+- `.cognieda/project.toml` may provide `model.provider`, `model.name`,
+  `model.base_url`, and `model.api_key` for the selected workspace. Non-empty
+  workspace values take precedence over `.env` and process values.
+- New Workspaces set the canonical `google` provider. To use `openai` or
+  `anthropic`, set `model.provider` in the selected Workspace's
+  `.cognieda/project.toml`; `gemini` remains an input compatibility alias for
+  `google`.
+- Missing workspace values fall back individually to `COGNIEDA_MODEL_PROVIDER`,
+  `COGNIEDA_MODEL_NAME`, `MODEL_BASE_URL`, and `MODEL_API_KEY`. The legacy
+  `COGNIEDA_OPENAI_BASE_URL` and `COGNIEDA_OPENAI_API_KEY` names remain fallback
+  compatibility inputs only.
 - Model name and API key are required at bootstrap. Base URL is optional and a
   user-provided value is not overwritten by a fixed router endpoint.
 - Bootstrap passes the resolved configuration into the infrastructure LLM

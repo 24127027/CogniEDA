@@ -21,6 +21,14 @@ uv tool install --editable .
 copy .env.example .env
 ```
 
+Set `MODEL_API_KEY` in `.env` before launch. The CLI loads `.env` from the
+selected Workspace without overriding variables already set in the process.
+New Workspaces use Google; `COGNIEDA_MODEL_PROVIDER` supplies the provider when
+an existing Workspace lacks `model.provider`. Select OpenAI or Anthropic with
+`model.provider` in the Workspace's `.cognieda/project.toml`. See
+[development setup](docs/development/setup.md) for the workspace-first
+precedence rules.
+
 If uv's tool directory is not already on `PATH`, run `uv tool update-shell`
 once and open a new shell. The editable tool installation makes later Python
 source edits visible without reinstalling; refresh the tool environment after

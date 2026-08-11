@@ -34,7 +34,7 @@ def test_workspace_initialization_writes_canonical_google_provider(tmp_path: Pat
     workspace = Workspace.open(tmp_path / "canonical-provider")
     config_path = workspace.root / ".cognieda" / "project.toml"
 
-    assert toml.load(config_path)["model"]["provider"] == "google"
+    assert toml.load(config_path)["model"] == {"provider": "google"}
     assert 'provider = "gemini"' not in config_path.read_text(encoding="utf-8")
 
 
