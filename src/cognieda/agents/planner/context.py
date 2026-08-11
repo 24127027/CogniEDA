@@ -4,11 +4,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.schemas.artifacts import Assumption, DataProfile, Evidence, Objective, Task
-from cognieda.schemas.common import CogniEDABaseModel
+from cognieda.schemas.common import ImmutableCogniEDABaseModel
 
 
-class PlanningContext(CogniEDABaseModel):
-    """Materialized research knowledge and conversation available to one Planner run."""
+class PlanningContext(ImmutableCogniEDABaseModel):
+    """Read-only materialized research state and conversation for one Planner run."""
 
     objective: Objective | None = None
     assumptions: tuple[Assumption, ...] = ()
@@ -25,4 +25,4 @@ class Context(BaseModel):
 
     planner_model: object
     dispatcher: object
-    planning_context: PlanningContext = Field(default_factory=PlanningContext)
+    planning_context: PlanningContext

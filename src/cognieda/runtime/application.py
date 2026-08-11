@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.context import PlanningContext
 from cognieda.execution import ExecutorDispatcher
 from cognieda.schemas.artifacts import SessionFrame
 
 from .conversation import ConversationHistory
 from .messages import Message, MessageRole, MessageType
+from .planner_context import apply_planner_output, build_planning_context
 from .workspace import Workspace
 
 
@@ -24,20 +24,15 @@ class Application:
         self.conversation_history = ConversationHistory()
 
     async def submit_message(self, message: str) -> Message:
-        planning_context = PlanningContext(
-            objective=self.session_frame.objective,
-            assumptions=self.session_frame.assumptions,
-            tasks=self.session_frame.tasks,
-            evidences=self.session_frame.evidences,
-            data_profile=self.session_frame.data_profile,
-            conversation_history=self.conversation_history,
+        planning_context = build_planning_context(
+            self.session_frame,
+            self.conversation_history,
         )
         planner_output = await self.planner_agent.run(
             message,
             planning_context=planning_context,
-            session_frame=self.session_frame,
         )
-        self.session_frame = planner_output.session_frame
+        self.session_frame = apply_planner_output(self.session_frame, planner_output)
         if planner_output.new_messages:
             self.conversation_history = self.conversation_history.add_turn(
                 planner_output.new_messages
