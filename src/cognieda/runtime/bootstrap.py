@@ -19,12 +19,8 @@ from .workspace import Workspace
 def bootstrap_application(workspace_path: Path) -> Application:
     workspace = Workspace.open(workspace_path)
     model_config = resolve_model_config(workspace)
-    tooling = AgentTooling.from_config_path(
-        path=workspace.agents_config_path,
-        mcp_path=workspace.mcp_config_path,
-        skills_path=workspace.skills_config_path,
-    )
-    agent_factory = AgentFactory(tooling)
+
+    agent_factory = AgentFactory(tooling_config=workspace)
 
     registry = ExecutorRegistry()
     registry.register_provider(
