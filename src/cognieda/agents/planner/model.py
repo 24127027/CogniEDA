@@ -43,21 +43,34 @@ class PlannerDecisionModel(Protocol):
 
 
 class PlannerModel:
-    """PydanticAI adapter for typed Planner decisions and grounded answers."""
-
     def __init__(
         self,
         deps: PlannerDeps,
         agent_factory: AgentFactoryPort,
         model_config: ModelConfig,
-    ) -> None:
+    ):
         self.deps = deps
-        self._agent = agent_factory.create_agent(
+        self._agent_factory = agent_factory
+        self._model_config = model_config
+
+        self._reload_agent()
+
+    def _reload_agent(self):
+        self._agent = self._agent_factory.create_agent(
             worker="planner",
-            config=model_config,
+            config=self._model_config,
             deps_type=PlannerDeps,
             builtin_tools=(),
         )
+
+    def reload_model(
+        self,
+        model_config: ModelConfig | None = None,
+    ):
+        if model_config is not None:
+            self._model_config = model_config
+
+        self._reload_agent()
 
     async def decide(
         self,

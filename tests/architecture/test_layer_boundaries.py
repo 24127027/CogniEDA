@@ -82,6 +82,7 @@ def test_planner_has_no_session_frame_dependency_or_result_surface() -> None:
     assert violations == []
     assert "session_frame" not in signature.parameters
     assert signature.parameters["planning_context"].default is inspect.Parameter.empty
+    assert inspect.iscoroutinefunction(Planner.reload_model)
     assert "session_frame" not in State.model_fields
     assert "session_frame" not in PlannerOutput.model_fields
 

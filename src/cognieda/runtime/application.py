@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from cognieda.agents.planner.agent import Planner
+from cognieda.application.ports import AgentFactoryPort
 from cognieda.execution import ExecutorDispatcher
 from cognieda.schemas.artifacts import SessionFrame
 
@@ -16,14 +17,19 @@ class Application:
         workspace: Workspace,
         planner_agent: Planner,
         dispatcher: ExecutorDispatcher,
+        agent_factory: AgentFactoryPort,
     ) -> None:
         self.workspace = workspace
+        self.agent_factory = agent_factory
         self.planner_agent = planner_agent
         self.dispatcher = dispatcher
         self.session_frame = SessionFrame()
         self.conversation_history = ConversationHistory()
 
     async def submit_message(self, message: str) -> Message:
+        if message.startswith("/"):
+            return await self._handle_command(message)
+
         planning_context = build_planning_context(
             self.session_frame,
             self.conversation_history,
@@ -42,4 +48,57 @@ class Application:
             type=MessageType.TEXT,
             role=MessageRole.ASSISTANT,
             content=planner_output.response,
+        )
+
+    # TODO: Move command handling to a separate class or module for better separation of concerns
+    async def _handle_command(self, command: str) -> Message:
+        parts = command.split()
+
+        match parts:
+            #
+            # Register a skill in skills.toml
+            #
+            case ["/skill", "register", name, directory]:
+                self.workspace.add_skill(name, directory)
+                return self._text(
+                    f"Registered skill '{name}' at '{directory}'."
+                )
+
+            case ["/skill", "unregister", name]:
+                self.workspace.remove_skill(name)
+                return self._text(
+                    f"Unregistered skill '{name}'."
+                )
+
+            #
+            # Assign a skill to a worker in agents.toml
+            #
+            case ["/skill", "assign", worker, skill]:
+                self.workspace.add_worker_skill(worker, skill)
+                self.agent_factory.reload_tooling()  # Reload the tooling to reflect the updated skills
+                await self.planner_agent.reload_model()
+
+                return self._text(
+                    f"Assigned skill '{skill}' to '{worker}'."
+                )
+
+            case ["/skill", "unassign", worker, skill]:
+                self.workspace.remove_worker_skill(worker, skill)
+                self.agent_factory.reload_tooling()  # Reload the tooling to reflect the updated skills
+                await self.planner_agent.reload_model()
+
+                return self._text(
+                    f"Removed skill '{skill}' from '{worker}'."
+                )
+
+            case _:
+                return self._text(
+                    f"Unknown command: '{command}'."
+                )
+
+    def _text(self, content: str) -> Message:
+        return Message(
+            type=MessageType.TEXT,
+            role=MessageRole.ASSISTANT,
+            content=content,
         )
