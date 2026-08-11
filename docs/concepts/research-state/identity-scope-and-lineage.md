@@ -61,7 +61,7 @@ Objective
   -> many scientific investigations over time
 
 eligible feasible leaf SCIENTIFIC Task
-  -> at most one Hypothesis
+  -> exactly one Hypothesis
 
 Hypothesis
   -> admitted Evidence through investigation and provenance records

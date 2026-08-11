@@ -26,6 +26,23 @@ context, and presentation. It does not promote the non-FCO records into the
 semantic Knowledge Graph. Nor does it imply that every upstream event reaches
 every downstream record.
 
+## Not every relationship carries scientific validity
+
+CogniEDA distinguishes at least three kinds of relationship:
+
+| Relationship | Example | Validity meaning |
+| --- | --- | --- |
+| epistemic dependency | Evidence was produced from a particular DataProfile, AnalysisFrame, and ExecutionRun | a defect in the bound data or analytical lineage may change whether the Evidence or a dependent Discovery is safe to use |
+| workflow dependency | one Task depends on another in an approved PlanRevision | coordinates order and eligibility to work; it does not by itself make one Task scientific support for another |
+| motivational or navigation relationship | an Assumption motivates a Task, or Graph Miner points to related work | explains why work was considered; it carries no evidential force |
+
+This distinction prevents naive graph-edge propagation. A system that treated
+every edge alike could turn a planning Assumption into scientific support,
+invalidate an observation because a scheduling dependency changed, or grant
+authority merely because SessionFrame referenced an object. Validity follows
+the exact typed dependency and the use being considered, not generic
+connectedness.
+
 ## Propagation decision
 
 For each candidate dependency, application authority must evaluate:
@@ -87,10 +104,11 @@ must distinguish the original claim and admission from its current eligibility.
 
 ## SessionFrame and GeneratedView eligibility
 
-A SessionFrame selects governed references for a purpose. When a selected
-source loses eligibility, the frame must be reviewed, superseded, or
-reconstructed for the affected use. The selected object's own validity and
-authority do not come from frame membership.
+A SessionFrame records governed session membership. When a referenced source
+loses eligibility, later operation-specific contexts must exclude or restrict
+it, and active selectors or a successor frame may require review. Historical
+membership can remain truth-to-record. The referenced object's own validity
+and authority do not come from frame membership.
 
 A GeneratedView is derived presentation. It may be regenerated from currently
 eligible sources or marked stale and withheld. It is never corrected as if it

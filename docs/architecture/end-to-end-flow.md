@@ -5,9 +5,9 @@ authority, Planner, specialist, dispatch, and admission boundaries together
 without forcing every Task through a Hypothesis-to-Discovery lifecycle.
 
 The sequence is target architecture. Current main does not yet implement the
-complete flow. The [MVP runtime subset](mvp-runtime-subset.md) defines the
-smaller executable path and its explicit non-goals without superseding this
-canonical sequence.
+complete flow. [MVP-v2](mvp-runtime-subset.md) requires one minimum complete
+scientific loop through this sequence, including restart and grounded
+follow-up; it does not supersede the broader canonical architecture.
 
 ## The authority sequence
 
@@ -32,7 +32,8 @@ non-completion. Completion does not imply a Discovery.
    new Objective within the Workspace boundary.
 3. Application authority validates identity, scope, lifecycle, and any required
    approval before admitting or resuming Objective state.
-4. The Planner requests a validity-aware SessionFrame for the planning purpose.
+4. The Planner resolves the current SessionFrame membership and requests a
+   validity-aware planning context from eligible authoritative state.
 5. If identity, scope, or active-session ownership is ambiguous, bootstrap
    stops with a typed blocker.
 
@@ -243,7 +244,7 @@ validity-aware presentation sequence remain incomplete or absent. Data
 Explorer's current local donor paths are not the canonical DATA workflow;
 SCIENTIFIC and GRAPH providers are not registered as runnable.
 
-Use [MVP runtime subset](mvp-runtime-subset.md) for the first executable
-vertical slice, [System overview](system-overview.md) for the component map,
+Use [MVP-v2](mvp-runtime-subset.md) for the minimum complete-loop definition,
+[System overview](system-overview.md) for the component map,
 and [Authority boundaries](authority-boundaries.md) for the controlling
 authority rules.

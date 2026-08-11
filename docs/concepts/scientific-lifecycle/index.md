@@ -63,10 +63,12 @@ evaluation, governance, and authoritative Discovery admission.
 
 ## Cardinality and safe termination
 
-An eligible feasible leaf `SCIENTIFIC` Task produces **at most one**
-Hypothesis. A Hypothesis produces **at most one** Discovery. A parent Task
-produces neither. These are upper bounds, not obligations to fabricate missing
-scientific objects.
+An eligible feasible leaf `SCIENTIFIC` Task produces **exactly one**
+Hypothesis. An infeasible or ineligible Task produces none. A Hypothesis
+produces **at most one** Discovery, and a parent Task produces neither. The
+Hypothesis rule gives feasible scientific work one unambiguous commitment; the
+Discovery upper bound does not force a claim when the investigation ends
+without a Discovery-eligible outcome.
 
 Typed non-completion may terminate the scientific investigation before
 Discovery. The lifecycle preserves that outcome and its reason so the Planner

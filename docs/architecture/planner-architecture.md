@@ -4,8 +4,8 @@ The Planner is CogniEDA's control plane and sole human-facing agent boundary.
 It coordinates research work without acquiring scientific operationalization,
 execution, governance, or durable-admission authority.
 
-This page defines the target Planner architecture. The bounded M1-B library
-implements only the MVP subset described below; canonical planning remains a
+This page defines the target Planner architecture. The bounded current library
+implements only the transitional behavior described below; canonical planning remains a
 target.
 
 ## Planner responsibility
@@ -130,11 +130,12 @@ approved plan in place.
 
 ## SessionFrame and GeneratedView coordination
 
-The Planner coordinates a `SessionFrame` as the governed active context for a
-specific purpose, Objective, and scope. It requests inclusion and exclusion of
-eligible state; application authority validates and persists the frame.
-SessionFrame construction must respect context type safety, validity, and
-Objective boundaries.
+The Planner coordinates `SessionFrame` membership and the active Objective and
+DataProfile selectors. Application authority validates and persists those
+structured references. For each operation, Planner requests a bounded context
+from eligible authoritative state. That selection respects purpose, context
+type safety, validity, lineage, and Objective boundaries; SessionFrame
+membership alone does not grant inclusion or scientific authority.
 
 The Planner may also coordinate a `GeneratedView` for an answer, table, report,
 or synthesis. A view references its sources and carries limitations and
@@ -179,56 +180,26 @@ scientific proposal.
 
 ## Implementation status
 
-**Partially implemented.** The active bounded M1-B graph is:
+**Partially implemented.** Current bounded Planner behavior can understand a
+finite set of requests, establish or refine an Objective, retain planning-only
+Assumptions, create and track bounded data Tasks, route work through the
+dispatcher, consume identity-checked outcomes, and draft empirical answers
+from admitted Evidence while excluding Assumptions. Planner does not admit
+Evidence.
 
-```text
-START
-  -> understand_request
-  -> apply_planning_state
-  -> dispatch_work
-  -> compose_response
-  -> END
-```
-
-At that library boundary, typed model output selects one finite MVP action;
-deterministic code constructs successor Objective, Assumption, and Task state;
-tracked data work transitions `PENDING -> RUNNING -> COMPLETED|FAILED`; and the
-injected dispatcher remains the only active execution path. The Planner
-normalizes and identity-checks `PlannerWorkOutcome`, preserves its digest and
-diagnostics, creates no Evidence, and gives empirical answer drafting an input
-containing admitted Evidence but no Assumptions. `PlannerOutput` exposes the
-human response, successor `SessionFrame`, typed decision, created Task IDs,
-selected `Capability`, work outcome, and controlled error.
-
-The bounded runtime also implements non-authoritative conversation continuity
-for model-backed Planner runs. `PlanningContext` materializes the current MVP
-research objects plus an append-only `ConversationHistory`. Each
-`ConversationTurn` contains the native PydanticAI `ModelMessage` values from
-one complete Planner/LangGraph run; the flattened history is passed unchanged
-to the next request-understanding model invocation. Conversation is not
-Evidence, does not alter SessionFrame authority, and is excluded from the
-Evidence-only answer input. The in-process `Application` retains history and
-the successor MVP SessionFrame, but does not durably persist or reconstruct
-either one after restart.
-
-The direct PydanticAI data-capability adapter remains a bounded tested seam but
-is not composed as an M1-B Planner tool. This prevents model tool calls from
-dispatching work before a canonical Task enters typed state. Planner receives
-its model and dispatcher dependencies explicitly; it constructs no persistence
-or provider infrastructure.
-
-The former donor request-understanding and decomposition tests were rewritten
-against active M1-A/M1-B contracts, and the obsolete PlannerOperation
-persistence module was removed. No compatibility `TaskManagementDraft`,
-`ChildTaskProposalDraft`, `manage_tasks`, or approval-resume API was restored.
+The current in-process runtime also preserves native model-message history
+across Planner runs so a follow-up can be understood in conversational context.
+That history remains separate from the materialized research state and is
+excluded from empirical answer support. Neither conversation nor the current
+SessionFrame is durably restored after restart.
 
 Canonical `PlanRevision` and plan-binding records are not implemented, and the
-current MVP Task does not yet implement canonical `DATA`, `SCIENTIFIC`,
+current bounded Task does not yet implement canonical `DATA`, `SCIENTIFIC`,
 `GRAPH`, and `SYNTHESIS`. The full approval-policy model, PlanRevision and Task
 DAG behavior, GeneratedView coordination, durable SessionFrame composition,
 and the end-to-end recovery model remain **Deferred** target design. The
-[MVP runtime subset](mvp-runtime-subset.md) owns the delivery sequence and
-milestone boundary.
+[MVP-v2 definition](mvp-runtime-subset.md) explains the minimum complete
+product and research capability.
 
 Continue with [Executor and dispatch](executor-and-dispatch.md) or follow the
 complete sequence in [End-to-end flow](end-to-end-flow.md).

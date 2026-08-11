@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import cast
 
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
@@ -46,11 +45,33 @@ def bootstrap_application(workspace_path: Path) -> Application:
     )
 
 
-def _resolved_value(workspace: Workspace, key: str, environment_name: str) -> str:
+def _resolved_value(
+    workspace: Workspace,
+    key: str,
+    *environment_names: str,
+) -> str:
     workspace_value = workspace.config.get(key)
     if workspace_value is not None and str(workspace_value).strip():
-        return str(workspace_value)
-    return os.environ.get(environment_name, "").strip()
+        return str(workspace_value).strip()
+
+    for environment_name in environment_names:
+        environment_value = os.environ.get(environment_name, "").strip()
+        if environment_value:
+            return environment_value
+
+    return ""
+
+
+def _normalize_provider(provider: str) -> ProviderType:
+    if provider == "gemini":
+        return "google"
+    if provider == "openai":
+        return "openai"
+    if provider == "google":
+        return "google"
+    if provider == "anthropic":
+        return "anthropic"
+    raise ValueError(f"Unsupported model provider: {provider}")
 
 
 def resolve_model_config(workspace: Workspace) -> ModelConfig:
@@ -58,8 +79,18 @@ def resolve_model_config(workspace: Workspace) -> ModelConfig:
 
     provider = _resolved_value(workspace, "model.provider", "COGNIEDA_MODEL_PROVIDER")
     model_name = _resolved_value(workspace, "model.name", "COGNIEDA_MODEL_NAME")
-    base_url = _resolved_value(workspace, "model.base_url", "COGNIEDA_OPENAI_BASE_URL")
-    api_key = _resolved_value(workspace, "model.api_key", "COGNIEDA_OPENAI_API_KEY")
+    base_url = _resolved_value(
+        workspace,
+        "model.base_url",
+        "MODEL_BASE_URL",
+        "COGNIEDA_OPENAI_BASE_URL",
+    )
+    api_key = _resolved_value(
+        workspace,
+        "model.api_key",
+        "MODEL_API_KEY",
+        "COGNIEDA_OPENAI_API_KEY",
+    )
 
     if not model_name:
         raise ValueError(
@@ -68,7 +99,7 @@ def resolve_model_config(workspace: Workspace) -> ModelConfig:
     if not api_key:
         raise ValueError(
             "Model API key is required in .cognieda/project.toml or "
-            "COGNIEDA_OPENAI_API_KEY."
+            "MODEL_API_KEY (legacy fallback: COGNIEDA_OPENAI_API_KEY)."
         )
     if not provider:
         raise ValueError(
@@ -76,15 +107,9 @@ def resolve_model_config(workspace: Workspace) -> ModelConfig:
             "COGNIEDA_MODEL_PROVIDER."
         )
 
-    try :
-        return ModelConfig(
-            provider=cast(ProviderType, provider),
-            model_name=model_name,
-            base_url=base_url,
-            api_key=api_key,
-        )
-    except Exception as e:
-        raise ValueError(
-            f"Invalid model configuration: {e}. "
-            "Check .cognieda/project.toml and environment variables."
-        ) from e
+    return ModelConfig(
+        provider=_normalize_provider(provider),
+        model_name=model_name,
+        base_url=base_url,
+        api_key=api_key,
+    )

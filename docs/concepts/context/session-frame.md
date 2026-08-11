@@ -1,38 +1,78 @@
 # SessionFrame
 
-`SessionFrame` is the First-Class Object for a governed active-context
-selection. It makes a bounded working set durable and auditable across a
-specific operation, handoff, pause, or resume without turning the selection
-itself into scientific knowledge.
+`SessionFrame` is the First-Class Object that records structured membership in
+a research session. It gives continuity a typed foundation: which research
+objects the session has accumulated, which Objective and DataProfile are
+active, and which authoritative records a later interaction can resolve.
 
-This page defines the **target design** for SessionFrame identity, scope,
-lifecycle, and non-authority. Exact fields and storage layout remain unfrozen.
+SessionFrame is not conversation memory and is not a scientific conclusion.
+It remembers research-state references; each later operation still decides
+which referenced records are eligible for its particular context.
 
-## Identity and binding
+This page defines the **Design target**. Exact fields and physical storage are
+not part of the conceptual contract.
 
-A canonical SessionFrame is bound to a specific:
+## What a frame remembers
 
-- Objective;
-- purpose;
-- reasoning mode;
-- scope;
-- lifecycle point;
-- validity basis.
+A SessionFrame may conceptually track references to:
 
-It records selected references, explicit exclusions or restrictions needed for
-the purpose, selection reasons, provenance, and the eligibility posture needed
-to audit or reconstruct the frame. It is a governed selection, not a copied
-knowledge base.
+- Objectives and the active Objective;
+- planning Assumptions;
+- Tasks;
+- DataProfiles and the active DataProfile;
+- admitted Evidence; and
+- Hypotheses and Discoveries when the supported workflow requires them.
 
-The identity must make it possible to distinguish a planning frame from a
-protected-evaluation frame even when both refer to the same Objective. A change
-of purpose, reasoning mode, scope, or relevant validity state may require a
-new or successor frame rather than silent mutation of the earlier selection.
+The frame preserves membership over time. Moving from one question to another
+within a session may narrow the immediate model context without deleting older
+membership. Similarly, an object needed as a lineage dependency does not
+automatically become a session member merely because another selected object
+refers to it.
+
+## Membership, selection, and authority
+
+Three questions must remain separate:
+
+```text
+Was this object historically referenced by the SessionFrame?
+  != Is this object selected for the current operation?
+  != May this object support the current scientific conclusion?
+```
+
+SessionFrame membership answers the first question only.
+
+An operation-specific context answers the second after applying its purpose,
+scope, size, lifecycle, validity, and lineage rules. A planning context may
+include Assumptions; a protected `EvaluationBundle` must exclude them. An
+answer context may refer to an eligible Discovery; a new scientific evaluation
+cannot use that prior Discovery as substitute Evidence.
+
+Scientific authority answers the third question. Selection cannot promote an
+Assumption to Evidence, turn raw execution output into admitted Evidence, or
+make an invalid Discovery current again. A frame is therefore a continuity
+record, not a permission slip.
+
+## Why typed membership matters
+
+Ordinary conversation preserves prose in chronological order. It does not
+reliably identify which statement is an Objective, which is an Assumption,
+which Task was approved, which data state is active, or which observed result
+was admitted as Evidence.
+
+Typed membership lets a later session resolve those questions from
+authoritative objects. Conversation can still help interpret what the Human
+means, but the system does not have to infer scientific authority from a
+transcript.
+
+This also protects history. A referenced Evidence item can remain in the frame
+after a later validity event while becoming ineligible for current scientific
+use. The frame records that it belonged to the session; validity rules decide
+whether it may be used now.
 
 ## FCO outside the semantic graph
 
 SessionFrame is one of the eight FCOs, but it is not a semantic Knowledge Graph
-node. The semantic graph remains exactly:
+node. The graph contains exactly:
 
 ```text
 Objective
@@ -41,91 +81,73 @@ Evidence
 Discovery
 ```
 
-FCO identity lets a frame be addressed, governed, superseded, and recovered.
-It does not grant scientific authority or semantic graph membership.
+SessionFrame describes how a research session is organized around scientific
+state. It is not itself a scientific proposition, observation, or claim. Its
+FCO identity permits durable reference, continuity, succession, and recovery
+without misclassifying session organization as knowledge.
 
-## What SessionFrame is not
+## Objective and Workspace boundaries
 
-SessionFrame is not:
+One Workspace may contain multiple Objectives. Sessions may proceed
+concurrently when bound to different Objectives; the current architecture
+phase permits at most one active Planner session for a given Objective.
 
-- conversation history or raw chat turns;
-- a chat or handoff summary treated as authority;
-- a vector-search result;
-- a GeneratedView;
-- a semantic graph node;
-- Evidence, Discovery, or scientific authority;
-- universal memory or the full Workspace state;
-- permission to ignore the selected objects' own lifecycle and validity.
+A SessionFrame must not turn Workspace membership into cross-Objective
+authority. Material from another Objective can motivate a planning suggestion,
+but it cannot silently enter the active Objective as Evidence or Discovery.
+Cross-Objective Evidence reuse requires explicit admission under the exact
+canonical equality rules.
 
-A frame may carry bounded summaries for presentation or efficiency, but those
-summaries do not replace the referenced authoritative records.
+## Active Objective and DataProfile
 
-## Selection without authority transfer
+The active Objective tells the session which research scope currently governs
+coordination. The active DataProfile tells it which admitted data state is
+currently selected for applicable work. Both must refer to known frame
+membership; neither may be guessed from recency or filesystem location.
 
-Frame membership means only that a reference is selected for an authorized
-purpose. Each selected record retains:
+Switching the active DataProfile is authority-sensitive because Evidence and
+scientific contracts remain bound to the data state they used. A switch does
+not rewrite earlier Evidence or make it compatible with the new profile.
 
-- its epistemic type;
-- its original author and admission authority;
-- its Objective and DataProfile scope;
-- its scientific lineage;
-- its lifecycle and current validity;
-- its permitted uses and exclusions.
+## Conversation is separate
 
-Selecting an Assumption into planning context does not promote it to Evidence.
-Selecting a Discovery into answer context does not make it a premise for a new
-protected evaluation. Selecting an execution result does not admit Evidence.
+Conversation history supports interaction continuity. It may help Planner
+understand a follow-up or preserve the native context of a model exchange. It
+does not become SessionFrame membership automatically, and SessionFrame does
+not store raw chat as research authority.
 
-## Objective isolation
+After restart, authoritative continuity must come from durable typed research
+state and its lifecycle. Replaying conversation may aid presentation, but it
+cannot reconstruct approvals, admissions, or scientific support that were not
+recorded authoritatively.
 
-A SessionFrame remains Objective-scoped unless a specific authorized operation
-explicitly permits otherwise. Related work from another Objective may be
-presented as a suggestion to create or investigate a new Objective; it is not
-silently imported as current authority.
+## Lifecycle and recovery
 
-Cross-Objective Evidence reuse requires explicit admission and exact equality
-over the relevant versioned canonical typed obligations. A frame cannot prove
-that equality merely by selecting two similar records.
+A session frame may gain membership, change active selectors, be succeeded,
+and later be restored. Those changes must remain auditable and must not erase
+the earlier truth-to-record.
 
-## Lifecycle
+Recovery resolves the applicable frame and its authoritative references, then
+reapplies current lifecycle and validity rules. Missing identity, ambiguous
+successor state, dangling active selectors, or unresolved authority fails
+closed rather than being repaired from prose or “latest record” heuristics.
 
-A SessionFrame may conceptually be created, made active for its bound purpose,
-checkpointed or handed off, reviewed after a validity change, superseded by a
-new selection, and archived. These meanings do not freeze an enum.
+## Current implementation
 
-Frame lifecycle must preserve:
+**Partially implemented.** Current source has a bounded immutable M1-A
+`SessionFrame` value containing one optional materialized Objective, ordered
+materialized Assumptions, Tasks, and Evidence, and one optional materialized
+DataProfile. Validated replacement seams protect duplicate identity and direct
+Task/DataProfile/Evidence consistency, and SQLite can round-trip bounded frame
+snapshots.
 
-- predecessor or successor identity where applicable;
-- the purpose and mode for which the selection was valid;
-- the exact authoritative references;
-- warnings, blockers, exclusions, and pending review;
-- why the frame stopped being current.
+The current value is not the canonical typed-reference membership FCO. It has
+no frame identity, Objective-bound session identity, reference manifest,
+active Objective/DataProfile selectors distinct from materialized objects,
+successor lineage, or runtime reload authority. The in-process application
+retains it only for the current process. Canonical durable session continuity
+and restart reconstruction remain **Deferred**.
 
-When a selected source becomes invalid, superseded, restricted, or stale, the
-earlier frame remains truth-to-record. It must not continue as the active frame
-for an affected use without review or reconstruction.
-
-## Planner and application authority
-
-Planner coordinates the desired active context for its Objective-scoped work.
-Application authority validates eligibility, Objective binding, lifecycle,
-validity, and permitted use before admitting the frame or its successor.
-
-Neither boundary uses the frame to author scientific meaning. Protected
-evaluation still requires its own closed EvaluationBundle and cannot consume a
-raw SessionFrame as a substitute.
-
-## Implementation status
-
-**Partially implemented.** A known target gap remains. Current source defines and
-persists append-only SessionFrame snapshots with compact DataProfile, Task,
-Assumption, Hypothesis, Discovery, Evidence, and user-decision summaries plus
-warnings, stale context, dead ends, cached-result summaries, invalidation
-rules, and parent-frame identity. Builders project mode-specific bundles.
-
-The current schema stores an Objective snapshot string rather than an explicit
-Objective identifier and does not encode the full canonical purpose, reasoning
-mode, scope, lifecycle point, validity basis, or item-level eligibility record.
-Repository `get_latest` and recent-frame queries are Workspace-wide rather than
-Objective-bound. Therefore the current snapshot surface is not the complete
-canonical SessionFrame or concurrency model.
+Continue with [Context type safety](context-type-safety.md) for the rules that
+govern operation-specific selection and [Continuity and resume](continuity-and-resume.md)
+for restart and session ownership.
