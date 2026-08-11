@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from uuid import uuid4
 
 import pandas as pd
 
@@ -21,6 +22,7 @@ from cognieda.execution import (
     ExecutorRegistry,
 )
 from cognieda.schemas.artifacts import DataProfile, Task
+from cognieda.schemas.enums import TaskKind
 
 
 class FakeAnalysisPlanner:
@@ -32,7 +34,7 @@ class FakeAnalysisPlanner:
 
 
 def _task(instruction: str) -> Task:
-    return Task(instruction=instruction)
+    return Task(objective_id=uuid4(), kind=TaskKind.DATA, instruction=instruction)
 
 
 def _request(
@@ -123,6 +125,23 @@ def test_data_transformation_fails_closed_without_successor_semantics() -> None:
     assert result.status == ExecutionStatus.BLOCKED
     assert result.failure is not None
     assert result.failure.code == "successor_data_profile_not_implemented"
+
+
+def test_data_explorer_rejects_direct_scientific_task_dispatch() -> None:
+    task = Task(
+        objective_id=uuid4(),
+        kind=TaskKind.SCIENTIFIC,
+        instruction="Test a scientific relationship.",
+    )
+
+    result = asyncio.run(
+        DataExplorer().run(_request(Capability.DATA_ANALYSIS, task))
+    )
+
+    assert result.status is ExecutionStatus.FAILED
+    assert result.failure is not None
+    assert result.failure.code == "unsupported_task_kind"
+    assert result.observations == []
     assert result.produced_data_profile is None
 
 

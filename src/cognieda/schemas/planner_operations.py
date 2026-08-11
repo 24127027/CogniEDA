@@ -19,53 +19,8 @@ from cognieda.schemas.enums import (
     PlannerNodeName,
     PlannerOperationApprovalState,
     PlannerOperationType,
-    TaskKind,
-    TaskLifecycleState,
 )
 from cognieda.schemas.provenance import ExecutionOutbox, ExecutionRun
-
-
-class TaskCreateOperationPayload(BaseModel):
-    """Typed persisted payload for creating one Task after user approval."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    # Planner drafts deliberately omit this id; commit assigns it when it
-    # materializes the durable Task. Existing reviewed operations may supply it.
-    task_id: UUID | None = None
-    title: NonEmptyStr
-    description: NonEmptyStr
-    lifecycle_state: TaskLifecycleState = TaskLifecycleState.ACTIVE
-    task_kind: TaskKind = TaskKind.ANALYTICAL
-    parent_task_id: UUID | None = None
-    profile_id: UUID | None = None
-    variables: list[NonEmptyStr] = Field(default_factory=list)
-    evidence_expectation: str | None = None
-
-
-class TaskUpdateOperationPayload(BaseModel):
-    """Typed persisted payload for updating one Task."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    task_id: UUID
-    title: str | None = None
-    description: str | None = None
-    lifecycle_state: TaskLifecycleState | None = None
-    task_kind: TaskKind | None = None
-    parent_task_id: UUID | None = None
-    profile_id: UUID | None = None
-    variables: list[str] | None = None
-    evidence_expectation: str | None = None
-
-
-class TaskStateChangeOperationPayload(BaseModel):
-    """Typed persisted payload for one Task lifecycle transition."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    task_id: UUID
-    lifecycle_state: TaskLifecycleState
 
 
 class ObjectiveUpdateOperationPayload(BaseModel):

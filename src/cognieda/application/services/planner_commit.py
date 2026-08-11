@@ -14,7 +14,6 @@ from cognieda.infrastructure.persistence.models import (
     ObjectiveRecord,
     PlannerOperationRecord,
     SessionFrameRecord,
-    TaskRecord,
 )
 from cognieda.infrastructure.persistence.repositories.assumption_repository import (
     ASSUMPTION_JSON_FIELDS,
@@ -28,11 +27,7 @@ from cognieda.infrastructure.persistence.repositories.objective_repository impor
 from cognieda.infrastructure.persistence.repositories.session_frame_repository import (
     SESSION_FRAME_JSON_FIELDS,
 )
-from cognieda.infrastructure.persistence.repositories.task_repository import (
-    TASK_JSON_FIELDS,
-    TaskUpdate,
-)
-from cognieda.schemas.artifacts import Assumption, SessionFrame, Task
+from cognieda.schemas.artifacts import Assumption, SessionFrame
 from cognieda.schemas.enums import (
     AssumptionStatus,
     ExecutionRunStatus,
@@ -46,9 +41,6 @@ from cognieda.schemas.planner_operations import (
     ExecutionRunOperationPayload,
     ObjectiveUpdateOperationPayload,
     PlannerCommitResult,
-    TaskCreateOperationPayload,
-    TaskStateChangeOperationPayload,
-    TaskUpdateOperationPayload,
 )
 from cognieda.schemas.provenance import ExecutionOutbox, ExecutionRun
 
@@ -163,12 +155,6 @@ def _load_candidate_operations(
 
 def _apply_operation(session: Session, record: PlannerOperationRecord) -> None:
     match record.operation_type:
-        case PlannerOperationType.CREATE_TASK:
-            _apply_create_task(session, record)
-        case PlannerOperationType.UPDATE_TASK:
-            _apply_update_task(session, record)
-        case PlannerOperationType.CHANGE_TASK_STATE:
-            _apply_change_task_state(session, record)
         case PlannerOperationType.CREATE_ASSUMPTION:
             _apply_create_assumption(session, record)
         case PlannerOperationType.UPDATE_ASSUMPTION_STATE:
@@ -258,48 +244,6 @@ def _validate_execution_admission_pair(run: ExecutionRun, outbox: ExecutionOutbo
         or not run.dispatch_idempotency_key
     ):
         raise ValueError("Execution admission requires complete immutable attempt identity.")
-
-
-def _apply_create_task(session: Session, operation: PlannerOperationRecord) -> None:
-    payload = TaskCreateOperationPayload.model_validate(
-        _payload_with_target_id(operation, id_field="task_id")
-    )
-    task = Task(**payload.model_dump(exclude_none=True))
-    if session.get(TaskRecord, task.task_id) is not None:
-        raise ValueError(f"Task already exists: {task.task_id}")
-    if task.parent_task_id is not None and session.get(TaskRecord, task.parent_task_id) is None:
-        raise ValueError(f"Parent Task not found: {task.parent_task_id}")
-    record = TaskRecord(**schema_to_record_payload(task, json_fields=TASK_JSON_FIELDS))
-    session.add(record)
-    operation.target_object_id = task.task_id
-    operation.target_object_type = "task"
-    session.add(operation)
-    session.flush()
-
-
-def _apply_update_task(session: Session, operation: PlannerOperationRecord) -> None:
-    payload = TaskUpdateOperationPayload.model_validate(
-        _payload_with_target_id(operation, id_field="task_id")
-    )
-    _require_payload_target_matches(operation, payload.task_id, "update_task")
-    task_record = _require_record(session, TaskRecord, payload.task_id, "Task")
-    update = TaskUpdate(**payload.model_dump(exclude={"task_id"}, exclude_none=True))
-    _require_update_payload(update.model_fields_set, operation.operation_type.value)
-    apply_update(task_record, update, json_fields=TASK_JSON_FIELDS)
-    session.add(task_record)
-    session.flush()
-
-
-def _apply_change_task_state(session: Session, operation: PlannerOperationRecord) -> None:
-    payload = TaskStateChangeOperationPayload.model_validate(
-        _payload_with_target_id(operation, id_field="task_id")
-    )
-    _require_payload_target_matches(operation, payload.task_id, "change_task_state")
-    task_record = _require_record(session, TaskRecord, payload.task_id, "Task")
-    update = TaskUpdate(lifecycle_state=payload.lifecycle_state)
-    apply_update(task_record, update, json_fields=TASK_JSON_FIELDS)
-    session.add(task_record)
-    session.flush()
 
 
 def _apply_create_assumption(session: Session, operation: PlannerOperationRecord) -> None:

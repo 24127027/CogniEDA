@@ -34,7 +34,7 @@ from cognieda.schemas.artifacts import (
     Task,
 )
 from cognieda.schemas.common import EvidenceProvenance
-from cognieda.schemas.enums import TaskStatus
+from cognieda.schemas.enums import TaskKind, TaskStatus
 
 
 class FakePlannerModel:
@@ -139,7 +139,8 @@ def test_typed_capability_selection_dispatches_one_bounded_canonical_task(
     )
     dispatcher = FakeDispatcher(status)
     model = FakePlannerModel(_data_decision(instruction, capability))
-    frame = SessionFrame(objective=Objective(text="Understand the active dataset."))
+    objective = Objective(text="Understand the active dataset.")
+    frame = SessionFrame(objective=objective)
 
     output = asyncio.run(
         _planner(model, dispatcher).run("Do the requested bounded data work.", session_frame=frame)
@@ -151,6 +152,8 @@ def test_typed_capability_selection_dispatches_one_bounded_canonical_task(
     request = dispatcher.requests[0]
     assert request.capability is capability
     assert request.input.task.task_id == output.created_task_ids[0]
+    assert request.input.task.objective_id == objective.objective_id
+    assert request.input.task.kind is TaskKind.DATA
     assert request.input.task.instruction == instruction
     assert request.input.task.status is TaskStatus.RUNNING
     assert output.session_frame.evidences == ()
@@ -168,9 +171,20 @@ def test_successful_work_preserves_task_identity_and_completes_without_evidence(
 
     task_id = output.created_task_ids[0]
     task = next(task for task in output.session_frame.tasks if task.task_id == task_id)
+    dispatched_task = dispatcher.requests[0].input.task
     assert task.status is TaskStatus.COMPLETED
+    assert (
+        task.task_id,
+        task.objective_id,
+        task.kind,
+        task.instruction,
+    ) == (
+        dispatched_task.task_id,
+        dispatched_task.objective_id,
+        dispatched_task.kind,
+        dispatched_task.instruction,
+    )
     assert task.instruction == instruction
-    assert dispatcher.requests[0].input.task.task_id == task.task_id
     assert output.work_outcome is not None
     assert output.work_outcome.status is ExecutionStatus.SUCCEEDED
     assert len(output.work_outcome.result_digest) == 64
@@ -260,9 +274,14 @@ def test_clear_data_request_can_establish_objective_before_creating_task() -> No
 
 
 def test_semantic_task_change_creates_new_identity_without_rewriting_existing_task() -> None:
-    existing = Task(instruction="Profile the dataset.")
+    objective = Objective(text="Understand the dataset.")
+    existing = Task(
+        objective_id=objective.objective_id,
+        kind=TaskKind.DATA,
+        instruction="Profile the dataset.",
+    )
     frame = SessionFrame(
-        objective=Objective(text="Understand the dataset."),
+        objective=objective,
         tasks=(existing,),
     )
     dispatcher = FakeDispatcher(ExecutionStatus.SUCCEEDED)
@@ -278,6 +297,8 @@ def test_semantic_task_change_creates_new_identity_without_rewriting_existing_ta
     assert old_task.instruction == "Profile the dataset."
     assert old_task.status is TaskStatus.PENDING
     assert new_task.task_id != old_task.task_id
+    assert new_task.objective_id == objective.objective_id
+    assert new_task.kind is TaskKind.DATA
     assert new_task.instruction == "Summarize missingness by column."
     assert new_task.status is TaskStatus.COMPLETED
 
@@ -305,7 +326,12 @@ def test_explicit_assumption_addition_uses_successor_state_and_never_dispatches(
 
 def _frame_with_admitted_evidence() -> tuple[SessionFrame, Evidence]:
     objective = Objective(text="Understand dataset size.")
-    task = Task(instruction="Count rows.", status=TaskStatus.COMPLETED)
+    task = Task(
+        objective_id=objective.objective_id,
+        kind=TaskKind.DATA,
+        instruction="Count rows.",
+        status=TaskStatus.COMPLETED,
+    )
     profile = DataProfile(row_count=42, column_count=0, columns=())
     evidence = Evidence(
         task_id=task.task_id,

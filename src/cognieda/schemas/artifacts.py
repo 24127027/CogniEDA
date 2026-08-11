@@ -23,6 +23,7 @@ from cognieda.schemas.enums import (
     DiscoveryEpistemicStatus,
     DiscoveryLifecycleState,
     HypothesisStatus,
+    TaskKind,
     TaskStatus,
     UserDecisionStatus,
     UserDecisionType,
@@ -97,9 +98,11 @@ class Assumption(CogniEDABaseModel):
 
 
 class Task(ImmutableCogniEDABaseModel):
-    """Bounded executable MVP work identity; a Task is not scientific knowledge."""
+    """Objective-scoped semantic work identity; a Task is not scientific knowledge."""
 
     task_id: UUID = Field(default_factory=uuid4)
+    objective_id: UUID
+    kind: TaskKind
     instruction: NonEmptyStr
     status: TaskStatus = TaskStatus.PENDING
 
@@ -295,6 +298,8 @@ class SessionFrame(ImmutableCogniEDABaseModel):
             if task.task_id == task_id:
                 replacement = Task(
                     task_id=task.task_id,
+                    objective_id=task.objective_id,
+                    kind=task.kind,
                     instruction=task.instruction,
                     status=status,
                 )

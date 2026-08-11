@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from pathlib import Path
+from uuid import uuid4
 
 import pandas as pd
 import pytest
+from sqlmodel import Session
 
 from cognieda.agents.data_explorer import (
     DataAnalysisOperation,
@@ -29,9 +32,10 @@ from cognieda.infrastructure.persistence.repositories import (
     DataProfileDatasetBindingRepository,
     DataProfileRepository,
     EvidenceRepository,
+    ObjectiveRepository,
     TaskRepository,
 )
-from cognieda.schemas import Assumption, DataProfile, Task, TaskStatus
+from cognieda.schemas import Assumption, DataProfile, Objective, Task, TaskKind, TaskStatus
 
 
 class FixedPlanner:
@@ -53,9 +57,20 @@ def _admitted_profile(db_session, dataset_path) -> DataProfile:
     return MvpDataProfileAdmissionService(db_session).admit_candidate(candidate).data_profile
 
 
-def _completed_task(db_session, instruction: str = "Count rows") -> Task:
+def _persisted_task(
+    db_session,
+    instruction: str = "Count rows",
+    status: TaskStatus = TaskStatus.COMPLETED,
+    kind: TaskKind = TaskKind.DATA,
+) -> Task:
+    objective = ObjectiveRepository(db_session).create(Objective(text="Understand dataset size"))
     return TaskRepository(db_session).create(
-        Task(instruction=instruction, status=TaskStatus.COMPLETED)
+        Task(
+            objective_id=objective.objective_id,
+            kind=kind,
+            instruction=instruction,
+            status=status,
+        )
     )
 
 
@@ -75,7 +90,7 @@ def _execute(dataset_path, task: Task, profile: DataProfile):
 def test_successful_real_work_admits_exactly_one_immutable_evidence(db_session, tmp_path) -> None:
     dataset_path = tmp_path / "admission.csv"
     pd.DataFrame({"value": [1, 2, 3]}).to_csv(dataset_path, index=False)
-    task = _completed_task(db_session)
+    task = _persisted_task(db_session)
     profile = _admitted_profile(db_session, dataset_path)
     request, result = _execute(dataset_path, task, profile)
     service = MvpEvidenceAdmissionService(db_session)
@@ -125,12 +140,12 @@ def test_lineage_or_payload_mismatch_creates_zero_evidence(
 ) -> None:
     dataset_path = tmp_path / "mismatch.csv"
     pd.DataFrame({"value": [1, 2, 3]}).to_csv(dataset_path, index=False)
-    task = _completed_task(db_session)
+    task = _persisted_task(db_session)
     profile = _admitted_profile(db_session, dataset_path)
     request, result = _execute(dataset_path, task, profile)
 
     if mutation == "wrong_task":
-        other_task = _completed_task(db_session, "Different work")
+        other_task = _persisted_task(db_session, "Different work")
         request = request.model_copy(update={"input": ExecutorInput(task=other_task)})
     elif mutation == "wrong_profile":
         other_profile = _raw_profile(db_session)
@@ -166,13 +181,80 @@ def test_lineage_or_payload_mismatch_creates_zero_evidence(
     assert EvidenceRepository(db_session).list() == []
 
 
+@pytest.mark.parametrize(
+    ("semantic_field", "expected_code"),
+    [
+        ("objective_id", DataAdmissionErrorCode.TASK_MISMATCH),
+        ("kind", DataAdmissionErrorCode.INVALID_RESULT),
+        ("instruction", DataAdmissionErrorCode.TASK_MISMATCH),
+    ],
+)
+def test_forged_task_semantics_create_zero_evidence(
+    db_session: Session,
+    tmp_path: Path,
+    semantic_field: str,
+    expected_code: DataAdmissionErrorCode,
+) -> None:
+    dataset_path = tmp_path / f"forged-{semantic_field}.csv"
+    pd.DataFrame({"value": [1, 2, 3]}).to_csv(dataset_path, index=False)
+    task = _persisted_task(db_session)
+    profile = _admitted_profile(db_session, dataset_path)
+    request, result = _execute(dataset_path, task, profile)
+    semantic_values = {
+        "objective_id": task.objective_id,
+        "kind": task.kind,
+        "instruction": task.instruction,
+    }
+    semantic_values[semantic_field] = {
+        "objective_id": uuid4(),
+        "kind": TaskKind.SCIENTIFIC,
+        "instruction": "Different semantic work",
+    }[semantic_field]
+    forged_task = Task.model_validate(
+        {"task_id": task.task_id, "status": task.status, **semantic_values}
+    )
+    forged_input = request.input.model_copy(update={"task": forged_task})
+    forged_request = request.model_copy(update={"input": forged_input})
+
+    with pytest.raises(DataAdmissionError) as exc_info:
+        MvpEvidenceAdmissionService(db_session).admit(forged_request, result)
+
+    assert exc_info.value.code is expected_code
+    assert EvidenceRepository(db_session).list() == []
+
+
+def test_scientific_task_cannot_enter_direct_data_evidence_admission(
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    dataset_path = tmp_path / "scientific-direct.csv"
+    pd.DataFrame({"value": [1, 2, 3]}).to_csv(dataset_path, index=False)
+    data_task = _persisted_task(db_session)
+    scientific_task = _persisted_task(
+        db_session,
+        instruction="Test a scientific relationship",
+        kind=TaskKind.SCIENTIFIC,
+    )
+    profile = _admitted_profile(db_session, dataset_path)
+    request, result = _execute(dataset_path, data_task, profile)
+    scientific_input = request.input.model_copy(update={"task": scientific_task})
+    scientific_request = request.model_copy(update={"input": scientific_input})
+    scientific_result = result.model_copy(update={"task_id": scientific_task.task_id})
+
+    with pytest.raises(DataAdmissionError) as exc_info:
+        MvpEvidenceAdmissionService(db_session).admit(scientific_request, scientific_result)
+
+    assert exc_info.value.code is DataAdmissionErrorCode.INVALID_RESULT
+    assert EvidenceRepository(db_session).list() == []
+
+
 @pytest.mark.parametrize("task_status", [TaskStatus.PENDING, TaskStatus.RUNNING, TaskStatus.FAILED])
 def test_non_completed_authoritative_task_creates_zero_evidence(
     db_session, tmp_path, task_status
 ) -> None:
     dataset_path = tmp_path / "task-status.csv"
     pd.DataFrame({"value": [1]}).to_csv(dataset_path, index=False)
-    task = TaskRepository(db_session).create(Task(instruction="Count rows", status=task_status))
+    task = _persisted_task(db_session, status=task_status)
     profile = _admitted_profile(db_session, dataset_path)
     request, result = _execute(dataset_path, task, profile)
 
@@ -186,7 +268,7 @@ def test_non_completed_authoritative_task_creates_zero_evidence(
 def test_failed_and_blocked_work_create_zero_evidence(db_session, tmp_path) -> None:
     dataset_path = tmp_path / "fail-closed.csv"
     pd.DataFrame({"value": [1]}).to_csv(dataset_path, index=False)
-    task = _completed_task(db_session)
+    task = _persisted_task(db_session)
     profile = _admitted_profile(db_session, dataset_path)
     missing_request, failed_result = _execute(tmp_path / "missing.csv", task, profile)
     blocked_request = ExecutionRequest(
@@ -219,7 +301,7 @@ def test_existing_profile_reprofiling_can_be_admitted_only_when_metrics_match(
     profile = MvpDataProfileAdmissionService(db_session).admit_candidate(
         candidate
     ).data_profile
-    task = _completed_task(db_session, "Reprofile the active dataset")
+    task = _persisted_task(db_session, "Reprofile the active dataset")
     request = ExecutionRequest(
         capability=Capability.DATA_PROFILING,
         input=ExecutorInput(task=task),
@@ -247,7 +329,7 @@ def test_changed_dataset_reprofiling_does_not_match_authoritative_profile(
         candidate
     ).data_profile
     pd.DataFrame({"value": [1, 2, 3]}).to_csv(dataset_path, index=False)
-    task = _completed_task(db_session, "Reprofile changed data")
+    task = _persisted_task(db_session, "Reprofile changed data")
     request = ExecutionRequest(
         capability=Capability.DATA_PROFILING,
         input=ExecutorInput(task=task),
@@ -267,7 +349,7 @@ def test_changed_dataset_reprofiling_does_not_match_authoritative_profile(
 def test_duplicate_work_reference_with_changed_result_fails_closed(db_session, tmp_path) -> None:
     dataset_path = tmp_path / "duplicate.csv"
     pd.DataFrame({"value": [1, 2]}).to_csv(dataset_path, index=False)
-    task = _completed_task(db_session)
+    task = _persisted_task(db_session)
     profile = _admitted_profile(db_session, dataset_path)
     request, result = _execute(dataset_path, task, profile)
     service = MvpEvidenceAdmissionService(db_session)
@@ -308,7 +390,7 @@ def test_evidence_admission_has_no_assumption_input_or_lookup(db_session, tmp_pa
     AssumptionRepository(db_session).create(Assumption(text="Planning-only context"))
     dataset_path = tmp_path / "assumption-isolation.csv"
     pd.DataFrame({"value": [1]}).to_csv(dataset_path, index=False)
-    task = _completed_task(db_session)
+    task = _persisted_task(db_session)
     profile = _admitted_profile(db_session, dataset_path)
     request, result = _execute(dataset_path, task, profile)
 
@@ -326,7 +408,7 @@ def test_raw_profile_without_dataset_binding_is_not_evidence_eligible(
     dataset_path = tmp_path / "unbound.csv"
     pd.DataFrame({"value": [1, 2]}).to_csv(dataset_path, index=False)
     profile = _raw_profile(db_session, row_count=2)
-    task = _completed_task(db_session)
+    task = _persisted_task(db_session)
     request, result = _execute(dataset_path, task, profile)
 
     with pytest.raises(DataAdmissionError) as exc_info:
@@ -344,7 +426,7 @@ def test_bound_profile_cannot_be_used_for_another_dataset_path(
     pd.DataFrame({"value": [1, 2]}).to_csv(dataset_a, index=False)
     pd.DataFrame({"value": [8, 9]}).to_csv(dataset_b, index=False)
     profile = _admitted_profile(db_session, dataset_a)
-    task = _completed_task(db_session)
+    task = _persisted_task(db_session)
     request, result = _execute(dataset_b, task, profile)
 
     with pytest.raises(DataAdmissionError) as exc_info:
@@ -408,7 +490,7 @@ def test_same_content_at_different_path_requires_new_profile_admission(
     pd.DataFrame({"value": [1, 2]}).to_csv(dataset_a, index=False)
     dataset_b.write_bytes(dataset_a.read_bytes())
     profile = _admitted_profile(db_session, dataset_a)
-    task = _completed_task(db_session)
+    task = _persisted_task(db_session)
     request, result = _execute(dataset_b, task, profile)
 
     with pytest.raises(DataAdmissionError) as exc_info:
@@ -433,7 +515,7 @@ def test_same_path_mutation_blocks_analysis_evidence(db_session, tmp_path) -> No
     )
     assert binding is not None
     pd.DataFrame({"value": [3, 4]}).to_csv(dataset_path, index=False)
-    task = _completed_task(db_session)
+    task = _persisted_task(db_session)
     request, result = _execute(dataset_path, task, profile)
 
     assert result.provenance is not None

@@ -11,7 +11,6 @@ from cognieda.schemas.enums import (
     EvidenceLifecycleState,
     FirstClassObjectType,
     HypothesisStatus,
-    TaskLifecycleState,
 )
 
 
@@ -34,7 +33,7 @@ def assert_excluded(
         (FirstClassObjectType.ASSUMPTION, AssumptionStatus.ACTIVE),
         (FirstClassObjectType.DISCOVERY, DiscoveryLifecycleState.ACTIVE),
         (FirstClassObjectType.HYPOTHESIS, HypothesisStatus.COMPLETED),
-        (FirstClassObjectType.TASK, TaskLifecycleState.REJECTED),
+        (FirstClassObjectType.TASK, None),
         (FirstClassObjectType.DATA_PROFILE, DataProfileLifecycleState.SUPERSEDED),
         (FirstClassObjectType.EVIDENCE, EvidenceLifecycleState.HISTORICALLY_SCOPED),
         (FirstClassObjectType.EVIDENCE, EvidenceLifecycleState.SUPERSEDED),

@@ -27,7 +27,7 @@ from cognieda.execution import (
     ExecutorInput,
     ExecutorRegistry,
 )
-from cognieda.schemas import DataProfile, Task
+from cognieda.schemas import DataProfile, Task, TaskKind
 
 
 class InstructionPlanFake:
@@ -53,6 +53,10 @@ class FailingPlanner:
         raise RuntimeError("model unavailable")
 
 
+def _task(instruction: str) -> Task:
+    return Task(objective_id=uuid4(), kind=TaskKind.DATA, instruction=instruction)
+
+
 def _request(
     dataset_path: Path | None,
     plan: DataAnalysisPlan | None,
@@ -65,23 +69,19 @@ def _request(
         capability=capability,
         input=(
             DataExplorerInput(
-                task=Task(
-                    instruction=(
-                        plan.model_dump_json()
-                        if plan is not None
-                        else "Unsupported direct analysis request"
-                    )
+                task=_task(
+                    plan.model_dump_json()
+                    if plan is not None
+                    else "Unsupported direct analysis request"
                 ),
                 data_profile=profile_projection,
             )
             if profile_projection is not None
             else ExecutorInput(
-                task=Task(
-                    instruction=(
-                        plan.model_dump_json()
-                        if plan is not None
-                        else "Unsupported direct analysis request"
-                    )
+                task=_task(
+                    plan.model_dump_json()
+                    if plan is not None
+                    else "Unsupported direct analysis request"
                 )
             )
         ),
@@ -473,7 +473,7 @@ def test_task_instruction_is_operationalized_inside_data_explorer(tmp_path) -> N
     request = ExecutionRequest(
         capability=Capability.DATA_ANALYSIS,
         input=DataExplorerInput(
-            task=Task(instruction="Count the rows in the active dataset"),
+            task=_task("Count the rows in the active dataset"),
             data_profile=profile,
         ),
         context=ExecutorContext(
@@ -504,7 +504,7 @@ def test_descriptive_task_uses_planner_proposal_and_deterministic_tool(tmp_path)
     request = ExecutionRequest(
         capability=Capability.DATA_ANALYSIS,
         input=DataExplorerInput(
-            task=Task(instruction="Summarize age"),
+            task=_task("Summarize age"),
             data_profile=profile,
         ),
         context=ExecutorContext(
@@ -527,7 +527,7 @@ def test_model_planner_failure_creates_typed_zero_observation_failure(tmp_path) 
     request = ExecutionRequest(
         capability=Capability.DATA_ANALYSIS,
         input=DataExplorerInput(
-            task=Task(instruction="Count rows"),
+            task=_task("Count rows"),
             data_profile=profile,
         ),
         context=ExecutorContext(

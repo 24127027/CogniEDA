@@ -107,7 +107,7 @@ Evidence loops, typed non-completion, and authoritative admission are owned by
 
 ## Implementation status
 
-**Planning/scientific separation is partially implemented; the canonical
-scientific lifecycle is a design target.** Current source contains legacy Task,
-Hypothesis, Evidence, Discovery, provenance, and context-safety surfaces but
-does not implement the complete lifecycle linked above.
+**Partially implemented.** The active Task semantic core is Objective-scoped
+and uses the canonical four-kind taxonomy, but only bounded `DATA` execution is
+supported. PlanRevision, canonical scientific execution, and the complete
+lifecycle linked above remain a **Design target**.

@@ -3,6 +3,9 @@
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session
 
 from cognieda.infrastructure.persistence.repositories import (
     AssumptionRepository,
@@ -23,8 +26,27 @@ from cognieda.schemas import (
     Objective,
     SessionFrame,
     Task,
+    TaskKind,
     TaskStatus,
 )
+
+
+def _persisted_task(
+    db_session: Session,
+    *,
+    instruction: str = "Count rows",
+    status: TaskStatus = TaskStatus.PENDING,
+) -> tuple[Objective, Task]:
+    objective = ObjectiveRepository(db_session).create(Objective(text="Understand dataset size"))
+    task = TaskRepository(db_session).create(
+        Task(
+            objective_id=objective.objective_id,
+            kind=TaskKind.DATA,
+            instruction=instruction,
+            status=status,
+        )
+    )
+    return objective, task
 
 
 def test_minimum_objective_assumption_and_task_round_trip(db_session) -> None:
@@ -32,7 +54,13 @@ def test_minimum_objective_assumption_and_task_round_trip(db_session) -> None:
     assumption = AssumptionRepository(db_session).create(
         Assumption(text="Premium membership may guide planning")
     )
-    task = TaskRepository(db_session).create(Task(instruction="Count retained customers"))
+    task = TaskRepository(db_session).create(
+        Task(
+            objective_id=objective.objective_id,
+            kind=TaskKind.DATA,
+            instruction="Count retained customers",
+        )
+    )
 
     assert ObjectiveRepository(db_session).get_by_id(objective.objective_id) == objective
     assert AssumptionRepository(db_session).get_by_id(assumption.assumption_id) == assumption
@@ -41,7 +69,31 @@ def test_minimum_objective_assumption_and_task_round_trip(db_session) -> None:
     updated = TaskRepository(db_session).update(task.task_id, TaskUpdate(status=TaskStatus.RUNNING))
     assert updated is not None
     assert updated.status is TaskStatus.RUNNING
-    assert updated.instruction == task.instruction
+    assert (
+        updated.task_id,
+        updated.objective_id,
+        updated.kind,
+        updated.instruction,
+    ) == (task.task_id, task.objective_id, task.kind, task.instruction)
+
+
+def test_task_persistence_requires_existing_exact_objective_identity(
+    db_session: Session,
+) -> None:
+    task = Task(
+        objective_id=uuid4(),
+        kind=TaskKind.DATA,
+        instruction="Count rows",
+    )
+
+    with pytest.raises(IntegrityError):
+        TaskRepository(db_session).create(task)
+
+
+@pytest.mark.parametrize("field", ["objective_id", "kind", "instruction"])
+def test_task_repository_update_rejects_semantic_fields(field: str) -> None:
+    with pytest.raises(ValidationError):
+        TaskUpdate.model_validate({field: "changed"})
 
 
 def test_objective_and_assumption_behavioral_updates_are_explicitly_deferred(db_session) -> None:
@@ -52,7 +104,7 @@ def test_objective_and_assumption_behavioral_updates_are_explicitly_deferred(db_
 
 
 def test_data_profile_evidence_and_session_frame_round_trip_with_direct_lineage(db_session) -> None:
-    task = TaskRepository(db_session).create(Task(instruction="Count rows"))
+    _, task = _persisted_task(db_session)
     task = TaskRepository(db_session).update(
         task.task_id,
         TaskUpdate(status=TaskStatus.COMPLETED),
@@ -105,7 +157,7 @@ def test_evidence_repository_rejects_missing_task_or_profile(db_session) -> None
     with pytest.raises(ValueError, match="existing Task"):
         EvidenceRepository(db_session).create(missing_task_evidence)
 
-    task = TaskRepository(db_session).create(Task(instruction="Count rows"))
+    _, task = _persisted_task(db_session)
     task = TaskRepository(db_session).update(
         task.task_id,
         TaskUpdate(status=TaskStatus.COMPLETED),
@@ -132,7 +184,7 @@ def test_evidence_repository_rejects_missing_task_or_profile(db_session) -> None
     [TaskStatus.PENDING, TaskStatus.RUNNING, TaskStatus.FAILED],
 )
 def test_evidence_repository_rejects_incomplete_task(db_session, status: TaskStatus) -> None:
-    task = TaskRepository(db_session).create(Task(instruction="Count rows", status=status))
+    _, task = _persisted_task(db_session, status=status)
     profile = DataProfileRepository(db_session).create(
         DataProfile(row_count=0, column_count=0, columns=())
     )
@@ -153,9 +205,7 @@ def test_evidence_repository_rejects_incomplete_task(db_session, status: TaskSta
 
 
 def test_evidence_repository_accepts_completed_task(db_session) -> None:
-    task = TaskRepository(db_session).create(
-        Task(instruction="Count rows", status=TaskStatus.COMPLETED)
-    )
+    _, task = _persisted_task(db_session, status=TaskStatus.COMPLETED)
     profile = DataProfileRepository(db_session).create(
         DataProfile(row_count=0, column_count=0, columns=())
     )

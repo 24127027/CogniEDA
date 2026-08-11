@@ -19,7 +19,6 @@ from cognieda.schemas.enums import (
     MemoryStatus,
     ObjectiveStatus,
     SessionFrameStatus,
-    TaskLifecycleState,
 )
 
 type RetrievalObjectType = FirstClassObjectType | str
@@ -28,7 +27,6 @@ type LifecycleState = (
     ObjectiveStatus
     | DataProfileLifecycleState
     | AssumptionStatus
-    | TaskLifecycleState
     | HypothesisStatus
     | EvidenceLifecycleState
     | DiscoveryLifecycleState
@@ -180,21 +178,11 @@ def _assumption_exclusion_reason(
 
 
 def _task_exclusion_reason(
-    state_key: str | None,
-    mode_key: str,
+    _state_key: str | None,
+    _mode_key: str,
     context_label: str,
 ) -> str | None:
-    if mode_key in {ContextMode.PLANNING.value, ContextMode.ANSWER.value} and state_key in {
-        TaskLifecycleState.PROPOSED.value,
-        TaskLifecycleState.ACTIVE.value,
-        TaskLifecycleState.PAUSED.value,
-    }:
-        return None
-    if state_key == TaskLifecycleState.REJECTED.value:
-        return f"Rejected Task is workflow state and cannot enter {context_label}."
-    if mode_key in {ContextMode.CONCLUSION.value, ContextMode.DISCOVERY_SYNTHESIS.value}:
-        return f"Task is workflow state and cannot enter {context_label}."
-    return _state_not_allowed("Task", state_key, context_label)
+    return f"Task is workflow state and cannot enter {context_label}."
 
 
 def _hypothesis_exclusion_reason(

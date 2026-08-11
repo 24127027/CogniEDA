@@ -20,6 +20,7 @@ from cognieda.agents.planner.types import (
 )
 from cognieda.execution import ExecutionRequest
 from cognieda.schemas.artifacts import Assumption, Objective, SessionFrame, Task
+from cognieda.schemas.enums import TaskKind
 
 
 class NeverDispatcher:
@@ -68,7 +69,11 @@ def _planner(model: FakePlannerModel, dispatcher: NeverDispatcher) -> Planner:
 def test_natural_language_understanding_receives_latest_request_and_typed_state() -> None:
     objective = Objective(text="Understand customer retention.")
     assumption = Assumption(text="Rows represent customers.")
-    task = Task(instruction="Profile the active dataset.")
+    task = Task(
+        objective_id=objective.objective_id,
+        kind=TaskKind.DATA,
+        instruction="Profile the active dataset.",
+    )
     frame = SessionFrame(objective=objective, assumptions=(assumption,), tasks=(task,))
     model = FakePlannerModel(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
     dispatcher = NeverDispatcher()

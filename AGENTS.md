@@ -25,11 +25,12 @@ traceable, scope-valid, and protected from the wrong state entering reasoning.
 
 All eight FCO names have schemas and SQLModel records. `PlannerOperation`,
 `AnalysisFrame`, `ExecutionRun`, and other provenance/operational records also
-exist. This does not establish the canonical workflow. Current Tasks use legacy
-kinds and scientific fields; PlanRevision and scientific-investigation
-contracts are absent; Planner execution nodes and specialist graphs are stubs;
-DVC and product CLI support are absent; database behavior is verified only on
-SQLite. Keep detailed claims in the status track.
+exist. This does not establish the canonical workflow. Active Tasks have the
+minimum Objective-scoped canonical semantic core, but only bounded `DATA` work
+is executable; PlanRevision and scientific-investigation contracts are absent;
+Planner execution nodes and specialist graphs are stubs; DVC and product CLI
+support are absent; database behavior is verified only on SQLite. Keep detailed
+claims in the status track.
 
 ## Exact FCO and graph boundaries
 
