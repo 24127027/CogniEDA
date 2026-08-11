@@ -44,6 +44,16 @@ class Planner:
         self.deps = deps
         self.graph = build_graph()
 
+    async def reload_model(self):
+        """Reload the underlying model from the agent factory and model config."""
+
+        #TODO: Temporarily allow reloading of the model
+        if not isinstance(self.model, PlannerModel):
+            raise RuntimeError(
+                "Cannot reload model because it was provided directly and is not a PlannerModel."
+            )
+        self.model.reload_model()
+
     async def run(
         self,
         query: str,

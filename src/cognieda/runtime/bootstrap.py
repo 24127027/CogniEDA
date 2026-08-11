@@ -18,13 +18,8 @@ from .workspace import Workspace
 def bootstrap_application(workspace_path: Path) -> Application:
     workspace = Workspace.open(workspace_path)
     model_config = resolve_model_config(workspace)
-    config_root = workspace.root / ".cognieda"
-    tooling = AgentTooling.from_config_path(
-        path=config_root / "agents.toml",
-        mcp_path=config_root / "mcp.toml",
-        skills_path=config_root / "skills.toml",
-    )
-    agent_factory = AgentFactory(tooling)
+
+    agent_factory = AgentFactory(tooling_config=workspace)
 
     registry = ExecutorRegistry()
     registry.register_provider(
@@ -43,6 +38,7 @@ def bootstrap_application(workspace_path: Path) -> Application:
     )
 
     return Application(
+        agent_factory=agent_factory,
         workspace=workspace,
         planner_agent=planner,
         dispatcher=dispatcher,
