@@ -300,21 +300,21 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
 
     if decision.action is PlannerAction.STATE_SUMMARY:
         planning_context = runtime.context.planning_context
-        objective = (
+        objective_text = (
             planning_context.objective.text
             if planning_context.objective is not None
             else "not established"
         )
         state.response = (
-            f"Active Objective: {objective}. "
+            f"Active Objective: {objective_text}. "
             f"Planning Assumptions (not Evidence): {len(planning_context.assumptions)}. "
             f"Tasks: {len(planning_context.tasks)}. "
             f"Admitted Evidence items: {len(planning_context.evidences)}."
         )
     elif decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE:
-        objective = state.created_objective or runtime.context.planning_context.objective
-        assert objective is not None
-        state.response = f"Active Objective set to: {objective.text}"
+        active_objective = state.created_objective or runtime.context.planning_context.objective
+        assert active_objective is not None
+        state.response = f"Active Objective set to: {active_objective.text}"
     elif decision.action is PlannerAction.ADD_ASSUMPTION:
         assert decision.assumption_text is not None
         state.response = (
