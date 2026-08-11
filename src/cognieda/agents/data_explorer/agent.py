@@ -11,6 +11,7 @@ from pydantic_ai import Agent
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import Capability, ExecutionFailure, ExecutionRequest, ExecutionStatus
 from cognieda.infrastructure.datasets import load_dataset
+from cognieda.schemas.enums import TaskKind
 
 from .contracts import (
     DataAnalysisPlan,
@@ -126,6 +127,13 @@ class DataExplorer:
 
     async def run(self, request: ExecutionRequest) -> DataExplorerResult:
         work_id = self._work_id()
+        if request.input.task.kind is not TaskKind.DATA:
+            return self._failure(
+                request,
+                work_id,
+                code="unsupported_task_kind",
+                message="Data Explorer accepts only DATA Tasks.",
+            )
         if request.capability == Capability.DATA_TRANSFORMATION:
             return DataExplorerResult(
                 source_role="data_explorer",

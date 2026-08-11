@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -21,10 +22,13 @@ from cognieda.execution import (
 from cognieda.execution.capabilities import Capability as CapabilityFromOwner
 from cognieda.runtime.bootstrap import bootstrap_application
 from cognieda.schemas.artifacts import Task
+from cognieda.schemas.enums import TaskKind
 
 
 def _task() -> Task:
     return Task(
+        objective_id=uuid4(),
+        kind=TaskKind.DATA,
         instruction="Check whether the treatment increases the target metric.",
     )
 

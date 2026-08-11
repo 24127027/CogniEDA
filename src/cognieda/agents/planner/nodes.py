@@ -13,7 +13,7 @@ from cognieda.execution import (
     normalize_for_planner,
 )
 from cognieda.schemas.artifacts import Assumption, Objective, Task
-from cognieda.schemas.enums import TaskStatus
+from cognieda.schemas.enums import TaskKind, TaskStatus
 
 from .context import Context
 from .model import PlannerDecisionModel
@@ -159,7 +159,14 @@ async def apply_planning_state(state: State, runtime: Runtime[Context]) -> State
                 state.session_frame = state.session_frame.set_objective(
                     Objective(text=decision.objective_text)
                 )
-            task = Task(instruction=decision.task_instruction, status=TaskStatus.PENDING)
+            objective = state.session_frame.objective
+            assert objective is not None
+            task = Task(
+                objective_id=objective.objective_id,
+                kind=TaskKind.DATA,
+                instruction=decision.task_instruction,
+                status=TaskStatus.PENDING,
+            )
             state.session_frame = state.session_frame.add_task(task)
             state.created_task_id = task.task_id
             state.selected_capability = decision.capability

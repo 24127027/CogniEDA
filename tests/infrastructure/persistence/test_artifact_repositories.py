@@ -64,10 +64,10 @@ from cognieda.schemas.enums import (
     ObjectiveStatus,
     QualityFlagSeverity,
     SessionFrameStatus,
-    TaskKind,
     TaskLifecycleState,
     UserDecisionType,
 )
+from cognieda.schemas.planner_operations import DeferredPlannerTaskKind
 from cognieda.schemas.provenance import AnalysisFrame, ExecutionRun, ObjectiveRevision
 
 pytestmark = pytest.mark.skip(
@@ -134,7 +134,7 @@ def build_task(profile_id: UUID | None, **overrides: object) -> Task:
         "title": "Test churn association",
         "description": "Evaluate whether monthly spend relates to churn.",
         "lifecycle_state": TaskLifecycleState.ACTIVE,
-        "task_kind": TaskKind.ANALYTICAL,
+        "task_kind": DeferredPlannerTaskKind.ANALYTICAL,
         "profile_id": profile_id,
         "variables": ["monthly_spend", "churned"],
         "evidence_expectation": "A statistical test over the accepted DataProfile.",
@@ -1776,7 +1776,7 @@ def test_task_and_non_fco_generated_view_guards() -> None:
     rejected_task = build_task(uuid4(), lifecycle_state=TaskLifecycleState.REJECTED)
     parent_task = build_task(
         uuid4(),
-        task_kind=TaskKind.ORGANIZING,
+        task_kind=DeferredPlannerTaskKind.ORGANIZING,
         variables=[],
         evidence_expectation=None,
     )

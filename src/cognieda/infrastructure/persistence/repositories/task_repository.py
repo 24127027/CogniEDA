@@ -1,4 +1,4 @@
-"""Bounded SQLite persistence for the M1-A Task contract."""
+"""Bounded SQLite persistence for the canonical Task semantic core."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ TASK_JSON_FIELDS: set[str] = set()
 
 
 class TaskUpdate(BaseModel):
-    """Only lifecycle status is mutable in the M1-A repository boundary."""
+    """Only execution status is mutable in the active Task repository boundary."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -28,7 +28,7 @@ class TaskUpdate(BaseModel):
 
 
 class TaskRepository:
-    """Persist MVP Tasks without legacy planning or scientific fields."""
+    """Persist canonical Task semantics without plan or scientific fields."""
 
     def __init__(self, session: Session) -> None:
         self._session = session

@@ -13,10 +13,13 @@ from cognieda.schemas.enums import (
     PlannerNodeName,
     PlannerOperationApprovalState,
     PlannerOperationType,
-    TaskKind,
     TaskLifecycleState,
 )
-from cognieda.schemas.planner_operations import PlannerOperation, TaskUpdateOperationPayload
+from cognieda.schemas.planner_operations import (
+    DeferredPlannerTaskKind,
+    PlannerOperation,
+    TaskUpdateOperationPayload,
+)
 
 pytestmark = pytest.mark.skip(
     reason="PlannerOperation approval mutation belongs to deferred canonical M1-C."
@@ -28,7 +31,7 @@ def _task() -> Task:
         title="Investigate churn signal",
         description="Evaluate whether spend is associated with churn.",
         lifecycle_state=TaskLifecycleState.ACTIVE,
-        task_kind=TaskKind.ANALYTICAL,
+        task_kind=DeferredPlannerTaskKind.ANALYTICAL,
         variables=["monthly_spend", "churned"],
         evidence_expectation="A scoped statistical test result.",
     )

@@ -36,6 +36,7 @@ from cognieda.schemas import (
     DataProfileDatasetBinding,
     Evidence,
     EvidenceProvenance,
+    TaskKind,
     TaskStatus,
 )
 
@@ -229,6 +230,11 @@ class MvpEvidenceAdmissionService:
                 DataAdmissionErrorCode.INVALID_RESULT,
                 "Evidence admission requires the Data Explorer source role.",
             )
+        if request.input.task.kind is not TaskKind.DATA:
+            raise DataAdmissionError(
+                DataAdmissionErrorCode.INVALID_RESULT,
+                "Bounded M3-A Evidence admission accepts only DATA Tasks.",
+            )
         if result.capability not in {Capability.DATA_ANALYSIS, Capability.DATA_PROFILING}:
             raise DataAdmissionError(
                 DataAdmissionErrorCode.INVALID_RESULT,
@@ -246,7 +252,18 @@ class MvpEvidenceAdmissionService:
             )
 
         task = self._tasks.get_by_id(result.task_id)
-        if task is None or task.instruction != request.input.task.instruction:
+        request_task = request.input.task
+        if task is None or (
+            task.task_id,
+            task.objective_id,
+            task.kind,
+            task.instruction,
+        ) != (
+            request_task.task_id,
+            request_task.objective_id,
+            request_task.kind,
+            request_task.instruction,
+        ):
             raise DataAdmissionError(
                 DataAdmissionErrorCode.TASK_MISMATCH,
                 "Evidence requires the matching authoritative Task.",

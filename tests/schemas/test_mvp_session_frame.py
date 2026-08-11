@@ -1,6 +1,6 @@
 """M1-A SessionFrame lineage and ordering invariants."""
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -13,12 +13,27 @@ from cognieda.schemas import (
     Objective,
     SessionFrame,
     Task,
+    TaskKind,
     TaskStatus,
 )
 
 
 def _profile() -> DataProfile:
     return DataProfile(row_count=0, column_count=0, columns=())
+
+
+def _task(
+    instruction: str,
+    *,
+    status: TaskStatus = TaskStatus.PENDING,
+    objective_id: UUID | None = None,
+) -> Task:
+    return Task(
+        objective_id=objective_id or uuid4(),
+        kind=TaskKind.DATA,
+        instruction=instruction,
+        status=status,
+    )
 
 
 def _evidence(task: Task, profile: DataProfile) -> Evidence:
@@ -40,8 +55,8 @@ def test_session_frame_retains_typed_state_in_insertion_order() -> None:
     objective = Objective(text="Understand retention")
     assumptions = [Assumption(text="First"), Assumption(text="Second")]
     tasks = [
-        Task(instruction="First task", status=TaskStatus.COMPLETED),
-        Task(instruction="Second task", status=TaskStatus.COMPLETED),
+        _task("First task", status=TaskStatus.COMPLETED, objective_id=objective.objective_id),
+        _task("Second task", status=TaskStatus.COMPLETED, objective_id=objective.objective_id),
     ]
     profile = _profile()
     evidences = [_evidence(tasks[0], profile), _evidence(tasks[1], profile)]
@@ -74,7 +89,7 @@ def test_session_frame_retains_typed_state_in_insertion_order() -> None:
 )
 def test_session_frame_rejects_duplicate_ids(field, value_factory, message) -> None:
     profile = _profile()
-    task = Task(instruction="Profile data")
+    task = _task("Profile data")
     values = {
         "assumptions": [],
         "tasks": [task],
@@ -94,14 +109,14 @@ def test_session_frame_rejects_duplicate_ids(field, value_factory, message) -> N
 
 def test_session_frame_rejects_orphan_evidence() -> None:
     profile = _profile()
-    evidence = _evidence(Task(instruction="Missing task"), profile)
+    evidence = _evidence(_task("Missing task"), profile)
 
     with pytest.raises(ValidationError, match="orphan Evidence"):
         SessionFrame(data_profile=profile, evidences=[evidence])
 
 
 def test_session_frame_rejects_evidence_without_data_profile() -> None:
-    task = Task(instruction="Count rows", status=TaskStatus.COMPLETED)
+    task = _task("Count rows", status=TaskStatus.COMPLETED)
     evidence = _evidence(task, _profile())
 
     with pytest.raises(ValidationError, match="without a DataProfile"):
@@ -109,7 +124,7 @@ def test_session_frame_rejects_evidence_without_data_profile() -> None:
 
 
 def test_session_frame_rejects_evidence_for_non_active_data_profile() -> None:
-    task = Task(instruction="Count rows", status=TaskStatus.COMPLETED)
+    task = _task("Count rows", status=TaskStatus.COMPLETED)
     evidence = _evidence(task, _profile())
 
     with pytest.raises(ValidationError, match="active SessionFrame DataProfile"):
@@ -119,10 +134,15 @@ def test_session_frame_rejects_evidence_for_non_active_data_profile() -> None:
 def test_mutation_seams_preserve_invariants_and_order() -> None:
     frame = SessionFrame()
     profile = _profile()
-    first_task = Task(instruction="First")
-    second_task = Task(instruction="Second", status=TaskStatus.COMPLETED)
+    objective = Objective(text="Explore")
+    first_task = _task("First", objective_id=objective.objective_id)
+    second_task = _task(
+        "Second",
+        status=TaskStatus.COMPLETED,
+        objective_id=objective.objective_id,
+    )
 
-    frame = frame.set_objective(Objective(text="Explore"))
+    frame = frame.set_objective(objective)
     frame = frame.add_assumption(Assumption(text="Planning premise"))
     frame = frame.add_task(first_task)
     frame = frame.add_task(second_task)
@@ -133,11 +153,13 @@ def test_mutation_seams_preserve_invariants_and_order() -> None:
     assert [task.instruction for task in frame.tasks] == ["First", "Second"]
     assert frame.tasks[0] is not first_task
     assert frame.tasks[0].task_id == first_task.task_id
+    assert frame.tasks[0].objective_id == first_task.objective_id
+    assert frame.tasks[0].kind is first_task.kind
     assert frame.tasks[0].instruction == first_task.instruction
     assert frame.tasks[0].status is TaskStatus.RUNNING
 
     with pytest.raises(ValueError, match="orphan Evidence"):
-        frame.add_evidence(_evidence(Task(instruction="Orphan"), profile))
+        frame.add_evidence(_evidence(_task("Orphan"), profile))
     with pytest.raises(ValueError, match="DataProfile"):
         frame.set_data_profile(_profile())
 
@@ -147,7 +169,7 @@ def test_mutation_seams_preserve_invariants_and_order() -> None:
     [TaskStatus.PENDING, TaskStatus.RUNNING, TaskStatus.FAILED],
 )
 def test_incomplete_task_cannot_admit_evidence(status: TaskStatus) -> None:
-    task = Task(instruction="Run bounded analysis", status=status)
+    task = _task("Run bounded analysis", status=status)
     profile = _profile()
     frame = SessionFrame(tasks=(task,), data_profile=profile)
 
@@ -159,7 +181,7 @@ def test_incomplete_task_cannot_admit_evidence(status: TaskStatus) -> None:
 
 
 def test_completed_task_can_admit_evidence() -> None:
-    task = Task(instruction="Run bounded analysis", status=TaskStatus.COMPLETED)
+    task = _task("Run bounded analysis", status=TaskStatus.COMPLETED)
     profile = _profile()
     evidence = _evidence(task, profile)
     frame = SessionFrame(tasks=(task,), data_profile=profile)
@@ -170,7 +192,7 @@ def test_completed_task_can_admit_evidence() -> None:
 
 
 def test_task_with_evidence_cannot_transition_away_from_completed() -> None:
-    task = Task(instruction="Run bounded analysis", status=TaskStatus.COMPLETED)
+    task = _task("Run bounded analysis", status=TaskStatus.COMPLETED)
     profile = _profile()
     frame = SessionFrame(
         tasks=(task,),
@@ -185,7 +207,7 @@ def test_task_with_evidence_cannot_transition_away_from_completed() -> None:
 
 
 def test_session_frame_collections_cannot_bypass_validation_by_direct_mutation() -> None:
-    task = Task(instruction="Profile data")
+    task = _task("Profile data")
     frame = SessionFrame(tasks=(task,))
 
     with pytest.raises(AttributeError):

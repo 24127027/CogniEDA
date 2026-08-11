@@ -193,11 +193,12 @@ class TaskStatus(StrEnum):
 
 
 class TaskKind(StrEnum):
-    """Task categories used to guard hypothesis creation."""
+    """Canonical semantic work categories for the Task FCO."""
 
-    ANALYTICAL = "analytical"
-    ORGANIZING = "organizing"
-    REVIEW = "review"
+    DATA = "data"
+    SCIENTIFIC = "scientific"
+    GRAPH = "graph"
+    SYNTHESIS = "synthesis"
 
 
 class HypothesisStatus(StrEnum):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
+from uuid import uuid4
 
 from cognieda.agents.planner.tools import invoke_data_capability
 from cognieda.execution import (
@@ -13,6 +14,7 @@ from cognieda.execution import (
     ExecutorRegistry,
 )
 from cognieda.schemas.artifacts import Task
+from cognieda.schemas.enums import TaskKind
 
 
 class ToolTestProvider:
@@ -34,6 +36,8 @@ def test_pydantic_ai_adapter_dispatches_to_registered_provider() -> None:
     deps = SimpleNamespace(dispatcher=ExecutorDispatcher(registry))
     context = SimpleNamespace(deps=deps)
     task = Task(
+        objective_id=uuid4(),
+        kind=TaskKind.DATA,
         instruction="Count dataset rows.",
     )
 

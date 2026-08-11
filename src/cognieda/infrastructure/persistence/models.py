@@ -18,6 +18,7 @@ from cognieda.schemas.enums import (
     PlannerNodeName,
     PlannerOperationApprovalState,
     PlannerOperationType,
+    TaskKind,
     TaskStatus,
     UserDecisionStatus,
     UserDecisionType,
@@ -118,11 +119,17 @@ class AssumptionRecord(SQLModel, table=True):
 
 
 class TaskRecord(SQLModel, table=True):
-    """Bounded SQLite mapping for the MVP Task lifecycle."""
+    """Bounded SQLite mapping for the canonical Task semantic core."""
 
     __tablename__ = "tasks"
 
     task_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    objective_id: UUID = Field(
+        foreign_key="objectives.objective_id",
+        nullable=False,
+        index=True,
+    )
+    kind: TaskKind = Field(nullable=False, index=True)
     instruction: str = Field(sa_column=Column(Text, nullable=False))
     status: TaskStatus = Field(default=TaskStatus.PENDING, nullable=False, index=True)
 
