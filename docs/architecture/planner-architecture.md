@@ -132,10 +132,12 @@ approved plan in place.
 
 The Planner coordinates `SessionFrame` membership and the active Objective and
 DataProfile selectors. Application authority validates and persists those
-structured references. For each operation, Planner requests a bounded context
-from eligible authoritative state. That selection respects purpose, context
-type safety, validity, lineage, and Objective boundaries; SessionFrame
-membership alone does not grant inclusion or scientific authority.
+structured references. It resolves every retained SessionFrame member into the
+Planner input context and may add authorized supplemental context. It may not
+filter, rank away, or truncate retained membership. Type, validity, lifecycle,
+lineage, scope, and authority constrain how Planner may use a visible object;
+SessionFrame membership never grants inclusion in a protected
+`EvaluationBundle`.
 
 The Planner may also coordinate a `GeneratedView` for an answer, table, report,
 or synthesis. A view references its sources and carries limitations and
@@ -180,7 +182,14 @@ scientific proposal.
 
 ## Implementation status
 
-**Partially implemented.** Current bounded Planner behavior can understand a
+**Partially implemented.** Application now exact-materializes the current
+SessionFrame into an immutable `PlanningContext`, calls Planner without passing
+the frame, and applies explicit `created_objective`, `created_assumption`, and
+terminal `created_task` results to its own successor frame. Planner graph state
+contains per-run control and typed result fields only; Planner neither mutates
+nor returns SessionFrame.
+
+Current bounded Planner behavior can understand a
 finite set of requests, establish or refine an Objective, retain planning-only
 Assumptions, create and track bounded data Tasks, route work through the
 dispatcher, consume identity-checked outcomes, and draft empirical answers
@@ -193,9 +202,9 @@ That history remains separate from the materialized research state and is
 excluded from empirical answer support. Neither conversation nor the current
 SessionFrame is durably restored after restart.
 
-Canonical `PlanRevision` and plan-binding records are not implemented, and the
-current bounded Task does not yet implement canonical `DATA`, `SCIENTIFIC`,
-`GRAPH`, and `SYNTHESIS`. The full approval-policy model, PlanRevision and Task
+Canonical `PlanRevision` and plan-binding records are not implemented. Active
+Task exposes all four canonical kinds, but only bounded `DATA` work is
+executable. The full approval-policy model, PlanRevision and Task
 DAG behavior, GeneratedView coordination, durable SessionFrame composition,
 and the end-to-end recovery model remain **Deferred** target design. The
 [MVP-v2 definition](mvp-runtime-subset.md) explains the minimum complete

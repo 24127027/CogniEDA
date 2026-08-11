@@ -32,8 +32,9 @@ non-completion. Completion does not imply a Discovery.
    new Objective within the Workspace boundary.
 3. Application authority validates identity, scope, lifecycle, and any required
    approval before admitting or resuming Objective state.
-4. The Planner resolves the current SessionFrame membership and requests a
-   validity-aware planning context from eligible authoritative state.
+4. Application authority resolves every retained SessionFrame member into
+   Planner context and may add authorized supplemental context without
+   subtracting retained membership.
 5. If identity, scope, or active-session ownership is ambiguous, bootstrap
    stops with a typed blocker.
 
