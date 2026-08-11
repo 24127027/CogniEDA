@@ -8,6 +8,7 @@ from cognieda.schemas.artifacts import (
     Hypothesis,
     Objective,
     SessionFrame,
+    SessionFrameMembership,
     Task,
     UserDecision,
 )
@@ -146,6 +147,7 @@ __all__ = [
     "QualityFlagSeverity",
     "SchemaSummary",
     "SessionFrame",
+    "SessionFrameMembership",
     "SessionFrameStatus",
     "StaleContextMarker",
     "Task",

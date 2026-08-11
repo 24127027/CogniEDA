@@ -221,6 +221,47 @@ class UserDecision(CogniEDABaseModel):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class SessionFrameMembership(ImmutableCogniEDABaseModel):
+    """Immutable non-FCO value object for typed SessionFrame membership references."""
+
+    objective_ids: tuple[UUID, ...] = ()
+    active_objective_id: UUID | None = None
+    assumption_ids: tuple[UUID, ...] = ()
+    task_ids: tuple[UUID, ...] = ()
+    data_profile_ids: tuple[UUID, ...] = ()
+    active_data_profile_id: UUID | None = None
+    hypothesis_ids: tuple[UUID, ...] = ()
+    evidence_ids: tuple[UUID, ...] = ()
+    discovery_ids: tuple[UUID, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_local_membership(self) -> SessionFrameMembership:
+        membership_fields = (
+            ("objective_ids", self.objective_ids),
+            ("assumption_ids", self.assumption_ids),
+            ("task_ids", self.task_ids),
+            ("data_profile_ids", self.data_profile_ids),
+            ("hypothesis_ids", self.hypothesis_ids),
+            ("evidence_ids", self.evidence_ids),
+            ("discovery_ids", self.discovery_ids),
+        )
+        for field_name, identifiers in membership_fields:
+            if len(identifiers) != len(set(identifiers)):
+                raise ValueError(f"{field_name} rejects duplicate UUIDs.")
+
+        if (
+            self.active_objective_id is not None
+            and self.active_objective_id not in self.objective_ids
+        ):
+            raise ValueError("active_objective_id must occur in objective_ids.")
+        if (
+            self.active_data_profile_id is not None
+            and self.active_data_profile_id not in self.data_profile_ids
+        ):
+            raise ValueError("active_data_profile_id must occur in data_profile_ids.")
+        return self
+
+
 class SessionFrame(ImmutableCogniEDABaseModel):
     """Authoritative typed research state for the single active MVP session."""
 
@@ -276,6 +317,25 @@ class SessionFrame(ImmutableCogniEDABaseModel):
         }
         values.update(updates)
         return SessionFrame.model_validate(values)
+
+    def to_membership(self) -> SessionFrameMembership:
+        """Project the bounded materialized frame into typed membership references."""
+
+        objective_ids = () if self.objective is None else (self.objective.objective_id,)
+        data_profile_ids = () if self.data_profile is None else (self.data_profile.data_profile_id,)
+        return SessionFrameMembership(
+            objective_ids=objective_ids,
+            active_objective_id=None if self.objective is None else self.objective.objective_id,
+            assumption_ids=tuple(item.assumption_id for item in self.assumptions),
+            task_ids=tuple(item.task_id for item in self.tasks),
+            data_profile_ids=data_profile_ids,
+            active_data_profile_id=(
+                None if self.data_profile is None else self.data_profile.data_profile_id
+            ),
+            hypothesis_ids=(),
+            evidence_ids=tuple(item.evidence_id for item in self.evidences),
+            discovery_ids=(),
+        )
 
     def set_objective(self, objective: Objective | None) -> SessionFrame:
         return self._validated_copy(objective=objective)

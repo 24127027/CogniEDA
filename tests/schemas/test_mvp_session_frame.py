@@ -199,3 +199,44 @@ def test_session_frame_collections_cannot_bypass_validation_by_direct_mutation()
 def test_session_frame_rejects_unknown_task_status_update() -> None:
     with pytest.raises(ValueError, match="does not contain"):
         SessionFrame().set_task_status(uuid4(), TaskStatus.COMPLETED)
+
+
+def test_empty_session_frame_projects_to_empty_membership() -> None:
+    membership = SessionFrame().to_membership()
+
+    assert all(value in ((), None) for value in membership.model_dump().values())
+
+
+def test_materialized_objective_and_data_profile_project_to_membership_and_selectors() -> None:
+    objective = Objective(text="Understand retention")
+    profile = _profile()
+
+    membership = SessionFrame(objective=objective, data_profile=profile).to_membership()
+
+    assert membership.objective_ids == (objective.objective_id,)
+    assert membership.active_objective_id == objective.objective_id
+    assert membership.data_profile_ids == (profile.data_profile_id,)
+    assert membership.active_data_profile_id == profile.data_profile_id
+
+
+def test_materialized_collections_project_exact_ids_without_fabricated_membership() -> None:
+    assumptions = (Assumption(text="First"), Assumption(text="Second"))
+    tasks = (
+        Task(instruction="First", status=TaskStatus.COMPLETED),
+        Task(instruction="Second", status=TaskStatus.COMPLETED),
+    )
+    profile = _profile()
+    evidences = (_evidence(tasks[0], profile), _evidence(tasks[1], profile))
+
+    membership = SessionFrame(
+        assumptions=assumptions,
+        tasks=tasks,
+        data_profile=profile,
+        evidences=evidences,
+    ).to_membership()
+
+    assert membership.assumption_ids == tuple(item.assumption_id for item in assumptions)
+    assert membership.task_ids == tuple(item.task_id for item in tasks)
+    assert membership.evidence_ids == tuple(item.evidence_id for item in evidences)
+    assert membership.hypothesis_ids == ()
+    assert membership.discovery_ids == ()
