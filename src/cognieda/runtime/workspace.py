@@ -85,6 +85,7 @@ class Workspace:
 
         cognieda_dir.mkdir(parents=True, exist_ok=True)
         (root / "data").mkdir(parents=True, exist_ok=True)
+        (cognieda_dir / "skills").mkdir(parents=True, exist_ok=True)
 
         # Initialize project.toml if it doesn't exist
         project_config_path = cognieda_dir / "project.toml"
