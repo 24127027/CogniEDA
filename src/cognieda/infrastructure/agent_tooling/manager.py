@@ -109,4 +109,6 @@ class AgentTooling:
         worker_cfg = self.config.get(worker, {})
         configured_skills = worker_cfg.get("skills", [])
 
+        #DEBUG: Log the configured skills for the worker
+        print(f"Worker '{worker}' configured skills: {configured_skills}")
         return [self.skills[skill] for skill in configured_skills]

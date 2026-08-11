@@ -28,7 +28,8 @@ class AgentFactoryPort(Protocol):
         deps_type: type[DepsT],
         builtin_tools: Sequence[AgentTool],
     ) -> Agent[DepsT]: ...
-
+    def reload_tooling(self) -> None: ...
+    
 # TODO: Consider move this port to somewhere more appropriate, replace or remove it
 # This port is still a questionable design choice
 # whether the AgentFactory should consume a ToolingConfig 

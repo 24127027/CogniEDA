@@ -39,6 +39,7 @@ def bootstrap_application(workspace_path: Path) -> Application:
     )
 
     return Application(
+        agent_factory=agent_factory,
         workspace=workspace,
         planner_agent=planner,
         dispatcher=dispatcher,

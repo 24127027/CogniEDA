@@ -4,7 +4,6 @@ from pathlib import Path
 
 import toml
 
-
 @dataclass(slots=True)
 class ProjectConfig:
     values: dict[str, object] = field(default_factory=dict)
@@ -121,3 +120,69 @@ class Workspace:
         config_data = toml.load(config_path) if config_path.exists() else {}
 
         return ProjectConfig(values=config_data)
+
+    # TODO: Temporarily implement add/remove skill methods for workspace, 
+    # but these should be moved to some where else
+    def add_skill(self, name: str, directory: str) -> None:
+        config = self._load_skills_config()
+
+        if name in config:
+            raise ValueError(f"Skill '{name}' already exists.")
+
+        config[name] = {
+            "directories": directory,
+        }
+
+        self._save_skills_config(config)
+
+    def remove_skill(self, name: str) -> None:
+        config = self._load_skills_config()
+
+        config.pop(name, None)
+
+        self._save_skills_config(config)
+
+    def add_worker_skill(self, worker: str, skill: str) -> None:
+        config = self._load_agents_config()
+
+        worker_cfg = config.setdefault(worker, {})
+        skills = worker_cfg.setdefault("skills", [])
+
+        if skill not in skills:
+            skills.append(skill)
+
+        self._save_agents_config(config)
+
+    def remove_worker_skill(self, worker: str, skill: str) -> None:
+        config = self._load_agents_config()
+
+        worker_cfg = config.get(worker)
+        if worker_cfg is None:
+            return
+
+        skills = worker_cfg.get("skills", [])
+
+        if skill in skills:
+            skills.remove(skill)
+
+        self._save_agents_config(config)
+
+    def _load_agents_config(self) -> dict:
+        try:
+            return toml.load(self.agents_config_path)
+        except FileNotFoundError:
+            return {}
+
+    def _save_agents_config(self, config: dict) -> None:
+        with open(self.agents_config_path, "w", encoding="utf-8") as f:
+            toml.dump(config, f)
+
+    def _load_skills_config(self) -> dict:
+        try:
+            return toml.load(self.skills_config_path)
+        except FileNotFoundError:
+            return {}
+
+    def _save_skills_config(self, config: dict) -> None:
+        with open(self.skills_config_path, "w", encoding="utf-8") as f:
+            toml.dump(config, f)
