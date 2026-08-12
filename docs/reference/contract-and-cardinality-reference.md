@@ -9,7 +9,41 @@ and [Discovery governance](../concepts/scientific-lifecycle/discovery-governance
 pages for explanation.
 
 All entries describe **target design**. Exact field layouts are intentionally
-not frozen here.
+not frozen here except for the bounded PlanRevision V1 contract below.
+
+## PlanRevision V1 contract
+
+`PlanRevision` is an immutable non-FCO and non-semantic-graph plan-content
+record. It contains revision identity, Objective identity, a contract version,
+canonical Task bindings, canonical dependency edges, and a deterministic
+fingerprint. It contains no DataProfile identity, stopping condition, replan
+trigger, approval, activation, or successor state.
+
+Each member Task appears in exactly one immutable `PlanTaskBinding` with
+`task_id`, `required_capability`, `assigned_role`, `order_rank`, and `priority`.
+Membership is derived from those bindings. Duplicate bindings, missing Tasks,
+cross-Objective Tasks, non-member dependency endpoints, self-edges, duplicate
+edges, and direct or indirect cycles fail closed.
+
+| Task kind | Required capability | Assigned role |
+| --- | --- | --- |
+| `DATA` | `DATA_ANALYSIS`, `DATA_PROFILING`, or `DATA_TRANSFORMATION` | `DATA_EXPLORER` |
+| `SCIENTIFIC` | `HYPOTHESIS_TESTING` | `HYPOTHESIS_ANALYST` |
+| `GRAPH` | `GRAPH_MINING` | `GRAPH_MINER` |
+| `SYNTHESIS` | `None` | `PLANNER` |
+
+`order_rank` is non-negative and permits ties. The DAG determines eligibility;
+rank is a preference only. Priority is exactly `LOW`, `NORMAL`, or `HIGH`,
+defaults to `NORMAL`, and is coordination metadata only. Canonical
+serialization sorts bindings by rank and then Task ID, and sorts dependency
+edges by their endpoint IDs. Tie-breaking is non-semantic.
+
+The fingerprint binds contract version, Objective identity, canonical bindings
+including capability, role, rank, and priority, and canonical dependencies. It
+excludes Task execution status and semantic payload, exact DataProfile
+identity, runtime or lifecycle policy and state, conversation, timestamps,
+executor instances, model configuration, and dataset location. Canonicalization
+is structural only.
 
 ## Role-native boundary contracts
 

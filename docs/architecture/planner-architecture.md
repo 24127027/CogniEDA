@@ -71,25 +71,60 @@ protected scientific evaluation.
 
 ## PlanRevision and Task DAG
 
-A `PlanRevision` is a non-FCO version of a complete proposed or approved plan.
-It owns plan-version concerns such as:
+A `PlanRevision` is a non-FCO immutable snapshot of one complete plan for one
+Objective. Its content owns plan-version concerns such as:
 
-- Task membership and dependency edges;
-- required capability for each Task;
-- executor assignment in `PlanTaskBinding` or equivalent plan-version state;
-- applicable DataProfile references;
-- ordering, priority, presentation, and scheduling metadata;
-- stopping conditions and replan triggers;
-- approval state and plan fingerprint.
+- exactly one immutable `PlanTaskBinding` for each member Task;
+- explicit dependency edges between member Tasks;
+- binding-owned required capability and assigned specialist or control role;
+- binding-owned non-negative `order_rank` and finite `LOW`, `NORMAL`, or `HIGH`
+  priority;
+- a deterministic plan-content fingerprint.
+
+Membership is derived from the binding Task identities; a parallel `task_ids`
+collection is not a second source of truth. Required capability, assigned role,
+order rank, and priority are coordination semantics. Changing any of them
+changes PlanRevision content and its fingerprint without, by itself, creating a
+successor Task.
+
+PlanRevision and `PlanTaskBinding` contain no exact DataProfile identity,
+dataset reference, column binding, row filter, cohort, population, or variable
+binding. Planner describes intended data scope only in the Task instruction.
+Each responsible specialist or controller receives the complete authoritative
+DataProfile context available for the work and selects the concrete applicable
+profile and scope within its own authority. The exact DataProfile actually used
+is recorded later in execution or scientific provenance, not in the
+PlanRevision fingerprint.
+
+Proposal, approval, activation, plan-execution completion, interruption, and
+replanning are workflow-lifecycle concerns around that immutable content. They
+are not configurable condition or trigger policy authored inside a
+`PlanRevision`. An actual cause that later requires reconsideration is a
+workflow fact associated with the affected revision; the finite typed cause
+taxonomy and successor lifecycle are deferred to their owning workflow
+milestone.
+
+Scientific stopping conditions remain part of Hypothesis Analyst-owned
+`InvestigationProtocol`. Bounded execution stopping conditions remain part of
+the applicable role-native work order, including `DataWorkOrder`.
 
 A `Task` is the durable semantic work unit. Its canonical kinds are `DATA`,
-`SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`. Assignment is not part of Task identity.
-Changing an executor does not change what the Task means; changing semantic
-work requires a successor Task.
+`SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`. Required capability, assignment,
+dependencies, parentage, order, priority, PlanRevision identity, approval, and
+activation are not part of Task identity. Changing binding coordination does
+not change what the Task means; changing semantic work requires a successor
+Task.
 
 The Planner constructs a DAG rather than a bag of instructions. It must expose
 dependencies, blocked prerequisites, terminal leaves, and capability
-requirements before activation. Proposed Tasks cannot execute.
+requirements before activation. The dependency DAG determines eligibility.
+`order_rank` is only a scheduling preference among otherwise compatible work,
+permits ties for concurrent or independent Tasks, and never overrides a
+dependency. Equal-rank bindings use canonical Task-ID ordering only as a
+deterministic serialization tie-breaker; that tie-breaker creates no dependency
+or execution-order meaning. Priority is coordination metadata only, defaults to
+`NORMAL`, and never overrides dependencies, validity, authority, or Task
+meaning. Proposed Tasks cannot execute.
 
 ## Proposal, approval, and activation
 
@@ -110,32 +145,38 @@ specific change.
 
 ## Routing and replanning
 
-| Task kind | Required role or coordination path |
-| --- | --- |
-| `DATA` | Data Explorer through a direct `DataWorkOrder` |
-| `SCIENTIFIC` | Hypothesis Analyst controls investigation and requests observations from Data Explorer |
-| `GRAPH` | Graph Miner through a `GraphInquiryRequest` |
-| `SYNTHESIS` | Planner coordinates a GeneratedView from eligible normalized outcomes and admitted state |
+| Task kind | Binding capability | Binding role |
+| --- | --- | --- |
+| `DATA` | exactly one of `DATA_ANALYSIS`, `DATA_PROFILING`, or `DATA_TRANSFORMATION` | `DATA_EXPLORER` |
+| `SCIENTIFIC` | `HYPOTHESIS_TESTING` | `HYPOTHESIS_ANALYST` |
+| `GRAPH` | `GRAPH_MINING` | `GRAPH_MINER` |
+| `SYNTHESIS` | `None`; Planner coordination is not a dispatcher capability | `PLANNER` |
 
-The Planner declares the required capability; the dispatcher resolves an
-eligible executor from the capability registry. If the capability is absent,
-the Planner receives a typed unavailable or blocked outcome. It does not choose
-a legacy executor, reinterpret the Task, or route by semantic guess.
+The Planner declares the required capability and assigned role in the
+`PlanTaskBinding`; the dispatcher resolves an eligible executor from the
+capability registry for dispatcher-backed work. Kind, capability, and role are
+distinct finite contracts and their compatibility is validated structurally.
+If the capability is absent, the Planner receives a typed unavailable or
+blocked outcome. It does not choose a legacy executor, reinterpret the Task,
+infer a capability or role, or route by semantic guess.
 
-Replanning may be triggered by capability absence, infeasibility, a blocked
-dependency, new limitations, a correction request, additional Evidence needs,
-validity change, or a human change in intent. Replanning creates a successor
-PlanRevision or returns to the grounded planning loop. It does not edit an
-approved plan in place.
+Capability absence, infeasibility, a blocked dependency, new limitations, a
+correction request, additional Evidence needs, validity change, or a human
+change in intent may later be recorded as actual workflow facts requiring
+reconsideration. The replanning lifecycle creates a successor PlanRevision or
+returns to the grounded planning loop; it does not mutate the historical
+revision. A finite typed cause taxonomy and runtime response are deferred.
 
 ## SessionFrame and GeneratedView coordination
 
 The Planner coordinates `SessionFrame` membership and the active Objective and
 DataProfile selectors. Application authority validates and persists those
-structured references. For each operation, Planner requests a bounded context
-from eligible authoritative state. That selection respects purpose, context
-type safety, validity, lineage, and Objective boundaries; SessionFrame
-membership alone does not grant inclusion or scientific authority.
+structured references. It resolves every retained SessionFrame member into the
+Planner input context and may add authorized supplemental context. It may not
+filter, rank away, or truncate retained membership. Type, validity, lifecycle,
+lineage, scope, and authority constrain how Planner may use a visible object;
+SessionFrame membership never grants inclusion in a protected
+`EvaluationBundle`.
 
 The Planner may also coordinate a `GeneratedView` for an answer, table, report,
 or synthesis. A view references its sources and carries limitations and
@@ -180,7 +221,14 @@ scientific proposal.
 
 ## Implementation status
 
-**Partially implemented.** Current bounded Planner behavior can understand a
+**Partially implemented.** Application now exact-materializes the current
+SessionFrame into an immutable `PlanningContext`, calls Planner without passing
+the frame, and applies explicit `created_objective`, `created_assumption`, and
+terminal `created_task` results to its own successor frame. Planner graph state
+contains per-run control and typed result fields only; Planner neither mutates
+nor returns SessionFrame.
+
+Current bounded Planner behavior can understand a
 finite set of requests, establish or refine an Objective, retain planning-only
 Assumptions, create and track bounded data Tasks, route work through the
 dispatcher, consume identity-checked outcomes, and draft empirical answers
@@ -193,10 +241,13 @@ That history remains separate from the materialized research state and is
 excluded from empirical answer support. Neither conversation nor the current
 SessionFrame is durably restored after restart.
 
-Canonical `PlanRevision` and plan-binding records are not implemented, and the
-current bounded Task does not yet implement canonical `DATA`, `SCIENTIFIC`,
-`GRAPH`, and `SYNTHESIS`. The full approval-policy model, PlanRevision and Task
-DAG behavior, GeneratedView coordination, durable SessionFrame composition,
+The immutable in-memory `PlanRevision`, `PlanTaskBinding`, and `PlanDependency`
+V1 domain contracts are **Implemented** with authoritative Task validation,
+structural canonicalization, DAG guards, and deterministic fingerprinting.
+Planner does not author or consume them, and no persistence, admission,
+approval, activation, or replanning runtime exists. Active Task exposes all
+four canonical kinds, but only bounded `DATA` work is executable. Full Task DAG
+runtime behavior, GeneratedView coordination, durable SessionFrame composition,
 and the end-to-end recovery model remain **Deferred** target design. The
 [MVP-v2 definition](mvp-runtime-subset.md) explains the minimum complete
 product and research capability.

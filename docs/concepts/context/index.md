@@ -1,9 +1,10 @@
 # Context
 
-Context is the governed, bounded selection available to one current operation.
-It is constructed for a specific Objective, purpose, reasoning mode, scope,
-lifecycle point, and validity basis. It is not everything the system remembers
-and not every item judged topically relevant.
+Context is typed input available to one current operation. Planner context has
+a non-subtractable base: every object retained in SessionFrame. Other
+purpose-specific inputs are constructed for an Objective, reasoning mode,
+scope, lifecycle point, validity basis, and authority boundary. These concepts
+must not be collapsed into one universal context.
 
 This track defines the **target design** for active context and continuity. It
 does not claim that the current runtime implements every mode or recovery path.
@@ -11,11 +12,10 @@ does not claim that the current runtime implements every mode or recovery path.
 ## Active-context mental model
 
 ```text
-durable governed research state
-  -> structural eligibility for this purpose
-  -> relevance ranking among eligible candidates
-  -> bounded context construction
-  -> one reasoning or presentation operation
+SessionFrame -> resolve every retained member -> PlannerContext base
+authorized state -> eligibility -> optional ranked supplemental context
+PlannerContext base + supplemental context -> Planner visibility
+authorized state -> purpose-specific closed input -> protected operation
 ```
 
 Context selection does not transfer authority. An Assumption remains planning-
@@ -32,10 +32,10 @@ membership remains exactly Objective, Hypothesis, Evidence, and Discovery.
 
 A SessionFrame is not conversation history, a chat summary, a vector-search
 result, a GeneratedView, a semantic graph node, scientific authority, or
-universal memory. Historical membership is an input to later context
-construction, not the context itself. An operation selects an eligible bounded
-subset, and selected objects retain their own type, lifecycle, validity, scope,
-and authority.
+universal memory. It is user-governed Planner context membership. Context
+construction resolves every retained member and may add authorized supplemental
+material; it may not silently omit, rank away, or truncate the retained base.
+Visible objects retain their own type, lifecycle, validity, scope, and authority.
 
 ## Context modes
 
@@ -58,10 +58,12 @@ context is safe for all reasoning.
 
 ## Structural eligibility before relevance
 
-Context selection considers epistemic type, authority, lifecycle, Objective
+Purpose-specific use and supplemental selection consider epistemic type,
+authority, lifecycle, Objective
 scope, DataProfile scope, scientific lineage, validity, reasoning mode,
 permitted use, freshness, and explicit exclusions. Only candidates that pass
-those checks may be ranked for relevance.
+those checks may be ranked for relevance. This ordering never removes a
+SessionFrame member from Planner visibility.
 
 Semantic similarity is therefore not admission. Missing identity, scope,
 lineage, or eligibility fails closed.
@@ -97,11 +99,14 @@ at a time; this is not a one-session-per-Workspace rule.
 **Partially implemented.** Current source has a bounded materialized
 `SessionFrame` with one optional Objective, ordered Assumptions, Tasks and
 Evidence, and one optional DataProfile. The in-process application passes those
-objects into a planning context and separately retains native conversation
-history for later request understanding.
+objects without filtering into an immutable planning context and separately
+retains native conversation history for later request understanding. Planner
+returns explicit Objective, Assumption, and terminal Task results; Application
+alone applies them to its successor SessionFrame.
 
 The current frame is not the canonical typed-reference membership model and is
 not durably restored by the runtime. Mode-specific context eligibility, exact
 Objective-bound session ownership, validity-aware recovery, and end-to-end
-resume orchestration remain **Deferred**. The uncomposed donor retrieval and
-context modules do not establish current runtime support.
+resume orchestration and supplemental retrieval remain **Deferred**. The
+superseded donor retrieval package has been removed rather than treated as a
+supported context capability.

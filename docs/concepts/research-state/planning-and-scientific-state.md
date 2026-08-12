@@ -57,8 +57,35 @@ only when the plan needs a governed work unit with its own identity and
 lifecycle.
 
 `PlanRevision` is the non-FCO version of an entire proposed or approved Task
-DAG, including membership, dependencies, assignment, ordering, approval, and
-other coordination state. Those concerns do not define Task identity.
+DAG. Exactly one immutable `PlanTaskBinding` represents each member Task and
+owns required capability, assigned specialist or control role, non-negative
+`order_rank`, and finite `LOW`, `NORMAL`, or `HIGH` priority. Membership is
+derived from binding Task identities, while dependencies remain explicit
+edges. Those coordination concerns do not define Task identity.
+
+The dependency DAG determines eligibility. `order_rank` expresses preference
+among otherwise compatible work, permits ties, and never overrides a
+dependency. Priority defaults to `NORMAL` and is scheduling metadata only; it
+does not establish epistemic importance, authority, or Task meaning. Required
+capability, assigned role, rank, priority, dependencies, parentage,
+PlanRevision identity, approval, and activation are absent from Task semantic
+identity.
+
+PlanRevision and its bindings contain no exact DataProfile identity or concrete
+data selection. Planner describes intended data scope only in the Task
+instruction. The responsible specialist or controller receives all
+authoritative DataProfile context available for the work and selects the
+applicable profile and concrete scope within its role-native authority. Exact
+profiles actually used remain mandatory downstream execution or scientific
+provenance and do not enter the PlanRevision fingerprint.
+
+Its immutable plan content contains neither configurable stopping conditions
+nor replan-trigger policy. Plan completion, interruption, approval and
+activation state, and replanning belong to workflow lifecycle around the
+revision. An actual cause that later requires reconsideration is a workflow
+fact associated with the affected revision, not content that mutates the
+historical plan. Scientific stopping remains `InvestigationProtocol`-owned;
+bounded execution stopping remains work-order-owned.
 
 A change to Task meaning requires a successor Task. A change to the approved
 plan creates an authorized successor PlanRevision or returns to grounded
@@ -108,6 +135,9 @@ Evidence loops, typed non-completion, and authoritative admission are owned by
 ## Implementation status
 
 **Partially implemented.** The active Task semantic core is Objective-scoped
-and uses the canonical four-kind taxonomy, but only bounded `DATA` execution is
-supported. PlanRevision, canonical scientific execution, and the complete
-lifecycle linked above remain a **Design target**.
+and uses the canonical four-kind taxonomy, while the immutable in-memory
+PlanRevision V1 domain contract implements binding membership, routing
+compatibility, DAG validation, and structural fingerprinting. Planner authoring,
+persistence/admission, approval/activation, replanning, canonical scientific
+execution, and the complete lifecycle linked above remain a **Design target**;
+only bounded `DATA` execution is supported.

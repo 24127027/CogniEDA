@@ -1,8 +1,9 @@
 # Retrieval strategy
 
-Retrieval locates candidates for a bounded purpose. It does not confer
-authority, repair lineage, establish scope, or decide validity. CogniEDA
-therefore filters for structural eligibility before ranking for relevance.
+Retrieval locates supplemental candidates for a bounded purpose. It does not
+confer authority, repair lineage, establish scope, or decide validity. CogniEDA
+therefore filters supplemental candidates for structural eligibility before
+ranking for relevance.
 
 This page defines the **target design** for eligibility-first retrieval,
 Graph Miner, ranking, and fail-closed construction.
@@ -21,8 +22,10 @@ purpose resolution
   -> bounded context construction
 ```
 
-The ordering is normative. A high relevance score cannot rescue a candidate
-that failed an earlier stage.
+The ordering is normative for supplemental retrieval and purpose-specific use.
+A high relevance score cannot rescue a candidate that failed an earlier stage.
+It does not apply to the user-governed SessionFrame base: every retained member
+must remain available to Planner regardless of lifecycle, score, or result cap.
 
 ## Purpose resolution
 
@@ -31,10 +34,11 @@ scientific investigation control, protected evaluation, Graph Miner inquiry,
 answer generation, recovery, or validity review. Without a known purpose and
 reasoning mode, the system cannot determine which epistemic types are safe.
 
-Purpose also determines whether the result is a planning or answer context, an
-EvaluationBundle input, a read-only inquiry result, a recovery projection, or
-a GeneratedView source set. SessionFrame membership may bound the candidates,
-but it is not interchangeable with any of these operation-specific outputs.
+Purpose also determines whether the result is supplemental Planner context, an
+Evidence-only answer input, an EvaluationBundle input, a read-only inquiry
+result, a recovery projection, or a GeneratedView source set. SessionFrame
+membership establishes the non-subtractable Planner base, but it is not
+interchangeable with any authority-specific input.
 
 ## Objective and scope binding
 
@@ -54,7 +58,7 @@ cannot establish that equality.
 
 ## Eligibility filters
 
-Before ranking, retrieval verifies:
+Before ranking supplemental candidates, retrieval verifies:
 
 - the candidate's recognized type and authority class;
 - lifecycle eligibility for the requested mode;
@@ -70,10 +74,11 @@ records exclusions or blockers rather than returning unsafe context.
 
 ## Ranking after eligibility
 
-Ranking chooses among already eligible candidates. It may consider recency,
-SessionFrame membership, exact typed relationships, query overlap, or other
-explainable signals appropriate to the purpose. Membership is only a ranking
-or bounding signal after eligibility; it is never authority.
+Ranking chooses among already eligible supplemental candidates. It may consider
+recency, exact typed relationships, query overlap, or other explainable signals
+appropriate to the purpose. A retained SessionFrame member is not a ranking
+candidate: it is already part of Planner's required base context. Membership
+still grants visibility rather than scientific authority.
 
 Vector search may support ranking only after eligibility filtering. A vector
 score is never an admission check, a validity determination, a cross-Objective
@@ -116,10 +121,12 @@ mode; application authority still enforces selection and admission.
 
 ## Bounded context construction
 
-The final context contains only the eligible subset needed for the operation,
-with authoritative references, selection reasons, limitations, warnings,
-exclusions, and size bounds. Bounded construction reduces accidental category
-mixing and makes the selection auditable.
+Planner context contains all resolved SessionFrame members plus any eligible
+bounded supplemental candidates, with authoritative references, selection
+reasons, limitations, warnings, and exclusions. A separate purpose-specific
+input may contain only the eligible records authorized for that use. Bounded
+construction reduces accidental category mixing but must never truncate the
+SessionFrame-derived Planner base.
 
 Retrieval results and summaries remain projections. Protected evaluation
 requires a closed EvaluationBundle validated against its exact scientific
@@ -138,9 +145,10 @@ lineage, not a generic search result.
 
 ## Implementation status
 
-**Unsupported.** No retrieval engine or Graph Miner inquiry is composed into
-the current bounded runtime. Deferred donor policies and a planning-only
-Discovery retrieval module remain in the source tree, but their presence does
-not establish a supported context-selection capability. The current Planner
-receives the materialized bounded frame plus separate in-process conversation
-history; canonical eligibility-first retrieval remains **Deferred**.
+**Unsupported.** No supplemental retrieval engine or Graph Miner inquiry is
+composed into the current bounded runtime. The superseded donor policy,
+scoring, retrieval schema, and planning-only Discovery retrieval package have
+been removed. The current Application exact-materializes every retained frame
+member into Planner context and carries in-process conversation history through
+a separate non-authoritative field. Supplemental eligibility-first retrieval
+remains **Deferred**.

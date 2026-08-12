@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Sequence
 from typing import cast
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from pydantic import ValidationError
@@ -24,6 +25,7 @@ from cognieda.agents.planner.types import (
     PlannerModelInput,
     PlannerResponseDraft,
 )
+from cognieda.application.ports import AgentFactoryPort
 from cognieda.execution import ExecutionRequest, ExecutorDispatcher
 from cognieda.runtime.application import Application
 from cognieda.runtime.conversation import ConversationHistory, ConversationTurn
@@ -97,6 +99,7 @@ def test_application_retains_original_history_alongside_current_session_frame() 
         workspace=cast(Workspace, object()),
         planner_agent=planner,
         dispatcher=cast(ExecutorDispatcher, dispatcher),
+        agent_factory=cast(AgentFactoryPort, object()),
     )
 
     asyncio.run(application.submit_message("Investigate customer churn."))
@@ -107,3 +110,26 @@ def test_application_retains_original_history_alongside_current_session_frame() 
     assert application.session_frame.objective.text == "Understand customer churn."
     assert model.message_histories == [(), first_turn.messages]
     assert len(application.conversation_history.turns) == 2
+
+
+def test_skill_assignment_preserves_runtime_reload_path_without_planner_state_access() -> None:
+    workspace = Mock(spec=Workspace)
+    planner = Mock(spec=Planner)
+    planner.reload_model = AsyncMock()
+    agent_factory = Mock()
+    application = Application(
+        workspace=workspace,
+        planner_agent=planner,
+        dispatcher=cast(ExecutorDispatcher, object()),
+        agent_factory=cast(AgentFactoryPort, agent_factory),
+    )
+    original_frame = application.session_frame
+
+    response = asyncio.run(application.submit_message("/skill assign planner review"))
+
+    workspace.add_worker_skill.assert_called_once_with("planner", "review")
+    agent_factory.reload_tooling.assert_called_once_with()
+    planner.reload_model.assert_awaited_once_with()
+    planner.run.assert_not_called()
+    assert application.session_frame is original_frame
+    assert response.content == "Assigned skill 'review' to 'planner'."

@@ -1,20 +1,14 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
 
 from cognieda.execution import Capability, ExecutorContext, PlannerWorkOutcome
-from cognieda.schemas.artifacts import (
-    Assumption,
-    DataProfile,
-    Evidence,
-    Objective,
-    SessionFrame,
-    Task,
-)
+from cognieda.schemas.artifacts import Assumption, DataProfile, Evidence, Objective, Task
+
+from .context import PlanningContext
 
 
 class PlannerAction(StrEnum):
@@ -120,14 +114,18 @@ class PlannerModelInput(BaseModel):
     evidences: tuple[Evidence, ...] = ()
 
     @classmethod
-    def from_frame(cls, latest_request: str, frame: SessionFrame) -> PlannerModelInput:
+    def from_planning_context(
+        cls,
+        latest_request: str,
+        planning_context: PlanningContext,
+    ) -> PlannerModelInput:
         return cls(
             latest_request=latest_request,
-            objective=frame.objective,
-            assumptions=frame.assumptions,
-            tasks=frame.tasks,
-            data_profile=frame.data_profile,
-            evidences=frame.evidences,
+            objective=planning_context.objective,
+            assumptions=planning_context.assumptions,
+            tasks=planning_context.tasks,
+            data_profile=planning_context.data_profile,
+            evidences=planning_context.evidences,
         )
 
 
@@ -156,10 +154,11 @@ class State(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: str = Field(min_length=1)
-    session_frame: SessionFrame
     execution_context: ExecutorContext = Field(default_factory=ExecutorContext)
     decision: PlannerDecision | None = None
-    created_task_id: UUID | None = None
+    created_objective: Objective | None = None
+    created_assumption: Assumption | None = None
+    created_task: Task | None = None
     selected_capability: Capability | None = None
     work_outcome: PlannerWorkOutcome | None = None
     response: str | None = None
@@ -173,9 +172,10 @@ class PlannerOutput(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     response: str = Field(min_length=1)
-    session_frame: SessionFrame
     decision: PlannerDecision | None = None
-    created_task_ids: tuple[UUID, ...] = ()
+    created_objective: Objective | None = None
+    created_assumption: Assumption | None = None
+    created_task: Task | None = None
     selected_capability: Capability | None = None
     work_outcome: PlannerWorkOutcome | None = None
     new_messages: tuple[ModelMessage, ...] = ()

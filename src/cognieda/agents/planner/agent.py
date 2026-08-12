@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import ExecutorContext
-from cognieda.schemas.artifacts import SessionFrame
 
 from .context import Context, PlanningContext
 from .dependencies import PlannerDeps
@@ -70,36 +69,26 @@ class Planner:
         self,
         query: str,
         *,
-        planning_context: PlanningContext | None = None,
-        session_frame: SessionFrame | None = None,
+        planning_context: PlanningContext,
         execution_context: ExecutorContext | None = None,
     ) -> PlannerOutput:
-        """Run one request against explicit typed state and return its validated successor."""
+        """Run one request against explicit read-only context and return typed results."""
 
-        frame = session_frame or SessionFrame()
         if not query.strip():
             error = PlannerControlledError(
                 code=PlannerErrorCode.INVALID_COMMAND,
                 message="Planner requests cannot be empty.",
             )
-            return PlannerOutput(response=error.message, session_frame=frame, error=error)
+            return PlannerOutput(response=error.message, error=error)
 
         state = State(
             query=query,
-            session_frame=frame,
             execution_context=execution_context or ExecutorContext(),
         )
         context = Context(
             planner_model=self.model,
             dispatcher=self.deps.dispatcher,
-            planning_context=planning_context
-            or PlanningContext(
-                objective=frame.objective,
-                assumptions=frame.assumptions,
-                tasks=frame.tasks,
-                evidences=frame.evidences,
-                data_profile=frame.data_profile,
-            ),
+            planning_context=planning_context,
         )
         result = await self.graph.ainvoke(state, context=context)
         final_state = State.model_validate(result)
@@ -114,13 +103,10 @@ class Planner:
 
         return PlannerOutput(
             response=final_state.response,
-            session_frame=final_state.session_frame,
             decision=final_state.decision,
-            created_task_ids=(
-                (final_state.created_task_id,)
-                if final_state.created_task_id is not None
-                else ()
-            ),
+            created_objective=final_state.created_objective,
+            created_assumption=final_state.created_assumption,
+            created_task=final_state.created_task,
             selected_capability=final_state.selected_capability,
             work_outcome=final_state.work_outcome,
             new_messages=final_state.new_messages,

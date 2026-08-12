@@ -1,12 +1,6 @@
 from collections.abc import Sequence
 
 from pydantic_ai import Agent
-from pydantic_ai.models.anthropic import AnthropicModel
-from pydantic_ai.models.google import GoogleModel
-from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic_ai.providers.anthropic import AnthropicProvider
-from pydantic_ai.providers.google import GoogleProvider
-from pydantic_ai.providers.openai import OpenAIProvider
 
 from cognieda.application.ports import AgentTool, ModelConfig, ToolingConfig
 from cognieda.infrastructure.agent_tooling import AgentTooling
@@ -50,18 +44,27 @@ class AgentFactory:
 
 def _choose_model(config: ModelConfig):
     if config.provider == "openai":
+        from pydantic_ai.providers.openai import OpenAIProvider
+        from pydantic_ai.models.openai import OpenAIChatModel
+
         openai_provider = OpenAIProvider(
             api_key=config.api_key,
             base_url=config.base_url if config.base_url else None,
         )
         return OpenAIChatModel(model_name=config.model_name, provider=openai_provider)
     if config.provider == "google":
+        from pydantic_ai.providers.google import GoogleProvider
+        from pydantic_ai.models.google import GoogleModel
+
         google_provider = GoogleProvider(
             api_key=config.api_key,
             base_url=config.base_url if config.base_url else None,
         )
         return GoogleModel(model_name=config.model_name, provider=google_provider)
     if config.provider == "anthropic":
+        from pydantic_ai.providers.anthropic import AnthropicProvider
+        from pydantic_ai.models.anthropic import AnthropicModel
+        
         anthropic_provider = AnthropicProvider(
             api_key=config.api_key,
             base_url=config.base_url if config.base_url else None,

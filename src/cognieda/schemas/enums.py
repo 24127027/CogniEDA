@@ -33,15 +33,6 @@ class MemoryStatus(StrEnum):
     UNRESOLVED = "unresolved"
 
 
-class ContextMode(StrEnum):
-    """Typed context views used to protect epistemic-role boundaries."""
-
-    PLANNING = "planning"
-    CONCLUSION = "conclusion"
-    DISCOVERY_SYNTHESIS = "discovery_synthesis"
-    ANSWER = "answer"
-
-
 class MemorySourceType(StrEnum):
     """Provenance sources for context-frame items."""
 
@@ -187,6 +178,33 @@ class TaskKind(StrEnum):
     SCIENTIFIC = "scientific"
     GRAPH = "graph"
     SYNTHESIS = "synthesis"
+
+
+class Capability(StrEnum):
+    """Finite dispatcher capabilities reusable by plan bindings."""
+
+    DATA_ANALYSIS = "data_analysis"
+    DATA_PROFILING = "data_profiling"
+    DATA_TRANSFORMATION = "data_transformation"
+    GRAPH_MINING = "graph_mining"
+    HYPOTHESIS_TESTING = "hypothesis_testing"
+
+
+class PlanTaskRole(StrEnum):
+    """Specialist or control role assigned by one PlanTaskBinding."""
+
+    DATA_EXPLORER = "data_explorer"
+    HYPOTHESIS_ANALYST = "hypothesis_analyst"
+    GRAPH_MINER = "graph_miner"
+    PLANNER = "planner"
+
+
+class PlanPriority(StrEnum):
+    """Finite coordination priority for a bound Task."""
+
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
 
 
 class HypothesisStatus(StrEnum):
