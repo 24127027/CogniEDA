@@ -243,11 +243,13 @@ That history remains separate from the materialized research state and is
 excluded from empirical answer support. Neither conversation nor the current
 SessionFrame is durably restored after restart.
 
-The immutable in-memory `PlanRevision`, `PlanTaskBinding`, and `PlanDependency`
-V1 domain contracts are **Implemented** with authoritative Task validation,
-structural canonicalization, DAG guards, and deterministic fingerprinting.
-Planner does not author or consume them, and no persistence, admission,
-approval, activation, or replanning runtime exists. Active Task exposes all
+The immutable `PlanRevision`, `PlanTaskBinding`, and `PlanDependency` V1 domain
+contracts, exact SQLite persistence, and application-owned proposal admission
+are **Implemented** with authoritative Objective and Task validation,
+structural canonicalization, DAG guards, deterministic fingerprinting, atomic
+snapshot writes, and fail-closed replay/collision handling. Planner does not
+author or consume them, and no approval, activation, active-plan selection, or
+replanning runtime exists. Active Task exposes all
 four canonical kinds, but only bounded `DATA` work is executable. Full Task DAG
 runtime behavior, GeneratedView coordination, durable SessionFrame composition,
 and the end-to-end recovery model remain **Deferred** target design. The

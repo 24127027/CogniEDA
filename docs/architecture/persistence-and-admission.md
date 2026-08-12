@@ -232,6 +232,16 @@ closed unless request path, observed execution path, observed digest, and
 provenance profile identity all match that authoritative binding. This is a
 non-FCO provenance/authority record and does not expand the semantic graph.
 
+Immutable PlanRevision proposal storage and admission are also **Verified on
+SQLite**. Normalized revision, binding, and dependency rows preserve exact V1
+content and fingerprint in one transaction. Application authority resolves the
+Objective and every bound Task from persistence, revalidates capability and DAG
+structure, and recomputes the canonical fingerprint. Same-ID/same-content
+replay returns the existing revision; same-ID/different-content collisions fail
+closed; different IDs with the same content fingerprint remain distinct.
+Admission does not consult current provider availability and does not approve,
+activate, select, schedule, or dispatch the admitted proposal.
+
 The complete target boundary is not implemented. Canonical PlanRevision
 activation, durable role-native result inbox processing, complete replay
 coordination, scientific Evidence admission from `EvidenceRequest`, governance

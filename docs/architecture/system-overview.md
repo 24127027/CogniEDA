@@ -171,8 +171,9 @@ foundations demonstrate important authority and traceability rules, but the
 direct Evidence path is transitional.
 
 The complete target architecture is not yet a supported end-to-end runtime.
-The immutable PlanRevision V1 domain contract is **Implemented**, but Planner
-authoring, persistence/admission, approval/activation, Task DAG runtime,
+The immutable PlanRevision V1 domain contract, exact SQLite persistence, and
+application-owned proposal admission are **Implemented**, but Planner
+authoring, approval/activation, active selection, Task DAG runtime,
 scientific investigation and protocol, canonical Evidence lineage, protected
 evaluation, governance, Discovery admission, semantic graph inquiry, and
 restart-safe continuity remain **Deferred**. [Current state](../status/current-state.md)
