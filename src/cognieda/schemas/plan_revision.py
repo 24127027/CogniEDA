@@ -25,7 +25,7 @@ from cognieda.schemas.enums import PlanPriority, TaskKind
 PlanRevisionContractVersion = Literal["plan-revision/v1"]
 PLAN_REVISION_CONTRACT_VERSION: PlanRevisionContractVersion = "plan-revision/v1"
 
-_COMPATIBLE_CAPABILITIES: dict[TaskKind, frozenset[Capability | None]] = {
+_COMPATIBLE_CAPABILITIES: dict[TaskKind, frozenset[Capability]] = {
     TaskKind.DATA: frozenset(
         {
             Capability.DATA_ANALYSIS,
@@ -35,7 +35,6 @@ _COMPATIBLE_CAPABILITIES: dict[TaskKind, frozenset[Capability | None]] = {
     ),
     TaskKind.SCIENTIFIC: frozenset({Capability.HYPOTHESIS_TESTING}),
     TaskKind.GRAPH: frozenset({Capability.GRAPH_MINING}),
-    TaskKind.SYNTHESIS: frozenset({None}),
 }
 
 
@@ -43,7 +42,7 @@ class PlanTaskBinding(ImmutableCogniEDABaseModel):
     """Revision-specific coordination and routing for one semantic Task."""
 
     task_id: UUID
-    required_capability: Capability | None
+    required_capability: Capability
     order_rank: NonNegativeInt
     priority: PlanPriority = PlanPriority.NORMAL
 
@@ -226,11 +225,7 @@ class PlanRevision(ImmutableCogniEDABaseModel):
             "task_bindings": [
                 {
                     "task_id": str(binding.task_id),
-                    "required_capability": (
-                        binding.required_capability.value
-                        if binding.required_capability is not None
-                        else None
-                    ),
+                    "required_capability": binding.required_capability.value,
                     "order_rank": binding.order_rank,
                     "priority": binding.priority.value,
                 }

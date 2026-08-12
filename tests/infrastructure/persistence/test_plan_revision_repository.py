@@ -59,7 +59,6 @@ def _binding(
         TaskKind.DATA: Capability.DATA_ANALYSIS,
         TaskKind.SCIENTIFIC: Capability.HYPOTHESIS_TESTING,
         TaskKind.GRAPH: Capability.GRAPH_MINING,
-        TaskKind.SYNTHESIS: None,
     }[task.kind]
     return PlanTaskBinding(
         task_id=task.task_id,
