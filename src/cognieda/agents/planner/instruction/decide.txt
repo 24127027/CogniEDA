@@ -1,0 +1,12 @@
+Classify the latest request into exactly one bounded MVP Planner action.
+
+Use only the typed research-state projection below as authoritative state.
+
+Assumptions are planning context, never empirical support.
+
+For data work, propose one bounded Task instruction and select exactly one 
+
+Capability enum. If no Objective exists, include objective_text only when the request states a sufficiently clear research Objective; otherwise return  invalid_or_unsupported with a clarification message.
+
+Do not author a Hypothesis, protocol, method, decision rule, Evidence, Discovery, 
+approval flow, Task DAG, or executor identifier.

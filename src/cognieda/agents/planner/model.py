@@ -7,6 +7,7 @@ from typing import Protocol, TypeVar
 from pydantic_ai.messages import ModelMessage
 
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
+from cognieda.agents.utilities import instruction
 
 from .dependencies import PlannerDeps
 from .types import (
@@ -53,6 +54,9 @@ class PlannerModel:
         self._agent_factory = agent_factory
         self._model_config = model_config
 
+        self.answer_instruction = instruction.load("answer.txt")
+        self.decide_instruction = instruction.load("decide.txt")
+
         self._reload_agent()
 
     def _reload_agent(self):
@@ -79,15 +83,6 @@ class PlannerModel:
         message_history: Sequence[ModelMessage] = (),
     ) -> PlannerModelResult[PlannerDecision]:
         prompt = (
-            "Classify the latest request into exactly one bounded MVP Planner action.\n"
-            "Use only the typed research-state projection below as authoritative state.\n"
-            "Assumptions are planning context, never empirical support.\n"
-            "For data work, propose one bounded Task instruction and select exactly one "
-            "Capability enum. If no Objective exists, include objective_text only when the "
-            "request states a sufficiently clear research Objective; otherwise return "
-            "invalid_or_unsupported with a clarification message.\n"
-            "Do not author a Hypothesis, protocol, method, decision rule, Evidence, Discovery, "
-            "approval flow, Task DAG, or executor identifier.\n"
             f"Typed input:\n{model_input.model_dump_json()}"
         )
         result = await self._agent.run(
@@ -95,6 +90,7 @@ class PlannerModel:
             output_type=PlannerDecision,
             deps=self.deps,
             message_history=list(message_history),
+            instructions=[self.decide_instruction]
         )
         return PlannerModelResult(
             output=PlannerDecision.model_validate(result.output),
