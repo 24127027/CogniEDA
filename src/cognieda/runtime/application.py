@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from sqlmodel import Session
+
 from cognieda.agents.planner.agent import Planner
 from cognieda.application.ports import AgentFactoryPort
+from cognieda.application.services import ActivePlanExecutor, commit_approved_plan
 from cognieda.execution import ExecutorDispatcher
+from cognieda.schemas import PlanDraft, PlanDraftApproval, PlanDraftDecision
 from cognieda.schemas.artifacts import SessionFrame
 
 from .conversation import ConversationHistory
@@ -18,13 +22,16 @@ class Application:
         planner_agent: Planner,
         dispatcher: ExecutorDispatcher,
         agent_factory: AgentFactoryPort,
+        session: Session | None = None,
     ) -> None:
         self.workspace = workspace
         self.agent_factory = agent_factory
         self.planner_agent = planner_agent
         self.dispatcher = dispatcher
+        self.session = session
         self.session_frame = SessionFrame()
         self.conversation_history = ConversationHistory()
+        self.pending_plan_draft: PlanDraft | None = None
 
     async def submit_message(self, message: str) -> Message:
         if message.startswith("/"):
@@ -39,6 +46,8 @@ class Application:
             planning_context=planning_context,
         )
         self.session_frame = apply_planner_output(self.session_frame, planner_output)
+        if planner_output.plan_draft is not None:
+            self.pending_plan_draft = planner_output.plan_draft
         if planner_output.new_messages:
             self.conversation_history = self.conversation_history.add_turn(
                 planner_output.new_messages
@@ -55,6 +64,12 @@ class Application:
         parts = command.split()
 
         match parts:
+            case ["/approve", fingerprint]:
+                return await self._approve_pending_plan(fingerprint)
+
+            case ["/reject", fingerprint]:
+                return self._reject_pending_plan(fingerprint)
+
             #
             # Register a skill in skills.toml
             #
@@ -75,7 +90,7 @@ class Application:
             #
             case ["/skill", "assign", worker, skill]:
                 self.workspace.add_worker_skill(worker, skill)
-                self.agent_factory.reload_tooling()  # Reload the tooling to reflect the updated skills
+                self.agent_factory.reload_tooling()
                 await self.planner_agent.reload_model()
 
                 return self._text(
@@ -84,7 +99,7 @@ class Application:
 
             case ["/skill", "unassign", worker, skill]:
                 self.workspace.remove_worker_skill(worker, skill)
-                self.agent_factory.reload_tooling()  # Reload the tooling to reflect the updated skills
+                self.agent_factory.reload_tooling()
                 await self.planner_agent.reload_model()
 
                 return self._text(
@@ -95,6 +110,56 @@ class Application:
                 return self._text(
                     f"Unknown command: '{command}'."
                 )
+
+    def _exact_pending_draft(self, fingerprint: str) -> PlanDraft | None:
+        draft = self.pending_plan_draft
+        if draft is None or draft.fingerprint != fingerprint:
+            return None
+        return draft
+
+    async def _approve_pending_plan(self, fingerprint: str) -> Message:
+        draft = self._exact_pending_draft(fingerprint)
+        if draft is None:
+            return self._text("Approval did not match the exact pending PlanDraft.")
+        if self.session is None:
+            return self._text("Authoritative plan persistence is unavailable.")
+        data_profile = self.session_frame.data_profile
+        if data_profile is None:
+            return self._text("Approved DATA execution requires an active DataProfile.")
+
+        committed = commit_approved_plan(
+            self.session,
+            plan_draft=draft,
+            approval=PlanDraftApproval(
+                plan_draft_id=draft.plan_draft_id,
+                plan_draft_fingerprint=draft.fingerprint,
+                decision=PlanDraftDecision.APPROVE,
+            ),
+        )
+        self.pending_plan_draft = None
+        successor = self.session_frame.set_objective(committed.objective)
+        for task in committed.tasks:
+            successor = successor.add_task(task)
+        self.session_frame = successor
+
+        executed = await ActivePlanExecutor(self.session, self.dispatcher).execute_next(
+            objective_id=committed.objective.objective_id,
+            data_profile_id=data_profile.data_profile_id,
+        )
+        self.session_frame = self.session_frame.set_task_status(
+            executed.task.task_id,
+            executed.task.status,
+        )
+        return self._text(self.planner_agent.respond_to_work(executed.planner_outcome))
+
+    def _reject_pending_plan(self, fingerprint: str) -> Message:
+        draft = self._exact_pending_draft(fingerprint)
+        if draft is None:
+            return self._text("Rejection did not match the exact pending PlanDraft.")
+        self.pending_plan_draft = None
+        return self._text(
+            "The exact PlanDraft was rejected. No authoritative Task or PlanRevision was created."
+        )
 
     def _text(self, content: str) -> Message:
         return Message(

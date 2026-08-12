@@ -3,13 +3,14 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from cognieda.infrastructure.llm import AgentFactory
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.application.ports import ModelConfig, ProviderType
 from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
-from cognieda.infrastructure.agent_tooling import AgentTooling
+from cognieda.infrastructure.llm import AgentFactory
+from cognieda.infrastructure.persistence.init_db import init_db
+from cognieda.infrastructure.persistence.session import get_session
 
 from .application import Application
 from .workspace import Workspace
@@ -37,11 +38,16 @@ def bootstrap_application(workspace_path: Path) -> Application:
         model_config=model_config,
     )
 
+    database_url = init_db(
+        os.getenv("COGNIEDA_DB_URL", "").strip()
+        or f"sqlite:///{(workspace.state_dir / 'cognieda.sqlite3').as_posix()}"
+    )
     return Application(
         agent_factory=agent_factory,
         workspace=workspace,
         planner_agent=planner,
         dispatcher=dispatcher,
+        session=get_session(database_url),
     )
 
 

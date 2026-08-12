@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
-from cognieda.execution import ExecutorContext
+from cognieda.execution import ExecutionStatus, ExecutorContext, PlannerWorkOutcome
 
 from .context import Context, PlanningContext
 from .dependencies import PlannerDeps
@@ -43,7 +43,7 @@ class Planner:
         self.deps = deps
         self.graph = build_graph()
 
-    async def reload_model(self):
+    async def reload_model(self) -> None:
         """Reload the underlying model from the agent factory and model config."""
 
         #TODO: Temporarily allow reloading of the model
@@ -52,6 +52,20 @@ class Planner:
                 "Cannot reload model because it was provided directly and is not a PlannerModel."
             )
         self.model.reload_model()
+
+    def respond_to_work(self, outcome: PlannerWorkOutcome) -> str:
+        """Present one role-native execution projection without admitting Evidence."""
+
+        if outcome.status is ExecutionStatus.SUCCEEDED:
+            return (
+                f"The approved DATA Task completed. {outcome.semantic_summary} "
+                "This computed result was not admitted as Evidence."
+            )
+        details = " ".join((*outcome.blockers, *outcome.limitations))
+        return (
+            f"The approved DATA Task ended with status {outcome.status.value}. {details} "
+            "No Evidence was created."
+        ).strip()
 
     async def run(
         self,

@@ -1,3 +1,9 @@
+from .active_plan_execution import (
+    ActivePlanExecutionError,
+    ActivePlanExecutionErrorCode,
+    ActivePlanExecutionResult,
+    ActivePlanExecutor,
+)
 from .approved_plan_commit import (
     ApprovedPlanCommitError,
     ApprovedPlanCommitErrorCode,
@@ -22,6 +28,10 @@ from .planner_commit import commit_planner_operations
 from .transition_service import ExecutionAttemptTransitionService
 
 __all__ = (
+    "ActivePlanExecutionError",
+    "ActivePlanExecutionErrorCode",
+    "ActivePlanExecutionResult",
+    "ActivePlanExecutor",
     "ApprovedPlanCommitError",
     "ApprovedPlanCommitErrorCode",
     "ApprovedPlanCommitResult",
