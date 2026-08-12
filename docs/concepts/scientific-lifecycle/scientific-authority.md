@@ -28,8 +28,8 @@ an admitted Hypothesis.
 Task meaning is immutable across scientific lineage. If a proposed change
 alters its semantic work, the Planner must propose a successor Task rather than
 silently editing the existing Task. The superseded Task taxonomy has been
-removed. Canonical Task kinds remain exactly `DATA`, `SCIENTIFIC`, `GRAPH`, and
-`SYNTHESIS`.
+removed. Canonical Task kinds remain exactly `DATA`, `SCIENTIFIC`, and `GRAPH`.
+Planner response synthesis is not executable Task work.
 
 ## Feasibility belongs to Hypothesis Analyst
 
