@@ -1,3 +1,5 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/24127027/CogniEDA)
+
 # CogniEDA
 
 CogniEDA is validity-preserving research-state infrastructure for analytical
