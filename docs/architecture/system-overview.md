@@ -164,18 +164,21 @@ The detailed contracts belong to [Authority boundaries](authority-boundaries.md)
 ## Implementation status
 
 **Partially implemented.** Current main provides a bounded typed research-state
-foundation, Planner behavior, deterministic Data Explorer operations, direct
-Task-to-Evidence admission, in-process conversation continuity, model-provider
-configuration, dispatch infrastructure, and SQLite persistence seams. These
+foundation, transient exact PlanDraft approval, atomic first PlanRevision
+activation, sequential bounded DATA execution, deterministic Data Explorer
+operations, separate direct Task-to-Evidence admission, in-process conversation
+continuity, model-provider configuration, dispatch infrastructure, and SQLite
+persistence seams. These
 foundations demonstrate important authority and traceability rules, but the
 direct Evidence path is transitional.
 
 The complete target architecture is not yet a supported end-to-end runtime.
 The immutable PlanRevision V1 domain contract and side-effect-free candidate
 validation are **Implemented**, and its append-only repository foundation is
-**Verified on SQLite**. No application path persists an unapproved candidate.
-Planner authoring, human approval, exact post-approval validation and
-persistence, activation, active selection, Task DAG runtime, scientific
+**Verified on SQLite**. No application path persists an unapproved draft. Exact
+in-process Human approval, post-approval validation and persistence, first
+active selection, and dependency-aware DATA execution are **Implemented**.
+Durable approval/recovery, successor/replanning runtime, scientific
 investigation and protocol, canonical Evidence lineage, protected evaluation,
 governance, Discovery admission, semantic graph inquiry, and restart-safe
 continuity remain **Deferred**. [Current state](../status/current-state.md)

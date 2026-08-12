@@ -151,9 +151,10 @@ and uses the canonical three-kind taxonomy. The immutable PlanRevision V1
 domain and side-effect-free application validator are **Implemented** with
 binding membership, routing compatibility, DAG validation, structural
 fingerprinting, and authoritative Objective/Task checks. The append-only
-repository foundation is **Verified on SQLite**, but has no application caller
-for unapproved candidates. Planner authoring, human approval, exact
-revalidation, persistence at the approval boundary, activation, active
-selection, replanning, canonical scientific execution, and the complete
-lifecycle linked above remain **Deferred**; only bounded `DATA` execution is
-supported, and PlanRevision state does not drive it.
+repository foundation is **Verified on SQLite**, and no application caller
+persists an unapproved draft. Transient Planner authoring, exact in-process
+Human approval, atomic approval-boundary persistence, first activation, active
+selection, and sequential dependency-aware DATA execution are **Implemented**.
+Durable approval/recovery, active-revision replacement, replanning, canonical
+scientific execution, and the complete lifecycle linked above remain
+**Deferred**.

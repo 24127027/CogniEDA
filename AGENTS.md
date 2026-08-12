@@ -26,11 +26,13 @@ traceable, scope-valid, and protected from the wrong state entering reasoning.
 All eight FCO names have schemas and SQLModel records. `PlannerOperation`,
 `AnalysisFrame`, `ExecutionRun`, and other provenance/operational records also
 exist. This does not establish the canonical workflow. Active Tasks have the
-minimum Objective-scoped canonical semantic core, but only bounded `DATA` work
-is executable; PlanRevision and scientific-investigation contracts are absent;
-Planner execution nodes and specialist graphs are stubs; DVC and product CLI
-support are absent; database behavior is verified only on SQLite. Keep detailed
-claims in the status track.
+minimum Objective-scoped canonical semantic core. A bounded in-process slice
+can propose an exact transient PlanDraft, obtain explicit Human approval,
+atomically persist and activate one PlanRevision, and execute eligible `DATA`
+work through Data Explorer without automatically creating Evidence. Durable
+approval/recovery, replanning, scientific-investigation runtime, DVC, and
+product CLI support are absent; database behavior is verified only on SQLite.
+Keep detailed claims in the status track.
 
 ## Exact FCO and graph boundaries
 

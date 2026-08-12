@@ -232,19 +232,21 @@ scientific proposal.
 
 ## Implementation status
 
-**Partially implemented.** Application now exact-materializes the current
-SessionFrame into an immutable `PlanningContext`, calls Planner without passing
-the frame, and applies explicit `created_objective`, `created_assumption`, and
-terminal `created_task` results to its own successor frame. Planner graph state
-contains per-run control and typed result fields only; Planner neither mutates
-nor returns SessionFrame.
+**Partially implemented.** Application exact-materializes the current
+SessionFrame into an immutable `PlanningContext` and calls Planner without
+passing the frame. Planner graph state contains per-run control and typed result
+fields only; Planner neither mutates nor returns SessionFrame.
 
 Current bounded Planner behavior can understand a
 finite set of requests, establish or refine an Objective, retain planning-only
-Assumptions, create and track bounded data Tasks, route work through the
-dispatcher, consume identity-checked outcomes, and draft empirical answers
-from admitted Evidence while excluding Assumptions. Planner does not admit
-Evidence.
+Assumptions, or propose one exact transient Objective-plus-DATA PlanDraft.
+Application retains that draft in process and accepts exact fingerprint-bound
+Human approval or rejection. Before approval, no Task is authoritative and no
+executor dispatch occurs. After approval, application authority atomically
+commits and activates the canonical Tasks and PlanRevision, executes the next
+eligible DATA Task, and gives the normalized result back to Planner for the
+Human-facing response. Planner does not admit Evidence, and this direct computed
+result is not automatically Evidence.
 
 The current in-process runtime also preserves native model-message history
 across Planner runs so a follow-up can be understood in conversational context.
@@ -257,14 +259,15 @@ contracts and side-effect-free application validation are **Implemented** with
 authoritative Objective and Task checks, structural canonicalization, DAG
 guards, and deterministic fingerprinting. Append-only snapshot persistence and
 fail-closed collision/fingerprint reconstruction are **Verified on SQLite** as
-infrastructure for the later approval boundary. Validation does not persist an
-unapproved candidate, and no application caller currently persists one.
-Planner does not author or consume PlanRevision, and approval, exact
-post-approval revalidation, activation, active-plan selection, and replanning
-runtime are **Deferred**. Active Task exposes all three canonical kinds, but
-only bounded `DATA` work is executable. Full Task DAG runtime behavior,
-GeneratedView coordination, durable SessionFrame composition, and the
-end-to-end recovery model remain **Deferred** target design. The
+infrastructure for the approval boundary. The transient draft is not an FCO and
+is not persisted. Exact approval, post-approval revalidation, atomic first
+activation, explicit active-plan selection, and deterministic sequential DATA
+eligibility are **Implemented**. A second plan for an already-active Objective
+fails closed because successor/replanning semantics are **Deferred**. Active
+Task exposes all three canonical kinds, but only bounded `DATA` work is
+executable. Scientific and GRAPH runtime, durable approval, GeneratedView
+coordination, canonical SessionFrame composition, and the end-to-end recovery
+model remain **Deferred** target design. The
 [MVP-v2 definition](mvp-runtime-subset.md) explains the minimum complete
 product and research capability.
 

@@ -212,11 +212,13 @@ composes a registry, Data Explorer provider factory, dispatcher, and
 `ExecutionResult` now contains only shared transport metadata.
 `DataExplorerResult` and the deferred `HypothesisAnalystResult` own their
 role-native fields. A minimal `PlannerWorkOutcome` projection seam consumes
-only shared metadata; full Planner consumption remains **Deferred**.
+shared metadata plus the bounded DATA observation summary for the Human-facing
+Planner response.
 
-At the bounded M3-A direct-DATA library surface, an execution-internal
-`DATA_ANALYSIS` request reaches Data Explorer outside PlanRevision. This
-transitional plumbing is not a canonical Task-kind route. Data Explorer owns
+At the bounded approved-DATA surface, exact approval first creates the
+authoritative Task and active PlanRevision. An execution-internal
+`DATA_ANALYSIS` request reaches Data Explorer outside PlanRevision; this
+transitional plumbing is not approved plan content. Data Explorer owns
 the typed `Task.instruction -> DataAnalysisPlan` translation through its
 `DataAnalysisPlannerPort`, using the application-supplied authoritative
 DataProfile projection from `DataExplorerInput` and the finite
@@ -236,11 +238,20 @@ rows, or missing values and does not mutate the active frame. Transformation
 returns a typed blocked result until it can create a successor dataset and
 DataProfile; it never establishes in-place mutation as valid behavior.
 
+Active-plan execution is **Implemented** for a deterministic sequential DATA
+subset. Application derives eligible pending Tasks from PlanRevision
+dependencies and completed Task status; prerequisite completion overrides
+order rank and priority. It resolves the supplied authoritative DataProfile and
+physical binding downstream, constructs `DataExplorerInput`, dispatches through
+the registered provider, verifies Task and dataset lineage on successful output,
+persists terminal Task status, and returns a typed non-success when capability
+is unavailable. It does not admit the computed result as Evidence.
+
 Canonical `DataWorkOrder`, `ScientificInvestigationInput`,
 `GraphInquiryRequest`, and complete role-native admission contracts remain
 **Unsupported**. Hypothesis Analyst and Graph Miner remain unregistered runtime
-scaffolds. Full Planner-to-real-dataset-to-Evidence-to-Planner execution is
-also **Unsupported**.
+scaffolds. Scientific execution and Planner-to-real-dataset-to-canonical-
+Evidence-to-Planner execution are **Unsupported**.
 
 See [MVP-v2](mvp-runtime-subset.md) for the minimum complete scientific loop
 and [Persistence and admission](persistence-and-admission.md)

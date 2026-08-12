@@ -424,18 +424,23 @@ the canonical authority model.
 ## Current transitional foundation
 
 **Partially implemented.** Current `main` provides valuable bounded
-foundations: typed research-state values, bounded Planner behavior,
-deterministic Data Explorer execution and direct Evidence admission, in-process
-conversation continuity, multi-provider model configuration, SQLite
+foundations: typed research-state values, transient exact PlanDraft approval,
+atomic first PlanRevision activation, bounded active DATA execution,
+deterministic Data Explorer execution and separate direct Evidence admission,
+in-process conversation continuity, multi-provider model configuration, SQLite
 persistence seams, and execution infrastructure.
 
-The current direct path is transitional:
+The newly composed DATA control path is transitional:
 
 ```text
-Task -> Data Explorer -> Evidence
+Human -> Planner -> PlanDraft -> approval -> active PlanRevision
+      -> DATA Task -> Data Explorer -> Planner -> Human
 ```
 
-It is not canonical scientific Evidence lineage and does not satisfy MVP-v2.
+Its computed result does not automatically become Evidence. The separate
+bounded `Task -> Data Explorer -> Evidence` admission service also remains
+available, but it is not canonical scientific Evidence lineage. Neither path
+satisfies MVP-v2.
 The complete loop still requires the real scientific investigation, protocol,
 request, execution, AnalysisFrame, protected evaluation, governance,
 Discovery, semantic graph, and restart boundaries. See
