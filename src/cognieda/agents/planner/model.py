@@ -49,13 +49,17 @@ class PlannerModel:
         deps: PlannerDeps,
         agent_factory: AgentFactoryPort,
         model_config: ModelConfig,
+        base_instruction: str | None = None
+
     ):
         self.deps = deps
+        self.base_instruction = base_instruction
         self._agent_factory = agent_factory
         self._model_config = model_config
 
-        self.answer_instruction = instruction.load("answer.txt")
-        self.decide_instruction = instruction.load("decide.txt")
+
+        self._answer_instruction = instruction.assemble("answer.txt", base_instruction)
+        self._decide_instruction = instruction.assemble("decide.txt", base_instruction)
 
         self._reload_agent()
 
@@ -90,7 +94,7 @@ class PlannerModel:
             output_type=PlannerDecision,
             deps=self.deps,
             message_history=list(message_history),
-            instructions=[self.decide_instruction]
+            instructions=self._decide_instruction
         )
         return PlannerModelResult(
             output=PlannerDecision.model_validate(result.output),
@@ -107,6 +111,7 @@ class PlannerModel:
             prompt,
             output_type=PlannerResponseDraft,
             deps=self.deps,
+            instructions=self._answer_instruction
         )
         return PlannerModelResult(
             output=PlannerResponseDraft.model_validate(result.output),
