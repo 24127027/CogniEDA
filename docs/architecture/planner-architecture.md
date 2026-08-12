@@ -76,14 +76,14 @@ Objective. Its content owns plan-version concerns such as:
 
 - exactly one immutable `PlanTaskBinding` for each member Task;
 - explicit dependency edges between member Tasks;
-- binding-owned required capability and assigned specialist or control role;
+- binding-owned required capability;
 - binding-owned non-negative `order_rank` and finite `LOW`, `NORMAL`, or `HIGH`
   priority;
 - a deterministic plan-content fingerprint.
 
 Membership is derived from the binding Task identities; a parallel `task_ids`
-collection is not a second source of truth. Required capability, assigned role,
-order rank, and priority are coordination semantics. Changing any of them
+collection is not a second source of truth. Required capability, order rank,
+and priority are coordination semantics. Changing any of them
 changes PlanRevision content and its fingerprint without, by itself, creating a
 successor Task.
 
@@ -145,20 +145,22 @@ specific change.
 
 ## Routing and replanning
 
-| Task kind | Binding capability | Binding role |
-| --- | --- | --- |
-| `DATA` | exactly one of `DATA_ANALYSIS`, `DATA_PROFILING`, or `DATA_TRANSFORMATION` | `DATA_EXPLORER` |
-| `SCIENTIFIC` | `HYPOTHESIS_TESTING` | `HYPOTHESIS_ANALYST` |
-| `GRAPH` | `GRAPH_MINING` | `GRAPH_MINER` |
-| `SYNTHESIS` | `None`; Planner coordination is not a dispatcher capability | `PLANNER` |
+| Task kind | Binding capability |
+| --- | --- |
+| `DATA` | exactly one of `DATA_ANALYSIS`, `DATA_PROFILING`, or `DATA_TRANSFORMATION` |
+| `SCIENTIFIC` | `HYPOTHESIS_TESTING` |
+| `GRAPH` | `GRAPH_MINING` |
+| `SYNTHESIS` | `None`; no executable capability or provider path exists in V1 |
 
-The Planner declares the required capability and assigned role in the
-`PlanTaskBinding`; the dispatcher resolves an eligible executor from the
-capability registry for dispatcher-backed work. Kind, capability, and role are
-distinct finite contracts and their compatibility is validated structurally.
+The Planner declares the required capability in the `PlanTaskBinding`;
+`ExecutorRegistry` resolves an eligible runtime provider for dispatcher-backed
+work. `Capability` is owned by the execution/dispatch layer. PlanRevision does
+not duplicate role, provider, worker, process, or model identity. Kind and
+capability compatibility is validated structurally. Planner coordinates and
+may invoke the dispatcher, but it does not perform executor-native Task work.
 If the capability is absent, the Planner receives a typed unavailable or
 blocked outcome. It does not choose a legacy executor, reinterpret the Task,
-infer a capability or role, or route by semantic guess.
+infer a capability or provider, or route by semantic guess.
 
 Capability absence, infeasibility, a blocked dependency, new limitations, a
 correction request, additional Evidence needs, validity change, or a human

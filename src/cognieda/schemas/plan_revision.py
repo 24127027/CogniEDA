@@ -17,41 +17,25 @@ from pydantic import (
     model_validator,
 )
 
+from cognieda.execution.capabilities import Capability
 from cognieda.schemas.artifacts import Task
 from cognieda.schemas.common import ImmutableCogniEDABaseModel
-from cognieda.schemas.enums import (
-    Capability,
-    PlanPriority,
-    PlanTaskRole,
-    TaskKind,
-)
+from cognieda.schemas.enums import PlanPriority, TaskKind
 
 PlanRevisionContractVersion = Literal["plan-revision/v1"]
 PLAN_REVISION_CONTRACT_VERSION: PlanRevisionContractVersion = "plan-revision/v1"
 
-_COMPATIBLE_BINDINGS: dict[
-    TaskKind,
-    tuple[frozenset[Capability | None], PlanTaskRole],
-] = {
-    TaskKind.DATA: (
-        frozenset(
-            {
-                Capability.DATA_ANALYSIS,
-                Capability.DATA_PROFILING,
-                Capability.DATA_TRANSFORMATION,
-            }
-        ),
-        PlanTaskRole.DATA_EXPLORER,
+_COMPATIBLE_CAPABILITIES: dict[TaskKind, frozenset[Capability | None]] = {
+    TaskKind.DATA: frozenset(
+        {
+            Capability.DATA_ANALYSIS,
+            Capability.DATA_PROFILING,
+            Capability.DATA_TRANSFORMATION,
+        }
     ),
-    TaskKind.SCIENTIFIC: (
-        frozenset({Capability.HYPOTHESIS_TESTING}),
-        PlanTaskRole.HYPOTHESIS_ANALYST,
-    ),
-    TaskKind.GRAPH: (
-        frozenset({Capability.GRAPH_MINING}),
-        PlanTaskRole.GRAPH_MINER,
-    ),
-    TaskKind.SYNTHESIS: (frozenset({None}), PlanTaskRole.PLANNER),
+    TaskKind.SCIENTIFIC: frozenset({Capability.HYPOTHESIS_TESTING}),
+    TaskKind.GRAPH: frozenset({Capability.GRAPH_MINING}),
+    TaskKind.SYNTHESIS: frozenset({None}),
 }
 
 
@@ -60,7 +44,6 @@ class PlanTaskBinding(ImmutableCogniEDABaseModel):
 
     task_id: UUID
     required_capability: Capability | None
-    assigned_role: PlanTaskRole
     order_rank: NonNegativeInt
     priority: PlanPriority = PlanPriority.NORMAL
 
@@ -159,11 +142,9 @@ class PlanRevision(ImmutableCogniEDABaseModel):
 
     @staticmethod
     def _validate_binding_compatibility(task: Task, binding: PlanTaskBinding) -> None:
-        capabilities, role = _COMPATIBLE_BINDINGS[task.kind]
+        capabilities = _COMPATIBLE_CAPABILITIES[task.kind]
         if binding.required_capability not in capabilities:
             raise ValueError(f"{task.kind.name} Task has an incompatible required capability.")
-        if binding.assigned_role is not role:
-            raise ValueError(f"{task.kind.name} Task has an incompatible assigned role.")
 
     def _validate_dependency_graph(self, member_ids: set[UUID]) -> None:
         in_degree = dict.fromkeys(member_ids, 0)
@@ -250,7 +231,6 @@ class PlanRevision(ImmutableCogniEDABaseModel):
                         if binding.required_capability is not None
                         else None
                     ),
-                    "assigned_role": binding.assigned_role.value,
                     "order_rank": binding.order_rank,
                     "priority": binding.priority.value,
                 }

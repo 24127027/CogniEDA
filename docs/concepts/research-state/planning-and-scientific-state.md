@@ -58,8 +58,8 @@ lifecycle.
 
 `PlanRevision` is the non-FCO version of an entire proposed or approved Task
 DAG. Exactly one immutable `PlanTaskBinding` represents each member Task and
-owns required capability, assigned specialist or control role, non-negative
-`order_rank`, and finite `LOW`, `NORMAL`, or `HIGH` priority. Membership is
+owns required capability, non-negative `order_rank`, and finite `LOW`,
+`NORMAL`, or `HIGH` priority. Membership is
 derived from binding Task identities, while dependencies remain explicit
 edges. Those coordination concerns do not define Task identity.
 
@@ -67,9 +67,15 @@ The dependency DAG determines eligibility. `order_rank` expresses preference
 among otherwise compatible work, permits ties, and never overrides a
 dependency. Priority defaults to `NORMAL` and is scheduling metadata only; it
 does not establish epistemic importance, authority, or Task meaning. Required
-capability, assigned role, rank, priority, dependencies, parentage,
+capability, rank, priority, dependencies, parentage,
 PlanRevision identity, approval, and activation are absent from Task semantic
 identity.
+
+Capability is an execution/dispatch contract. PlanRevision states only what
+capability a Task requires; `ExecutorRegistry` resolves the concrete provider
+at runtime. Provider or worker changes therefore do not change plan content or
+its fingerprint. Planner coordinates and dispatches but is not a Task executor.
+`SYNTHESIS` retains no executable capability or provider path in V1.
 
 PlanRevision and its bindings contain no exact DataProfile identity or concrete
 data selection. Planner describes intended data scope only in the Task
