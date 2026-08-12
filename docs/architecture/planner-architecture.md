@@ -74,12 +74,27 @@ protected scientific evaluation.
 A `PlanRevision` is a non-FCO immutable snapshot of one complete plan for one
 Objective. Its content owns plan-version concerns such as:
 
-- Task membership and dependency edges;
-- required capability for each Task;
-- executor assignment in `PlanTaskBinding` or equivalent plan-version state;
-- applicable DataProfile references;
-- ordering, priority, presentation, and scheduling metadata;
+- exactly one immutable `PlanTaskBinding` for each member Task;
+- explicit dependency edges between member Tasks;
+- binding-owned required capability and assigned specialist or control role;
+- binding-owned non-negative `order_rank` and finite `LOW`, `NORMAL`, or `HIGH`
+  priority;
 - a deterministic plan-content fingerprint.
+
+Membership is derived from the binding Task identities; a parallel `task_ids`
+collection is not a second source of truth. Required capability, assigned role,
+order rank, and priority are coordination semantics. Changing any of them
+changes PlanRevision content and its fingerprint without, by itself, creating a
+successor Task.
+
+PlanRevision and `PlanTaskBinding` contain no exact DataProfile identity,
+dataset reference, column binding, row filter, cohort, population, or variable
+binding. Planner describes intended data scope only in the Task instruction.
+Each responsible specialist or controller receives the complete authoritative
+DataProfile context available for the work and selects the concrete applicable
+profile and scope within its own authority. The exact DataProfile actually used
+is recorded later in execution or scientific provenance, not in the
+PlanRevision fingerprint.
 
 Proposal, approval, activation, plan-execution completion, interruption, and
 replanning are workflow-lifecycle concerns around that immutable content. They
@@ -94,13 +109,22 @@ Scientific stopping conditions remain part of Hypothesis Analyst-owned
 the applicable role-native work order, including `DataWorkOrder`.
 
 A `Task` is the durable semantic work unit. Its canonical kinds are `DATA`,
-`SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`. Assignment is not part of Task identity.
-Changing an executor does not change what the Task means; changing semantic
-work requires a successor Task.
+`SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`. Required capability, assignment,
+dependencies, parentage, order, priority, PlanRevision identity, approval, and
+activation are not part of Task identity. Changing binding coordination does
+not change what the Task means; changing semantic work requires a successor
+Task.
 
 The Planner constructs a DAG rather than a bag of instructions. It must expose
 dependencies, blocked prerequisites, terminal leaves, and capability
-requirements before activation. Proposed Tasks cannot execute.
+requirements before activation. The dependency DAG determines eligibility.
+`order_rank` is only a scheduling preference among otherwise compatible work,
+permits ties for concurrent or independent Tasks, and never overrides a
+dependency. Equal-rank bindings use canonical Task-ID ordering only as a
+deterministic serialization tie-breaker; that tie-breaker creates no dependency
+or execution-order meaning. Priority is coordination metadata only, defaults to
+`NORMAL`, and never overrides dependencies, validity, authority, or Task
+meaning. Proposed Tasks cannot execute.
 
 ## Proposal, approval, and activation
 
@@ -121,17 +145,20 @@ specific change.
 
 ## Routing and replanning
 
-| Task kind | Required role or coordination path |
-| --- | --- |
-| `DATA` | Data Explorer through a direct `DataWorkOrder` |
-| `SCIENTIFIC` | Hypothesis Analyst controls investigation and requests observations from Data Explorer |
-| `GRAPH` | Graph Miner through a `GraphInquiryRequest` |
-| `SYNTHESIS` | Planner coordinates a GeneratedView from eligible normalized outcomes and admitted state |
+| Task kind | Binding capability | Binding role |
+| --- | --- | --- |
+| `DATA` | exactly one of `DATA_ANALYSIS`, `DATA_PROFILING`, or `DATA_TRANSFORMATION` | `DATA_EXPLORER` |
+| `SCIENTIFIC` | `HYPOTHESIS_TESTING` | `HYPOTHESIS_ANALYST` |
+| `GRAPH` | `GRAPH_MINING` | `GRAPH_MINER` |
+| `SYNTHESIS` | `None`; Planner coordination is not a dispatcher capability | `PLANNER` |
 
-The Planner declares the required capability; the dispatcher resolves an
-eligible executor from the capability registry. If the capability is absent,
-the Planner receives a typed unavailable or blocked outcome. It does not choose
-a legacy executor, reinterpret the Task, or route by semantic guess.
+The Planner declares the required capability and assigned role in the
+`PlanTaskBinding`; the dispatcher resolves an eligible executor from the
+capability registry for dispatcher-backed work. Kind, capability, and role are
+distinct finite contracts and their compatibility is validated structurally.
+If the capability is absent, the Planner receives a typed unavailable or
+blocked outcome. It does not choose a legacy executor, reinterpret the Task,
+infer a capability or role, or route by semantic guess.
 
 Capability absence, infeasibility, a blocked dependency, new limitations, a
 correction request, additional Evidence needs, validity change, or a human
