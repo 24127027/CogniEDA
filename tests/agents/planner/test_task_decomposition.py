@@ -68,7 +68,7 @@ class NeverDispatcher:
 
     async def dispatch(self, request: ExecutionRequest):
         self.requests.append(request)
-        raise AssertionError("A PlanDraft must not dispatch before Human approval.")
+        raise AssertionError("A transient plan must not dispatch before Human approval.")
 
 
 def _planner(model: FakePlannerModel, dispatcher: NeverDispatcher) -> Planner:
@@ -104,7 +104,7 @@ def _data_decision(
         ("Create a cleaned successor dataset.", Capability.DATA_TRANSFORMATION),
     ],
 )
-def test_typed_data_request_proposes_exact_draft_without_dispatch(
+def test_typed_data_request_proposes_exact_canonical_objects_without_dispatch(
     instruction: str,
     capability: Capability,
 ) -> None:
@@ -117,15 +117,17 @@ def test_typed_data_request_proposes_exact_draft_without_dispatch(
         )
     )
 
-    assert output.plan_draft is not None
-    assert output.plan_draft.objective == objective
-    assert len(output.plan_draft.task_drafts) == 1
-    task_draft = output.plan_draft.task_drafts[0]
-    assert task_draft.kind is TaskKind.DATA
-    assert task_draft.instruction == instruction
-    assert task_draft.required_capability is capability
-    assert task_draft.order_rank == 0
-    assert output.plan_draft.fingerprint in output.response
+    assert output.proposed_objective == objective
+    assert len(output.proposed_tasks) == 1
+    task = output.proposed_tasks[0]
+    assert task.kind is TaskKind.DATA
+    assert task.instruction == instruction
+    revision = output.proposed_plan_revision
+    assert revision is not None
+    assert revision.task_ids == {task.task_id}
+    assert revision.task_bindings[0].required_capability is capability
+    assert revision.task_bindings[0].order_rank == 0
+    assert str(revision.plan_revision_id) in output.response
     assert "No authoritative state or execution exists yet" in output.response
     assert dispatcher.requests == []
 
@@ -149,8 +151,8 @@ def test_clear_data_request_proposes_objective_and_task_in_one_draft() -> None:
     )
 
     assert output.created_objective is None
-    assert output.plan_draft is not None
-    assert output.plan_draft.objective.text == (
+    assert output.proposed_objective is not None
+    assert output.proposed_objective.text == (
         "Understand the active dataset schema and quality."
     )
     assert dispatcher.requests == []
@@ -167,7 +169,7 @@ def test_data_work_without_objective_proposal_is_blocked() -> None:
 
     assert output.error is not None
     assert output.error.code is PlannerErrorCode.MISSING_OBJECTIVE
-    assert output.plan_draft is None
+    assert output.proposed_plan_revision is None
     assert dispatcher.requests == []
 
 
@@ -188,8 +190,8 @@ def test_semantic_task_change_proposes_new_identity_without_rewriting_existing_t
         ).run("Now inspect missingness.", planning_context=_context(frame))
     )
 
-    assert output.plan_draft is not None
-    assert output.plan_draft.task_drafts[0].task_draft_id != existing.task_id
+    assert output.proposed_plan_revision is not None
+    assert output.proposed_tasks[0].task_id != existing.task_id
     assert frame.tasks == (existing,)
     assert dispatcher.requests == []
 
@@ -211,7 +213,7 @@ def test_explicit_assumption_addition_uses_successor_state_and_never_dispatches(
     assert output.created_assumption is not None
     assert output.created_assumption.text == "Rows represent customers."
     assert "not empirical Evidence" in output.response
-    assert output.plan_draft is None
+    assert output.proposed_plan_revision is None
     assert dispatcher.requests == []
 
 
@@ -260,7 +262,7 @@ def test_follow_up_answer_uses_admitted_typed_evidence() -> None:
     )
 
     assert output.response == "The admitted Evidence reports 42 rows."
-    assert output.plan_draft is None
+    assert output.proposed_plan_revision is None
     assert model.answer_inputs[0].evidences == (evidence,)
     assert "assumptions" not in PlannerAnswerInput.model_fields
     assert dispatcher.requests == []

@@ -6,8 +6,8 @@ from cognieda.agents.planner.agent import Planner
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.application.services import ActivePlanExecutor, commit_approved_plan
 from cognieda.execution import ExecutorDispatcher
-from cognieda.schemas import PlanDraft, PlanDraftApproval, PlanDraftDecision
-from cognieda.schemas.artifacts import SessionFrame
+from cognieda.schemas.artifacts import Objective, SessionFrame, Task
+from cognieda.schemas.plan_revision import PlanRevision
 
 from .conversation import ConversationHistory
 from .messages import Message, MessageRole, MessageType
@@ -31,10 +31,13 @@ class Application:
         self.session = session
         self.session_frame = SessionFrame()
         self.conversation_history = ConversationHistory()
-        self.pending_plan_draft: PlanDraft | None = None
+        self._pending_objective: Objective | None = None
+        self._pending_tasks: tuple[Task, ...] = ()
+        self._pending_plan_revision: PlanRevision | None = None
 
     async def submit_message(self, message: str) -> Message:
-        if message.startswith("/"):
+        command_name = message.split(maxsplit=1)[0].casefold() if message.startswith("/") else ""
+        if command_name in {"/approve", "/reject", "/skill"}:
             return await self._handle_command(message)
 
         planning_context = build_planning_context(
@@ -46,8 +49,17 @@ class Application:
             planning_context=planning_context,
         )
         self.session_frame = apply_planner_output(self.session_frame, planner_output)
-        if planner_output.plan_draft is not None:
-            self.pending_plan_draft = planner_output.plan_draft
+        if planner_output.proposed_plan_revision is not None:
+            if self._pending_plan_revision is not None:
+                return self._text(
+                    "A plan is already pending Human approval. Use /approve or /reject "
+                    "before proposing another plan."
+                )
+            if planner_output.proposed_objective is None or not planner_output.proposed_tasks:
+                return self._text("Planner returned an incomplete transient plan proposal.")
+            self._pending_objective = planner_output.proposed_objective
+            self._pending_tasks = planner_output.proposed_tasks
+            self._pending_plan_revision = planner_output.proposed_plan_revision
         if planner_output.new_messages:
             self.conversation_history = self.conversation_history.add_turn(
                 planner_output.new_messages
@@ -64,11 +76,11 @@ class Application:
         parts = command.split()
 
         match parts:
-            case ["/approve", fingerprint]:
-                return await self._approve_pending_plan(fingerprint)
+            case ["/approve"]:
+                return await self._approve_pending_plan()
 
-            case ["/reject", fingerprint]:
-                return self._reject_pending_plan(fingerprint)
+            case ["/reject"]:
+                return self._reject_pending_plan()
 
             #
             # Register a skill in skills.toml
@@ -111,39 +123,32 @@ class Application:
                     f"Unknown command: '{command}'."
                 )
 
-    def _exact_pending_draft(self, fingerprint: str) -> PlanDraft | None:
-        draft = self.pending_plan_draft
-        if draft is None or draft.fingerprint != fingerprint:
-            return None
-        return draft
-
-    async def _approve_pending_plan(self, fingerprint: str) -> Message:
-        draft = self._exact_pending_draft(fingerprint)
-        if draft is None:
-            return self._text("Approval did not match the exact pending PlanDraft.")
+    async def _approve_pending_plan(self) -> Message:
+        objective = self._pending_objective
+        tasks = self._pending_tasks
+        revision = self._pending_plan_revision
+        if objective is None or not tasks or revision is None:
+            return self._text("No plan is pending Human approval.")
         if self.session is None:
             return self._text("Authoritative plan persistence is unavailable.")
         data_profile = self.session_frame.data_profile
         if data_profile is None:
             return self._text("Approved DATA execution requires an active DataProfile.")
 
-        committed = commit_approved_plan(
+        commit_approved_plan(
             self.session,
-            plan_draft=draft,
-            approval=PlanDraftApproval(
-                plan_draft_id=draft.plan_draft_id,
-                plan_draft_fingerprint=draft.fingerprint,
-                decision=PlanDraftDecision.APPROVE,
-            ),
+            objective=objective,
+            tasks=tasks,
+            plan_revision=revision,
         )
-        self.pending_plan_draft = None
-        successor = self.session_frame.set_objective(committed.objective)
-        for task in committed.tasks:
+        self._clear_pending_plan()
+        successor = self.session_frame.set_objective(objective)
+        for task in tasks:
             successor = successor.add_task(task)
         self.session_frame = successor
 
         executed = await ActivePlanExecutor(self.session, self.dispatcher).execute_next(
-            objective_id=committed.objective.objective_id,
+            objective_id=objective.objective_id,
             data_profile_id=data_profile.data_profile_id,
         )
         self.session_frame = self.session_frame.set_task_status(
@@ -152,14 +157,18 @@ class Application:
         )
         return self._text(self.planner_agent.respond_to_work(executed.planner_outcome))
 
-    def _reject_pending_plan(self, fingerprint: str) -> Message:
-        draft = self._exact_pending_draft(fingerprint)
-        if draft is None:
-            return self._text("Rejection did not match the exact pending PlanDraft.")
-        self.pending_plan_draft = None
+    def _reject_pending_plan(self) -> Message:
+        if self._pending_plan_revision is None:
+            return self._text("No plan is pending Human rejection.")
+        self._clear_pending_plan()
         return self._text(
-            "The exact PlanDraft was rejected. No authoritative Task or PlanRevision was created."
+            "The pending plan was rejected. No authoritative Task or PlanRevision was created."
         )
+
+    def _clear_pending_plan(self) -> None:
+        self._pending_objective = None
+        self._pending_tasks = ()
+        self._pending_plan_revision = None
 
     def _text(self, content: str) -> Message:
         return Message(

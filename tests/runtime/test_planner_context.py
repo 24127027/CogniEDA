@@ -17,7 +17,7 @@ from cognieda.schemas.artifacts import (
 )
 from cognieda.schemas.common import EvidenceProvenance
 from cognieda.schemas.enums import TaskKind, TaskStatus
-from cognieda.schemas.plan_draft import PlanDraft, TaskDraft
+from cognieda.schemas.plan_revision import PlanRevision, PlanTaskBinding
 
 
 def _full_frame() -> SessionFrame:
@@ -87,24 +87,34 @@ def test_application_boundary_applies_objective_and_assumption_results() -> None
     assert successor.assumptions == (assumption,)
 
 
-def test_application_boundary_does_not_apply_non_authoritative_plan_draft() -> None:
+def test_application_boundary_does_not_apply_transient_canonical_plan_objects() -> None:
     objective = Objective(text="Understand missingness.")
-    draft = PlanDraft(
-        objective=objective,
-        task_drafts=(
-            TaskDraft(
-                kind=TaskKind.DATA,
-                instruction="Summarize missingness by column.",
+    task = Task(
+        objective_id=objective.objective_id,
+        kind=TaskKind.DATA,
+        instruction="Summarize missingness by column.",
+    )
+    revision = PlanRevision.create(
+        objective_id=objective.objective_id,
+        task_bindings=(
+            PlanTaskBinding(
+                task_id=task.task_id,
                 required_capability=Capability.DATA_ANALYSIS,
                 order_rank=0,
             ),
         ),
+        authoritative_tasks=(task,),
     )
     current = SessionFrame()
 
     successor = apply_planner_output(
         current,
-        PlannerOutput(response="Approval required.", plan_draft=draft),
+        PlannerOutput(
+            response="Approval required.",
+            proposed_objective=objective,
+            proposed_tasks=(task,),
+            proposed_plan_revision=revision,
+        ),
     )
 
     assert successor is current

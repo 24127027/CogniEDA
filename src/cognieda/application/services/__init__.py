@@ -6,8 +6,6 @@ from .active_plan_execution import (
 )
 from .approved_plan_commit import (
     ApprovedPlanCommitError,
-    ApprovedPlanCommitErrorCode,
-    ApprovedPlanCommitResult,
     commit_approved_plan,
 )
 from .execution_admission import build_execution_admission_operations
@@ -33,8 +31,6 @@ __all__ = (
     "ActivePlanExecutionResult",
     "ActivePlanExecutor",
     "ApprovedPlanCommitError",
-    "ApprovedPlanCommitErrorCode",
-    "ApprovedPlanCommitResult",
     "ExecutionAttemptTransitionService",
     "DataAdmissionError",
     "DataAdmissionErrorCode",

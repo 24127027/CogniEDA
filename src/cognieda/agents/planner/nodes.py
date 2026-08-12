@@ -5,9 +5,9 @@ from typing import cast
 from langgraph.runtime import Runtime
 
 from cognieda.execution import Capability
-from cognieda.schemas.artifacts import Assumption, Objective
+from cognieda.schemas.artifacts import Assumption, Objective, Task
 from cognieda.schemas.enums import TaskKind
-from cognieda.schemas.plan_draft import PlanDraft, TaskDraft
+from cognieda.schemas.plan_revision import PlanRevision, PlanTaskBinding
 
 from .context import Context
 from .model import PlannerDecisionModel
@@ -151,17 +151,25 @@ async def prepare_results(state: State, runtime: Runtime[Context]) -> State:
                     )
                     return state
                 objective = Objective(text=decision.objective_text)
-            state.plan_draft = PlanDraft(
-                objective=objective,
-                task_drafts=(
-                    TaskDraft(
-                        kind=TaskKind.DATA,
-                        instruction=decision.task_instruction,
+            task = Task(
+                objective_id=objective.objective_id,
+                kind=TaskKind.DATA,
+                instruction=decision.task_instruction,
+            )
+            revision = PlanRevision.create(
+                objective_id=objective.objective_id,
+                task_bindings=(
+                    PlanTaskBinding(
+                        task_id=task.task_id,
                         required_capability=decision.capability,
                         order_rank=0,
                     ),
                 ),
+                authoritative_tasks=(task,),
             )
+            state.proposed_objective = objective
+            state.proposed_tasks = (task,)
+            state.proposed_plan_revision = revision
         elif decision.action is PlannerAction.INVALID_OR_UNSUPPORTED:
             state.error = _error(
                 PlannerErrorCode.UNSUPPORTED_ACTION,
@@ -244,13 +252,15 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
             "It is not empirical Evidence."
         )
     elif decision.action is PlannerAction.CREATE_OR_RUN_DATA_TASK:
-        draft = state.plan_draft
-        assert draft is not None
+        objective = state.proposed_objective
+        revision = state.proposed_plan_revision
+        assert objective is not None
+        assert revision is not None
         state.response = (
-            f"Proposed plan {draft.plan_draft_id} for Objective: {draft.objective.text} "
-            f"with {len(draft.task_drafts)} DATA Task. No authoritative state or execution "
-            f"exists yet. Approve the exact draft with /approve {draft.fingerprint} or "
-            f"reject it with /reject {draft.fingerprint}."
+            f"Proposed transient PlanRevision {revision.plan_revision_id} for Objective: "
+            f"{objective.text} with {len(state.proposed_tasks)} DATA Task. No authoritative "
+            "state or execution exists yet. Use /approve to commit this pending plan or "
+            "/reject to discard it."
         )
     else:
         state.response = decision.message or "The requested action is unsupported."

@@ -5,11 +5,7 @@ from uuid import uuid4
 import pytest
 from sqlmodel import Session, select
 
-from cognieda.application.services import (
-    ApprovedPlanCommitError,
-    ApprovedPlanCommitErrorCode,
-    commit_approved_plan,
-)
+from cognieda.application.services import ApprovedPlanCommitError, commit_approved_plan
 from cognieda.execution import Capability
 from cognieda.infrastructure.persistence.models import (
     ActivePlanRevisionRecord,
@@ -20,55 +16,67 @@ from cognieda.infrastructure.persistence.models import (
 from cognieda.infrastructure.persistence.repositories import PlanRevisionRepository
 from cognieda.schemas import (
     Objective,
-    PlanDraft,
-    PlanDraftApproval,
-    PlanDraftDecision,
-    PlanDraftDependency,
+    PlanDependency,
     PlanPriority,
-    TaskDraft,
+    PlanRevision,
+    PlanTaskBinding,
+    Task,
     TaskKind,
     TaskStatus,
 )
 
 
-def _draft(*, objective: Objective | None = None, task_count: int = 1) -> PlanDraft:
+def _plan(
+    *,
+    objective: Objective | None = None,
+    task_count: int = 1,
+) -> tuple[Objective, tuple[Task, ...], PlanRevision]:
     objective = objective or Objective(text="Understand dataset size.")
-    task_drafts = tuple(
-        TaskDraft(
+    tasks = tuple(
+        Task(
+            objective_id=objective.objective_id,
             kind=TaskKind.DATA,
             instruction=f"Bounded data work {index}.",
-            required_capability=Capability.DATA_ANALYSIS,
-            order_rank=index,
-            priority=PlanPriority.HIGH if index == 0 else PlanPriority.NORMAL,
         )
         for index in range(task_count)
     )
     dependencies = (
         (
-            PlanDraftDependency(
-                prerequisite_task_draft_id=task_drafts[0].task_draft_id,
-                dependent_task_draft_id=task_drafts[1].task_draft_id,
+            PlanDependency(
+                prerequisite_task_id=tasks[0].task_id,
+                dependent_task_id=tasks[1].task_id,
             ),
         )
         if task_count == 2
         else ()
     )
-    return PlanDraft(
-        objective=objective,
-        task_drafts=task_drafts,
+    revision = PlanRevision.create(
+        objective_id=objective.objective_id,
+        task_bindings=(
+            PlanTaskBinding(
+                task_id=task.task_id,
+                required_capability=Capability.DATA_ANALYSIS,
+                order_rank=index,
+                priority=PlanPriority.HIGH if index == 0 else PlanPriority.NORMAL,
+            )
+            for index, task in enumerate(tasks)
+        ),
         dependencies=dependencies,
+        authoritative_tasks=tasks,
     )
+    return objective, tasks, revision
 
 
-def _approval(
-    draft: PlanDraft,
-    *,
-    decision: PlanDraftDecision = PlanDraftDecision.APPROVE,
-) -> PlanDraftApproval:
-    return PlanDraftApproval(
-        plan_draft_id=draft.plan_draft_id,
-        plan_draft_fingerprint=draft.fingerprint,
-        decision=decision,
+def _commit(
+    session: Session,
+    plan: tuple[Objective, tuple[Task, ...], PlanRevision],
+) -> None:
+    objective, tasks, revision = plan
+    commit_approved_plan(
+        session,
+        objective=objective,
+        tasks=tasks,
+        plan_revision=revision,
     )
 
 
@@ -81,57 +89,42 @@ def _counts(session: Session) -> tuple[int, int, int, int]:
     )
 
 
-def test_approved_draft_atomically_admits_tasks_revision_and_active_selection(
+def test_approval_atomically_admits_exact_tasks_revision_and_active_selection(
     db_session: Session,
 ) -> None:
-    draft = _draft(task_count=2)
+    objective, tasks, revision = _plan(task_count=2)
 
-    result = commit_approved_plan(
-        db_session,
-        plan_draft=draft,
-        approval=_approval(draft),
-    )
+    _commit(db_session, (objective, tasks, revision))
 
-    assert result.objective == draft.objective
-    assert [task.task_id for task in result.tasks] == [
-        task_draft.task_draft_id for task_draft in draft.task_drafts
-    ]
-    assert all(task.status is TaskStatus.PENDING for task in result.tasks)
-    assert result.plan_revision.objective_id == draft.objective.objective_id
-    assert result.plan_revision.dependencies[0].prerequisite_task_id == result.tasks[0].task_id
-    assert result.active_selection.plan_revision_id == result.plan_revision.plan_revision_id
-    assert PlanRevisionRepository(db_session).get_by_id(
-        result.plan_revision.plan_revision_id
-    ) == result.plan_revision
+    assert all(task.status is TaskStatus.PENDING for task in tasks)
+    assert revision.dependencies[0].prerequisite_task_id == tasks[0].task_id
+    assert PlanRevisionRepository(db_session).get_by_id(revision.plan_revision_id) == revision
+    task_rows = db_session.exec(select(TaskRecord)).all()
+    assert {row.task_id for row in task_rows} == {task.task_id for task in tasks}
+    selection = db_session.exec(select(ActivePlanRevisionRecord)).one()
+    assert selection.plan_revision_id == revision.plan_revision_id
     assert _counts(db_session) == (1, 2, 1, 1)
 
 
-@pytest.mark.parametrize(
-    ("approval", "expected_code"),
-    [
-        ("reject", ApprovedPlanCommitErrorCode.DRAFT_REJECTED),
-        ("mismatch", ApprovedPlanCommitErrorCode.APPROVAL_MISMATCH),
-    ],
-)
-def test_rejection_or_non_exact_approval_creates_no_authoritative_state(
+def test_mismatched_canonical_objects_create_no_authoritative_state(
     db_session: Session,
-    approval: str,
-    expected_code: ApprovedPlanCommitErrorCode,
 ) -> None:
-    draft = _draft()
-    decision = _approval(draft, decision=PlanDraftDecision.REJECT)
-    if approval == "mismatch":
-        decision = decision.model_copy(
-            update={
-                "decision": PlanDraftDecision.APPROVE,
-                "plan_draft_id": uuid4(),
-            }
+    objective, _, revision = _plan()
+    mismatched_task = Task(
+        task_id=uuid4(),
+        objective_id=objective.objective_id,
+        kind=TaskKind.DATA,
+        instruction="Different task identity.",
+    )
+
+    with pytest.raises(ApprovedPlanCommitError, match="membership must match"):
+        commit_approved_plan(
+            db_session,
+            objective=objective,
+            tasks=(mismatched_task,),
+            plan_revision=revision,
         )
 
-    with pytest.raises(ApprovedPlanCommitError) as exc_info:
-        commit_approved_plan(db_session, plan_draft=draft, approval=decision)
-
-    assert exc_info.value.code is expected_code
     assert _counts(db_session) == (0, 0, 0, 0)
 
 
@@ -139,7 +132,7 @@ def test_failed_commit_rolls_back_staged_objective_and_tasks(
     db_session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    draft = _draft()
+    plan = _plan()
 
     def fail_revision_add(self: PlanRevisionRepository, revision: object) -> None:
         del self, revision
@@ -148,11 +141,7 @@ def test_failed_commit_rolls_back_staged_objective_and_tasks(
     monkeypatch.setattr(PlanRevisionRepository, "add", fail_revision_add)
 
     with pytest.raises(RuntimeError, match="injected revision persistence failure"):
-        commit_approved_plan(
-            db_session,
-            plan_draft=draft,
-            approval=_approval(draft),
-        )
+        _commit(db_session, plan)
 
     assert _counts(db_session) == (0, 0, 0, 0)
 
@@ -160,20 +149,11 @@ def test_failed_commit_rolls_back_staged_objective_and_tasks(
 def test_existing_active_revision_blocks_replanning_without_orphan_task(
     db_session: Session,
 ) -> None:
-    first = _draft()
-    commit_approved_plan(
-        db_session,
-        plan_draft=first,
-        approval=_approval(first),
-    )
-    second = _draft(objective=first.objective)
+    first = _plan()
+    _commit(db_session, first)
+    second = _plan(objective=first[0])
 
-    with pytest.raises(ApprovedPlanCommitError) as exc_info:
-        commit_approved_plan(
-            db_session,
-            plan_draft=second,
-            approval=_approval(second),
-        )
+    with pytest.raises(ApprovedPlanCommitError, match="Replanning"):
+        _commit(db_session, second)
 
-    assert exc_info.value.code is ApprovedPlanCommitErrorCode.ACTIVE_PLAN_EXISTS
     assert _counts(db_session) == (1, 1, 1, 1)

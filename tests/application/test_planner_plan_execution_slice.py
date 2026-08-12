@@ -128,21 +128,26 @@ def test_approved_planner_data_plan_executes_real_work_end_to_end(
         application.submit_message("How many rows are in this customer dataset?")
     )
 
-    draft = application.pending_plan_draft
-    assert draft is not None
-    assert draft.fingerprint in proposal.content
+    pending_objective = application._pending_objective
+    pending_tasks = application._pending_tasks
+    pending_revision = application._pending_plan_revision
+    assert pending_objective is not None
+    assert pending_tasks
+    assert pending_revision is not None
+    assert str(pending_revision.plan_revision_id) in proposal.content
     assert _authoritative_counts(db_session) == (0, 0, 0, 0)
     assert application.session_frame.objective is None
     assert application.session_frame.tasks == ()
 
-    response = asyncio.run(
-        application.submit_message(f"/approve {draft.fingerprint}")
-    )
+    response = asyncio.run(application.submit_message("/approve"))
 
-    assert application.pending_plan_draft is None
-    assert application.session_frame.objective == draft.objective
+    assert application._pending_objective is None
+    assert application._pending_tasks == ()
+    assert application._pending_plan_revision is None
+    assert application.session_frame.objective == pending_objective
     assert len(application.session_frame.tasks) == 1
     completed_task = application.session_frame.tasks[0]
+    assert completed_task.task_id == pending_tasks[0].task_id
     assert completed_task.status is TaskStatus.COMPLETED
     assert TaskRepository(db_session).get_by_id(completed_task.task_id) == completed_task
     assert _authoritative_counts(db_session) == (1, 1, 1, 0)
@@ -150,37 +155,59 @@ def test_approved_planner_data_plan_executes_real_work_end_to_end(
     assert "not admitted as Evidence" in response.content
 
 
-def test_rejected_plan_draft_never_creates_or_executes_authoritative_work(
+def test_rejected_transient_plan_never_creates_or_executes_authoritative_work(
     tmp_path,
     db_session: Session,
 ) -> None:
     application = _application(tmp_path, db_session)
     asyncio.run(application.submit_message("How many rows are in this customer dataset?"))
-    draft = application.pending_plan_draft
-    assert draft is not None
+    pending_revision = application._pending_plan_revision
+    assert pending_revision is not None
 
-    response = asyncio.run(
-        application.submit_message(f"/reject {draft.fingerprint}")
-    )
+    response = asyncio.run(application.submit_message("/reject"))
 
-    assert application.pending_plan_draft is None
+    assert application._pending_plan_revision is None
     assert "No authoritative Task or PlanRevision was created" in response.content
     assert _authoritative_counts(db_session) == (0, 0, 0, 0)
     assert application.session_frame.objective is None
     assert application.session_frame.tasks == ()
 
 
-def test_non_exact_approval_cannot_commit_or_execute_pending_draft(
+def test_approval_and_rejection_without_pending_plan_fail_cleanly(
+    tmp_path,
+    db_session: Session,
+) -> None:
+    application = _application(tmp_path, db_session)
+
+    approval = asyncio.run(application.submit_message("/approve"))
+    rejection = asyncio.run(application.submit_message("/reject"))
+
+    assert "No plan is pending Human approval" in approval.content
+    assert "No plan is pending Human rejection" in rejection.content
+    assert _authoritative_counts(db_session) == (0, 0, 0, 0)
+
+
+def test_second_proposal_cannot_replace_the_exact_pending_objects(
     tmp_path,
     db_session: Session,
 ) -> None:
     application = _application(tmp_path, db_session)
     asyncio.run(application.submit_message("How many rows are in this customer dataset?"))
-    draft = application.pending_plan_draft
-    assert draft is not None
+    first_objective = application._pending_objective
+    first_tasks = application._pending_tasks
+    first_revision = application._pending_plan_revision
 
-    response = asyncio.run(application.submit_message(f"/approve sha256:{'0' * 64}"))
+    response = asyncio.run(
+        application.submit_message("Propose a later regenerated version of that plan.")
+    )
 
-    assert "did not match" in response.content
-    assert application.pending_plan_draft is draft
+    assert "already pending Human approval" in response.content
+    assert application._pending_objective is first_objective
+    assert application._pending_tasks is first_tasks
+    assert application._pending_plan_revision is first_revision
     assert _authoritative_counts(db_session) == (0, 0, 0, 0)
+
+    asyncio.run(application.submit_message("/approve"))
+
+    assert application.session_frame.objective == first_objective
+    assert application.session_frame.tasks[0].task_id == first_tasks[0].task_id

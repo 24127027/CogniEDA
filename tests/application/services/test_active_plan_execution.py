@@ -27,12 +27,11 @@ from cognieda.execution import (
 )
 from cognieda.schemas import (
     Objective,
-    PlanDraft,
-    PlanDraftApproval,
-    PlanDraftDecision,
-    PlanDraftDependency,
+    PlanDependency,
     PlanPriority,
-    TaskDraft,
+    PlanRevision,
+    PlanTaskBinding,
+    Task,
     TaskKind,
 )
 
@@ -58,15 +57,17 @@ def _profile_and_registry(tmp_path, db_session: Session):
     return admitted.data_profile, registry
 
 
-def _approve(db_session: Session, draft: PlanDraft) -> None:
+def _approve(
+    db_session: Session,
+    objective: Objective,
+    tasks: tuple[Task, ...],
+    revision: PlanRevision,
+) -> None:
     commit_approved_plan(
         db_session,
-        plan_draft=draft,
-        approval=PlanDraftApproval(
-            plan_draft_id=draft.plan_draft_id,
-            plan_draft_fingerprint=draft.fingerprint,
-            decision=PlanDraftDecision.APPROVE,
-        ),
+        objective=objective,
+        tasks=tasks,
+        plan_revision=revision,
     )
 
 
@@ -75,52 +76,64 @@ def test_dependency_precedes_priority_and_completed_tasks_are_not_rerun(
     db_session: Session,
 ) -> None:
     profile, registry = _profile_and_registry(tmp_path, db_session)
-    prerequisite = TaskDraft(
+    objective = Objective(text="Verify deterministic plan progression.")
+    prerequisite = Task(
+        objective_id=objective.objective_id,
         kind=TaskKind.DATA,
         instruction="First count rows.",
-        required_capability=Capability.DATA_ANALYSIS,
-        order_rank=10,
-        priority=PlanPriority.LOW,
     )
-    dependent = TaskDraft(
+    dependent = Task(
+        objective_id=objective.objective_id,
         kind=TaskKind.DATA,
         instruction="Then count rows again.",
-        required_capability=Capability.DATA_ANALYSIS,
-        order_rank=0,
-        priority=PlanPriority.HIGH,
     )
-    draft = PlanDraft(
-        objective=Objective(text="Verify deterministic plan progression."),
-        task_drafts=(dependent, prerequisite),
-        dependencies=(
-            PlanDraftDependency(
-                prerequisite_task_draft_id=prerequisite.task_draft_id,
-                dependent_task_draft_id=dependent.task_draft_id,
+    tasks = (dependent, prerequisite)
+    revision = PlanRevision.create(
+        objective_id=objective.objective_id,
+        task_bindings=(
+            PlanTaskBinding(
+                task_id=dependent.task_id,
+                required_capability=Capability.DATA_ANALYSIS,
+                order_rank=0,
+                priority=PlanPriority.HIGH,
+            ),
+            PlanTaskBinding(
+                task_id=prerequisite.task_id,
+                required_capability=Capability.DATA_ANALYSIS,
+                order_rank=10,
+                priority=PlanPriority.LOW,
             ),
         ),
+        dependencies=(
+            PlanDependency(
+                prerequisite_task_id=prerequisite.task_id,
+                dependent_task_id=dependent.task_id,
+            ),
+        ),
+        authoritative_tasks=tasks,
     )
-    _approve(db_session, draft)
+    _approve(db_session, objective, tasks, revision)
     executor = ActivePlanExecutor(db_session, ExecutorDispatcher(registry))
 
     first = asyncio.run(
         executor.execute_next(
-            objective_id=draft.objective.objective_id,
+            objective_id=objective.objective_id,
             data_profile_id=profile.data_profile_id,
         )
     )
     second = asyncio.run(
         executor.execute_next(
-            objective_id=draft.objective.objective_id,
+            objective_id=objective.objective_id,
             data_profile_id=profile.data_profile_id,
         )
     )
 
-    assert first.task.task_id == prerequisite.task_draft_id
-    assert second.task.task_id == dependent.task_draft_id
+    assert first.task.task_id == prerequisite.task_id
+    assert second.task.task_id == dependent.task_id
     with pytest.raises(ActivePlanExecutionError) as exc_info:
         asyncio.run(
             executor.execute_next(
-                objective_id=draft.objective.objective_id,
+                objective_id=objective.objective_id,
                 data_profile_id=profile.data_profile_id,
             )
         )
@@ -132,24 +145,31 @@ def test_unavailable_capability_returns_typed_non_success_without_fallback(
     db_session: Session,
 ) -> None:
     profile, _ = _profile_and_registry(tmp_path, db_session)
-    task = TaskDraft(
+    objective = Objective(text="Count rows.")
+    task = Task(
+        objective_id=objective.objective_id,
         kind=TaskKind.DATA,
         instruction="Count rows.",
-        required_capability=Capability.DATA_ANALYSIS,
-        order_rank=0,
     )
-    draft = PlanDraft(
-        objective=Objective(text="Count rows."),
-        task_drafts=(task,),
+    revision = PlanRevision.create(
+        objective_id=objective.objective_id,
+        task_bindings=(
+            PlanTaskBinding(
+                task_id=task.task_id,
+                required_capability=Capability.DATA_ANALYSIS,
+                order_rank=0,
+            ),
+        ),
+        authoritative_tasks=(task,),
     )
-    _approve(db_session, draft)
+    _approve(db_session, objective, (task,), revision)
 
     result = asyncio.run(
         ActivePlanExecutor(
             db_session,
             ExecutorDispatcher(ExecutorRegistry()),
         ).execute_next(
-            objective_id=draft.objective.objective_id,
+            objective_id=objective.objective_id,
             data_profile_id=profile.data_profile_id,
         )
     )

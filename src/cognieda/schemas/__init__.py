@@ -75,13 +75,6 @@ from cognieda.schemas.enums import (
     UserDecisionType,
     VariableType,
 )
-from cognieda.schemas.plan_draft import (
-    PlanDraft,
-    PlanDraftApproval,
-    PlanDraftDecision,
-    PlanDraftDependency,
-    TaskDraft,
-)
 from cognieda.schemas.plan_revision import (
     PLAN_REVISION_CONTRACT_VERSION,
     ActivePlanRevisionSelection,
@@ -156,10 +149,6 @@ __all__ = [
     "PlannerOperationApprovalState",
     "PlannerOperationType",
     "PlanDependency",
-    "PlanDraft",
-    "PlanDraftApproval",
-    "PlanDraftDecision",
-    "PlanDraftDependency",
     "PlanPriority",
     "PlanRevision",
     "PlanTaskBinding",
@@ -171,7 +160,6 @@ __all__ = [
     "SessionFrameStatus",
     "StaleContextMarker",
     "Task",
-    "TaskDraft",
     "TaskContextSummary",
     "TaskKind",
     "TaskStatus",

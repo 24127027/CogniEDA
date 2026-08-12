@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SkipValidation, model_validator
 from pydantic_ai.messages import ModelMessage
 
 from cognieda.execution import Capability, ExecutorContext
 from cognieda.schemas.artifacts import Assumption, DataProfile, Evidence, Objective, Task
-from cognieda.schemas.plan_draft import PlanDraft
+from cognieda.schemas.plan_revision import PlanRevision
 
 from .context import PlanningContext
 
@@ -159,7 +159,9 @@ class State(BaseModel):
     decision: PlannerDecision | None = None
     created_objective: Objective | None = None
     created_assumption: Assumption | None = None
-    plan_draft: PlanDraft | None = None
+    proposed_objective: Objective | None = None
+    proposed_tasks: tuple[Task, ...] = ()
+    proposed_plan_revision: SkipValidation[PlanRevision] | None = None
     response: str | None = None
     new_messages: tuple[ModelMessage, ...] = ()
     error: PlannerControlledError | None = None
@@ -174,6 +176,8 @@ class PlannerOutput(BaseModel):
     decision: PlannerDecision | None = None
     created_objective: Objective | None = None
     created_assumption: Assumption | None = None
-    plan_draft: PlanDraft | None = None
+    proposed_objective: Objective | None = None
+    proposed_tasks: tuple[Task, ...] = ()
+    proposed_plan_revision: SkipValidation[PlanRevision] | None = None
     new_messages: tuple[ModelMessage, ...] = ()
     error: PlannerControlledError | None = None

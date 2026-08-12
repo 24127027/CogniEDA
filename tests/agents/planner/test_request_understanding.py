@@ -95,7 +95,7 @@ def test_natural_language_understanding_receives_latest_request_and_typed_state(
     assert output.decision.action is PlannerAction.STATE_SUMMARY
     assert output.created_objective is None
     assert output.created_assumption is None
-    assert output.plan_draft is None
+    assert output.proposed_plan_revision is None
     assert len(model.decision_inputs) == 1
     model_input = model.decision_inputs[0]
     assert model_input.latest_request == "Summarize the active research state."
@@ -177,7 +177,7 @@ def test_unknown_explicit_command_fails_without_model_fallback_or_state_change()
     assert output.error.code is PlannerErrorCode.INVALID_COMMAND
     assert output.created_objective is None
     assert output.created_assumption is None
-    assert output.plan_draft is None
+    assert output.proposed_plan_revision is None
     assert model.decision_inputs == []
     assert dispatcher.requests == []
 
