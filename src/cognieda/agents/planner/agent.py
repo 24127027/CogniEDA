@@ -23,6 +23,7 @@ class Planner:
         planner_model: PlannerDecisionModel | None = None,
         agent_factory: AgentFactoryPort | None = None,
         model_config: ModelConfig | None = None,
+        agent_instruction: str = "",
     ) -> None:
         if planner_model is not None:
             if agent_factory is not None or model_config is not None:
@@ -39,6 +40,7 @@ class Planner:
                 deps=deps,
                 agent_factory=agent_factory,
                 model_config=model_config,
+                agent_instruction=agent_instruction,
             )
 
         self.deps = deps

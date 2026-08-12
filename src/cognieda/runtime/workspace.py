@@ -61,7 +61,7 @@ class Workspace:
         return self.cognieda_dir / "skills.toml"
 
     @property
-    def agents_instruction_path(self) -> Path:
+    def planner_agent_instruction_path(self) -> Path:
         return self.root / "AGENTS.md"
 
     @classmethod
@@ -183,3 +183,11 @@ class Workspace:
     def _save_skills_config(self, config: dict) -> None:
         with open(self.skills_config_path, "w", encoding="utf-8") as f:
             toml.dump(config, f)
+
+    def load_planner_agent_instruction(self) -> str:
+        path = self.planner_agent_instruction_path
+
+        if not path.is_file():
+            return ""
+
+        return path.read_text(encoding="utf-8")

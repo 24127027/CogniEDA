@@ -4,7 +4,7 @@ from pathlib import Path
 
 def assemble(
     file_name: str,
-    base_instruction: str | None = None,
+    agent_instruction: str | None = None,
 ) -> list[str]:
     """
     Load an operation instruction and optionally prepend the agent's
@@ -13,12 +13,12 @@ def assemble(
     The operation instruction is loaded from the calling agent's
     ``instruction/`` directory.
 
-    If ``base_instruction`` is not provided, ``agents.md`` in the same
+    If ``agent_instruction`` is not provided, ``agents.md`` in the same
     directory is used when present.
 
     :param file_name: Filename or relative path inside the agent's
         ``instruction/`` directory.
-    :param base_instruction: Optional base agent instruction.
+    :param agent_instruction: Optional base agent instruction.
     :return: Instruction parts in base-then-operation order.
     """
     caller_frame = inspect.stack()[1]
@@ -33,18 +33,18 @@ def assemble(
             f"{instruction_path}"
         )
 
-    if base_instruction is None:
-        base_instruction_path = instruction_dir / "agents.md"
+    if agent_instruction is None:
+        agent_instruction_path = instruction_dir / "agents.md"
 
-        if base_instruction_path.is_file():
-            base_instruction = base_instruction_path.read_text(
+        if agent_instruction_path.is_file():
+            agent_instruction = agent_instruction_path.read_text(
                 encoding="utf-8"
             )
 
     instructions: list[str] = []
 
-    if base_instruction and base_instruction.strip():
-        instructions.append(base_instruction)
+    if agent_instruction and agent_instruction.strip():
+        instructions.append(agent_instruction)
 
     operation_instruction = instruction_path.read_text(encoding="utf-8")
 
