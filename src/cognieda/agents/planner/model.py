@@ -101,9 +101,6 @@ class PlannerModel:
         self, answer_input: PlannerAnswerInput
     ) -> PlannerModelResult[PlannerResponseDraft]:
         prompt = (
-            "Answer the latest request using only the admitted Evidence in this typed input.\n"
-            "Do not invent analysis, strengthen the Evidence, or treat omitted planning "
-            "Assumptions as support. Mention material provenance or scope limits when useful.\n"
             f"Typed evidence input:\n{answer_input.model_dump_json()}"
         )
         result = await self._agent.run(
