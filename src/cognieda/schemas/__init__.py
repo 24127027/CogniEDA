@@ -84,6 +84,7 @@ from cognieda.schemas.plan_draft import (
 )
 from cognieda.schemas.plan_revision import (
     PLAN_REVISION_CONTRACT_VERSION,
+    ActivePlanRevisionSelection,
     PlanDependency,
     PlanRevision,
     PlanTaskBinding,
@@ -97,6 +98,7 @@ from cognieda.schemas.provenance import (
 )
 
 __all__ = [
+    "ActivePlanRevisionSelection",
     "AnalysisFrame",
     "Assumption",
     "AssumptionContextSummary",

@@ -30,11 +30,18 @@ class ObjectiveRepository:
         self._session = session
 
     def create(self, objective: Objective) -> Objective:
-        record = ObjectiveRecord(**schema_to_record_payload(objective))
-        self._session.add(record)
+        self.add(objective)
         self._session.commit()
+        record = self._session.get(ObjectiveRecord, objective.objective_id)
+        if record is None:
+            raise RuntimeError("Committed Objective could not be reloaded.")
         self._session.refresh(record)
         return record_to_schema(Objective, record)
+
+    def add(self, objective: Objective) -> None:
+        """Stage an Objective without committing the caller-owned transaction."""
+
+        self._session.add(ObjectiveRecord(**schema_to_record_payload(objective)))
 
     def get_by_id(self, objective_id: UUID) -> Objective | None:
         record = self._session.get(ObjectiveRecord, objective_id)

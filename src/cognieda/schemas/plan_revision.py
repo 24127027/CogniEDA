@@ -228,8 +228,16 @@ class PlanRevision(ImmutableCogniEDABaseModel):
         return f"sha256:{hashlib.sha256(serialized).hexdigest()}"
 
 
+class ActivePlanRevisionSelection(ImmutableCogniEDABaseModel):
+    """Explicit runtime selection of the sole active revision for one Objective."""
+
+    objective_id: UUID
+    plan_revision_id: UUID
+
+
 __all__ = (
     "PLAN_REVISION_CONTRACT_VERSION",
+    "ActivePlanRevisionSelection",
     "PlanDependency",
     "PlanRevision",
     "PlanTaskBinding",

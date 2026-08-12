@@ -1,3 +1,9 @@
+from .approved_plan_commit import (
+    ApprovedPlanCommitError,
+    ApprovedPlanCommitErrorCode,
+    ApprovedPlanCommitResult,
+    commit_approved_plan,
+)
 from .execution_admission import build_execution_admission_operations
 from .mvp_data_admission import (
     DataAdmissionError,
@@ -16,6 +22,9 @@ from .planner_commit import commit_planner_operations
 from .transition_service import ExecutionAttemptTransitionService
 
 __all__ = (
+    "ApprovedPlanCommitError",
+    "ApprovedPlanCommitErrorCode",
+    "ApprovedPlanCommitResult",
     "ExecutionAttemptTransitionService",
     "DataAdmissionError",
     "DataAdmissionErrorCode",
@@ -27,5 +36,6 @@ __all__ = (
     "PlanRevisionValidationErrorCode",
     "PlanRevisionValidator",
     "build_execution_admission_operations",
+    "commit_approved_plan",
     "commit_planner_operations",
 )

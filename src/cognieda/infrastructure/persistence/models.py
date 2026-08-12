@@ -177,6 +177,24 @@ class PlanDependencyRecord(SQLModel, table=True):
     dependent_task_id: UUID = Field(foreign_key="tasks.task_id", primary_key=True)
 
 
+class ActivePlanRevisionRecord(SQLModel, table=True):
+    """Sole explicit executable PlanRevision selection for one Objective."""
+
+    __tablename__ = "active_plan_revisions"
+    __table_args__ = (
+        UniqueConstraint("plan_revision_id", name="uq_active_plan_revision_id"),
+    )
+
+    objective_id: UUID = Field(
+        foreign_key="objectives.objective_id",
+        primary_key=True,
+    )
+    plan_revision_id: UUID = Field(
+        foreign_key="plan_revisions.plan_revision_id",
+        nullable=False,
+    )
+
+
 class HypothesisRecord(TimestampedRecord, table=True):
     """Persisted Hypothesis FCO."""
 

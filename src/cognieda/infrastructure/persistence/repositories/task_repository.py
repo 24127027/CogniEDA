@@ -34,11 +34,18 @@ class TaskRepository:
         self._session = session
 
     def create(self, task: Task) -> Task:
-        record = TaskRecord(**schema_to_record_payload(task))
-        self._session.add(record)
+        self.add(task)
         self._session.commit()
+        record = self._session.get(TaskRecord, task.task_id)
+        if record is None:
+            raise RuntimeError("Committed Task could not be reloaded.")
         self._session.refresh(record)
         return record_to_schema(Task, record)
+
+    def add(self, task: Task) -> None:
+        """Stage a Task without committing the caller-owned transaction."""
+
+        self._session.add(TaskRecord(**schema_to_record_payload(task)))
 
     def get_by_id(self, task_id: UUID) -> Task | None:
         record = self._session.get(TaskRecord, task_id)
