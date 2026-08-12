@@ -4,16 +4,10 @@ from typing import cast
 
 from langgraph.runtime import Runtime
 
-from cognieda.application.ports import ExecutorDispatcherPort
-from cognieda.execution import (
-    Capability,
-    ExecutionRequest,
-    ExecutionStatus,
-    ExecutorInput,
-    normalize_for_planner,
-)
-from cognieda.schemas.artifacts import Assumption, Objective, Task
-from cognieda.schemas.enums import TaskKind, TaskStatus
+from cognieda.execution import Capability
+from cognieda.schemas.artifacts import Assumption, Objective
+from cognieda.schemas.enums import TaskKind
+from cognieda.schemas.plan_draft import PlanDraft, TaskDraft
 
 from .context import Context
 from .model import PlannerDecisionModel
@@ -157,14 +151,17 @@ async def prepare_results(state: State, runtime: Runtime[Context]) -> State:
                     )
                     return state
                 objective = Objective(text=decision.objective_text)
-                state.created_objective = objective
-            state.created_task = Task(
-                objective_id=objective.objective_id,
-                kind=TaskKind.DATA,
-                instruction=decision.task_instruction,
-                status=TaskStatus.PENDING,
+            state.plan_draft = PlanDraft(
+                objective=objective,
+                task_drafts=(
+                    TaskDraft(
+                        kind=TaskKind.DATA,
+                        instruction=decision.task_instruction,
+                        required_capability=decision.capability,
+                        order_rank=0,
+                    ),
+                ),
             )
-            state.selected_capability = decision.capability
         elif decision.action is PlannerAction.INVALID_OR_UNSUPPORTED:
             state.error = _error(
                 PlannerErrorCode.UNSUPPORTED_ACTION,
@@ -178,86 +175,11 @@ async def prepare_results(state: State, runtime: Runtime[Context]) -> State:
     return state
 
 
-def _with_task_status(task: Task, status: TaskStatus) -> Task:
-    return Task(
-        task_id=task.task_id,
-        objective_id=task.objective_id,
-        kind=task.kind,
-        instruction=task.instruction,
-        status=status,
-    )
-
-
-async def dispatch_work(state: State, runtime: Runtime[Context]) -> State:
-    """Run only a tracked Task and consume its bounded PlannerWorkOutcome projection."""
-
-    if (
-        state.error is not None
-        or state.created_task is None
-        or state.selected_capability is None
-    ):
-        return state
-
-    dispatcher = cast(ExecutorDispatcherPort, runtime.context.dispatcher)
-    task = state.created_task
-    task_id = task.task_id
-    try:
-        running_task = _with_task_status(task, TaskStatus.RUNNING)
-        state.created_task = running_task
-        result = await dispatcher.dispatch(
-            ExecutionRequest(
-                capability=state.selected_capability,
-                input=ExecutorInput(task=running_task),
-                context=state.execution_context,
-            )
-        )
-        outcome = normalize_for_planner(result)
-        state.work_outcome = outcome
-        if outcome.task_id != task_id:
-            state.created_task = _with_task_status(running_task, TaskStatus.FAILED)
-            state.error = _error(
-                PlannerErrorCode.TASK_OUTCOME_MISMATCH,
-                "Executor outcome Task identity did not match the dispatched Task.",
-            )
-            return state
-
-        terminal_status = (
-            TaskStatus.COMPLETED
-            if outcome.status is ExecutionStatus.SUCCEEDED
-            else TaskStatus.FAILED
-        )
-        state.created_task = _with_task_status(running_task, terminal_status)
-    except Exception as exc:
-        state.created_task = _with_task_status(task, TaskStatus.FAILED)
-        state.error = _error(
-            PlannerErrorCode.DISPATCH_FAILED,
-            f"Planner could not complete dispatcher work: {exc}",
-        )
-    return state
-
-
-def _outcome_details(state: State) -> str:
-    if (
-        state.error is not None
-        and state.error.code is PlannerErrorCode.TASK_OUTCOME_MISMATCH
-    ):
-        return ""
-    outcome = state.work_outcome
-    if outcome is None:
-        return ""
-    details = [*outcome.blockers, *outcome.limitations]
-    if outcome.permitted_next_actions:
-        details.append(
-            "Permitted next actions: " + ", ".join(outcome.permitted_next_actions) + "."
-        )
-    return " " + " ".join(details) if details else ""
-
-
 async def compose_response(state: State, runtime: Runtime[Context]) -> State:
     """Compose a human-facing response without upgrading non-admitted work to Evidence."""
 
     if state.error is not None:
-        state.response = state.error.message + _outcome_details(state)
+        state.response = state.error.message
         return state
 
     decision = state.decision
@@ -322,21 +244,14 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
             "It is not empirical Evidence."
         )
     elif decision.action is PlannerAction.CREATE_OR_RUN_DATA_TASK:
-        outcome = state.work_outcome
-        if outcome is None:
-            state.response = "The bounded Task was created but no executor outcome was returned."
-        elif outcome.status is ExecutionStatus.SUCCEEDED:
-            state.response = (
-                "The requested work completed at the executor boundary. No Evidence was "
-                "admitted, so the outcome is not an authoritative empirical finding."
-                + _outcome_details(state)
-            )
-        else:
-            state.response = (
-                f"The requested work ended with executor status {outcome.status.value}. "
-                "No Evidence was created."
-                + _outcome_details(state)
-            )
+        draft = state.plan_draft
+        assert draft is not None
+        state.response = (
+            f"Proposed plan {draft.plan_draft_id} for Objective: {draft.objective.text} "
+            f"with {len(draft.task_drafts)} DATA Task. No authoritative state or execution "
+            f"exists yet. Approve the exact draft with /approve {draft.fingerprint} or "
+            f"reject it with /reject {draft.fingerprint}."
+        )
     else:
         state.response = decision.message or "The requested action is unsupported."
     return state

@@ -34,12 +34,4 @@ def apply_planner_output(
         successor = successor.set_objective(planner_output.created_objective)
     if planner_output.created_assumption is not None:
         successor = successor.add_assumption(planner_output.created_assumption)
-    if planner_output.created_task is not None:
-        objective = successor.objective
-        if (
-            objective is None
-            or planner_output.created_task.objective_id != objective.objective_id
-        ):
-            raise ValueError("Planner Task result must match the active Objective identity.")
-        successor = successor.add_task(planner_output.created_task)
     return successor

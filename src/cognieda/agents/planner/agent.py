@@ -94,9 +94,7 @@ class Planner:
             decision=final_state.decision,
             created_objective=final_state.created_objective,
             created_assumption=final_state.created_assumption,
-            created_task=final_state.created_task,
-            selected_capability=final_state.selected_capability,
-            work_outcome=final_state.work_outcome,
+            plan_draft=final_state.plan_draft,
             new_messages=final_state.new_messages,
             error=final_state.error,
         )

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from uuid import uuid4
-
 import pytest
 from pydantic import ValidationError
 
 from cognieda.agents.planner.types import PlannerOutput
+from cognieda.execution import Capability
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.planner_context import apply_planner_output, build_planning_context
 from cognieda.schemas.artifacts import (
@@ -18,6 +17,7 @@ from cognieda.schemas.artifacts import (
 )
 from cognieda.schemas.common import EvidenceProvenance
 from cognieda.schemas.enums import TaskKind, TaskStatus
+from cognieda.schemas.plan_draft import PlanDraft, TaskDraft
 
 
 def _full_frame() -> SessionFrame:
@@ -87,46 +87,26 @@ def test_application_boundary_applies_objective_and_assumption_results() -> None
     assert successor.assumptions == (assumption,)
 
 
-def test_application_boundary_applies_terminal_task_with_exact_semantic_identity() -> None:
+def test_application_boundary_does_not_apply_non_authoritative_plan_draft() -> None:
     objective = Objective(text="Understand missingness.")
-    task = Task(
-        objective_id=objective.objective_id,
-        kind=TaskKind.DATA,
-        instruction="Summarize missingness by column.",
-        status=TaskStatus.COMPLETED,
+    draft = PlanDraft(
+        objective=objective,
+        task_drafts=(
+            TaskDraft(
+                kind=TaskKind.DATA,
+                instruction="Summarize missingness by column.",
+                required_capability=Capability.DATA_ANALYSIS,
+                order_rank=0,
+            ),
+        ),
     )
+    current = SessionFrame()
 
     successor = apply_planner_output(
-        SessionFrame(objective=objective),
-        PlannerOutput(response="Work completed.", created_task=task),
+        current,
+        PlannerOutput(response="Approval required.", plan_draft=draft),
     )
 
-    applied = successor.tasks[0]
-    assert applied.status is TaskStatus.COMPLETED
-    assert (
-        applied.task_id,
-        applied.objective_id,
-        applied.kind,
-        applied.instruction,
-    ) == (
-        task.task_id,
-        task.objective_id,
-        task.kind,
-        task.instruction,
-    )
-
-
-def test_application_boundary_rejects_task_for_another_objective() -> None:
-    objective = Objective(text="Understand missingness.")
-    mismatched_task = Task(
-        objective_id=uuid4(),
-        kind=TaskKind.DATA,
-        instruction="Summarize missingness by column.",
-        status=TaskStatus.FAILED,
-    )
-
-    with pytest.raises(ValueError, match="active Objective identity"):
-        apply_planner_output(
-            SessionFrame(objective=objective),
-            PlannerOutput(response="Work failed.", created_task=mismatched_task),
-        )
+    assert successor is current
+    assert successor.objective is None
+    assert successor.tasks == ()

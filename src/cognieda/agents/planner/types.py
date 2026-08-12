@@ -5,8 +5,9 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
 
-from cognieda.execution import Capability, ExecutorContext, PlannerWorkOutcome
+from cognieda.execution import Capability, ExecutorContext
 from cognieda.schemas.artifacts import Assumption, DataProfile, Evidence, Objective, Task
+from cognieda.schemas.plan_draft import PlanDraft
 
 from .context import PlanningContext
 
@@ -158,9 +159,7 @@ class State(BaseModel):
     decision: PlannerDecision | None = None
     created_objective: Objective | None = None
     created_assumption: Assumption | None = None
-    created_task: Task | None = None
-    selected_capability: Capability | None = None
-    work_outcome: PlannerWorkOutcome | None = None
+    plan_draft: PlanDraft | None = None
     response: str | None = None
     new_messages: tuple[ModelMessage, ...] = ()
     error: PlannerControlledError | None = None
@@ -175,8 +174,6 @@ class PlannerOutput(BaseModel):
     decision: PlannerDecision | None = None
     created_objective: Objective | None = None
     created_assumption: Assumption | None = None
-    created_task: Task | None = None
-    selected_capability: Capability | None = None
-    work_outcome: PlannerWorkOutcome | None = None
+    plan_draft: PlanDraft | None = None
     new_messages: tuple[ModelMessage, ...] = ()
     error: PlannerControlledError | None = None
