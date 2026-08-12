@@ -61,8 +61,8 @@ class Workspace:
         return self.cognieda_dir / "skills.toml"
 
     @property
-    def planner_instruction_path(self) -> Path:
-        return self.cognieda_dir / "agents.md"
+    def agents_instruction_path(self) -> Path:
+        return self.root / "AGENTS.md"
 
     @classmethod
     def open(cls, root: Path) -> "Workspace":
