@@ -30,11 +30,10 @@ from cognieda.schemas import enums as schema_enums
 
 OBJECTIVE_ID = UUID("10000000-0000-0000-0000-000000000000")
 
-_DEFAULT_CAPABILITY: dict[TaskKind, Capability | None] = {
+_DEFAULT_CAPABILITY: dict[TaskKind, Capability] = {
     TaskKind.DATA: Capability.DATA_ANALYSIS,
     TaskKind.SCIENTIFIC: Capability.HYPOTHESIS_TESTING,
     TaskKind.GRAPH: Capability.GRAPH_MINING,
-    TaskKind.SYNTHESIS: None,
 }
 
 
@@ -57,13 +56,13 @@ def _task(
 def _binding(
     task: Task,
     *,
-    capability: Capability | None | object = ...,
+    capability: Capability | object = ...,
     order_rank: int = 0,
     priority: PlanPriority = PlanPriority.NORMAL,
 ) -> PlanTaskBinding:
     default_capability = _DEFAULT_CAPABILITY[task.kind]
     selected_capability = default_capability if capability is ... else capability
-    assert isinstance(selected_capability, Capability) or selected_capability is None
+    assert isinstance(selected_capability, Capability)
     return PlanTaskBinding(
         task_id=task.task_id,
         required_capability=selected_capability,
@@ -289,24 +288,6 @@ def test_graph_requires_graph_mining() -> None:
     revision = _revision([task])
 
     assert revision.task_bindings[0].required_capability is Capability.GRAPH_MINING
-
-
-def test_synthesis_requires_no_capability() -> None:
-    task = _task(kind=TaskKind.SYNTHESIS)
-
-    revision = _revision([task])
-
-    assert revision.task_bindings[0].required_capability is None
-
-
-def test_synthesis_with_dispatcher_capability_is_rejected() -> None:
-    task = _task(kind=TaskKind.SYNTHESIS)
-
-    with pytest.raises(ValidationError, match="incompatible required capability"):
-        _revision(
-            [task],
-            bindings=(_binding(task, capability=Capability.DATA_ANALYSIS),),
-        )
 
 
 def test_binding_rejects_removed_assigned_role() -> None:

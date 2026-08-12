@@ -177,7 +177,6 @@ class TaskKind(StrEnum):
     DATA = "data"
     SCIENTIFIC = "scientific"
     GRAPH = "graph"
-    SYNTHESIS = "synthesis"
 
 
 class PlanPriority(StrEnum):

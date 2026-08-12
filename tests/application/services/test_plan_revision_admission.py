@@ -66,7 +66,6 @@ def _binding(
         TaskKind.DATA: Capability.DATA_ANALYSIS,
         TaskKind.SCIENTIFIC: Capability.HYPOTHESIS_TESTING,
         TaskKind.GRAPH: Capability.GRAPH_MINING,
-        TaskKind.SYNTHESIS: None,
     }[task.kind]
     selected = default_capability if capability is ... else capability
     assert isinstance(selected, Capability) or selected is None
@@ -175,7 +174,6 @@ def test_wrong_objective_authoritative_task_is_rejected(db_session: Session) -> 
         (TaskKind.DATA, Capability.HYPOTHESIS_TESTING),
         (TaskKind.SCIENTIFIC, Capability.DATA_ANALYSIS),
         (TaskKind.GRAPH, Capability.DATA_PROFILING),
-        (TaskKind.SYNTHESIS, Capability.GRAPH_MINING),
     ],
 )
 def test_invalid_task_kind_capability_is_rejected(
@@ -426,26 +424,13 @@ def test_unavailable_provider_does_not_block_or_rewrite_admission(
     assert admitted.plan_revision.task_bindings[0].required_capability is Capability.GRAPH_MINING
 
 
-def test_admission_adds_no_approval_activation_execution_or_planner_surface(
-    db_session: Session,
-) -> None:
-    objective = _persisted_objective(db_session)
-    task = _task(
-        objective.objective_id,
-        kind=TaskKind.SYNTHESIS,
-        persisted_in=db_session,
-    )
-    candidate = _revision(objective.objective_id, [task])
-
-    admitted = PlanRevisionAdmissionService(db_session).admit_proposal(candidate)
-
+def test_admission_adds_no_approval_activation_execution_or_planner_surface() -> None:
     prohibited = {
         "approval_state",
         "activation_state",
         "active_plan_revision_id",
         "execution_state",
     }
-    assert admitted.plan_revision.task_bindings[0].required_capability is None
     assert prohibited.isdisjoint(PlanRevision.model_fields)
     assert "plan_revision" not in PlanningContext.model_fields
     assert "plan_revision" not in PlannerOutput.model_fields

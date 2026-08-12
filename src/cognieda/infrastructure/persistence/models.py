@@ -161,7 +161,7 @@ class PlanTaskBindingRecord(SQLModel, table=True):
         primary_key=True,
     )
     task_id: UUID = Field(foreign_key="tasks.task_id", primary_key=True)
-    required_capability: Capability | None = Field(default=None, nullable=True)
+    required_capability: Capability = Field(nullable=False)
     order_rank: int = Field(ge=0, nullable=False)
     priority: PlanPriority = Field(nullable=False)
 
