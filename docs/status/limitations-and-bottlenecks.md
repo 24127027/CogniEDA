@@ -25,7 +25,9 @@ These are verified constraints of the bounded current implementation.
   at bounded library surfaces. The in-process Application retains its current
   successor SessionFrame and model-backed conversation turns, but durable
   restart/recovery and complete-loop composition are **Deferred**.
-- `PlanRevision`, `ScientificInvestigationRun`, `InvestigationPlan`,
+- PlanRevision V1 domain validation is **Implemented**, but Planner authoring,
+  persistence/admission, approval/activation, and Task DAG runtime are
+  **Deferred**. `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
   and `GovernanceDecision` have no supported implementation.

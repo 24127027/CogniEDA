@@ -241,10 +241,13 @@ That history remains separate from the materialized research state and is
 excluded from empirical answer support. Neither conversation nor the current
 SessionFrame is durably restored after restart.
 
-Canonical `PlanRevision` and plan-binding records are not implemented. Active
-Task exposes all four canonical kinds, but only bounded `DATA` work is
-executable. The full approval-policy model, PlanRevision and Task
-DAG behavior, GeneratedView coordination, durable SessionFrame composition,
+The immutable in-memory `PlanRevision`, `PlanTaskBinding`, and `PlanDependency`
+V1 domain contracts are **Implemented** with authoritative Task validation,
+structural canonicalization, DAG guards, and deterministic fingerprinting.
+Planner does not author or consume them, and no persistence, admission,
+approval, activation, or replanning runtime exists. Active Task exposes all
+four canonical kinds, but only bounded `DATA` work is executable. Full Task DAG
+runtime behavior, GeneratedView coordination, durable SessionFrame composition,
 and the end-to-end recovery model remain **Deferred** target design. The
 [MVP-v2 definition](mvp-runtime-subset.md) explains the minimum complete
 product and research capability.

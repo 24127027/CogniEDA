@@ -171,11 +171,12 @@ foundations demonstrate important authority and traceability rules, but the
 direct Evidence path is transitional.
 
 The complete target architecture is not yet a supported end-to-end runtime.
-Canonical PlanRevision and Task DAG behavior, the scientific investigation and
-protocol chain, canonical Evidence lineage, protected evaluation, governance,
-Discovery admission, semantic graph inquiry, and restart-safe continuity
-remain **Deferred**. [Current state](../status/current-state.md) owns the exact
-dated implementation boundary.
+The immutable PlanRevision V1 domain contract is **Implemented**, but Planner
+authoring, persistence/admission, approval/activation, Task DAG runtime,
+scientific investigation and protocol, canonical Evidence lineage, protected
+evaluation, governance, Discovery admission, semantic graph inquiry, and
+restart-safe continuity remain **Deferred**. [Current state](../status/current-state.md)
+owns the exact dated implementation boundary.
 
 Continue with [MVP-v2](mvp-runtime-subset.md) for the minimum complete-loop
 Definition of Done, [Authority boundaries](authority-boundaries.md) for ownership,

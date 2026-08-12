@@ -135,6 +135,9 @@ Evidence loops, typed non-completion, and authoritative admission are owned by
 ## Implementation status
 
 **Partially implemented.** The active Task semantic core is Objective-scoped
-and uses the canonical four-kind taxonomy, but only bounded `DATA` execution is
-supported. PlanRevision, canonical scientific execution, and the complete
-lifecycle linked above remain a **Design target**.
+and uses the canonical four-kind taxonomy, while the immutable in-memory
+PlanRevision V1 domain contract implements binding membership, routing
+compatibility, DAG validation, and structural fingerprinting. Planner authoring,
+persistence/admission, approval/activation, replanning, canonical scientific
+execution, and the complete lifecycle linked above remain a **Design target**;
+only bounded `DATA` execution is supported.
