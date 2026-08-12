@@ -97,6 +97,15 @@ class Application:
                     f"Removed skill '{skill}' from '{worker}'."
                 )
 
+            case ["/reload", "instructions"]:
+                await self.planner_agent.reload(
+                    agent_instruction=self.workspace.load_planner_agent_instruction(),
+                )
+
+                return self._text(
+                    "Planner instructions reloaded."
+                )
+
             case _:
                 return self._text(
                     f"Unknown command: '{command}'."
