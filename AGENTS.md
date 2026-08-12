@@ -27,9 +27,10 @@ All eight FCO names have schemas and SQLModel records. `PlannerOperation`,
 `AnalysisFrame`, `ExecutionRun`, and other provenance/operational records also
 exist. This does not establish the canonical workflow. Active Tasks have the
 minimum Objective-scoped canonical semantic core. A bounded in-process slice
-can propose an exact transient PlanDraft, obtain explicit Human approval,
-atomically persist and activate one PlanRevision, and execute eligible `DATA`
-work through Data Explorer without automatically creating Evidence. Durable
+can construct exact transient canonical Objective, Task, and PlanRevision
+objects, obtain explicit Human approval, atomically persist and activate that
+exact plan, and execute eligible `DATA` work through Data Explorer without
+automatically creating Evidence. Durable
 approval/recovery, replanning, scientific-investigation runtime, DVC, and
 product CLI support are absent; database behavior is verified only on SQLite.
 Keep detailed claims in the status track.
@@ -97,6 +98,9 @@ other workflow/provenance/cache/presentation state into an FCO.
 - Keep intent, workflow, data state, Assumptions, scientific contracts,
   observations, claims, active context, provenance, and cache separate.
 - Assumptions guide planning only and cannot be inference premises.
+- Assumptions are Human-authored only. Planner checks a Human-proposed statement
+  for reasonable testability; a reasonably testable claim does not enter
+  Assumption state.
 - Evidence is an admitted observation, not raw executor output or
   interpretation.
 - Discovery is an evidence-bound admitted claim, not a summary or generated

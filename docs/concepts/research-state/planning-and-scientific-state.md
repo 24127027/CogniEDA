@@ -18,17 +18,18 @@ silently shared across Objectives.
 
 ## Assumptions guide planning only
 
-An `Assumption` is a provisional planning constraint. It is not Evidence and
-cannot serve as an inference premise in protected evaluation. A testable claim
-should become proposed scientific work rather than being admitted as an
-Assumption to avoid Evidence requirements.
+An `Assumption` is a Human-authored provisional planning constraint. Planner
+never invents, infers, paraphrases, improves, or strengthens one. It is not
+Evidence and cannot serve as an inference premise in protected evaluation.
+Every Human-proposed Assumption first crosses a reasonable-testability gate.
 
 Keeping an Assumption explicit is still useful: it records the belief or
 constraint that shaped planning, makes uncertainty visible, and lets later
 Evidence trigger review. Quarantine preserves that context without rewarding
-an untested belief with evidential authority. If the claim cannot reasonably be
-tested with available means, it may remain a planning constraint; if it can be
-tested, Planner should propose a `SCIENTIFIC` Task.
+an untested belief with evidential authority. If the Human statement is not
+reasonably testable within the project, data, or research workflow, its exact
+text may remain a planning constraint. If it is reasonably testable, it does
+not enter Assumption state and routes toward scientific investigation.
 
 After Discovery admission, comparison may flag an Assumption for review. The
 flag is not an automatic rewrite or deletion of either object.
@@ -152,9 +153,11 @@ domain and side-effect-free application validator are **Implemented** with
 binding membership, routing compatibility, DAG validation, structural
 fingerprinting, and authoritative Objective/Task checks. The append-only
 repository foundation is **Verified on SQLite**, and no application caller
-persists an unapproved draft. Transient Planner authoring, exact in-process
+persists an unapproved proposal. Transient Planner authoring, exact in-process
 Human approval, atomic approval-boundary persistence, first activation, active
 selection, and sequential dependency-aware DATA execution are **Implemented**.
-Durable approval/recovery, active-revision replacement, replanning, canonical
+The current DATA-only runtime reports that reasonably testable Human claims
+require scientific investigation but cannot execute them. Durable
+approval/recovery, active-revision replacement, replanning, canonical
 scientific execution, and the complete lifecycle linked above remain
 **Deferred**.

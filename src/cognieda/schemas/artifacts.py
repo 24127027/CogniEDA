@@ -91,7 +91,7 @@ class DataProfile(ImmutableCogniEDABaseModel):
 
 
 class Assumption(CogniEDABaseModel):
-    """Planning-only statement; an Assumption is never empirical Evidence."""
+    """Human-authored planning statement that is never empirical Evidence."""
 
     assumption_id: UUID = Field(default_factory=uuid4)
     text: NonEmptyStr

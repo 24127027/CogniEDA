@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, SkipValidation, model_validator
+from pydantic import BaseModel, ConfigDict, Field, InstanceOf, model_validator
 from pydantic_ai.messages import ModelMessage
 
 from cognieda.execution import Capability, ExecutorContext
@@ -191,7 +191,7 @@ class State(BaseModel):
     created_assumption: Assumption | None = None
     proposed_objective: Objective | None = None
     proposed_tasks: tuple[Task, ...] = ()
-    proposed_plan_revision: SkipValidation[PlanRevision] | None = None
+    proposed_plan_revision: InstanceOf[PlanRevision] | None = None
     response: str | None = None
     new_messages: tuple[ModelMessage, ...] = ()
     error: PlannerControlledError | None = None
@@ -208,6 +208,6 @@ class PlannerOutput(BaseModel):
     created_assumption: Assumption | None = None
     proposed_objective: Objective | None = None
     proposed_tasks: tuple[Task, ...] = ()
-    proposed_plan_revision: SkipValidation[PlanRevision] | None = None
+    proposed_plan_revision: InstanceOf[PlanRevision] | None = None
     new_messages: tuple[ModelMessage, ...] = ()
     error: PlannerControlledError | None = None

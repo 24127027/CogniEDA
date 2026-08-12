@@ -76,6 +76,12 @@ The Planner must use only planning-eligible context. An `Assumption` may guide
 this loop, but it remains a planning constraint and cannot be smuggled into
 protected scientific evaluation.
 
+Only a Human may author an Assumption. Planner preserves the exact Human
+statement and classifies whether it is reasonably testable. A reasonably
+testable claim does not enter Assumption state; it routes toward scientific
+investigation. Planner does not invent a premise from missing information,
+conversation inference, prior Discoveries, or executor results.
+
 ## PlanRevision and Task DAG
 
 A `PlanRevision` is a non-FCO immutable snapshot of one complete plan for one
@@ -239,11 +245,12 @@ fields only; Planner neither mutates nor returns SessionFrame.
 
 Current bounded Planner behavior can understand a
 finite set of requests, establish or refine an Objective, retain planning-only
-Assumptions, or propose one exact transient Objective-plus-DATA PlanDraft.
-Application retains that draft in process and accepts exact fingerprint-bound
-Human approval or rejection. Before approval, no Task is authoritative and no
+Human-authored Assumptions after the testability gate, or propose exact
+transient canonical Objective, DATA Task, and PlanRevision objects. Application
+retains those objects in process and accepts `/approve` or `/reject` for the
+sole pending plan. Before approval, no proposed Task is authoritative and no
 executor dispatch occurs. After approval, application authority atomically
-commits and activates the canonical Tasks and PlanRevision, executes the next
+persists and activates those exact canonical objects, executes the next
 eligible DATA Task, and gives the normalized result back to Planner for the
 Human-facing response. Planner does not admit Evidence, and this direct computed
 result is not automatically Evidence.
@@ -259,13 +266,15 @@ contracts and side-effect-free application validation are **Implemented** with
 authoritative Objective and Task checks, structural canonicalization, DAG
 guards, and deterministic fingerprinting. Append-only snapshot persistence and
 fail-closed collision/fingerprint reconstruction are **Verified on SQLite** as
-infrastructure for the approval boundary. The transient draft is not an FCO and
-is not persisted. Exact approval, post-approval revalidation, atomic first
+infrastructure for the approval boundary. Transient is a lifecycle and
+authority state, not a separate domain type; the pending objects are not
+persisted. Exact approval, post-approval revalidation, atomic first
 activation, explicit active-plan selection, and deterministic sequential DATA
 eligibility are **Implemented**. A second plan for an already-active Objective
 fails closed because successor/replanning semantics are **Deferred**. Active
 Task exposes all three canonical kinds, but only bounded `DATA` work is
-executable. Scientific and GRAPH runtime, durable approval, GeneratedView
+executable. A reasonably testable Human claim produces zero Assumption and a
+controlled scientific-runtime-unavailable response. Scientific and GRAPH runtime, durable approval, GeneratedView
 coordination, canonical SessionFrame composition, and the end-to-end recovery
 model remain **Deferred** target design. The
 [MVP-v2 definition](mvp-runtime-subset.md) explains the minimum complete

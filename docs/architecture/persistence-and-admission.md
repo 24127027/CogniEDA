@@ -246,17 +246,17 @@ same-ID replay or collision cannot overwrite the existing snapshot; and
 different IDs with the same content fingerprint remain distinct. The
 repository is append-only and exposes no update or delete surface.
 
-No application path persists an unapproved draft. Exact in-process Human
+No application path persists an unapproved proposal. Exact in-process Human
 approval invokes an application-owned transaction that resolves or creates the
-Objective, constructs authoritative Tasks, revalidates the canonical
+Objective, persists the exact pending canonical Tasks, revalidates the exact
 PlanRevision against those exact Tasks, appends the revision, and inserts the
 sole `active_plan_revisions` selection for that Objective. An injected failure
 rolls the Objective, Tasks, revision, and active selection back together. This
 bounded transition is **Verified on SQLite**.
 
-Durable PlanDraft storage, restart-safe approval identity, active-selection
+Durable pending-plan storage, restart-safe approval identity, active-selection
 replacement, successor PlanRevision admission, and full replanning are
-**Deferred**. The append-only repository alone never makes a draft
+**Deferred**. The append-only repository alone never makes a transient proposal
 authoritative.
 
 The complete target boundary is not implemented. Canonical PlanRevision

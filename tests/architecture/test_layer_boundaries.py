@@ -43,14 +43,13 @@ def test_planner_cannot_access_dataset_implementation_directly() -> None:
     assert violations == []
 
 
-def test_mvp_planner_does_not_import_deferred_scientific_or_plan_contracts() -> None:
+def test_mvp_planner_does_not_import_deferred_scientific_contracts() -> None:
     forbidden_symbols = {
         "Discovery",
         "EvidenceRequest",
         "GovernanceDecision",
         "Hypothesis",
         "InvestigationProtocol",
-        "PlanRevision",
     }
     violations: list[str] = []
     for path in _python_files("agents/planner"):

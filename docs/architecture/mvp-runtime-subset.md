@@ -256,10 +256,12 @@ transitions, validity propagation, replay safety, and fail-closed enforcement.
 
 ## Assumption quarantine and protected evaluation
 
-An Assumption is planning state or a planning constraint. It is not Evidence
-and cannot enter protected evaluation or Discovery support as an inference
-premise. If a user-provided Assumption is reasonably testable, Planner warns
-and proposes a `SCIENTIFIC` Task. Otherwise it remains planning state.
+An Assumption is Human-authored planning state or a planning constraint.
+Planner never invents one. It is not Evidence and cannot enter protected
+evaluation or Discovery support as an inference premise. Planner checks every
+Human-proposed Assumption for reasonable testability. A reasonably testable
+claim does not enter Assumption state and routes toward scientific
+investigation; otherwise the exact Human statement may remain planning state.
 
 Protected evaluation belongs to Hypothesis Analyst and consumes only a closed,
 validated `EvaluationBundle` containing the applicable Hypothesis, locked
@@ -423,9 +425,10 @@ the canonical authority model.
 
 ## Current transitional foundation
 
-**Partially implemented.** Current `main` provides valuable bounded
-foundations: typed research-state values, transient exact PlanDraft approval,
-atomic first PlanRevision activation, bounded active DATA execution,
+**Partially implemented.** The current implementation provides valuable bounded
+foundations: typed research-state values, transient canonical Objective, Task,
+and PlanRevision proposal state, atomic first PlanRevision activation, bounded
+active DATA execution,
 deterministic Data Explorer execution and separate direct Evidence admission,
 in-process conversation continuity, multi-provider model configuration, SQLite
 persistence seams, and execution infrastructure.
@@ -433,11 +436,13 @@ persistence seams, and execution infrastructure.
 The newly composed DATA control path is transitional:
 
 ```text
-Human -> Planner -> PlanDraft -> approval -> active PlanRevision
+Human -> Planner -> transient Objective / Tasks / PlanRevision
+      -> approval -> Application atomic persistence + activation
       -> DATA Task -> Data Explorer -> Planner -> Human
 ```
 
-Its computed result does not automatically become Evidence. The separate
+Transient is an authority and lifecycle state, not a separate domain-object
+family. Its computed result does not automatically become Evidence. The separate
 bounded `Task -> Data Explorer -> Evidence` admission service also remains
 available, but it is not canonical scientific Evidence lineage. Neither path
 satisfies MVP-v2.
