@@ -42,6 +42,13 @@ class PlannerDecisionModel(Protocol):
         self, answer_input: PlannerAnswerInput
     ) -> PlannerModelResult[PlannerResponseDraft]: ...
 
+    async def reload(
+        self,
+        *,
+        model_config: ModelConfig | None = None,
+        agent_instruction: str | None = None,
+    ) -> None: ...
+
 
 class PlannerModel:
     def __init__(
@@ -71,14 +78,29 @@ class PlannerModel:
             builtin_tools=(),
         )
 
-    def reload_model(
+    def reload(
         self,
+        *,
         model_config: ModelConfig | None = None,
-    ):
+        agent_instruction: str | None = None,
+    ) -> None:
         if model_config is not None:
             self._model_config = model_config
 
-        self._reload_agent()
+        if agent_instruction is not None:
+            self._agent_instruction = agent_instruction
+
+        self._decide_instruction = instruction.assemble(
+            "decide.txt",
+            agent_instruction=self._agent_instruction,
+        )
+        self._answer_instruction = instruction.assemble(
+            "answer.txt",
+            agent_instruction=self._agent_instruction,
+        )
+
+        if model_config is not None:
+            self._reload_agent()
 
     async def decide(
         self,
