@@ -1,41 +1,37 @@
-"""Application-authority admission for durable PlanRevision proposals."""
+"""Side-effect-free application validation for PlanRevision candidates."""
 
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 
 import pytest
 from sqlmodel import Session
 
-from cognieda.agents.planner.context import PlanningContext
-from cognieda.agents.planner.types import PlannerOutput, State
 from cognieda.application.services import (
-    PlanRevisionAdmissionError,
-    PlanRevisionAdmissionErrorCode,
-    PlanRevisionAdmissionService,
+    PlanRevisionValidationError,
+    PlanRevisionValidationErrorCode,
+    PlanRevisionValidator,
 )
 from cognieda.execution import Capability
-from cognieda.infrastructure.persistence.models import PlanRevisionRecord
 from cognieda.infrastructure.persistence.repositories import (
     ObjectiveRepository,
     PlanRevisionRepository,
     TaskRepository,
 )
 from cognieda.schemas import (
-    FirstClassObjectType,
     Objective,
     PlanDependency,
     PlanPriority,
     PlanRevision,
     PlanTaskBinding,
-    SessionFrame,
     Task,
     TaskKind,
 )
 
 
-def _persisted_objective(session: Session, text: str = "Admit a plan") -> Objective:
+def _persisted_objective(session: Session, text: str = "Validate a plan") -> Objective:
     return ObjectiveRepository(session).create(Objective(text=text))
 
 
@@ -58,7 +54,7 @@ def _task(
 def _binding(
     task: Task,
     *,
-    capability: Capability | None | object = ...,
+    capability: Capability | object = ...,
     order_rank: int = 0,
     priority: PlanPriority = PlanPriority.NORMAL,
 ) -> PlanTaskBinding:
@@ -68,7 +64,7 @@ def _binding(
         TaskKind.GRAPH: Capability.GRAPH_MINING,
     }[task.kind]
     selected = default_capability if capability is ... else capability
-    assert isinstance(selected, Capability) or selected is None
+    assert isinstance(selected, Capability)
     return PlanTaskBinding(
         task_id=task.task_id,
         required_capability=selected,
@@ -107,26 +103,28 @@ def _edge(prerequisite: Task, dependent: Task) -> PlanDependency:
 
 
 def _assert_rejected(
-    service: PlanRevisionAdmissionService,
+    validator: PlanRevisionValidator,
     candidate: PlanRevision,
-    code: PlanRevisionAdmissionErrorCode,
+    code: PlanRevisionValidationErrorCode,
 ) -> None:
-    with pytest.raises(PlanRevisionAdmissionError) as exc_info:
-        service.admit_proposal(candidate)
+    with pytest.raises(PlanRevisionValidationError) as exc_info:
+        validator.validate(candidate)
     assert exc_info.value.code is code
 
 
-def test_valid_proposal_is_admitted_and_reloads_exactly(db_session: Session) -> None:
+def test_valid_candidate_is_returned_without_persistence(db_session: Session) -> None:
     objective = _persisted_objective(db_session)
     task = _task(objective.objective_id, persisted_in=db_session)
     candidate = _revision(objective.objective_id, [task])
 
-    result = PlanRevisionAdmissionService(db_session).admit_proposal(candidate)
+    validated = PlanRevisionValidator(db_session).validate(candidate)
 
-    assert result.created is True
-    assert result.plan_revision == candidate
-    assert result.plan_revision.fingerprint == candidate.fingerprint
-    assert PlanRevisionRepository(db_session).get_by_id(candidate.plan_revision_id) == candidate
+    assert validated == candidate
+    assert validated.fingerprint == candidate.fingerprint
+    assert PlanRevisionRepository(db_session).get_by_id(candidate.plan_revision_id) is None
+    assert not db_session.new
+    assert not db_session.dirty
+    assert not db_session.deleted
 
 
 def test_missing_objective_is_rejected(db_session: Session) -> None:
@@ -135,9 +133,9 @@ def test_missing_objective_is_rejected(db_session: Session) -> None:
     candidate = _revision(objective_id, [task])
 
     _assert_rejected(
-        PlanRevisionAdmissionService(db_session),
+        PlanRevisionValidator(db_session),
         candidate,
-        PlanRevisionAdmissionErrorCode.OBJECTIVE_NOT_FOUND,
+        PlanRevisionValidationErrorCode.OBJECTIVE_NOT_FOUND,
     )
 
 
@@ -147,24 +145,24 @@ def test_missing_task_is_rejected(db_session: Session) -> None:
     candidate = _revision(objective.objective_id, [task])
 
     _assert_rejected(
-        PlanRevisionAdmissionService(db_session),
+        PlanRevisionValidator(db_session),
         candidate,
-        PlanRevisionAdmissionErrorCode.TASK_NOT_FOUND,
+        PlanRevisionValidationErrorCode.TASK_NOT_FOUND,
     )
 
 
 def test_wrong_objective_authoritative_task_is_rejected(db_session: Session) -> None:
-    proposal_objective = _persisted_objective(db_session, "Proposal objective")
+    candidate_objective = _persisted_objective(db_session, "Candidate objective")
     task_objective = _persisted_objective(db_session, "Task objective")
     task_id = uuid4()
     _task(task_objective.objective_id, task_id=task_id, persisted_in=db_session)
-    caller_task = _task(proposal_objective.objective_id, task_id=task_id)
-    candidate = _revision(proposal_objective.objective_id, [caller_task])
+    caller_task = _task(candidate_objective.objective_id, task_id=task_id)
+    candidate = _revision(candidate_objective.objective_id, [caller_task])
 
     _assert_rejected(
-        PlanRevisionAdmissionService(db_session),
+        PlanRevisionValidator(db_session),
         candidate,
-        PlanRevisionAdmissionErrorCode.TASK_OBJECTIVE_MISMATCH,
+        PlanRevisionValidationErrorCode.TASK_OBJECTIVE_MISMATCH,
     )
 
 
@@ -193,9 +191,9 @@ def test_invalid_task_kind_capability_is_rejected(
     )
 
     _assert_rejected(
-        PlanRevisionAdmissionService(db_session),
+        PlanRevisionValidator(db_session),
         candidate,
-        PlanRevisionAdmissionErrorCode.INVALID_PROPOSAL,
+        PlanRevisionValidationErrorCode.INVALID_CANDIDATE,
     )
 
 
@@ -212,9 +210,9 @@ def test_duplicate_binding_is_rejected(db_session: Session) -> None:
     )
 
     _assert_rejected(
-        PlanRevisionAdmissionService(db_session),
+        PlanRevisionValidator(db_session),
         candidate,
-        PlanRevisionAdmissionErrorCode.INVALID_PROPOSAL,
+        PlanRevisionValidationErrorCode.INVALID_CANDIDATE,
     )
 
 
@@ -225,6 +223,7 @@ def test_invalid_dependency_graph_is_rejected(db_session: Session, case: str) ->
         _task(objective.objective_id, persisted_in=db_session) for _ in range(3)
     )
     first, second, third = tasks
+    dependencies: tuple[PlanDependency, ...]
     if case == "outside":
         dependencies = (_edge(first, _task(objective.objective_id)),)
     elif case == "self":
@@ -254,9 +253,9 @@ def test_invalid_dependency_graph_is_rejected(db_session: Session, case: str) ->
     )
 
     _assert_rejected(
-        PlanRevisionAdmissionService(db_session),
+        PlanRevisionValidator(db_session),
         candidate,
-        PlanRevisionAdmissionErrorCode.INVALID_PROPOSAL,
+        PlanRevisionValidationErrorCode.INVALID_CANDIDATE,
     )
 
 
@@ -270,9 +269,9 @@ def test_unsupported_contract_version_is_rejected(db_session: Session) -> None:
     )
 
     _assert_rejected(
-        PlanRevisionAdmissionService(db_session),
+        PlanRevisionValidator(db_session),
         candidate,
-        PlanRevisionAdmissionErrorCode.UNSUPPORTED_CONTRACT_VERSION,
+        PlanRevisionValidationErrorCode.UNSUPPORTED_CONTRACT_VERSION,
     )
 
 
@@ -286,9 +285,9 @@ def test_invalid_revision_identity_is_rejected(db_session: Session) -> None:
     )
 
     _assert_rejected(
-        PlanRevisionAdmissionService(db_session),
+        PlanRevisionValidator(db_session),
         candidate,
-        PlanRevisionAdmissionErrorCode.INVALID_IDENTITY,
+        PlanRevisionValidationErrorCode.INVALID_IDENTITY,
     )
 
 
@@ -328,86 +327,50 @@ def test_invalid_rank_or_priority_is_rejected(
     )
 
     _assert_rejected(
-        PlanRevisionAdmissionService(db_session),
+        PlanRevisionValidator(db_session),
         candidate,
-        PlanRevisionAdmissionErrorCode.INVALID_PROPOSAL,
+        PlanRevisionValidationErrorCode.INVALID_CANDIDATE,
     )
     assert task.task_id == invalid_binding.task_id
 
 
-def test_exact_replay_is_idempotent(db_session: Session) -> None:
+class _FingerprintMismatchCandidate:
+    def __init__(self, revision: PlanRevision) -> None:
+        self._revision = revision
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._revision, name)
+
+    @property
+    def fingerprint(self) -> str:
+        return "sha256:" + "0" * 64
+
+    def model_dump(
+        self,
+        *,
+        mode: Literal["json"],
+        exclude: set[str],
+    ) -> dict[str, Any]:
+        return self._revision.model_dump(mode=mode, exclude=exclude)
+
+
+def test_candidate_fingerprint_mismatch_is_rejected(db_session: Session) -> None:
     objective = _persisted_objective(db_session)
     task = _task(objective.objective_id, persisted_in=db_session)
-    candidate = _revision(objective.objective_id, [task])
-    service = PlanRevisionAdmissionService(db_session)
-
-    first = service.admit_proposal(candidate)
-    replay = service.admit_proposal(candidate)
-
-    assert first.created is True
-    assert replay.created is False
-    assert replay.plan_revision == candidate
-
-
-def test_same_identity_different_content_is_rejected(db_session: Session) -> None:
-    objective = _persisted_objective(db_session)
-    first = _task(objective.objective_id, persisted_in=db_session)
-    second = _task(objective.objective_id, persisted_in=db_session)
-    revision_id = uuid4()
-    original = _revision(objective.objective_id, [first], plan_revision_id=revision_id)
-    conflicting = _revision(objective.objective_id, [second], plan_revision_id=revision_id)
-    service = PlanRevisionAdmissionService(db_session)
-    service.admit_proposal(original)
-
-    _assert_rejected(
-        service,
-        conflicting,
-        PlanRevisionAdmissionErrorCode.IDENTITY_COLLISION,
-    )
-    assert PlanRevisionRepository(db_session).get_by_id(revision_id) == original
-
-
-def test_different_identities_with_same_fingerprint_are_both_admitted(
-    db_session: Session,
-) -> None:
-    objective = _persisted_objective(db_session)
-    task = _task(objective.objective_id, persisted_in=db_session)
-    first = _revision(objective.objective_id, [task])
-    second = _revision(objective.objective_id, [task])
-    service = PlanRevisionAdmissionService(db_session)
-    assert first.fingerprint == second.fingerprint
-
-    first_result = service.admit_proposal(first)
-    second_result = service.admit_proposal(second)
-
-    assert first_result.created is True
-    assert second_result.created is True
-    assert (
-        first_result.plan_revision.plan_revision_id
-        != second_result.plan_revision.plan_revision_id
+    valid = _revision(objective.objective_id, [task])
+    candidate = cast(
+        PlanRevision,
+        _FingerprintMismatchCandidate(valid),
     )
 
-
-def test_corrupt_stored_fingerprint_fails_closed(db_session: Session) -> None:
-    objective = _persisted_objective(db_session)
-    task = _task(objective.objective_id, persisted_in=db_session)
-    candidate = _revision(objective.objective_id, [task])
-    service = PlanRevisionAdmissionService(db_session)
-    service.admit_proposal(candidate)
-    record = db_session.get(PlanRevisionRecord, candidate.plan_revision_id)
-    assert record is not None
-    record.fingerprint = "sha256:" + "0" * 64
-    db_session.add(record)
-    db_session.commit()
-
     _assert_rejected(
-        service,
+        PlanRevisionValidator(db_session),
         candidate,
-        PlanRevisionAdmissionErrorCode.FINGERPRINT_MISMATCH,
+        PlanRevisionValidationErrorCode.FINGERPRINT_MISMATCH,
     )
 
 
-def test_unavailable_provider_does_not_block_or_rewrite_admission(
+def test_unavailable_provider_does_not_block_or_rewrite_validation(
     db_session: Session,
 ) -> None:
     objective = _persisted_objective(db_session)
@@ -418,22 +381,7 @@ def test_unavailable_provider_does_not_block_or_rewrite_admission(
     )
     candidate = _revision(objective.objective_id, [task])
 
-    admitted = PlanRevisionAdmissionService(db_session).admit_proposal(candidate)
+    validated = PlanRevisionValidator(db_session).validate(candidate)
 
-    assert admitted.created is True
-    assert admitted.plan_revision.task_bindings[0].required_capability is Capability.GRAPH_MINING
-
-
-def test_admission_adds_no_approval_activation_execution_or_planner_surface() -> None:
-    prohibited = {
-        "approval_state",
-        "activation_state",
-        "active_plan_revision_id",
-        "execution_state",
-    }
-    assert prohibited.isdisjoint(PlanRevision.model_fields)
-    assert "plan_revision" not in PlanningContext.model_fields
-    assert "plan_revision" not in PlannerOutput.model_fields
-    assert "plan_revision" not in State.model_fields
-    assert "plan_revision" not in SessionFrame.model_fields
-    assert "PLAN_REVISION" not in FirstClassObjectType.__members__
+    assert validated.task_bindings[0].required_capability is Capability.GRAPH_MINING
+    assert PlanRevisionRepository(db_session).get_by_id(candidate.plan_revision_id) is None

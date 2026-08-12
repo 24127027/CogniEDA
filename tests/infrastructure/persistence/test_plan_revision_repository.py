@@ -251,10 +251,26 @@ def test_identity_collision_never_overwrites_existing_revision(db_session: Sessi
     assert PlanRevisionRepository(db_session).get_by_id(revision_id) == original
 
 
+def test_same_identity_identical_replay_is_rejected_without_overwrite(
+    db_session: Session,
+) -> None:
+    objective = ObjectiveRepository(db_session).create(Objective(text="Exact replay"))
+    task = _persisted_task(db_session, objective.objective_id)
+    revision = _revision(objective.objective_id, [task])
+    _persist_revision(db_session, revision)
+
+    with pytest.raises(IntegrityError):
+        PlanRevisionRepository(db_session).add(revision)
+        db_session.commit()
+    db_session.rollback()
+
+    assert PlanRevisionRepository(db_session).get_by_id(revision.plan_revision_id) == revision
+
+
 def test_different_identities_with_same_fingerprint_remain_distinct(
     db_session: Session,
 ) -> None:
-    objective = ObjectiveRepository(db_session).create(Objective(text="Distinct proposals"))
+    objective = ObjectiveRepository(db_session).create(Objective(text="Distinct revisions"))
     task = _persisted_task(db_session, objective.objective_id)
     first = _revision(objective.objective_id, [task])
     second = _revision(objective.objective_id, [task])
@@ -266,6 +282,21 @@ def test_different_identities_with_same_fingerprint_remain_distinct(
 
     assert PlanRevisionRepository(db_session).get_by_id(first.plan_revision_id) == first
     assert PlanRevisionRepository(db_session).get_by_id(second.plan_revision_id) == second
+
+
+def test_corrupt_stored_fingerprint_fails_closed(db_session: Session) -> None:
+    objective = ObjectiveRepository(db_session).create(Objective(text="Corrupt fingerprint"))
+    task = _persisted_task(db_session, objective.objective_id)
+    revision = _revision(objective.objective_id, [task])
+    _persist_revision(db_session, revision)
+    record = db_session.get(PlanRevisionRecord, revision.plan_revision_id)
+    assert record is not None
+    record.fingerprint = "sha256:" + "0" * 64
+    db_session.add(record)
+    db_session.commit()
+
+    with pytest.raises(ValueError, match="fingerprint does not match"):
+        PlanRevisionRepository(db_session).get_by_id(revision.plan_revision_id)
 
 
 def test_repository_exposes_no_mutating_revision_api() -> None:

@@ -7,11 +7,10 @@ from .mvp_data_admission import (
     MvpDataProfileAdmissionService,
     MvpEvidenceAdmissionService,
 )
-from .plan_revision_admission import (
-    PlanRevisionAdmissionError,
-    PlanRevisionAdmissionErrorCode,
-    PlanRevisionAdmissionResult,
-    PlanRevisionAdmissionService,
+from .plan_revision_validation import (
+    PlanRevisionValidationError,
+    PlanRevisionValidationErrorCode,
+    PlanRevisionValidator,
 )
 from .planner_commit import commit_planner_operations
 from .transition_service import ExecutionAttemptTransitionService
@@ -24,10 +23,9 @@ __all__ = (
     "EvidenceAdmissionResult",
     "MvpDataProfileAdmissionService",
     "MvpEvidenceAdmissionService",
-    "PlanRevisionAdmissionError",
-    "PlanRevisionAdmissionErrorCode",
-    "PlanRevisionAdmissionResult",
-    "PlanRevisionAdmissionService",
+    "PlanRevisionValidationError",
+    "PlanRevisionValidationErrorCode",
+    "PlanRevisionValidator",
     "build_execution_admission_operations",
     "commit_planner_operations",
 )
