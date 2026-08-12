@@ -8,7 +8,7 @@ coordination metadata and separates historical truth from current authority.
 ## Stable identity and mutable metadata
 
 An object's identifier is not permission to change its meaning. Changes to
-required capability, priority, ordering, assignment, dependencies, scheduling,
+required capability, priority, ordering, dependencies, scheduling,
 or presentation do not redefine a `Task`; those properties belong to
 `PlanRevision`, `PlanTaskBinding`, and related records.
 

@@ -8,9 +8,12 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
+import cognieda.execution as execution
+import cognieda.schemas as schemas
 from cognieda.agents.planner.context import PlanningContext
 from cognieda.agents.planner.types import PlannerOutput, State
-from cognieda.execution import Capability
+from cognieda.execution import Capability, ExecutorRegistry
+from cognieda.execution import capabilities as execution_capabilities
 from cognieda.schemas import (
     PLAN_REVISION_CONTRACT_VERSION,
     FirstClassObjectType,
@@ -18,23 +21,20 @@ from cognieda.schemas import (
     PlanPriority,
     PlanRevision,
     PlanTaskBinding,
-    PlanTaskRole,
     SessionFrame,
     Task,
     TaskKind,
     TaskStatus,
 )
+from cognieda.schemas import enums as schema_enums
 
 OBJECTIVE_ID = UUID("10000000-0000-0000-0000-000000000000")
 
-_DEFAULT_BINDING: dict[TaskKind, tuple[Capability | None, PlanTaskRole]] = {
-    TaskKind.DATA: (Capability.DATA_ANALYSIS, PlanTaskRole.DATA_EXPLORER),
-    TaskKind.SCIENTIFIC: (
-        Capability.HYPOTHESIS_TESTING,
-        PlanTaskRole.HYPOTHESIS_ANALYST,
-    ),
-    TaskKind.GRAPH: (Capability.GRAPH_MINING, PlanTaskRole.GRAPH_MINER),
-    TaskKind.SYNTHESIS: (None, PlanTaskRole.PLANNER),
+_DEFAULT_CAPABILITY: dict[TaskKind, Capability | None] = {
+    TaskKind.DATA: Capability.DATA_ANALYSIS,
+    TaskKind.SCIENTIFIC: Capability.HYPOTHESIS_TESTING,
+    TaskKind.GRAPH: Capability.GRAPH_MINING,
+    TaskKind.SYNTHESIS: None,
 }
 
 
@@ -58,17 +58,15 @@ def _binding(
     task: Task,
     *,
     capability: Capability | None | object = ...,
-    role: PlanTaskRole | None = None,
     order_rank: int = 0,
     priority: PlanPriority = PlanPriority.NORMAL,
 ) -> PlanTaskBinding:
-    default_capability, default_role = _DEFAULT_BINDING[task.kind]
+    default_capability = _DEFAULT_CAPABILITY[task.kind]
     selected_capability = default_capability if capability is ... else capability
     assert isinstance(selected_capability, Capability) or selected_capability is None
     return PlanTaskBinding(
         task_id=task.task_id,
         required_capability=selected_capability,
-        assigned_role=role or default_role,
         order_rank=order_rank,
         priority=priority,
     )
@@ -249,12 +247,12 @@ def test_indirect_cycle_is_rejected() -> None:
         Capability.DATA_TRANSFORMATION,
     ],
 )
-def test_data_capability_and_data_explorer_role_are_valid(capability: Capability) -> None:
+def test_data_capability_is_valid(capability: Capability) -> None:
     task = _task(kind=TaskKind.DATA)
 
     revision = _revision([task], bindings=(_binding(task, capability=capability),))
 
-    assert revision.task_bindings[0].assigned_role is PlanTaskRole.DATA_EXPLORER
+    assert revision.task_bindings[0].required_capability is capability
 
 
 def test_data_with_hypothesis_testing_is_rejected() -> None:
@@ -267,13 +265,12 @@ def test_data_with_hypothesis_testing_is_rejected() -> None:
         )
 
 
-def test_scientific_hypothesis_testing_and_analyst_role_are_valid() -> None:
+def test_scientific_requires_hypothesis_testing() -> None:
     task = _task(kind=TaskKind.SCIENTIFIC)
 
     revision = _revision([task])
 
     assert revision.task_bindings[0].required_capability is Capability.HYPOTHESIS_TESTING
-    assert revision.task_bindings[0].assigned_role is PlanTaskRole.HYPOTHESIS_ANALYST
 
 
 def test_scientific_with_data_analysis_is_rejected() -> None:
@@ -286,22 +283,20 @@ def test_scientific_with_data_analysis_is_rejected() -> None:
         )
 
 
-def test_graph_mining_and_graph_miner_role_are_valid() -> None:
+def test_graph_requires_graph_mining() -> None:
     task = _task(kind=TaskKind.GRAPH)
 
     revision = _revision([task])
 
     assert revision.task_bindings[0].required_capability is Capability.GRAPH_MINING
-    assert revision.task_bindings[0].assigned_role is PlanTaskRole.GRAPH_MINER
 
 
-def test_synthesis_none_capability_and_planner_role_are_valid() -> None:
+def test_synthesis_requires_no_capability() -> None:
     task = _task(kind=TaskKind.SYNTHESIS)
 
     revision = _revision([task])
 
     assert revision.task_bindings[0].required_capability is None
-    assert revision.task_bindings[0].assigned_role is PlanTaskRole.PLANNER
 
 
 def test_synthesis_with_dispatcher_capability_is_rejected() -> None:
@@ -314,11 +309,19 @@ def test_synthesis_with_dispatcher_capability_is_rejected() -> None:
         )
 
 
-def test_task_kind_and_role_mismatch_is_rejected() -> None:
+def test_binding_rejects_removed_assigned_role() -> None:
     task = _task(kind=TaskKind.DATA)
+    payload = _binding(task).model_dump()
+    payload["assigned_role"] = "data_explorer"
 
-    with pytest.raises(ValidationError, match="incompatible assigned role"):
-        _revision([task], bindings=(_binding(task, role=PlanTaskRole.PLANNER),))
+    assert "assigned_role" not in PlanTaskBinding.model_fields
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        PlanTaskBinding.model_validate(payload)
+
+
+def test_plan_task_role_is_removed_from_schema_surfaces() -> None:
+    assert not hasattr(schema_enums, "PlanTaskRole")
+    assert not hasattr(schemas, "PlanTaskRole")
 
 
 def test_negative_order_rank_is_rejected() -> None:
@@ -450,23 +453,32 @@ def test_changing_capability_changes_fingerprint() -> None:
     )
 
 
-def test_changing_role_changes_fingerprint_contribution() -> None:
+def test_fingerprint_payload_has_no_role_or_provider_identity() -> None:
     task = _task()
     revision = _revision([task])
-    changed_binding = revision.task_bindings[0].model_copy(
-        update={"assigned_role": PlanTaskRole.PLANNER}
-    )
-    structurally_changed = PlanRevision.model_construct(
-        plan_revision_id=revision.plan_revision_id,
-        objective_id=revision.objective_id,
-        task_bindings=(changed_binding,),
-        dependencies=revision.dependencies,
-        contract_version=revision.contract_version,
-    )
 
-    assert structurally_changed.fingerprint != revision.fingerprint
-    with pytest.raises(ValidationError, match="incompatible assigned role"):
-        _revision([task], bindings=(changed_binding,))
+    payload = revision._fingerprint_payload()
+    binding_payload = payload["task_bindings"][0]
+    assert "assigned_role" not in binding_payload
+    assert "provider" not in revision.model_dump_json()
+
+
+def test_runtime_provider_registration_does_not_change_fingerprint() -> None:
+    task = _task()
+    revision = _revision([task])
+    registry = ExecutorRegistry()
+
+    registry.register_provider(lambda: object(), capabilities=(Capability.DATA_ANALYSIS,))
+
+    assert revision.fingerprint == _revision([task]).fingerprint
+
+
+def test_capability_is_execution_owned_and_not_schema_exported() -> None:
+    assert Capability.__module__ == "cognieda.execution.capabilities"
+    assert execution.Capability is execution_capabilities.Capability is Capability
+    assert not hasattr(schema_enums, "Capability")
+    assert not hasattr(schemas, "Capability")
+    assert "PLANNER" not in Capability.__members__
 
 
 @pytest.mark.parametrize(

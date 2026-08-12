@@ -37,18 +37,17 @@ GRAPH
 SYNTHESIS
 ```
 
-Required capability and assigned specialist or control role belong to the
-immutable `PlanTaskBinding`, not to Task semantics or Task identity. Changing
-either value changes PlanRevision content and its fingerprint without, by
-itself, changing the Task's meaning. `TaskKind`, `Capability`, and
-`PlanTaskRole` remain distinct finite contracts and are validated for exact
-compatibility; none is inferred from another or from Task prose.
+Required capability belongs to the immutable `PlanTaskBinding`, not to Task
+semantics or Task identity. Changing it changes PlanRevision content and its
+fingerprint without, by itself, changing the Task's meaning. `Capability` is
+defined by the execution/dispatch layer, and `TaskKind` compatibility is
+validated exactly rather than inferred from Task prose.
 
 The V1 mapping is `DATA` to one of `DATA_ANALYSIS`, `DATA_PROFILING`, or
-`DATA_TRANSFORMATION` with `DATA_EXPLORER`; `SCIENTIFIC` to
-`HYPOTHESIS_TESTING` with `HYPOTHESIS_ANALYST`; `GRAPH` to `GRAPH_MINING` with
-`GRAPH_MINER`; and `SYNTHESIS` to no dispatcher capability with `PLANNER`.
-Planner coordination does not justify a synthetic synthesis capability.
+`DATA_TRANSFORMATION`; `SCIENTIFIC` to `HYPOTHESIS_TESTING`; `GRAPH` to
+`GRAPH_MINING`; and `SYNTHESIS` to no dispatcher capability. Planner
+coordination does not justify a synthetic synthesis capability or make Planner
+a Task executor.
 
 Dispatch is capability-based and fail closed. For an approved Task whose
 required capability is unavailable, the dispatcher must decline execution,
@@ -158,9 +157,10 @@ human.
 
 ## Capability registry and dispatcher
 
-The capability registry records stable capability identity, compatible
-role-native contract, version and policy eligibility, availability and health,
-and constraints needed for deterministic selection.
+The capability registry is the authoritative runtime mapping from stable
+capability identity to a provider factory. Provider registration, instance
+reuse, availability, and implementation identity remain outside PlanRevision
+content and its fingerprint.
 
 The dispatcher accepts an admitted work identity and required capability. It
 does not infer scientific intent from prose. It verifies plan binding,
@@ -198,7 +198,7 @@ wire format, or serialization details.
 ## Implementation status
 
 **Partially implemented.** At the S0 library boundary, one lightweight
-`Capability` `StrEnum` drives an explicit `Capability -> ProviderFactory`
+execution-owned `Capability` `StrEnum` drives an explicit `Capability -> ProviderFactory`
 registry. One dependency-aware factory may serve multiple capabilities and its
 provider instance is reused. Duplicate and absent registrations fail closed.
 The thin async dispatcher invokes the resolved provider and preserves provider

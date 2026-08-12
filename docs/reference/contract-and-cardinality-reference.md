@@ -20,17 +20,24 @@ fingerprint. It contains no DataProfile identity, stopping condition, replan
 trigger, approval, activation, or successor state.
 
 Each member Task appears in exactly one immutable `PlanTaskBinding` with
-`task_id`, `required_capability`, `assigned_role`, `order_rank`, and `priority`.
+`task_id`, `required_capability`, `order_rank`, and `priority`.
 Membership is derived from those bindings. Duplicate bindings, missing Tasks,
 cross-Objective Tasks, non-member dependency endpoints, self-edges, duplicate
 edges, and direct or indirect cycles fail closed.
 
-| Task kind | Required capability | Assigned role |
-| --- | --- | --- |
-| `DATA` | `DATA_ANALYSIS`, `DATA_PROFILING`, or `DATA_TRANSFORMATION` | `DATA_EXPLORER` |
-| `SCIENTIFIC` | `HYPOTHESIS_TESTING` | `HYPOTHESIS_ANALYST` |
-| `GRAPH` | `GRAPH_MINING` | `GRAPH_MINER` |
-| `SYNTHESIS` | `None` | `PLANNER` |
+| Task kind | Required capability |
+| --- | --- |
+| `DATA` | `DATA_ANALYSIS`, `DATA_PROFILING`, or `DATA_TRANSFORMATION` |
+| `SCIENTIFIC` | `HYPOTHESIS_TESTING` |
+| `GRAPH` | `GRAPH_MINING` |
+| `SYNTHESIS` | `None` |
+
+`Capability` is owned by the execution/dispatch layer. A binding declares the
+required capability, while `ExecutorRegistry.resolve(required_capability)`
+selects the currently registered provider. Provider, worker, model, process,
+and Planner identity are not plan content. `SYNTHESIS` has no executable
+capability or provider path in V1; Planner coordinates work but is not a Task
+executor.
 
 `order_rank` is non-negative and permits ties. The DAG determines eligibility;
 rank is a preference only. Priority is exactly `LOW`, `NORMAL`, or `HIGH`,
@@ -39,10 +46,10 @@ serialization sorts bindings by rank and then Task ID, and sorts dependency
 edges by their endpoint IDs. Tie-breaking is non-semantic.
 
 The fingerprint binds contract version, Objective identity, canonical bindings
-including capability, role, rank, and priority, and canonical dependencies. It
+including capability, rank, and priority, and canonical dependencies. It
 excludes Task execution status and semantic payload, exact DataProfile
 identity, runtime or lifecycle policy and state, conversation, timestamps,
-executor instances, model configuration, and dataset location. Canonicalization
+provider and worker identity, Planner identity, model configuration, and dataset location. Canonicalization
 is structural only.
 
 ## Role-native boundary contracts

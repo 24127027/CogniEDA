@@ -68,7 +68,7 @@ eight first-class domain identities.
 
 | State family | Representative records | Responsibility |
 | --- | --- | --- |
-| planning and plan versioning | `PlanRevision`, `PlanTaskBinding`, `PlanDependency`, `TaskLifecycleRecord`, `TaskPresentationMetadata`, `PlannerConsultationRun` | binding-derived membership, explicit dependencies, assignment, ordering, approval, and presentation |
+| planning and plan versioning | `PlanRevision`, `PlanTaskBinding`, `PlanDependency`, `TaskLifecycleRecord`, `TaskPresentationMetadata`, `PlannerConsultationRun` | binding-derived membership, required capability, explicit dependencies, ordering, approval, and presentation |
 | scientific investigation | `ScientificInvestigationRun`, feasibility record, `InvestigationPlan`, `InvestigationProtocol`, `ProtocolRevision`, `EvidenceRequest` | feasibility, operationalization, protocol evolution, and evidence obligations |
 | execution and provenance | `ExecutionRun`, `AnalysisFrame` | attempt history and exact data-view lineage |
 | evaluation and outcome | `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal` | protected inputs, typed endings, and proposed scientific content |
