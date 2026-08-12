@@ -69,7 +69,34 @@ class OneDataPlanModel:
         raise AssertionError(f"Computed DATA output is not admitted Evidence: {answer_input}")
 
 
-def _application(tmp_path, db_session: Session) -> Application:
+class AssumptionGateModel:
+    def __init__(self, decision: PlannerDecision) -> None:
+        self.decision = decision
+        self.inputs: list[PlannerModelInput] = []
+
+    async def decide(
+        self,
+        model_input: PlannerModelInput,
+        *,
+        message_history: Sequence[ModelMessage] = (),
+    ) -> PlannerModelResult[PlannerDecision]:
+        del message_history
+        self.inputs.append(model_input)
+        return PlannerModelResult(output=self.decision, new_messages=())
+
+    async def answer(
+        self,
+        answer_input: PlannerAnswerInput,
+    ) -> PlannerModelResult[PlannerResponseDraft]:
+        raise AssertionError(f"Assumption handling cannot answer from Evidence: {answer_input}")
+
+
+def _application(
+    tmp_path,
+    db_session: Session,
+    *,
+    planner_model: OneDataPlanModel | AssumptionGateModel | None = None,
+) -> Application:
     dataset_path = tmp_path / "customers.csv"
     pd.DataFrame(
         {
@@ -94,7 +121,7 @@ def _application(tmp_path, db_session: Session) -> Application:
     dispatcher = ExecutorDispatcher(registry)
     planner = Planner(
         deps=PlannerDeps(dispatcher=dispatcher),
-        planner_model=OneDataPlanModel(),
+        planner_model=planner_model or OneDataPlanModel(),
     )
     application = Application(
         workspace=cast(Workspace, object()),
@@ -211,3 +238,60 @@ def test_second_proposal_cannot_replace_the_exact_pending_objects(
 
     assert application.session_frame.objective == first_objective
     assert application.session_frame.tasks[0].task_id == first_tasks[0].task_id
+
+
+def test_explicit_non_testable_human_assumption_passes_gate_without_execution(
+    tmp_path,
+    db_session: Session,
+) -> None:
+    model = AssumptionGateModel(
+        PlannerDecision(
+            action=PlannerAction.ADD_ASSUMPTION,
+            assumption_text="Customer intent is stable during this study.",
+            assumption_is_reasonably_testable=False,
+        )
+    )
+    application = _application(tmp_path, db_session, planner_model=model)
+
+    response = asyncio.run(
+        application.submit_message(
+            "/assumption Customer intent is stable during this study."
+        )
+    )
+
+    assert model.inputs[0].latest_request.startswith("/assumption")
+    assert len(application.session_frame.assumptions) == 1
+    assert application.session_frame.assumptions[0].text == (
+        "Customer intent is stable during this study."
+    )
+    assert application.session_frame.evidences == ()
+    assert application._pending_plan_revision is None
+    assert "not reasonably testable" in response.content
+    assert _authoritative_counts(db_session) == (0, 0, 0, 0)
+
+
+def test_explicit_testable_human_claim_never_enters_assumption_state(
+    tmp_path,
+    db_session: Session,
+) -> None:
+    model = AssumptionGateModel(
+        PlannerDecision(
+            action=PlannerAction.INVALID_OR_UNSUPPORTED,
+            assumption_text="Rows correspond to unique customers.",
+            assumption_is_reasonably_testable=True,
+        )
+    )
+    application = _application(tmp_path, db_session, planner_model=model)
+
+    response = asyncio.run(
+        application.submit_message(
+            "/assumption Rows correspond to unique customers."
+        )
+    )
+
+    assert application.session_frame.assumptions == ()
+    assert application.session_frame.evidences == ()
+    assert application._pending_plan_revision is None
+    assert "scientific investigation" in response.content
+    assert "not executable in the current DATA-only runtime" in response.content
+    assert _authoritative_counts(db_session) == (0, 0, 0, 0)

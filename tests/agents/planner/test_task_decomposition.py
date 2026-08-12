@@ -41,6 +41,7 @@ class FakePlannerModel:
     ) -> None:
         self.decision = decision
         self.answer_text = answer
+        self.decision_inputs: list[PlannerModelInput] = []
         self.answer_inputs: list[PlannerAnswerInput] = []
 
     async def decide(
@@ -49,7 +50,8 @@ class FakePlannerModel:
         *,
         message_history: Sequence[ModelMessage] = (),
     ) -> PlannerModelResult[PlannerDecision]:
-        del model_input, message_history
+        del message_history
+        self.decision_inputs.append(model_input)
         return PlannerModelResult(output=self.decision, new_messages=())
 
     async def answer(
@@ -199,21 +201,101 @@ def test_semantic_task_change_proposes_new_identity_without_rewriting_existing_t
 def test_explicit_assumption_addition_uses_successor_state_and_never_dispatches() -> None:
     dispatcher = NeverDispatcher()
     frame = SessionFrame(objective=Objective(text="Understand churn."))
+    model = FakePlannerModel(
+        PlannerDecision(
+            action=PlannerAction.ADD_ASSUMPTION,
+            assumption_text="Rows represent customers.",
+            assumption_is_reasonably_testable=False,
+        )
+    )
     output = asyncio.run(
-        _planner(
-            FakePlannerModel(PlannerDecision(action=PlannerAction.STATE_SUMMARY)),
-            dispatcher,
-        ).run(
+        _planner(model, dispatcher).run(
             "/assumption Rows represent customers.",
             planning_context=_context(frame),
         )
     )
 
     assert frame.assumptions == ()
+    assert model.decision_inputs[0].latest_request == (
+        "/assumption Rows represent customers."
+    )
     assert output.created_assumption is not None
     assert output.created_assumption.text == "Rows represent customers."
+    assert "not reasonably testable" in output.response
     assert "not empirical Evidence" in output.response
     assert output.proposed_plan_revision is None
+    assert dispatcher.requests == []
+
+
+def test_natural_language_human_assumption_retains_only_exact_source_text() -> None:
+    dispatcher = NeverDispatcher()
+    model = FakePlannerModel(
+        PlannerDecision(
+            action=PlannerAction.ADD_ASSUMPTION,
+            assumption_text="Customer identity is stable across exports.",
+            assumption_is_reasonably_testable=False,
+        )
+    )
+
+    output = asyncio.run(
+        _planner(model, dispatcher).run(
+            "Please retain the assumption Customer identity is stable across exports.",
+            planning_context=_context(),
+        )
+    )
+
+    assert output.created_assumption is not None
+    assert output.created_assumption.text == "Customer identity is stable across exports."
+    assert dispatcher.requests == []
+
+
+def test_planner_cannot_spontaneously_author_assumption_for_normal_request() -> None:
+    dispatcher = NeverDispatcher()
+    model = FakePlannerModel(
+        PlannerDecision(
+            action=PlannerAction.ADD_ASSUMPTION,
+            assumption_text="Rows are customers.",
+            assumption_is_reasonably_testable=False,
+        )
+    )
+
+    output = asyncio.run(
+        _planner(model, dispatcher).run(
+            "Profile the customer dataset.",
+            planning_context=_context(),
+        )
+    )
+
+    assert output.error is not None
+    assert output.error.code is PlannerErrorCode.INVALID_MODEL_DECISION
+    assert output.created_assumption is None
+    assert "cannot author or rewrite" in output.response
+    assert dispatcher.requests == []
+
+
+def test_reasonably_testable_human_claim_requires_unavailable_scientific_runtime() -> None:
+    dispatcher = NeverDispatcher()
+    model = FakePlannerModel(
+        PlannerDecision(
+            action=PlannerAction.INVALID_OR_UNSUPPORTED,
+            assumption_text="Rows correspond to unique customers.",
+            assumption_is_reasonably_testable=True,
+        )
+    )
+
+    output = asyncio.run(
+        _planner(model, dispatcher).run(
+            "/assumption Rows correspond to unique customers.",
+            planning_context=_context(),
+        )
+    )
+
+    assert output.error is not None
+    assert output.error.code is PlannerErrorCode.UNSUPPORTED_ACTION
+    assert output.created_assumption is None
+    assert "reasonably testable" in output.response
+    assert "scientific investigation" in output.response
+    assert "not executable in the current DATA-only runtime" in output.response
     assert dispatcher.requests == []
 
 

@@ -53,6 +53,7 @@ class PlannerDecision(BaseModel):
     action: PlannerAction
     objective_text: str | None = Field(default=None, min_length=1)
     assumption_text: str | None = Field(default=None, min_length=1)
+    assumption_is_reasonably_testable: bool | None = None
     task_instruction: str | None = Field(default=None, min_length=1)
     capability: Capability | None = None
     message: str | None = Field(default=None, min_length=1)
@@ -64,12 +65,23 @@ class PlannerDecision(BaseModel):
                 raise ValueError("Objective actions require objective_text.")
             if any(
                 value is not None
-                for value in (self.assumption_text, self.task_instruction, self.capability)
+                for value in (
+                    self.assumption_text,
+                    self.assumption_is_reasonably_testable,
+                    self.task_instruction,
+                    self.capability,
+                )
             ):
                 raise ValueError("Objective actions cannot propose other state changes.")
         elif self.action is PlannerAction.ADD_ASSUMPTION:
-            if self.assumption_text is None:
-                raise ValueError("Assumption actions require assumption_text.")
+            if (
+                self.assumption_text is None
+                or self.assumption_is_reasonably_testable is not False
+            ):
+                raise ValueError(
+                    "Assumption retention requires Human text classified as not reasonably "
+                    "testable."
+                )
             if any(
                 value is not None
                 for value in (self.objective_text, self.task_instruction, self.capability)
@@ -78,7 +90,10 @@ class PlannerDecision(BaseModel):
         elif self.action is PlannerAction.CREATE_OR_RUN_DATA_TASK:
             if self.task_instruction is None or self.capability is None:
                 raise ValueError("Data work requires task_instruction and capability.")
-            if self.assumption_text is not None:
+            if (
+                self.assumption_text is not None
+                or self.assumption_is_reasonably_testable is not None
+            ):
                 raise ValueError("A data-work decision cannot add an Assumption.")
             if self.capability not in {
                 Capability.DATA_ANALYSIS,
@@ -86,18 +101,33 @@ class PlannerDecision(BaseModel):
                 Capability.DATA_TRANSFORMATION,
             }:
                 raise ValueError("MVP Planner data work requires a Data Explorer capability.")
+        elif self.action is PlannerAction.INVALID_OR_UNSUPPORTED and (
+            self.assumption_is_reasonably_testable is True
+        ):
+            if self.assumption_text is None:
+                raise ValueError("A testable Human claim requires its exact source text.")
+            if any(
+                value is not None
+                for value in (self.objective_text, self.task_instruction, self.capability)
+            ):
+                raise ValueError("A testable Human claim cannot propose other state changes.")
         elif any(
             value is not None
             for value in (
                 self.objective_text,
                 self.assumption_text,
+                self.assumption_is_reasonably_testable,
                 self.task_instruction,
                 self.capability,
             )
         ):
             raise ValueError("This Planner action cannot propose research-state changes.")
 
-        if self.action is PlannerAction.INVALID_OR_UNSUPPORTED and self.message is None:
+        if (
+            self.action is PlannerAction.INVALID_OR_UNSUPPORTED
+            and self.assumption_is_reasonably_testable is not True
+            and self.message is None
+        ):
             raise ValueError("An invalid or unsupported decision requires a message.")
         return self
 

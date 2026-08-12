@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import cast
 
 from langgraph.runtime import Runtime
@@ -60,13 +61,7 @@ def _explicit_decision(
                 None,
             )
         if command == "/assumption":
-            return (
-                PlannerDecision(
-                    action=PlannerAction.ADD_ASSUMPTION,
-                    assumption_text=payload,
-                ),
-                None,
-            )
+            return None
         if command == "/answer":
             return PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE), None
 
@@ -93,6 +88,24 @@ def _explicit_decision(
     )
 
 
+def _is_exact_human_assumption_source(query: str, assumption_text: str) -> bool:
+    stripped = query.strip()
+    command, separator, payload = stripped.partition(" ")
+    if command.casefold() == "/assumption":
+        return bool(separator) and payload.strip() == assumption_text
+
+    if assumption_text not in query:
+        return False
+    request = query.casefold()
+    return bool(
+        re.search(r"\bi\s+assume\b", request)
+        or re.search(
+            r"\b(?:add|keep|record|retain|treat)\b.*\bassumption\b",
+            request,
+        )
+    )
+
+
 async def understand_request(state: State, runtime: Runtime[Context]) -> State:
     """Produce one typed intent from explicit syntax or the latest natural-language request."""
 
@@ -112,7 +125,18 @@ async def understand_request(state: State, runtime: Runtime[Context]) -> State:
                 runtime.context.planning_context.conversation_history.model_messages()
             ),
         )
-        state.decision = result.output
+        decision = result.output
+        if decision.assumption_text is not None and not _is_exact_human_assumption_source(
+            state.query,
+            decision.assumption_text,
+        ):
+            state.error = _error(
+                PlannerErrorCode.INVALID_MODEL_DECISION,
+                "Planner cannot author or rewrite an Assumption; exact Human-supplied "
+                "assumption text is required.",
+            )
+            return state
+        state.decision = decision
         state.new_messages = (*state.new_messages, *result.new_messages)
     except Exception as exc:
         state.error = _error(
@@ -171,9 +195,19 @@ async def prepare_results(state: State, runtime: Runtime[Context]) -> State:
             state.proposed_tasks = (task,)
             state.proposed_plan_revision = revision
         elif decision.action is PlannerAction.INVALID_OR_UNSUPPORTED:
+            if decision.assumption_is_reasonably_testable is True:
+                message = (
+                    "The Human-supplied claim is reasonably testable and therefore was not "
+                    "retained as an Assumption. It belongs to scientific investigation, which "
+                    "is not executable in the current DATA-only runtime."
+                )
+            else:
+                message = decision.message or (
+                    "The requested action is unsupported by the MVP Planner."
+                )
             state.error = _error(
                 PlannerErrorCode.UNSUPPORTED_ACTION,
-                decision.message or "The requested action is unsupported by the MVP Planner.",
+                message,
             )
     except (TypeError, ValueError) as exc:
         state.error = _error(
@@ -249,7 +283,8 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
         assert decision.assumption_text is not None
         state.response = (
             f"Planning Assumption recorded: {decision.assumption_text} "
-            "It is not empirical Evidence."
+            "The Human supplied this statement, and Planner classified it as not reasonably "
+            "testable. It is planning context, not empirical Evidence."
         )
     elif decision.action is PlannerAction.CREATE_OR_RUN_DATA_TASK:
         objective = state.proposed_objective

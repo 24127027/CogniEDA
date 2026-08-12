@@ -196,5 +196,6 @@ def test_planner_decision_rejects_untyped_or_mixed_core_changes() -> None:
         PlannerDecision(
             action=PlannerAction.ADD_ASSUMPTION,
             assumption_text="Rows are customers.",
+            assumption_is_reasonably_testable=False,
             task_instruction="Profile the dataset.",
         )
