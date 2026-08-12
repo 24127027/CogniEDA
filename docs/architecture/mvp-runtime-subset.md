@@ -147,13 +147,17 @@ Planning is an active, approval-bound loop:
 
 ```text
 user request
-  -> Planner drafts a high-level plan
-  -> gaps identified
-  -> bounded Graph Miner or Data Explorer planning support when needed
-  -> plan revised
-  -> Human reviews
-  -> PlanRevision approved and activated
-  -> eligible Task DAG work executes
+  -> Planner determines whether project work is required
+     -> no: answer directly from eligible retained state
+     -> yes: draft a high-level plan
+        -> gaps identified
+        -> bounded Graph Miner or Data Explorer planning support when needed
+        -> candidate PlanRevision revised
+        -> application validates candidate without persistence
+        -> Human reviews and approves exact candidate
+        -> application validates exact approved candidate again
+        -> immutable PlanRevision persisted and activated
+        -> eligible Task DAG work executes
 ```
 
 Planning-support observations are not Evidence. `PlanRevision` represents the
@@ -165,6 +169,10 @@ Membership is derived from the bindings;
 dependencies remain explicit DAG edges. Related workflow-lifecycle state owns
 approval and activation metadata.
 
+An unapproved candidate is not durable authoritative PlanRevision state.
+Validation alone is not admission; persistence and activation belong to the
+later exact-approval transition.
+
 The DAG alone determines eligibility. Rank ties are valid for concurrent or
 independent Tasks, canonical Task-ID ordering is only a deterministic
 serialization tie-breaker, and neither rank nor priority overrides a
@@ -174,8 +182,9 @@ fingerprint without, by itself, creating a successor Task.
 Capability is execution/dispatch-owned. PlanRevision states the requirement;
 `ExecutorRegistry` resolves a concrete runtime provider. Role, provider,
 worker, process, model, and Planner identity are excluded from plan content and
-its fingerprint. Planner coordinates but is not a Task executor. `SYNTHESIS`
-has no executable capability or provider path in the V1 contract.
+its fingerprint. Planner coordinates but is not a Task executor. When retained
+authoritative state already answers a request, Planner synthesizes the response
+without creating a Task, capability, or provider path.
 
 PlanRevision and its bindings contain no concrete DataProfile identity or data
 selection. Planner describes intended data scope only through Task semantics.
@@ -197,7 +206,6 @@ Canonical Task kinds are exactly:
 DATA
 SCIENTIFIC
 GRAPH
-SYNTHESIS
 ```
 
 New authoritative state accepts only canonical Task meanings; legacy shapes do

@@ -232,15 +232,24 @@ closed unless request path, observed execution path, observed digest, and
 provenance profile identity all match that authoritative binding. This is a
 non-FCO provenance/authority record and does not expand the semantic graph.
 
-Immutable PlanRevision proposal storage and admission are also **Verified on
-SQLite**. Normalized revision, binding, and dependency rows preserve exact V1
-content and fingerprint in one transaction. Application authority resolves the
-Objective and every bound Task from persistence, revalidates capability and DAG
-structure, and recomputes the canonical fingerprint. Same-ID/same-content
-replay returns the existing revision; same-ID/different-content collisions fail
-closed; different IDs with the same content fingerprint remain distinct.
-Admission does not consult current provider availability and does not approve,
-activate, select, schedule, or dispatch the admitted proposal.
+Side-effect-free PlanRevision candidate validation is **Implemented**.
+Application resolves the Objective and every bound Task from persistence,
+revalidates capability and DAG structure, verifies canonical representation,
+and recomputes the structural fingerprint without writing or committing. It
+does not consult current provider availability.
+
+Immutable PlanRevision repository infrastructure is **Verified on SQLite**.
+Normalized revision, binding, and dependency rows preserve exact V1 content
+and fingerprint in one caller-owned transaction. Child-write failure rolls the
+complete snapshot back; loading fails closed on a stored fingerprint mismatch;
+same-ID replay or collision cannot overwrite the existing snapshot; and
+different IDs with the same content fingerprint remain distinct. The
+repository is append-only and exposes no update or delete surface.
+
+No application path currently persists an unapproved candidate. Persistence of
+the exact human-approved candidate, its required second validation, and
+activation are **Deferred**; repository existence alone does not make a Planner
+draft authoritative.
 
 The complete target boundary is not implemented. Canonical PlanRevision
 activation, durable role-native result inbox processing, complete replay

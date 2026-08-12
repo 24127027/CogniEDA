@@ -9,9 +9,11 @@ These are verified constraints of the bounded current implementation.
   implement the minimum complete scientific loop defined by MVP-v2.
 - Active bounded Task has no runtime-selected PlanRevision membership,
   dependency eligibility, approval, activation, or parent/leaf execution
-  semantics. Immutable PlanRevision proposals can now retain membership,
-  capability requirements, dependencies, rank, and priority durably, but only
-  `DATA` is executable and no admitted plan drives execution.
+  semantics. Immutable PlanRevision candidates can represent membership,
+  capability requirements, dependencies, rank, and priority and can be
+  validated without persistence. The append-only repository is an isolated
+  infrastructure foundation; only `DATA` is executable and no PlanRevision
+  drives execution.
 - The current materialized SessionFrame can hold one Objective and one
   DataProfile but is not the canonical reference-based session-membership FCO
   and does not implement Objective-bound multi-session isolation.
@@ -26,9 +28,11 @@ These are verified constraints of the bounded current implementation.
   at bounded library surfaces. The in-process Application retains its current
   successor SessionFrame and model-backed conversation turns, but durable
   restart/recovery and complete-loop composition are **Deferred**.
-- PlanRevision V1 domain validation, exact SQLite persistence, and
-  application-owned proposal admission are **Implemented**. Planner authoring,
-  approval/activation, active selection, and Task DAG runtime are **Deferred**.
+- PlanRevision V1 domain and side-effect-free candidate validation are
+  **Implemented**, and append-only repository behavior is **Verified on
+  SQLite**. No application path persists an unapproved candidate. Planner
+  authoring, human approval, exact post-approval validation and persistence,
+  activation, active selection, and Task DAG runtime are **Deferred**.
   `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,

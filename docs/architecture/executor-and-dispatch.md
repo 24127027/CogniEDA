@@ -34,7 +34,6 @@ Canonical Task kinds are:
 DATA
 SCIENTIFIC
 GRAPH
-SYNTHESIS
 ```
 
 Required capability belongs to the immutable `PlanTaskBinding`, not to Task
@@ -45,9 +44,9 @@ validated exactly rather than inferred from Task prose.
 
 The V1 mapping is `DATA` to one of `DATA_ANALYSIS`, `DATA_PROFILING`, or
 `DATA_TRANSFORMATION`; `SCIENTIFIC` to `HYPOTHESIS_TESTING`; `GRAPH` to
-`GRAPH_MINING`; and `SYNTHESIS` to no dispatcher capability. Planner
-coordination does not justify a synthetic synthesis capability or make Planner
-a Task executor.
+`GRAPH_MINING`. Planner response synthesis is not Task work and does not
+justify a synthesis capability, Planner capability, Planner provider, or
+Planner executor role.
 
 Dispatch is capability-based and fail closed. For an approved Task whose
 required capability is unavailable, the dispatcher must decline execution,

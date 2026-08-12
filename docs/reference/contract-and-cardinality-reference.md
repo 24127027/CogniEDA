@@ -30,14 +30,13 @@ edges, and direct or indirect cycles fail closed.
 | `DATA` | `DATA_ANALYSIS`, `DATA_PROFILING`, or `DATA_TRANSFORMATION` |
 | `SCIENTIFIC` | `HYPOTHESIS_TESTING` |
 | `GRAPH` | `GRAPH_MINING` |
-| `SYNTHESIS` | `None` |
 
 `Capability` is owned by the execution/dispatch layer. A binding declares the
 required capability, while `ExecutorRegistry.resolve(required_capability)`
 selects the currently registered provider. Provider, worker, model, process,
-and Planner identity are not plan content. `SYNTHESIS` has no executable
-capability or provider path in V1; Planner coordinates work but is not a Task
-executor.
+and Planner identity are not plan content. Planner coordinates work and may
+synthesize an answer from eligible state, but it is not a Task executor and
+response synthesis is not a capability or Task kind.
 
 `order_rank` is non-negative and permits ties. The DAG determines eligibility;
 rank is a preference only. Priority is exactly `LOW`, `NORMAL`, or `HIGH`,

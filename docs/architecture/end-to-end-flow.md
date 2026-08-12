@@ -56,23 +56,22 @@ observation is not automatically Evidence.
 
 ## Plan proposal, approval, and activation
 
-1. The Planner drafts a complete PlanRevision with canonical Tasks, exactly one
-   immutable binding per member Task, and explicit dependency edges. Each
-   binding owns required capability, non-negative `order_rank`, and `LOW`,
+1. The Planner drafts a complete candidate PlanRevision with canonical Tasks,
+   exactly one immutable binding per member Task, and explicit dependency edges.
+   Each binding owns required capability, non-negative `order_rank`, and `LOW`,
    `NORMAL`, or `HIGH` priority. The revision contains no role or provider
    identity, no exact DataProfile identity, and no configurable
    stopping-condition or replan-trigger policy.
-2. Application authority validates the proposal and assigns or verifies exact
-   proposal identity without activation.
-3. The Planner presents the same version through `ALWAYS_ASK`,
-   `POLICY_GUARDED`, or `ALWAYS_ACCEPT` policy. Policy-guarded is the default,
-   and initial plan approval is required unless explicit policy says otherwise.
-4. Approval authorizes only the exact proposal version.
-5. Application authority atomically activates the PlanRevision and eligible
-   Task state.
+2. Application validates the exact candidate without persisting, approving, or
+   activating it.
+3. The Planner presents that exact candidate to the Human.
+4. Human approval authorizes only that exact candidate version.
+5. Application authority validates the approved candidate again, persists the
+   immutable PlanRevision, and atomically activates it with eligible Task state.
 
-A rejection or requested revision returns to the Planner. A hold preserves the
-pending proposal and its exact identity without execution.
+A rejection, hold, or requested revision returns to the Planner without
+creating authoritative PlanRevision state. Any separately retained draft or
+interaction provenance is not the approved PlanRevision.
 
 Plan completion, interruption, and replanning are workflow-lifecycle concerns.
 An actual cause that later requires reconsideration is recorded by that
@@ -89,10 +88,8 @@ flowchart TD
     K -->|DATA| D[Data Explorer<br/>Direct DataTask]
     K -->|SCIENTIFIC| H[Hypothesis Analyst<br/>Scientific investigation]
     K -->|GRAPH| G[Graph Miner<br/>Read-only inquiry]
-    K -->|SYNTHESIS| S[Planner-coordinated<br/>GeneratedView]
     D --> O[Normalized PlannerWorkOutcome]
     G --> O
-    S --> O
     H --> ER[EvidenceRequest]
     ER --> D2[Data Explorer<br/>Scientific observation]
     D2 --> EA[Evidence admission]
@@ -112,8 +109,8 @@ route.
 Capability is execution/dispatch-owned, and `ExecutorRegistry` is the runtime
 mapping from the declared requirement to a provider. Provider registration or
 instance changes do not alter PlanRevision content. Planner coordinates and
-dispatches but is not a Task executor; `SYNTHESIS` has no executable capability
-or provider path in V1.
+dispatches but is not a Task executor. Planner response synthesis is not a Task
+kind, capability, provider, or dispatch path.
 
 The dependency DAG determines eligibility; binding `order_rank` only expresses
 a scheduling preference and may tie, while priority is coordination metadata.
@@ -177,7 +174,7 @@ manufacturing a Discovery.
 Graph Miner cannot mutate the graph or admit a cross-Objective relation. The
 path does not require a Hypothesis and cannot create Evidence or Discovery.
 
-## SYNTHESIS path
+## Planner response synthesis
 
 1. The Planner requests a purpose-specific, validity-aware projection of
    admitted state and normalized outcomes.
@@ -189,8 +186,8 @@ path does not require a Hypothesis and cannot create Evidence or Discovery.
    remains derived and non-authoritative.
 5. The Planner presents the view to the human.
 
-SYNTHESIS does not force inputs into a scientific investigation and does not
-turn a summary into a Discovery.
+Planner response synthesis does not create a Task, force inputs into a
+scientific investigation, or turn a summary into a Discovery.
 
 ## Capability blocked or unavailable
 

@@ -41,7 +41,6 @@ A `Task` is a durable semantic work unit of exactly one canonical kind:
 DATA
 SCIENTIFIC
 GRAPH
-SYNTHESIS
 ```
 
 | Kind | Reader-facing purpose |
@@ -49,12 +48,13 @@ SYNTHESIS
 | `DATA` | explore, profile, or create an authorized successor data state through Data Explorer |
 | `SCIENTIFIC` | govern one scientific investigation through Hypothesis Analyst |
 | `GRAPH` | ask a bounded read-only question about semantic research-state relationships |
-| `SYNTHESIS` | let Planner derive a GeneratedView from eligible admitted state |
 
 A Task is an independently managed deliverable. A short planning consultation
 with Data Explorer or Graph Miner is not automatically a Task; it becomes one
 only when the plan needs a governed work unit with its own identity and
-lifecycle.
+lifecycle. A direct question that needs no project work, or that can already be
+answered from retained authoritative state, does not become a Task. Planner
+response synthesis is Planner behavior, not executable Task work.
 
 `PlanRevision` is the non-FCO version of an entire proposed or approved Task
 DAG. Exactly one immutable `PlanTaskBinding` represents each member Task and
@@ -75,7 +75,8 @@ Capability is an execution/dispatch contract. PlanRevision states only what
 capability a Task requires; `ExecutorRegistry` resolves the concrete provider
 at runtime. Provider or worker changes therefore do not change plan content or
 its fingerprint. Planner coordinates and dispatches but is not a Task executor.
-`SYNTHESIS` retains no executable capability or provider path in V1.
+There is no Planner or synthesis capability, provider, role, or compatibility
+branch.
 
 PlanRevision and its bindings contain no exact DataProfile identity or concrete
 data selection. Planner describes intended data scope only in the Task
@@ -105,8 +106,11 @@ coordination. It does not author the scientific Hypothesis, InvestigationPlan,
 InvestigationProtocol, Evidence obligations, decision rule, or protected final
 evaluation.
 
-Planner proposals cross application-authority validation and admission before
-durable transition. See [Scientific authority](../scientific-lifecycle/scientific-authority.md)
+A candidate PlanRevision crosses side-effect-free application validation before
+the Planner presents it. Human approval authorizes only that exact candidate;
+application authority must validate it again before later persistence and
+activation. Validation alone is not admission and an unapproved candidate is
+not durable authoritative PlanRevision state. See [Scientific authority](../scientific-lifecycle/scientific-authority.md)
 for the complete authority split.
 
 ## Eligibility for scientific investigation
@@ -141,10 +145,13 @@ Evidence loops, typed non-completion, and authoritative admission are owned by
 ## Implementation status
 
 **Partially implemented.** The active Task semantic core is Objective-scoped
-and uses the canonical four-kind taxonomy, while the immutable in-memory
-PlanRevision V1 implements binding membership, routing compatibility, DAG
-validation, structural fingerprinting, exact SQLite persistence, and
-application-owned proposal admission. Planner authoring, approval/activation,
-active selection, replanning, canonical scientific execution, and the complete
-lifecycle linked above remain a **Design target**; only bounded `DATA`
-execution is supported, and admitted plans do not drive it.
+and uses the canonical three-kind taxonomy. The immutable PlanRevision V1
+domain and side-effect-free application validator are **Implemented** with
+binding membership, routing compatibility, DAG validation, structural
+fingerprinting, and authoritative Objective/Task checks. The append-only
+repository foundation is **Verified on SQLite**, but has no application caller
+for unapproved candidates. Planner authoring, human approval, exact
+revalidation, persistence at the approval boundary, activation, active
+selection, replanning, canonical scientific execution, and the complete
+lifecycle linked above remain **Deferred**; only bounded `DATA` execution is
+supported, and PlanRevision state does not drive it.

@@ -41,9 +41,9 @@ choices, presents limitations and blockers, and asks for correction or
 clarification when needed. Specialists return typed results to application
 coordination; they do not send messages or approval requests to the human.
 
-Approval uses `ALWAYS_ASK`, `POLICY_GUARDED`, or `ALWAYS_ACCEPT` at this boundary
-only. The default is policy-guarded, and an initial plan requires approval
-unless explicit policy authorizes activation without an interactive decision.
+The Human approves the exact PlanRevision candidate presented at this boundary.
+Approval policy modes and their runtime behavior are **Deferred**; they are not
+part of the implemented validator or repository foundation.
 
 ## Grounded planning loop
 
@@ -109,11 +109,15 @@ Scientific stopping conditions remain part of Hypothesis Analyst-owned
 the applicable role-native work order, including `DataWorkOrder`.
 
 A `Task` is the durable semantic work unit. Its canonical kinds are `DATA`,
-`SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`. Required capability, assignment,
+`SCIENTIFIC`, and `GRAPH`. Required capability, assignment,
 dependencies, parentage, order, priority, PlanRevision identity, approval, and
 activation are not part of Task identity. Changing binding coordination does
 not change what the Task means; changing semantic work requires a successor
 Task.
+
+Not every user prompt becomes a Task. The Planner may answer a general/direct
+question with no project work, or synthesize an answer from retained
+authoritative project state, without creating executable work.
 
 The Planner constructs a DAG rather than a bag of instructions. It must expose
 dependencies, blocked prerequisites, terminal leaves, and capability
@@ -130,13 +134,14 @@ meaning. Proposed Tasks cannot execute.
 
 The planning sequence is:
 
-1. The Planner drafts a complete `PlanRevision` proposal and its Task DAG.
-2. Application authority validates the proposal contract without activating
-   it.
-3. The Planner presents the proposal through the configured approval mode.
-4. Human or policy authority approves, rejects, holds, or requests revision.
-5. Application authority verifies the exact approved proposal and atomically
-   activates the PlanRevision and eligible Task state.
+1. The Planner drafts a complete candidate `PlanRevision` and its Task DAG.
+2. Application validates the candidate without persistence or another
+   authoritative side effect.
+3. The Planner presents that exact candidate to the Human.
+4. The Human approves, rejects, holds, or requests revision.
+5. After approval, application authority validates the exact approved
+   candidate again, persists the immutable PlanRevision, and activates it with
+   eligible Task state.
 
 Approval is not activation. The plan visible to a user must be the same plan
 fingerprint or exact version that application authority activates. A changed
@@ -150,7 +155,6 @@ specific change.
 | `DATA` | exactly one of `DATA_ANALYSIS`, `DATA_PROFILING`, or `DATA_TRANSFORMATION` |
 | `SCIENTIFIC` | `HYPOTHESIS_TESTING` |
 | `GRAPH` | `GRAPH_MINING` |
-| `SYNTHESIS` | `None`; no executable capability or provider path exists in V1 |
 
 The Planner declares the required capability in the `PlanTaskBinding`;
 `ExecutorRegistry` resolves an eligible runtime provider for dispatcher-backed
@@ -183,7 +187,8 @@ SessionFrame membership never grants inclusion in a protected
 The Planner may also coordinate a `GeneratedView` for an answer, table, report,
 or synthesis. A view references its sources and carries limitations and
 validity warnings. It never becomes Evidence, Discovery, or an authority
-record merely because it is user-facing.
+record merely because it is user-facing. This response synthesis is Planner
+behavior, not a Task kind or executor path.
 
 ## Recovery and resume
 
@@ -244,15 +249,18 @@ excluded from empirical answer support. Neither conversation nor the current
 SessionFrame is durably restored after restart.
 
 The immutable `PlanRevision`, `PlanTaskBinding`, and `PlanDependency` V1 domain
-contracts, exact SQLite persistence, and application-owned proposal admission
-are **Implemented** with authoritative Objective and Task validation,
-structural canonicalization, DAG guards, deterministic fingerprinting, atomic
-snapshot writes, and fail-closed replay/collision handling. Planner does not
-author or consume them, and no approval, activation, active-plan selection, or
-replanning runtime exists. Active Task exposes all
-four canonical kinds, but only bounded `DATA` work is executable. Full Task DAG
-runtime behavior, GeneratedView coordination, durable SessionFrame composition,
-and the end-to-end recovery model remain **Deferred** target design. The
+contracts and side-effect-free application validation are **Implemented** with
+authoritative Objective and Task checks, structural canonicalization, DAG
+guards, and deterministic fingerprinting. Append-only snapshot persistence and
+fail-closed collision/fingerprint reconstruction are **Verified on SQLite** as
+infrastructure for the later approval boundary. Validation does not persist an
+unapproved candidate, and no application caller currently persists one.
+Planner does not author or consume PlanRevision, and approval, exact
+post-approval revalidation, activation, active-plan selection, and replanning
+runtime are **Deferred**. Active Task exposes all three canonical kinds, but
+only bounded `DATA` work is executable. Full Task DAG runtime behavior,
+GeneratedView coordination, durable SessionFrame composition, and the
+end-to-end recovery model remain **Deferred** target design. The
 [MVP-v2 definition](mvp-runtime-subset.md) explains the minimum complete
 product and research capability.
 
