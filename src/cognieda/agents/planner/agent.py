@@ -51,11 +51,19 @@ class Planner:
         *,
         model_config: ModelConfig | None = None,
         agent_instruction: str | None = None,
+        recreate_agent: bool = False,
     ) -> None:
-        """Reload the planner's model and instructions."""
+        """Reload the planner's model and instructions.\n
+            * **model_config**: Optional new model configuration to use for the planner agent.\n
+            * **agent_instruction**: Optional new instruction string to use for the planner agent.\n
+            * **recreate_agent**: Recreate underlying agent\n
+                set to True automatically when model_config is provided
+        """
+
         self.model.reload(
             model_config=model_config, 
-            agent_instruction=agent_instruction
+            agent_instruction=agent_instruction,
+            recreate_agent=recreate_agent
         )
 
     async def run(

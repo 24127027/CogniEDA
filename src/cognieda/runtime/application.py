@@ -82,7 +82,7 @@ class Application:
             case ["/skill", "assign", worker, skill]:
                 self.workspace.add_worker_skill(worker, skill)
                 self.agent_factory.reload_tooling()  # Reload the tooling to reflect the updated skills
-                await self.planner_agent.reload_model()
+                await self.planner_agent.reload(recreate_agent=True)  # Reload the planner agent to reflect the updated skills
 
                 return self._text(
                     f"Assigned skill '{skill}' to '{worker}'."
@@ -91,7 +91,7 @@ class Application:
             case ["/skill", "unassign", worker, skill]:
                 self.workspace.remove_worker_skill(worker, skill)
                 self.agent_factory.reload_tooling()  # Reload the tooling to reflect the updated skills
-                await self.planner_agent.reload_model()
+                await self.planner_agent.reload(recreate_agent=True)
 
                 return self._text(
                     f"Removed skill '{skill}' from '{worker}'."

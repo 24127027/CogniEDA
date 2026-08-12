@@ -47,6 +47,7 @@ class PlannerDecisionModel(Protocol):
         *,
         model_config: ModelConfig | None = None,
         agent_instruction: str | None = None,
+        recreate_agent: bool = False,
     ) -> None: ...
 
 
@@ -81,11 +82,13 @@ class PlannerModel:
     def reload(
         self,
         *,
-        model_config: ModelConfig | None = None,
         agent_instruction: str | None = None,
+        model_config: ModelConfig | None = None,
+        recreate_agent: bool = False,
     ) -> None:
         if model_config is not None:
             self._model_config = model_config
+            recreate_agent = True
 
         if agent_instruction is not None:
             self._agent_instruction = agent_instruction
@@ -99,7 +102,7 @@ class PlannerModel:
             agent_instruction=self._agent_instruction,
         )
 
-        if model_config is not None:
+        if recreate_agent:
             self._reload_agent()
 
     async def decide(
