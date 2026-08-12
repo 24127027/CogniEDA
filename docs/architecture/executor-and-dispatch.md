@@ -76,6 +76,10 @@ artifacts, and stopping conditions. `DataExplorerResult` returns observations,
 `AnalysisFrame` material, diagnostics, artifacts, limitations, blockers, and
 bounded completion status.
 
+Those stopping conditions bound one Data Explorer execution. They are not
+PlanRevision completion policy, replan triggers, or scientific investigation
+stopping conditions.
+
 This direct path is not a scientific `EvidenceRequest`. It may produce useful
 observations and views without creating Evidence or a Discovery.
 

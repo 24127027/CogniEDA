@@ -71,16 +71,27 @@ protected scientific evaluation.
 
 ## PlanRevision and Task DAG
 
-A `PlanRevision` is a non-FCO version of a complete proposed or approved plan.
-It owns plan-version concerns such as:
+A `PlanRevision` is a non-FCO immutable snapshot of one complete plan for one
+Objective. Its content owns plan-version concerns such as:
 
 - Task membership and dependency edges;
 - required capability for each Task;
 - executor assignment in `PlanTaskBinding` or equivalent plan-version state;
 - applicable DataProfile references;
 - ordering, priority, presentation, and scheduling metadata;
-- stopping conditions and replan triggers;
-- approval state and plan fingerprint.
+- a deterministic plan-content fingerprint.
+
+Proposal, approval, activation, plan-execution completion, interruption, and
+replanning are workflow-lifecycle concerns around that immutable content. They
+are not configurable condition or trigger policy authored inside a
+`PlanRevision`. An actual cause that later requires reconsideration is a
+workflow fact associated with the affected revision; the finite typed cause
+taxonomy and successor lifecycle are deferred to their owning workflow
+milestone.
+
+Scientific stopping conditions remain part of Hypothesis Analyst-owned
+`InvestigationProtocol`. Bounded execution stopping conditions remain part of
+the applicable role-native work order, including `DataWorkOrder`.
 
 A `Task` is the durable semantic work unit. Its canonical kinds are `DATA`,
 `SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`. Assignment is not part of Task identity.
@@ -122,11 +133,12 @@ eligible executor from the capability registry. If the capability is absent,
 the Planner receives a typed unavailable or blocked outcome. It does not choose
 a legacy executor, reinterpret the Task, or route by semantic guess.
 
-Replanning may be triggered by capability absence, infeasibility, a blocked
-dependency, new limitations, a correction request, additional Evidence needs,
-validity change, or a human change in intent. Replanning creates a successor
-PlanRevision or returns to the grounded planning loop. It does not edit an
-approved plan in place.
+Capability absence, infeasibility, a blocked dependency, new limitations, a
+correction request, additional Evidence needs, validity change, or a human
+change in intent may later be recorded as actual workflow facts requiring
+reconsideration. The replanning lifecycle creates a successor PlanRevision or
+returns to the grounded planning loop; it does not mutate the historical
+revision. A finite typed cause taxonomy and runtime response are deferred.
 
 ## SessionFrame and GeneratedView coordination
 

@@ -99,6 +99,11 @@ Planner must not define or revise these scientific fields. Application
 authority validates and admits the exact candidate under the applicable
 approval and lineage rules.
 
+These scientific stopping conditions are not PlanRevision completion policy or
+replanning triggers. PlanRevision contains high-level plan content; the
+Hypothesis Analyst retains exclusive authority over investigation stopping
+semantics.
+
 A protocol change after Evidence exists is consequential. It requires the
 appropriate approval and scientific-authority path, a traceable protocol
 revision, and reevaluation of which Evidence remains eligible. Silent in-place

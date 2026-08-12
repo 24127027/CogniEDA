@@ -57,8 +57,9 @@ observation is not automatically Evidence.
 ## Plan proposal, approval, and activation
 
 1. The Planner drafts a complete PlanRevision with Task DAG, canonical Task
-   kinds, dependencies, capability requirements, plan bindings, stopping
-   conditions, and replan triggers.
+   kinds, dependencies, capability requirements, and plan bindings. The
+   revision contains no configurable stopping-condition or replan-trigger
+   policy.
 2. Application authority validates the proposal and assigns or verifies exact
    proposal identity without activation.
 3. The Planner presents the same version through `ALWAYS_ASK`,
@@ -70,6 +71,13 @@ observation is not automatically Evidence.
 
 A rejection or requested revision returns to the Planner. A hold preserves the
 pending proposal and its exact identity without execution.
+
+Plan completion, interruption, and replanning are workflow-lifecycle concerns.
+An actual cause that later requires reconsideration is recorded by that
+workflow against the affected immutable revision; it is not hypothetical
+Planner-authored trigger policy inside the PlanRevision. Scientific stopping
+remains `InvestigationProtocol`-owned, and bounded execution stopping remains
+owned by the applicable role-native work order such as `DataWorkOrder`.
 
 ## Routing overview
 

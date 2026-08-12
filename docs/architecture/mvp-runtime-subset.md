@@ -158,8 +158,15 @@ user request
 
 Planning-support observations are not Evidence. `PlanRevision` represents the
 full approved Task DAG. A Task is an independently governed semantic work
-unit; PlanRevision owns membership, dependencies, assignment, ordering, and
-approval metadata.
+unit; PlanRevision owns membership, dependencies, assignment, and ordering.
+Related workflow-lifecycle state owns approval and activation metadata.
+
+The immutable PlanRevision content does not embed configurable stopping
+conditions, replan triggers, or hypothetical future causes. Plan-execution
+completion, interruption, approval and activation state, and replanning are
+workflow-lifecycle state associated with the revision. Scientific stopping is
+owned by `InvestigationProtocol`; bounded execution stopping is owned by the
+applicable role-native work order.
 
 Canonical Task kinds are exactly:
 

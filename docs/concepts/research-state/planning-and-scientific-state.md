@@ -57,8 +57,16 @@ only when the plan needs a governed work unit with its own identity and
 lifecycle.
 
 `PlanRevision` is the non-FCO version of an entire proposed or approved Task
-DAG, including membership, dependencies, assignment, ordering, approval, and
-other coordination state. Those concerns do not define Task identity.
+DAG, including membership, dependencies, assignment, ordering, and other
+immutable coordination content. Those concerns do not define Task identity.
+
+Its immutable plan content contains neither configurable stopping conditions
+nor replan-trigger policy. Plan completion, interruption, approval and
+activation state, and replanning belong to workflow lifecycle around the
+revision. An actual cause that later requires reconsideration is a workflow
+fact associated with the affected revision, not content that mutates the
+historical plan. Scientific stopping remains `InvestigationProtocol`-owned;
+bounded execution stopping remains work-order-owned.
 
 A change to Task meaning requires a successor Task. A change to the approved
 plan creates an authorized successor PlanRevision or returns to grounded
