@@ -1,10 +1,5 @@
-from enum import StrEnum
+"""Execution-layer export of the shared finite Capability contract."""
 
+from cognieda.schemas.enums import Capability
 
-class Capability(StrEnum):
-    DATA_ANALYSIS = "data_analysis"
-    DATA_PROFILING = "data_profiling"
-    DATA_TRANSFORMATION = "data_transformation"
-
-    GRAPH_MINING = "graph_mining"
-    HYPOTHESIS_TESTING = "hypothesis_testing"
+__all__ = ("Capability",)

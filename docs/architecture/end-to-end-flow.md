@@ -56,9 +56,12 @@ observation is not automatically Evidence.
 
 ## Plan proposal, approval, and activation
 
-1. The Planner drafts a complete PlanRevision with Task DAG, canonical Task
-   kinds, dependencies, capability requirements, plan bindings, stopping
-   conditions, and replan triggers.
+1. The Planner drafts a complete PlanRevision with canonical Tasks, exactly one
+   immutable binding per member Task, and explicit dependency edges. Each
+   binding owns required capability, assigned role, non-negative `order_rank`,
+   and `LOW`, `NORMAL`, or `HIGH` priority. The revision contains no exact
+   DataProfile identity and no configurable stopping-condition or
+   replan-trigger policy.
 2. Application authority validates the proposal and assigns or verifies exact
    proposal identity without activation.
 3. The Planner presents the same version through `ALWAYS_ASK`,
@@ -70,6 +73,13 @@ observation is not automatically Evidence.
 
 A rejection or requested revision returns to the Planner. A hold preserves the
 pending proposal and its exact identity without execution.
+
+Plan completion, interruption, and replanning are workflow-lifecycle concerns.
+An actual cause that later requires reconsideration is recorded by that
+workflow against the affected immutable revision; it is not hypothetical
+Planner-authored trigger policy inside the PlanRevision. Scientific stopping
+remains `InvestigationProtocol`-owned, and bounded execution stopping remains
+owned by the applicable role-native work order such as `DataWorkOrder`.
 
 ## Routing overview
 
@@ -98,6 +108,14 @@ Before any route executes, the dispatcher verifies the required capability and
 plan binding. Capability absence returns a typed unavailable or blocked outcome
 and preserves Task meaning. There is no legacy fallback or semantic-guess
 route.
+
+The dependency DAG determines eligibility; binding `order_rank` only expresses
+a scheduling preference and may tie, while priority is coordination metadata.
+Neither can override a prerequisite. Planner describes intended data scope in
+the Task instruction but does not bind an exact DataProfile. The responsible
+specialist or controller receives complete authoritative DataProfile context,
+selects the applicable profile and concrete scope, and leaves the exact profile
+used to downstream execution or scientific provenance.
 
 ## DATA path
 

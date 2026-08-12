@@ -26,7 +26,7 @@ Executors should be stateless or restart-safe. Durable progress, leases,
 attempt identity, and replay protection belong to application authority, not
 to hidden in-memory agent state.
 
-## Task semantics and capability
+## Task kind and binding-owned capability
 
 Canonical Task kinds are:
 
@@ -37,9 +37,18 @@ GRAPH
 SYNTHESIS
 ```
 
-The required capability belongs to Task semantics. Executor assignment belongs
-to `PlanTaskBinding` or equivalent plan-version state, not to Task identity.
-Changing the assigned worker therefore does not change the Task's meaning.
+Required capability and assigned specialist or control role belong to the
+immutable `PlanTaskBinding`, not to Task semantics or Task identity. Changing
+either value changes PlanRevision content and its fingerprint without, by
+itself, changing the Task's meaning. `TaskKind`, `Capability`, and
+`PlanTaskRole` remain distinct finite contracts and are validated for exact
+compatibility; none is inferred from another or from Task prose.
+
+The V1 mapping is `DATA` to one of `DATA_ANALYSIS`, `DATA_PROFILING`, or
+`DATA_TRANSFORMATION` with `DATA_EXPLORER`; `SCIENTIFIC` to
+`HYPOTHESIS_TESTING` with `HYPOTHESIS_ANALYST`; `GRAPH` to `GRAPH_MINING` with
+`GRAPH_MINER`; and `SYNTHESIS` to no dispatcher capability with `PLANNER`.
+Planner coordination does not justify a synthetic synthesis capability.
 
 Dispatch is capability-based and fail closed. For an approved Task whose
 required capability is unavailable, the dispatcher must decline execution,
@@ -48,6 +57,13 @@ blocked outcome, and expose permitted next actions to the Planner.
 
 It must not fall back to a legacy executor, route by semantic guess, silently
 change capability, or reinterpret the Task.
+
+Neither PlanRevision nor `PlanTaskBinding` selects a concrete DataProfile.
+Specialists receive the complete authoritative DataProfile context available
+for their work, then select the applicable profile and concrete scope within
+their role-native authority. Receiving metadata does not grant Graph Miner or
+Planner dataset access. Exact profiles actually used remain mandatory
+downstream execution or scientific provenance.
 
 ## Role-native contracts
 
@@ -75,6 +91,10 @@ references, allowed operation, scope, resource limits, required diagnostics or
 artifacts, and stopping conditions. `DataExplorerResult` returns observations,
 `AnalysisFrame` material, diagnostics, artifacts, limitations, blockers, and
 bounded completion status.
+
+Those stopping conditions bound one Data Explorer execution. They are not
+PlanRevision completion policy, replan triggers, or scientific investigation
+stopping conditions.
 
 This direct path is not a scientific `EvidenceRequest`. It may produce useful
 observations and views without creating Evidence or a Discovery.

@@ -158,8 +158,32 @@ user request
 
 Planning-support observations are not Evidence. `PlanRevision` represents the
 full approved Task DAG. A Task is an independently governed semantic work
-unit; PlanRevision owns membership, dependencies, assignment, ordering, and
-approval metadata.
+unit; required capability is not Task semantics. Exactly one immutable
+`PlanTaskBinding` represents each member Task and owns required capability,
+assigned specialist or control role, non-negative `order_rank`, and finite
+`LOW`, `NORMAL`, or `HIGH` priority. Membership is derived from the bindings;
+dependencies remain explicit DAG edges. Related workflow-lifecycle state owns
+approval and activation metadata.
+
+The DAG alone determines eligibility. Rank ties are valid for concurrent or
+independent Tasks, canonical Task-ID ordering is only a deterministic
+serialization tie-breaker, and neither rank nor priority overrides a
+dependency. A binding coordination change changes PlanRevision content and its
+fingerprint without, by itself, creating a successor Task.
+
+PlanRevision and its bindings contain no concrete DataProfile identity or data
+selection. Planner describes intended data scope only through Task semantics.
+Each specialist or controller receives complete authoritative DataProfile
+context and chooses the concrete applicable profile and scope within its own
+authority. Exact DataProfiles actually used are captured later in execution or
+scientific provenance and are not PlanRevision fingerprint content.
+
+The immutable PlanRevision content does not embed configurable stopping
+conditions, replan triggers, or hypothetical future causes. Plan-execution
+completion, interruption, approval and activation state, and replanning are
+workflow-lifecycle state associated with the revision. Scientific stopping is
+owned by `InvestigationProtocol`; bounded execution stopping is owned by the
+applicable role-native work order.
 
 Canonical Task kinds are exactly:
 

@@ -11,8 +11,9 @@ These are established architecture, not speculative enhancements:
 - replace legacy Task kinds with `DATA`, `SCIENTIFIC`, `GRAPH`, and
   `SYNTHESIS`, keeping semantic Task identity separate from PlanRevision
   assignment and coordination metadata;
-- implement PlanRevision and its versioned Task membership, dependencies,
-  assignments, approval, and activation;
+- integrate the implemented PlanRevision V1 domain contract with Planner
+  authoring, persistence/admission, active revision selection, approval,
+  activation, and Task DAG runtime;
 - preserve Planner-only human interaction while preventing Planner ownership
   of scientific feasibility, methods, parameters, protocols, obligations,
   evaluation, or proposal content;
