@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Literal, cast
 
-from langgraph.graph import END
 from langgraph.runtime import Runtime
 from pydantic import TypeAdapter
 from pydantic_ai import Agent
@@ -72,7 +71,7 @@ def route_after_planner(
 
     if isinstance(state.result, AuthoritativeAnswerRequest):
         return "compose_authoritative_answer"
-    return END
+    return "__end__"
 
 
 async def compose_authoritative_answer(
