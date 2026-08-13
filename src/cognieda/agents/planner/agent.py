@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from pydantic_ai import Agent
+
+from cognieda.agents.utilities import instruction
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import ExecutorContext
 
 from .context import Context, PlanningContext
 from .dependencies import PlannerDeps
 from .graph import build_graph
-from .model import PlannerDecisionModel, PlannerModel
 from .types import PlannerControlledError, PlannerErrorCode, PlannerOutput, State
 
 
@@ -19,32 +21,33 @@ class Planner:
         self,
         deps: PlannerDeps,
         *,
-        planner_model: PlannerDecisionModel | None = None,
-        agent_factory: AgentFactoryPort | None = None,
-        model_config: ModelConfig | None = None,
-        agent_instruction: str = "",
+        agent_factory: AgentFactoryPort,
+        model_config: ModelConfig,
+        agent_instruction: str | None = None,
     ) -> None:
-        if planner_model is not None:
-            if agent_factory is not None:
-                raise ValueError(
-                    "Provide either planner_model or agent_factory, not both."
-                )
-            self.model = planner_model
-        else:
-            if agent_factory is None:
-                raise ValueError(
-                    "Planner requires either planner_model or agent_factory."
-                )
-
-            self.model = PlannerModel(
-                deps=deps,
-                agent_factory=agent_factory,
-                model_config=model_config,      # may be None
-                agent_instruction=agent_instruction,
-            )
-
         self.deps = deps
+        self._agent_factory = agent_factory
+        self._model_config = model_config
+        self._workspace_instruction = agent_instruction
+        self._assemble_instructions()
+        self._recreate_agent()
         self.graph = build_graph()
+
+    def _assemble_instructions(self) -> None:
+        self._answer_instructions = tuple(
+            instruction.assemble("answer.txt", self._workspace_instruction)
+        )
+        self._decide_instructions = tuple(
+            instruction.assemble("decide.txt", self._workspace_instruction)
+        )
+
+    def _recreate_agent(self) -> None:
+        self._agent: Agent[PlannerDeps, object] = self._agent_factory.create_agent(
+            worker="planner",
+            config=self._model_config,
+            deps_type=PlannerDeps,
+            builtin_tools=self.builtin_tools,
+        )
 
     async def reload(
         self,
@@ -53,18 +56,17 @@ class Planner:
         agent_instruction: str | None = None,
         recreate_agent: bool = False,
     ) -> None:
-        """Reload the planner's model and instructions.\n
-            * **model_config**: Optional new model configuration to use for the planner agent.\n
-            * **agent_instruction**: Optional new instruction string to use for the planner agent.\n
-            * **recreate_agent**: Recreate underlying agent\n
-                set to True automatically when model_config is provided
-        """
+        """Reload Planner instructions and optionally recreate its current Agent."""
 
-        self.model.reload(
-            model_config=model_config, 
-            agent_instruction=agent_instruction,
-            recreate_agent=recreate_agent
-        )
+        if model_config is not None:
+            self._model_config = model_config
+            recreate_agent = True
+        if agent_instruction is not None:
+            self._workspace_instruction = agent_instruction
+
+        self._assemble_instructions()
+        if recreate_agent:
+            self._recreate_agent()
 
     async def run(
         self,
@@ -87,9 +89,11 @@ class Planner:
             execution_context=execution_context or ExecutorContext(),
         )
         context = Context(
-            planner_model=self.model,
-            dispatcher=self.deps.dispatcher,
+            agent=self._agent,
+            deps=self.deps,
             planning_context=planning_context,
+            decide_instructions=self._decide_instructions,
+            answer_instructions=self._answer_instructions,
         )
         result = await self.graph.ainvoke(state, context=context)
         final_state = State.model_validate(result)

@@ -82,9 +82,28 @@ def test_planner_has_no_session_frame_dependency_or_result_surface() -> None:
     assert violations == []
     assert "session_frame" not in signature.parameters
     assert signature.parameters["planning_context"].default is inspect.Parameter.empty
-    assert inspect.iscoroutinefunction(Planner.reload_model)
+    assert inspect.iscoroutinefunction(Planner.reload)
     assert "session_frame" not in State.model_fields
     assert "session_frame" not in PlannerOutput.model_fields
+
+
+def test_planner_model_wrapper_family_is_removed_from_production() -> None:
+    planner_root = SOURCE_ROOT / "agents" / "planner"
+    forbidden_names = (
+        "Planner" + "Model",
+        "PlannerDecision" + "Model",
+        "PlannerModel" + "Result",
+        "PlannerModel" + "Input",
+    )
+    violations = [
+        f"{path.relative_to(PROJECT_ROOT)} contains {name}"
+        for path in planner_root.rglob("*.py")
+        for name in forbidden_names
+        if name in path.read_text(encoding="utf-8")
+    ]
+
+    assert not (planner_root / "model.py").exists()
+    assert violations == []
 
 
 def test_inward_layers_do_not_depend_on_cli() -> None:
@@ -127,11 +146,19 @@ def test_specialist_roles_are_peer_packages() -> None:
     assert all(importlib.import_module(module) is not None for module in modules)
 
 
-def test_production_source_contains_only_python_files() -> None:
+def test_production_source_contains_only_python_and_known_instruction_assets() -> None:
+    allowed = {
+        Path("src/cognieda/agents/planner/instruction/agents.md"),
+        Path("src/cognieda/agents/planner/instruction/answer.txt"),
+        Path("src/cognieda/agents/planner/instruction/decide.txt"),
+    }
     non_python = [
         path.relative_to(PROJECT_ROOT)
         for path in SOURCE_ROOT.rglob("*")
-        if path.is_file() and path.suffix != ".py" and "__pycache__" not in path.parts
+        if path.is_file()
+        and path.suffix != ".py"
+        and "__pycache__" not in path.parts
+        and path.relative_to(PROJECT_ROOT) not in allowed
     ]
 
     assert non_python == []

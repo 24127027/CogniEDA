@@ -101,7 +101,7 @@ class PlannerDecision(BaseModel):
         return self
 
 
-class PlannerModelInput(BaseModel):
+class PlannerDecisionInput(BaseModel):
     """Bounded typed research-state projection used for request understanding."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -118,7 +118,7 @@ class PlannerModelInput(BaseModel):
         cls,
         latest_request: str,
         planning_context: PlanningContext,
-    ) -> PlannerModelInput:
+    ) -> PlannerDecisionInput:
         return cls(
             latest_request=latest_request,
             objective=planning_context.objective,

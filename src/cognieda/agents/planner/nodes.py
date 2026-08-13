@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import cast
 
 from langgraph.runtime import Runtime
+from pydantic_ai import Agent
 
-from cognieda.application.ports import ExecutorDispatcherPort
 from cognieda.execution import (
     Capability,
     ExecutionRequest,
@@ -16,14 +16,15 @@ from cognieda.schemas.artifacts import Assumption, Objective, Task
 from cognieda.schemas.enums import TaskKind, TaskStatus
 
 from .context import Context
-from .model import PlannerDecisionModel
+from .dependencies import PlannerDeps
 from .types import (
     PlannerAction,
     PlannerAnswerInput,
     PlannerControlledError,
     PlannerDecision,
+    PlannerDecisionInput,
     PlannerErrorCode,
-    PlannerModelInput,
+    PlannerResponseDraft,
     State,
 )
 
@@ -107,19 +108,24 @@ async def understand_request(state: State, runtime: Runtime[Context]) -> State:
         state.decision, state.error = explicit
         return state
 
-    model = cast(PlannerDecisionModel, runtime.context.planner_model)
     try:
-        result = await model.decide(
-            PlannerModelInput.from_planning_context(
-                state.query,
-                runtime.context.planning_context,
-            ),
+        agent = cast(Agent[PlannerDeps, object], runtime.context.agent)
+        deps = cast(PlannerDeps, runtime.context.deps)
+        model_input = PlannerDecisionInput.from_planning_context(
+            state.query,
+            runtime.context.planning_context,
+        )
+        result = await agent.run(
+            f"Typed input:\n{model_input.model_dump_json()}",
+            output_type=PlannerDecision,
+            deps=deps,
             message_history=(
                 runtime.context.planning_context.conversation_history.model_messages()
             ),
+            instructions=runtime.context.decide_instructions,
         )
-        state.decision = result.output
-        state.new_messages = (*state.new_messages, *result.new_messages)
+        state.decision = PlannerDecision.model_validate(result.output)
+        state.new_messages = (*state.new_messages, *result.new_messages())
     except Exception as exc:
         state.error = _error(
             PlannerErrorCode.INVALID_MODEL_DECISION,
@@ -198,13 +204,13 @@ async def dispatch_work(state: State, runtime: Runtime[Context]) -> State:
     ):
         return state
 
-    dispatcher = cast(ExecutorDispatcherPort, runtime.context.dispatcher)
     task = state.created_task
     task_id = task.task_id
     try:
         running_task = _with_task_status(task, TaskStatus.RUNNING)
         state.created_task = running_task
-        result = await dispatcher.dispatch(
+        deps = cast(PlannerDeps, runtime.context.deps)
+        result = await deps.dispatcher.dispatch(
             ExecutionRequest(
                 capability=state.selected_capability,
                 input=ExecutorInput(task=running_task),
@@ -278,18 +284,24 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
             )
             state.response = state.error.message
             return state
-        model = cast(PlannerDecisionModel, runtime.context.planner_model)
         try:
-            result = await model.answer(
-                PlannerAnswerInput(
-                    latest_request=state.query,
-                    objective=planning_context.objective,
-                    data_profile=planning_context.data_profile,
-                    evidences=planning_context.evidences,
-                )
+            agent = cast(Agent[PlannerDeps, object], runtime.context.agent)
+            deps = cast(PlannerDeps, runtime.context.deps)
+            answer_input = PlannerAnswerInput(
+                latest_request=state.query,
+                objective=planning_context.objective,
+                data_profile=planning_context.data_profile,
+                evidences=planning_context.evidences,
             )
-            state.response = result.output.text
-            state.new_messages = (*state.new_messages, *result.new_messages)
+            result = await agent.run(
+                f"Typed evidence input:\n{answer_input.model_dump_json()}",
+                output_type=PlannerResponseDraft,
+                deps=deps,
+                instructions=runtime.context.answer_instructions,
+            )
+            response = PlannerResponseDraft.model_validate(result.output)
+            state.response = response.text
+            state.new_messages = (*state.new_messages, *result.new_messages())
         except Exception as exc:
             state.error = _error(
                 PlannerErrorCode.RESPONSE_FAILED,

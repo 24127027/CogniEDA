@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import cast
 from unittest.mock import AsyncMock, Mock
 
@@ -17,15 +17,12 @@ from pydantic_ai.messages import (
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
-from cognieda.agents.planner.model import PlannerModelResult
 from cognieda.agents.planner.types import (
     PlannerAction,
-    PlannerAnswerInput,
     PlannerDecision,
-    PlannerModelInput,
-    PlannerResponseDraft,
+    PlannerDecisionInput,
 )
-from cognieda.application.ports import AgentFactoryPort
+from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import ExecutionRequest, ExecutorDispatcher
 from cognieda.runtime.application import Application
 from cognieda.runtime.conversation import ConversationHistory, ConversationTurn
@@ -44,27 +41,40 @@ class NeverDispatcher:
         raise AssertionError(f"Unexpected dispatch: {request}")
 
 
-class SequencePlannerModel:
+@dataclass
+class FakeRunResult:
+    output: object
+    messages: tuple[ModelMessage, ...]
+
+    def new_messages(self) -> list[ModelMessage]:
+        return list(self.messages)
+
+
+class SequencePlannerAgent:
     def __init__(self, *decisions: PlannerDecision) -> None:
         self._decisions = iter(decisions)
         self.message_histories: list[tuple[ModelMessage, ...]] = []
 
-    async def decide(
-        self,
-        model_input: PlannerModelInput,
-        *,
-        message_history: Sequence[ModelMessage] = (),
-    ) -> PlannerModelResult[PlannerDecision]:
-        self.message_histories.append(tuple(message_history))
-        return PlannerModelResult(
+    async def run(self, prompt: str, **kwargs: object) -> FakeRunResult:
+        assert kwargs["output_type"] is PlannerDecision
+        model_input = PlannerDecisionInput.model_validate_json(prompt.split("\n", 1)[1])
+        history = kwargs.get("message_history", ())
+        self.message_histories.append(tuple(history))  # type: ignore[arg-type]
+        return FakeRunResult(
             output=next(self._decisions),
-            new_messages=_messages(model_input.latest_request, "typed decision"),
+            messages=_messages(model_input.latest_request, "typed decision"),
         )
 
-    async def answer(
-        self, answer_input: PlannerAnswerInput
-    ) -> PlannerModelResult[PlannerResponseDraft]:
-        raise AssertionError(f"Unexpected answer request: {answer_input}")
+
+class FakeAgentFactory:
+    def __init__(self, agent: SequencePlannerAgent) -> None:
+        self.agent = agent
+
+    def create_agent(self, **_: object) -> SequencePlannerAgent:
+        return self.agent
+
+    def reload_tooling(self) -> None:
+        pass
 
 
 def test_conversation_history_appends_complete_native_message_turns() -> None:
@@ -83,7 +93,7 @@ def test_conversation_history_appends_complete_native_message_turns() -> None:
 
 
 def test_application_retains_original_history_alongside_current_session_frame() -> None:
-    model = SequencePlannerModel(
+    model = SequencePlannerAgent(
         PlannerDecision(
             action=PlannerAction.SET_OR_REFINE_OBJECTIVE,
             objective_text="Understand customer churn.",
@@ -93,7 +103,8 @@ def test_application_retains_original_history_alongside_current_session_frame() 
     dispatcher = NeverDispatcher()
     planner = Planner(
         deps=PlannerDeps(dispatcher=dispatcher),
-        planner_model=model,
+        agent_factory=FakeAgentFactory(model),  # type: ignore[arg-type]
+        model_config=ModelConfig(provider="openai", model_name="test", api_key="test"),
     )
     application = Application(
         workspace=cast(Workspace, object()),
@@ -115,7 +126,7 @@ def test_application_retains_original_history_alongside_current_session_frame() 
 def test_skill_assignment_preserves_runtime_reload_path_without_planner_state_access() -> None:
     workspace = Mock(spec=Workspace)
     planner = Mock(spec=Planner)
-    planner.reload_model = AsyncMock()
+    planner.reload = AsyncMock()
     agent_factory = Mock()
     application = Application(
         workspace=workspace,
@@ -129,7 +140,7 @@ def test_skill_assignment_preserves_runtime_reload_path_without_planner_state_ac
 
     workspace.add_worker_skill.assert_called_once_with("planner", "review")
     agent_factory.reload_tooling.assert_called_once_with()
-    planner.reload_model.assert_awaited_once_with()
+    planner.reload.assert_awaited_once_with(recreate_agent=True)
     planner.run.assert_not_called()
     assert application.session_frame is original_frame
     assert response.content == "Assigned skill 'review' to 'planner'."

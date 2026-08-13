@@ -23,6 +23,8 @@ class Context(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
-    planner_model: object
-    dispatcher: object
+    agent: object
+    deps: object
     planning_context: PlanningContext
+    decide_instructions: tuple[str, ...]
+    answer_instructions: tuple[str, ...]

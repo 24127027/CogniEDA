@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 import pytest
@@ -9,15 +9,15 @@ from pydantic_ai.messages import ModelMessage
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
-from cognieda.agents.planner.model import PlannerModelResult
 from cognieda.agents.planner.types import (
     PlannerAction,
     PlannerAnswerInput,
     PlannerDecision,
+    PlannerDecisionInput,
     PlannerErrorCode,
-    PlannerModelInput,
     PlannerResponseDraft,
 )
+from cognieda.application.ports import ModelConfig
 from cognieda.execution import (
     Capability,
     ExecutionFailure,
@@ -39,7 +39,15 @@ from cognieda.schemas.common import EvidenceProvenance
 from cognieda.schemas.enums import TaskKind, TaskStatus
 
 
-class FakePlannerModel:
+@dataclass
+class FakeRunResult:
+    output: object
+
+    def new_messages(self) -> list[ModelMessage]:
+        return []
+
+
+class RecordingPlannerAgent:
     def __init__(
         self,
         decision: PlannerDecision,
@@ -48,28 +56,33 @@ class FakePlannerModel:
     ) -> None:
         self.decision = decision
         self.answer_text = answer
-        self.decision_inputs: list[PlannerModelInput] = []
+        self.decision_inputs: list[PlannerDecisionInput] = []
         self.answer_inputs: list[PlannerAnswerInput] = []
         self.message_histories: list[tuple[ModelMessage, ...]] = []
 
-    async def decide(
-        self,
-        model_input: PlannerModelInput,
-        *,
-        message_history: Sequence[ModelMessage] = (),
-    ) -> PlannerModelResult[PlannerDecision]:
-        self.decision_inputs.append(model_input)
-        self.message_histories.append(tuple(message_history))
-        return PlannerModelResult(output=self.decision, new_messages=())
+    async def run(self, prompt: str, **kwargs: object) -> FakeRunResult:
+        output_type = kwargs["output_type"]
+        payload = prompt.split("\n", 1)[1]
+        if output_type is PlannerDecision:
+            self.decision_inputs.append(PlannerDecisionInput.model_validate_json(payload))
+            history = kwargs.get("message_history", ())
+            self.message_histories.append(tuple(history))  # type: ignore[arg-type]
+            return FakeRunResult(output=self.decision)
+        if output_type is PlannerResponseDraft:
+            self.answer_inputs.append(PlannerAnswerInput.model_validate_json(payload))
+            return FakeRunResult(output=PlannerResponseDraft(text=self.answer_text))
+        raise AssertionError(f"Unexpected output type: {output_type}")
 
-    async def answer(
-        self, answer_input: PlannerAnswerInput
-    ) -> PlannerModelResult[PlannerResponseDraft]:
-        self.answer_inputs.append(answer_input)
-        return PlannerModelResult(
-            output=PlannerResponseDraft(text=self.answer_text),
-            new_messages=(),
-        )
+
+class FakeAgentFactory:
+    def __init__(self, agent: RecordingPlannerAgent) -> None:
+        self.agent = agent
+
+    def create_agent(self, **_: object) -> RecordingPlannerAgent:
+        return self.agent
+
+    def reload_tooling(self) -> None:
+        pass
 
 
 class FakeDispatcher:
@@ -110,10 +123,11 @@ class RaisingDispatcher:
         raise RuntimeError("provider unavailable")
 
 
-def _planner(model: FakePlannerModel, dispatcher: FakeDispatcher) -> Planner:
+def _planner(agent: RecordingPlannerAgent, dispatcher: FakeDispatcher) -> Planner:
     return Planner(
         deps=PlannerDeps(dispatcher=dispatcher),
-        planner_model=model,
+        agent_factory=FakeAgentFactory(agent),  # type: ignore[arg-type]
+        model_config=ModelConfig(provider="openai", model_name="test", api_key="test"),
     )
 
 
@@ -153,7 +167,7 @@ def test_typed_capability_selection_dispatches_one_bounded_canonical_task(
         else ExecutionStatus.SUCCEEDED
     )
     dispatcher = FakeDispatcher(status)
-    model = FakePlannerModel(_data_decision(instruction, capability))
+    model = RecordingPlannerAgent(_data_decision(instruction, capability))
     objective = Objective(text="Understand the active dataset.")
     frame = SessionFrame(objective=objective)
 
@@ -179,7 +193,7 @@ def test_typed_capability_selection_dispatches_one_bounded_canonical_task(
 def test_successful_work_preserves_task_identity_and_completes_without_evidence() -> None:
     instruction = "Summarize missingness by column."
     dispatcher = FakeDispatcher(ExecutionStatus.SUCCEEDED)
-    model = FakePlannerModel(_data_decision(instruction))
+    model = RecordingPlannerAgent(_data_decision(instruction))
     frame = SessionFrame(objective=Objective(text="Assess dataset quality."))
 
     output = asyncio.run(
@@ -216,7 +230,7 @@ def test_failed_or_blocked_work_fails_task_and_surfaces_blocker_without_evidence
     status: ExecutionStatus,
 ) -> None:
     dispatcher = FakeDispatcher(status)
-    model = FakePlannerModel(_data_decision("Transform the active dataset."))
+    model = RecordingPlannerAgent(_data_decision("Transform the active dataset."))
     frame = SessionFrame(objective=Objective(text="Prepare data for analysis."))
 
     output = asyncio.run(
@@ -242,7 +256,7 @@ def test_task_outcome_identity_mismatch_fails_closed() -> None:
         ExecutionStatus.SUCCEEDED,
         returned_task_id=uuid4(),
     )
-    model = FakePlannerModel(_data_decision("Profile the active dataset."))
+    model = RecordingPlannerAgent(_data_decision("Profile the active dataset."))
     frame = SessionFrame(objective=Objective(text="Understand the data."))
 
     output = asyncio.run(
@@ -261,7 +275,7 @@ def test_task_outcome_identity_mismatch_fails_closed() -> None:
 
 def test_dispatcher_exception_returns_the_exact_failed_task_result() -> None:
     dispatcher = RaisingDispatcher()
-    model = FakePlannerModel(_data_decision("Profile the active dataset."))
+    model = RecordingPlannerAgent(_data_decision("Profile the active dataset."))
     objective = Objective(text="Understand the data.")
 
     output = asyncio.run(
@@ -291,7 +305,7 @@ def test_dispatcher_exception_returns_the_exact_failed_task_result() -> None:
 
 def test_data_work_without_objective_returns_blocker_without_creating_task() -> None:
     dispatcher = FakeDispatcher(ExecutionStatus.SUCCEEDED)
-    model = FakePlannerModel(_data_decision("Profile the active dataset."))
+    model = RecordingPlannerAgent(_data_decision("Profile the active dataset."))
 
     output = asyncio.run(
         _planner(model, dispatcher).run(
@@ -308,7 +322,7 @@ def test_data_work_without_objective_returns_blocker_without_creating_task() -> 
 
 def test_clear_data_request_can_establish_objective_before_creating_task() -> None:
     dispatcher = FakeDispatcher(ExecutionStatus.SUCCEEDED)
-    model = FakePlannerModel(
+    model = RecordingPlannerAgent(
         _data_decision(
             "Profile the active dataset.",
             Capability.DATA_PROFILING,
@@ -343,7 +357,7 @@ def test_semantic_task_change_creates_new_identity_without_rewriting_existing_ta
         tasks=(existing,),
     )
     dispatcher = FakeDispatcher(ExecutionStatus.SUCCEEDED)
-    model = FakePlannerModel(_data_decision("Summarize missingness by column."))
+    model = RecordingPlannerAgent(_data_decision("Summarize missingness by column."))
 
     output = asyncio.run(
         _planner(model, dispatcher).run(
@@ -365,7 +379,7 @@ def test_semantic_task_change_creates_new_identity_without_rewriting_existing_ta
 
 def test_explicit_assumption_addition_uses_successor_state_and_never_dispatches() -> None:
     dispatcher = FakeDispatcher(ExecutionStatus.SUCCEEDED)
-    model = FakePlannerModel(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
+    model = RecordingPlannerAgent(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
     frame = SessionFrame(objective=Objective(text="Understand churn."))
 
     output = asyncio.run(
@@ -417,7 +431,7 @@ def _frame_with_admitted_evidence() -> tuple[SessionFrame, Evidence]:
 
 def test_follow_up_answer_uses_admitted_typed_evidence() -> None:
     frame, evidence = _frame_with_admitted_evidence()
-    model = FakePlannerModel(PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE))
+    model = RecordingPlannerAgent(PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE))
     dispatcher = FakeDispatcher(ExecutionStatus.SUCCEEDED)
 
     output = asyncio.run(
@@ -445,7 +459,7 @@ def test_assumption_only_claim_cannot_support_empirical_answer() -> None:
         objective=Objective(text="Understand dataset size."),
         assumptions=(assumption,),
     )
-    model = FakePlannerModel(PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE))
+    model = RecordingPlannerAgent(PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE))
     dispatcher = FakeDispatcher(ExecutionStatus.SUCCEEDED)
 
     output = asyncio.run(
