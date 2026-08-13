@@ -108,8 +108,8 @@ def test_planner_model_wrapper_family_is_removed_from_production() -> None:
 
 
 def test_planner_cognitive_contracts_exclude_legacy_routing_and_adapter_state() -> None:
-    from cognieda.agents.planner.dependencies import PlannerDeps
     from cognieda.agents.planner.contracts import PlannerOutput
+    from cognieda.agents.planner.dependencies import PlannerDeps
     from cognieda.agents.planner.state import PlannerState
 
     planner_root = SOURCE_ROOT / "agents" / "planner"
@@ -121,6 +121,11 @@ def test_planner_cognitive_contracts_exclude_legacy_routing_and_adapter_state() 
         "Execution" + "Request",
         "Executor" + "Input",
         "_INSTRUCTION" + "_DIR",
+        "Planner" + "Decision",
+        "Planner" + "Action",
+        "Planner" + "Intent",
+        "understand_" + "request",
+        "prepare_" + "results",
     )
     violations = [
         f"{path.relative_to(PROJECT_ROOT)} contains {name}"
@@ -135,18 +140,12 @@ def test_planner_cognitive_contracts_exclude_legacy_routing_and_adapter_state() 
     assert violations == []
     assert set(PlannerState.model_fields) == {
         "request",
-        "decision",
-        "objective_proposal",
-        "assumption_assessment",
-        "response",
+        "result",
         "new_messages",
         "error",
     }
     assert set(PlannerOutput.model_fields) == {
-        "response",
-        "decision",
-        "objective_proposal",
-        "assumption_assessment",
+        "result",
         "new_messages",
         "error",
     }
@@ -207,7 +206,7 @@ def test_production_source_contains_only_python_and_known_instruction_assets() -
     allowed = {
         Path("src/cognieda/agents/planner/instruction/agents.md"),
         Path("src/cognieda/agents/planner/instruction/answer.txt"),
-        Path("src/cognieda/agents/planner/instruction/decide.txt"),
+        Path("src/cognieda/agents/planner/instruction/planner-turn.txt"),
     }
     non_python = [
         path.relative_to(PROJECT_ROOT)

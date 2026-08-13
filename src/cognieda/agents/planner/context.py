@@ -36,5 +36,5 @@ class PlannerGraphContext(BaseModel):
     deps: PlannerDeps
     planner_context: PlannerContext
     conversation_history: ConversationHistory
-    decide_instructions: tuple[str, ...]
+    planner_instructions: tuple[str, ...]
     answer_instructions: tuple[str, ...]

@@ -4,26 +4,23 @@ import asyncio
 from dataclasses import dataclass
 
 import pytest
-from pydantic import TypeAdapter, ValidationError
+from pydantic import ValidationError
 from pydantic_ai.messages import ModelMessage
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.contracts import (
-    AnswerFromContextDecision,
-    AssumptionAssessmentDecision,
-    PlannerAction,
-    PlannerDecision,
+    AssumptionAssessment,
+    DirectResponse,
+    ObjectiveProposal,
+    PlannerCognitiveResult,
     PlannerErrorCode,
-    SetOrRefineObjectiveDecision,
-    StateSummaryDecision,
-    UnsupportedDecision,
 )
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.application.ports import ModelConfig
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.planner_context import build_planner_context
 from cognieda.schemas.artifacts import Assumption, Objective, SessionFrame, Task
-from cognieda.schemas.enums import TaskKind
+from cognieda.schemas.enums import AssumptionTestability, TaskKind
 
 
 @dataclass
@@ -35,13 +32,13 @@ class FakeRunResult:
 
 
 class RecordingPlannerAgent:
-    def __init__(self, decision: PlannerDecision) -> None:
-        self.decision = decision
+    def __init__(self, result: object) -> None:
+        self.result = result
         self.calls: list[dict[str, object]] = []
 
     async def run(self, prompt: str, **kwargs: object) -> FakeRunResult:
         self.calls.append({"prompt": prompt, **kwargs})
-        return FakeRunResult(output=self.decision)
+        return FakeRunResult(output=self.result)
 
 
 class FakeAgentFactory:
@@ -63,22 +60,17 @@ def _planner(agent: RecordingPlannerAgent) -> Planner:
     )
 
 
-def _run(
-    planner: Planner,
-    request: str,
-    frame: SessionFrame | None = None,
-    history: ConversationHistory | None = None,
-):
+def _run(planner: Planner, request: str, frame: SessionFrame | None = None):
     return asyncio.run(
         planner.run(
             request,
             planner_context=build_planner_context(frame or SessionFrame()),
-            conversation_history=history or ConversationHistory(),
+            conversation_history=ConversationHistory(),
         )
     )
 
 
-def test_understanding_uses_request_and_exact_context_without_flattening_dto() -> None:
+def test_planner_turn_uses_request_and_exact_context() -> None:
     objective = Objective(text="Understand customer retention.")
     assumption = Assumption(text="Rows represent customers.")
     task = Task(
@@ -87,76 +79,67 @@ def test_understanding_uses_request_and_exact_context_without_flattening_dto() -
         instruction="Profile the active dataset.",
     )
     frame = SessionFrame(objective=objective, assumptions=(assumption,), tasks=(task,))
-    model = RecordingPlannerAgent(StateSummaryDecision())
+    agent = RecordingPlannerAgent(DirectResponse(text="State summarized."))
 
-    output = _run(_planner(model), "Summarize the active state.", frame)
+    output = _run(_planner(agent), "Summarize the active state.", frame)
 
-    assert isinstance(output.decision, StateSummaryDecision)
-    assert output.objective_proposal is None
-    assert output.assumption_assessment is None
-    prompt = str(model.calls[0]["prompt"])
+    assert output.result == DirectResponse(text="State summarized.")
+    prompt = str(agent.calls[0]["prompt"])
     assert "Current Human request:\nSummarize the active state." in prompt
     assert str(objective.objective_id) in prompt
     assert assumption.text in prompt
     assert task.instruction in prompt
-    assert "PlannerDecisionInput" not in prompt
+    assert agent.calls[0]["output_type"] == PlannerCognitiveResult
 
 
-def test_explicit_and_model_objective_requests_use_canonical_objective_payload() -> None:
-    natural_objective = Objective(text="Understand customer churn.")
-    natural = _run(
-        _planner(
-            RecordingPlannerAgent(
-                SetOrRefineObjectiveDecision(objective=natural_objective)
-            )
-        ),
-        "Investigate customer churn.",
-    )
-    explicit = _run(
-        _planner(RecordingPlannerAgent(StateSummaryDecision())),
-        "/objective Understand customer churn.",
+def test_typed_final_results_carry_one_semantic_representation() -> None:
+    objective = Objective(text="Understand customer churn.")
+    proposal = ObjectiveProposal(objective=objective, response="Objective proposed.")
+    assessment = AssumptionAssessment(
+        source_text="Competitor intent is unavailable to this project.",
+        testability=AssumptionTestability.UNTESTABLE_IN_PROJECT,
+        response="The exact Human statement may be used for planning only.",
     )
 
-    assert natural.objective_proposal is natural_objective
-    assert explicit.objective_proposal is not None
-    assert explicit.objective_proposal.text == natural_objective.text
+    proposal_output = _run(_planner(RecordingPlannerAgent(proposal)), "Set objective")
+    assessment_output = _run(
+        _planner(RecordingPlannerAgent(assessment)), assessment.source_text
+    )
+
+    assert proposal_output.result is proposal
+    assert proposal_output.response == proposal.response
+    assert assessment_output.result is assessment
+    assert assessment_output.response == assessment.response
+    assert "action" not in DirectResponse.model_fields
+    assert "action" not in ObjectiveProposal.model_fields
+    assert "action" not in AssumptionAssessment.model_fields
 
 
-@pytest.mark.parametrize("command", ["/profile data", "/analyze data", "/transform data"])
-def test_legacy_data_commands_fail_controlled_without_routing(command: str) -> None:
-    model = RecordingPlannerAgent(StateSummaryDecision())
+def test_result_contracts_reject_unrelated_fields() -> None:
+    with pytest.raises(ValidationError):
+        DirectResponse(text="Valid", action="summary")
+    with pytest.raises(ValidationError):
+        ObjectiveProposal(
+            objective=Objective(text="Valid objective"),
+            response="Proposed.",
+            assessment="unrelated",
+        )
 
-    output = _run(_planner(model), command)
 
-    assert isinstance(output.decision, UnsupportedDecision)
+def test_invalid_model_result_fails_closed_with_typed_response() -> None:
+    output = _run(_planner(RecordingPlannerAgent({"unexpected": "shape"})), "Help")
+
+    assert isinstance(output.result, DirectResponse)
     assert output.error is not None
-    assert output.error.code is PlannerErrorCode.UNSUPPORTED_ACTION
-    assert model.calls == []
+    assert output.error.code is PlannerErrorCode.INVALID_MODEL_RESULT
+    assert output.response == output.error.message
 
 
-def test_unknown_explicit_command_fails_without_model_fallback() -> None:
-    model = RecordingPlannerAgent(StateSummaryDecision())
+def test_empty_request_fails_before_agent_run() -> None:
+    agent = RecordingPlannerAgent(DirectResponse(text="unused"))
 
-    output = _run(_planner(model), "/unknown remove everything")
+    output = _run(_planner(agent), "   ")
 
     assert output.error is not None
     assert output.error.code is PlannerErrorCode.INVALID_COMMAND
-    assert output.objective_proposal is None
-    assert output.assumption_assessment is None
-    assert model.calls == []
-
-
-def test_action_variants_expose_only_their_own_fields() -> None:
-    assert set(AnswerFromContextDecision.model_fields) == {"action"}
-    assert set(StateSummaryDecision.model_fields) == {"action"}
-    assert set(SetOrRefineObjectiveDecision.model_fields) == {"action", "objective"}
-    assert set(AssumptionAssessmentDecision.model_fields) == {"action", "assessment"}
-    assert set(UnsupportedDecision.model_fields) == {"action", "message"}
-
-    with pytest.raises(ValidationError):
-        TypeAdapter(PlannerDecision).validate_python(
-            {
-                "action": PlannerAction.STATE_SUMMARY,
-                "message": "unrelated payload",
-            }
-        )
+    assert agent.calls == []

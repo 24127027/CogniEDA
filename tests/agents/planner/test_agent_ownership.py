@@ -13,11 +13,11 @@ from pydantic_ai.messages import (
 )
 
 from cognieda.agents.planner.agent import Planner
+from cognieda.agents.planner.context import PlannerGraphContext
 from cognieda.agents.planner.contracts import (
-    AnswerFromContextDecision,
-    PlannerDecision,
-    PlannerResponseDraft,
-    StateSummaryDecision,
+    AuthoritativeAnswerRequest,
+    DirectResponse,
+    PlannerCognitiveResult,
 )
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.graph import build_graph
@@ -41,23 +41,23 @@ class FakeRunResult:
 class RecordingAgent:
     def __init__(
         self,
-        decision: PlannerDecision,
-        response: PlannerResponseDraft,
-        decision_messages: tuple[ModelMessage, ...] = (),
-        response_messages: tuple[ModelMessage, ...] = (),
+        result: PlannerCognitiveResult,
+        answer: DirectResponse | None = None,
+        result_messages: tuple[ModelMessage, ...] = (),
+        answer_messages: tuple[ModelMessage, ...] = (),
     ) -> None:
-        self._decision = decision
-        self._response = response
-        self._decision_messages = decision_messages
-        self._response_messages = response_messages
+        self._result = result
+        self._answer = answer or DirectResponse(text="unused")
+        self._result_messages = result_messages
+        self._answer_messages = answer_messages
         self.calls: list[dict[str, object]] = []
 
     async def run(self, prompt: str, **kwargs: object) -> FakeRunResult:
         self.calls.append({"prompt": prompt, **kwargs})
-        if kwargs["output_type"] is PlannerDecision:
-            return FakeRunResult(self._decision, self._decision_messages)
-        if kwargs["output_type"] is PlannerResponseDraft:
-            return FakeRunResult(self._response, self._response_messages)
+        if kwargs["output_type"] == PlannerCognitiveResult:
+            return FakeRunResult(self._result, self._result_messages)
+        if kwargs["output_type"] is DirectResponse:
+            return FakeRunResult(self._answer, self._answer_messages)
         raise AssertionError(f"Unexpected output type: {kwargs['output_type']}")
 
 
@@ -82,7 +82,7 @@ def _messages(request: str, response: str) -> tuple[ModelMessage, ...]:
 
 
 def _agent(label: str = "unused") -> RecordingAgent:
-    return RecordingAgent(StateSummaryDecision(), PlannerResponseDraft(text=label))
+    return RecordingAgent(DirectResponse(text=label))
 
 
 def _evidence_frame() -> SessionFrame:
@@ -113,19 +113,16 @@ def _evidence_frame() -> SessionFrame:
     )
 
 
-def test_planner_constructs_and_owns_agent_from_factory() -> None:
+def test_planner_constructs_and_owns_agent_and_dependency() -> None:
     config = ModelConfig(provider="openai", model_name="test", api_key="test-key")
     agent = _agent()
     factory = RecordingFactory(agent)
-
     deps = PlannerDeps()
-    planner = Planner(
-        deps,
-        agent_factory=factory,  # type: ignore[arg-type]
-        model_config=config,
-    )
+
+    planner = Planner(deps, agent_factory=factory, model_config=config)
 
     assert planner._agent is agent
+    assert planner._deps is deps
     assert factory.calls == [
         {
             "worker": "planner",
@@ -134,38 +131,46 @@ def test_planner_constructs_and_owns_agent_from_factory() -> None:
             "builtin_tools": (),
         }
     ]
-    assert "planner_model" not in inspect.signature(Planner).parameters
-    assert planner._deps is deps
     assert inspect.signature(Planner).parameters["deps"].default is inspect.Parameter.empty
+    assert PlannerDeps.__dataclass_fields__ == {}
 
 
-def test_langgraph_has_only_current_routing_free_lifecycle_nodes() -> None:
+def test_graph_context_names_each_runtime_category() -> None:
+    assert set(PlannerGraphContext.model_fields) == {
+        "agent",
+        "deps",
+        "planner_context",
+        "conversation_history",
+        "planner_instructions",
+        "answer_instructions",
+    }
+
+
+def test_langgraph_contains_only_cognitive_and_protected_answer_stages() -> None:
     graph = build_graph().get_graph()
 
     assert set(graph.nodes) == {
         "__start__",
-        "understand_request",
-        "prepare_results",
-        "compose_response",
+        "run_planner",
+        "compose_authoritative_answer",
         "__end__",
     }
-    assert {(edge.source, edge.target) for edge in graph.edges} == {
-        ("__start__", "understand_request"),
-        ("understand_request", "prepare_results"),
-        ("prepare_results", "compose_response"),
-        ("compose_response", "__end__"),
-    }
+    edges = {(edge.source, edge.target, edge.conditional) for edge in graph.edges}
+    assert ("__start__", "run_planner", False) in edges
+    assert ("run_planner", "compose_authoritative_answer", True) in edges
+    assert ("run_planner", "__end__", True) in edges
+    assert ("compose_authoritative_answer", "__end__", False) in edges
 
 
-def test_graph_nodes_use_same_agent_and_keep_new_messages_as_delta() -> None:
+def test_both_agent_runs_use_same_agent_and_exact_dependency_instance() -> None:
     prior_messages = _messages("Earlier request", "Earlier response")
-    decision_messages = _messages("Current request", "Typed decision")
-    response_messages = _messages("Answer context", "Grounded response")
+    cognitive_messages = _messages("Current request", "Protected answer requested")
+    answer_messages = _messages("Answer context", "Grounded response")
     agent = RecordingAgent(
-        AnswerFromContextDecision(),
-        PlannerResponseDraft(text="The admitted Evidence reports 42 rows."),
-        decision_messages,
-        response_messages,
+        AuthoritativeAnswerRequest(),
+        DirectResponse(text="The admitted Evidence reports 42 rows."),
+        cognitive_messages,
+        answer_messages,
     )
     deps = PlannerDeps()
     planner = Planner(
@@ -184,15 +189,14 @@ def test_graph_nodes_use_same_agent_and_keep_new_messages_as_delta() -> None:
     )
 
     assert output.response == "The admitted Evidence reports 42 rows."
-    assert output.new_messages == (*decision_messages, *response_messages)
+    assert output.new_messages == (*cognitive_messages, *answer_messages)
     assert [call["output_type"] for call in agent.calls] == [
-        PlannerDecision,
-        PlannerResponseDraft,
+        PlannerCognitiveResult,
+        DirectResponse,
     ]
     assert agent.calls[0]["message_history"] == list(prior_messages)
     assert "message_history" not in agent.calls[1]
-    assert agent.calls[0]["deps"] is deps
-    assert agent.calls[1]["deps"] is deps
+    assert all(call["deps"] is deps for call in agent.calls)
 
 
 def test_instruction_reload_updates_layers_without_recreating_agent() -> None:
@@ -208,13 +212,12 @@ def test_instruction_reload_updates_layers_without_recreating_agent() -> None:
 
     assert planner._agent is agent
     assert len(factory.calls) == 1
-    assert planner._decide_instructions[1] == "workspace-specific guidance"
+    assert planner._planner_instructions[1] == "workspace-specific guidance"
     assert planner._answer_instructions[1] == "workspace-specific guidance"
-    assert "Classify the current request" in planner._decide_instructions[-1]
-    assert "Answer the current request" in planner._answer_instructions[-1]
+    assert "Reason about the current Human request" in planner._planner_instructions[-1]
 
 
-def test_recreation_uses_current_model_configuration() -> None:
+def test_recreation_uses_current_model_configuration_and_same_deps_type() -> None:
     first, second, third = _agent("first"), _agent("second"), _agent("third")
     factory = RecordingFactory(first, second, third)
     initial = ModelConfig(provider="openai", model_name="initial", api_key="key")
@@ -230,3 +233,4 @@ def test_recreation_uses_current_model_configuration() -> None:
     asyncio.run(planner.reload(model_config=updated))
     assert planner._agent is third
     assert factory.calls[-1]["config"] == updated
+    assert all(call["deps_type"] is PlannerDeps for call in factory.calls)

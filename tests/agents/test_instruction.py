@@ -15,7 +15,9 @@ def _caller_tree(tmp_path: Path) -> tuple[Path, Path]:
     instruction_dir.mkdir(parents=True)
     caller.touch()
     (instruction_dir / "agents.md").write_text("built-in base", encoding="utf-8")
-    (instruction_dir / "decide.txt").write_text("operation last", encoding="utf-8")
+    (instruction_dir / "planner-turn.txt").write_text(
+        "operation last", encoding="utf-8"
+    )
     return caller, instruction_dir
 
 
@@ -35,7 +37,7 @@ def test_assembly_resolves_direct_caller_sibling_and_orders_layers(
     _direct_caller(monkeypatch, caller)
 
     assembled = instruction.assemble(
-        "decide.txt",
+        "planner-turn.txt",
         workspace_instruction="workspace supplement",
     )
 
@@ -49,7 +51,10 @@ def test_missing_optional_workspace_instruction_keeps_built_in_base(
     caller, _ = _caller_tree(tmp_path)
     _direct_caller(monkeypatch, caller)
 
-    assert instruction.assemble("decide.txt") == ["built-in base", "operation last"]
+    assert instruction.assemble("planner-turn.txt") == [
+        "built-in base",
+        "operation last",
+    ]
 
 
 def test_missing_required_instruction_files_fail_closed(
@@ -62,11 +67,11 @@ def test_missing_required_instruction_files_fail_closed(
     _direct_caller(monkeypatch, caller)
 
     with pytest.raises(FileNotFoundError, match="Built-in agent instruction"):
-        instruction.assemble("decide.txt")
+        instruction.assemble("planner-turn.txt")
 
     (caller.parent / "instruction" / "agents.md").write_text("base", encoding="utf-8")
-    with pytest.raises(FileNotFoundError, match="decide.txt"):
-        instruction.assemble("decide.txt")
+    with pytest.raises(FileNotFoundError, match="planner-turn.txt"):
+        instruction.assemble("planner-turn.txt")
 
 
 def test_root_agents_md_is_not_loaded(
@@ -77,7 +82,7 @@ def test_root_agents_md_is_not_loaded(
     caller, _ = _caller_tree(tmp_path)
     _direct_caller(monkeypatch, caller)
 
-    assembled = instruction.assemble("decide.txt")
+    assembled = instruction.assemble("planner-turn.txt")
 
     assert "root instructions" not in assembled
 

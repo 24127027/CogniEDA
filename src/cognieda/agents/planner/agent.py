@@ -7,7 +7,13 @@ from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.runtime.conversation import ConversationHistory
 
 from .context import PlannerContext, PlannerGraphContext
-from .contracts import PlannerControlledError, PlannerErrorCode, PlannerOutput
+from .contracts import (
+    AuthoritativeAnswerRequest,
+    DirectResponse,
+    PlannerControlledError,
+    PlannerErrorCode,
+    PlannerOutput,
+)
 from .dependencies import PlannerDeps
 from .graph import build_graph
 from .state import PlannerState
@@ -41,9 +47,9 @@ class Planner:
                 workspace_instruction=self._workspace_instruction,
             )
         )
-        self._decide_instructions = tuple(
+        self._planner_instructions = tuple(
             instruction.assemble(
-                "decide.txt",
+                "planner-turn.txt",
                 workspace_instruction=self._workspace_instruction,
             )
         )
@@ -89,7 +95,7 @@ class Planner:
                 code=PlannerErrorCode.INVALID_COMMAND,
                 message="Planner requests cannot be empty.",
             )
-            return PlannerOutput(response=error.message, error=error)
+            return PlannerOutput(result=DirectResponse(text=error.message), error=error)
 
         state = PlannerState(request=request)
         context = PlannerGraphContext(
@@ -97,25 +103,24 @@ class Planner:
             deps=self._deps,
             planner_context=planner_context,
             conversation_history=conversation_history,
-            decide_instructions=self._decide_instructions,
+            planner_instructions=self._planner_instructions,
             answer_instructions=self._answer_instructions,
         )
         result = await self.graph.ainvoke(state, context=context)
         final_state = PlannerState.model_validate(result)
 
-        if final_state.response is None:
+        if final_state.result is None or isinstance(
+            final_state.result, AuthoritativeAnswerRequest
+        ):
             error = PlannerControlledError(
                 code=PlannerErrorCode.RESPONSE_FAILED,
                 message="Planner graph completed without a human-facing response.",
             )
             final_state.error = error
-            final_state.response = error.message
+            final_state.result = DirectResponse(text=error.message)
 
         return PlannerOutput(
-            response=final_state.response,
-            decision=final_state.decision,
-            objective_proposal=final_state.objective_proposal,
-            assumption_assessment=final_state.assumption_assessment,
+            result=final_state.result,
             new_messages=final_state.new_messages,
             error=final_state.error,
         )

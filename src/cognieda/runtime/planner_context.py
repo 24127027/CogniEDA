@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from cognieda.agents.planner.context import PlannerContext
-from cognieda.agents.planner.contracts import PlannerOutput
+from cognieda.agents.planner.contracts import (
+    AssumptionAssessment,
+    ObjectiveProposal,
+    PlannerOutput,
+)
 from cognieda.schemas.artifacts import Assumption, SessionFrame
 from cognieda.schemas.enums import AssumptionTestability
 
@@ -28,18 +32,12 @@ def apply_planner_output(
     """Apply the bounded typed results from one Planner turn to a successor frame."""
 
     successor = current_frame
-    if planner_output.objective_proposal is not None:
-        successor = successor.set_objective(planner_output.objective_proposal)
-    assessment = planner_output.assumption_assessment
-    if assessment is not None:
-        stripped_request = request.strip()
-        expected_source = (
-            stripped_request.partition(" ")[2].strip()
-            if stripped_request.casefold().startswith("/assumption ")
-            else stripped_request
-        )
-        if assessment.source_text != expected_source:
+    result = planner_output.result
+    if isinstance(result, ObjectiveProposal):
+        successor = successor.set_objective(result.objective)
+    if isinstance(result, AssumptionAssessment):
+        if result.source_text != request:
             raise ValueError("Planner Assumption assessment must preserve exact Human text.")
-        if assessment.testability is AssumptionTestability.UNTESTABLE_IN_PROJECT:
-            successor = successor.add_assumption(Assumption(text=assessment.source_text))
+        if result.testability is AssumptionTestability.UNTESTABLE_IN_PROJECT:
+            successor = successor.add_assumption(Assumption(text=result.source_text))
     return successor

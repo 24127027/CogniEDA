@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
@@ -10,21 +9,10 @@ from cognieda.schemas.artifacts import DataProfile, Discovery, Evidence, Objecti
 from cognieda.schemas.enums import AssumptionTestability
 
 
-class PlannerAction(StrEnum):
-    """Finite action space for the current routing-free Planner."""
-
-    ANSWER_FROM_CONTEXT = "answer_from_context"
-    SET_OR_REFINE_OBJECTIVE = "set_or_refine_objective"
-    ASSESS_ASSUMPTION = "assess_assumption"
-    STATE_SUMMARY = "state_summary"
-    INVALID_OR_UNSUPPORTED = "invalid_or_unsupported"
-
-
 class PlannerErrorCode(StrEnum):
     INVALID_COMMAND = "invalid_command"
     MODEL_UNAVAILABLE = "model_unavailable"
-    INVALID_MODEL_DECISION = "invalid_model_decision"
-    UNSUPPORTED_ACTION = "unsupported_action"
+    INVALID_MODEL_RESULT = "invalid_model_result"
     INVALID_SUCCESSOR_STATE = "invalid_successor_state"
     NO_AUTHORITATIVE_SUPPORT = "no_authoritative_support"
     RESPONSE_FAILED = "response_failed"
@@ -39,27 +27,21 @@ class PlannerControlledError(BaseModel):
     message: str = Field(min_length=1)
 
 
-class AnswerFromContextDecision(BaseModel):
+class DirectResponse(BaseModel):
+    """Human-facing result that proposes no authoritative state transition."""
+
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    action: Literal[PlannerAction.ANSWER_FROM_CONTEXT] = (
-        PlannerAction.ANSWER_FROM_CONTEXT
-    )
+    text: str = Field(min_length=1)
 
 
-class StateSummaryDecision(BaseModel):
+class ObjectiveProposal(BaseModel):
+    """Canonical Objective proposed for validation by Application authority."""
+
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    action: Literal[PlannerAction.STATE_SUMMARY] = PlannerAction.STATE_SUMMARY
-
-
-class SetOrRefineObjectiveDecision(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    action: Literal[PlannerAction.SET_OR_REFINE_OBJECTIVE] = (
-        PlannerAction.SET_OR_REFINE_OBJECTIVE
-    )
     objective: Objective
+    response: str = Field(min_length=1)
 
 
 class AssumptionAssessment(BaseModel):
@@ -69,32 +51,17 @@ class AssumptionAssessment(BaseModel):
 
     source_text: str = Field(min_length=1)
     testability: AssumptionTestability
+    response: str = Field(min_length=1)
 
 
-class AssumptionAssessmentDecision(BaseModel):
+class AuthoritativeAnswerRequest(BaseModel):
+    """Request drafting from the separate protected research-support context."""
+
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    action: Literal[PlannerAction.ASSESS_ASSUMPTION] = PlannerAction.ASSESS_ASSUMPTION
-    assessment: AssumptionAssessment
 
-
-class UnsupportedDecision(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    action: Literal[PlannerAction.INVALID_OR_UNSUPPORTED] = (
-        PlannerAction.INVALID_OR_UNSUPPORTED
-    )
-    message: str = Field(min_length=1)
-
-
-type PlannerDecision = Annotated[
-    AnswerFromContextDecision
-    | StateSummaryDecision
-    | SetOrRefineObjectiveDecision
-    | AssumptionAssessmentDecision
-    | UnsupportedDecision,
-    Field(discriminator="action"),
-]
+type PlannerFinalResult = DirectResponse | ObjectiveProposal | AssumptionAssessment
+type PlannerCognitiveResult = PlannerFinalResult | AuthoritativeAnswerRequest
 
 
 class PlannerAnswerContext(BaseModel):
@@ -117,22 +84,17 @@ class PlannerAnswerContext(BaseModel):
         return self
 
 
-class PlannerResponseDraft(BaseModel):
-    """Human-facing prose drafted only from an authorized answer context."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    text: str = Field(min_length=1)
-
-
 class PlannerOutput(BaseModel):
-    """Application-relevant result for one Planner turn."""
+    """Application-facing envelope for one completed Planner turn."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    response: str = Field(min_length=1)
-    decision: PlannerDecision | None = None
-    objective_proposal: Objective | None = None
-    assumption_assessment: AssumptionAssessment | None = None
+    result: PlannerFinalResult
     new_messages: tuple[ModelMessage, ...] = ()
     error: PlannerControlledError | None = None
+
+    @property
+    def response(self) -> str:
+        if isinstance(self.result, DirectResponse):
+            return self.result.text
+        return self.result.response

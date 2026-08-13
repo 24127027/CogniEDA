@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from cognieda.agents.planner.context import PlannerContext
-from cognieda.agents.planner.contracts import PlannerOutput
+from cognieda.agents.planner.contracts import ObjectiveProposal, PlannerOutput
 from cognieda.runtime.planner_context import apply_planner_output, build_planner_context
 from cognieda.schemas.artifacts import (
     Assumption,
@@ -104,7 +104,12 @@ def test_application_boundary_applies_objective_proposal_immutably() -> None:
 
     successor = apply_planner_output(
         current,
-        PlannerOutput(response="Updated planning state.", objective_proposal=refined),
+        PlannerOutput(
+            result=ObjectiveProposal(
+                objective=refined,
+                response="Updated planning state.",
+            )
+        ),
         request="Refine the objective.",
     )
 
