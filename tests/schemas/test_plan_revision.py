@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Iterable
 from uuid import UUID, uuid4
 
 import pytest
 from pydantic import ValidationError
 
-import cognieda.execution as execution
 import cognieda.schemas as schemas
+import cognieda.schemas.plan_revision as plan_revision_module
 from cognieda.agents.planner.context import PlanningContext
 from cognieda.agents.planner.types import PlannerOutput, State
-from cognieda.execution import Capability, ExecutorRegistry
-from cognieda.execution import capabilities as execution_capabilities
 from cognieda.schemas import (
     PLAN_REVISION_CONTRACT_VERSION,
     FirstClassObjectType,
@@ -29,13 +28,6 @@ from cognieda.schemas import (
 from cognieda.schemas import enums as schema_enums
 
 OBJECTIVE_ID = UUID("10000000-0000-0000-0000-000000000000")
-
-_DEFAULT_CAPABILITY: dict[TaskKind, Capability] = {
-    TaskKind.DATA: Capability.DATA_ANALYSIS,
-    TaskKind.SCIENTIFIC: Capability.HYPOTHESIS_TESTING,
-    TaskKind.GRAPH: Capability.GRAPH_MINING,
-}
-
 
 def _task(
     *,
@@ -56,16 +48,11 @@ def _task(
 def _binding(
     task: Task,
     *,
-    capability: Capability | object = ...,
     order_rank: int = 0,
     priority: PlanPriority = PlanPriority.NORMAL,
 ) -> PlanTaskBinding:
-    default_capability = _DEFAULT_CAPABILITY[task.kind]
-    selected_capability = default_capability if capability is ... else capability
-    assert isinstance(selected_capability, Capability)
     return PlanTaskBinding(
         task_id=task.task_id,
-        required_capability=selected_capability,
         order_rank=order_rank,
         priority=priority,
     )
@@ -87,7 +74,7 @@ def _revision(
             tuple(_binding(task) for task in task_tuple) if bindings is None else tuple(bindings)
         ),
         dependencies=dependencies,
-        authoritative_tasks=task_tuple,
+        tasks=task_tuple,
     )
 
 
@@ -160,25 +147,36 @@ def test_duplicate_binding_is_rejected() -> None:
         _revision([task], bindings=(binding, binding))
 
 
-def test_missing_authoritative_task_is_rejected() -> None:
+def test_binding_without_member_task_is_rejected() -> None:
     task = _task()
 
-    with pytest.raises(ValidationError, match="without an authoritative Task"):
+    with pytest.raises(ValidationError, match="exactly match binding membership"):
         PlanRevision.create(
             objective_id=OBJECTIVE_ID,
             task_bindings=(_binding(task),),
-            authoritative_tasks=(),
+            tasks=(),
         )
 
 
-def test_duplicate_authoritative_task_is_rejected() -> None:
+def test_unbound_member_task_is_rejected() -> None:
+    bound, unbound = _task(), _task()
+
+    with pytest.raises(ValidationError, match="exactly match binding membership"):
+        PlanRevision.create(
+            objective_id=OBJECTIVE_ID,
+            task_bindings=(_binding(bound),),
+            tasks=(bound, unbound),
+        )
+
+
+def test_duplicate_member_task_is_rejected() -> None:
     task = _task()
 
-    with pytest.raises(ValidationError, match="duplicate authoritative Task"):
+    with pytest.raises(ValidationError, match="duplicate member Task"):
         PlanRevision.create(
             objective_id=OBJECTIVE_ID,
             task_bindings=(_binding(task),),
-            authoritative_tasks=(task, task),
+            tasks=(task, task),
         )
 
 
@@ -238,56 +236,20 @@ def test_indirect_cycle_is_rejected() -> None:
         )
 
 
-@pytest.mark.parametrize(
-    "capability",
-    [
-        Capability.DATA_ANALYSIS,
-        Capability.DATA_PROFILING,
-        Capability.DATA_TRANSFORMATION,
-    ],
-)
-def test_data_capability_is_valid(capability: Capability) -> None:
-    task = _task(kind=TaskKind.DATA)
-
-    revision = _revision([task], bindings=(_binding(task, capability=capability),))
-
-    assert revision.task_bindings[0].required_capability is capability
-
-
-def test_data_with_hypothesis_testing_is_rejected() -> None:
-    task = _task(kind=TaskKind.DATA)
-
-    with pytest.raises(ValidationError, match="incompatible required capability"):
-        _revision(
-            [task],
-            bindings=(_binding(task, capability=Capability.HYPOTHESIS_TESTING),),
-        )
-
-
-def test_scientific_requires_hypothesis_testing() -> None:
-    task = _task(kind=TaskKind.SCIENTIFIC)
+@pytest.mark.parametrize("kind", list(TaskKind))
+def test_every_task_kind_is_structural_plan_membership_without_a_route(
+    kind: TaskKind,
+) -> None:
+    task = _task(kind=kind)
 
     revision = _revision([task])
 
-    assert revision.task_bindings[0].required_capability is Capability.HYPOTHESIS_TESTING
-
-
-def test_scientific_with_data_analysis_is_rejected() -> None:
-    task = _task(kind=TaskKind.SCIENTIFIC)
-
-    with pytest.raises(ValidationError, match="incompatible required capability"):
-        _revision(
-            [task],
-            bindings=(_binding(task, capability=Capability.DATA_ANALYSIS),),
-        )
-
-
-def test_graph_requires_graph_mining() -> None:
-    task = _task(kind=TaskKind.GRAPH)
-
-    revision = _revision([task])
-
-    assert revision.task_bindings[0].required_capability is Capability.GRAPH_MINING
+    assert revision.task_ids == frozenset({task.task_id})
+    assert set(PlanTaskBinding.model_fields) == {
+        "task_id",
+        "order_rank",
+        "priority",
+    }
 
 
 def test_binding_rejects_removed_assigned_role() -> None:
@@ -421,45 +383,26 @@ def test_dependency_input_order_does_not_change_fingerprint() -> None:
     )
 
 
-def test_changing_capability_changes_fingerprint() -> None:
-    task = _task()
-
-    assert (
-        _revision(
-            [task], bindings=(_binding(task, capability=Capability.DATA_ANALYSIS),)
-        ).fingerprint
-        != _revision(
-            [task], bindings=(_binding(task, capability=Capability.DATA_PROFILING),)
-        ).fingerprint
-    )
-
-
-def test_fingerprint_payload_has_no_role_or_provider_identity() -> None:
+def test_fingerprint_payload_has_only_plan_coordination_content() -> None:
     task = _task()
     revision = _revision([task])
 
     payload = revision._fingerprint_payload()
     binding_payload = payload["task_bindings"][0]
-    assert "assigned_role" not in binding_payload
-    assert "provider" not in revision.model_dump_json()
+    assert set(binding_payload) == {"task_id", "order_rank", "priority"}
+    serialized = revision.model_dump_json()
+    assert "provider" not in serialized
+    assert "capability" not in serialized
 
 
-def test_runtime_provider_registration_does_not_change_fingerprint() -> None:
-    task = _task()
-    revision = _revision([task])
-    registry = ExecutorRegistry()
+def test_plan_revision_source_has_no_execution_routing_contract() -> None:
+    source = inspect.getsource(plan_revision_module)
 
-    registry.register_provider(lambda: object(), capabilities=(Capability.DATA_ANALYSIS,))
-
-    assert revision.fingerprint == _revision([task]).fingerprint
-
-
-def test_capability_is_execution_owned_and_not_schema_exported() -> None:
-    assert Capability.__module__ == "cognieda.execution.capabilities"
-    assert execution.Capability is execution_capabilities.Capability is Capability
+    assert "required_capability" not in source
+    assert "_COMPATIBLE_CAPABILITIES" not in source
+    assert "Capability" not in source
     assert not hasattr(schema_enums, "Capability")
     assert not hasattr(schemas, "Capability")
-    assert "PLANNER" not in Capability.__members__
 
 
 @pytest.mark.parametrize(
@@ -575,11 +518,11 @@ def test_dependency_eligibility_overrides_lower_dependent_order_rank() -> None:
     )
 
 
-def test_plan_revision_is_immutable_and_requires_authoritative_construction() -> None:
+def test_plan_revision_is_immutable_and_requires_member_task_construction() -> None:
     task = _task()
     revision = _revision([task])
 
-    with pytest.raises(ValidationError, match="authoritative Tasks"):
+    with pytest.raises(ValidationError, match="requires Tasks"):
         PlanRevision(
             objective_id=OBJECTIVE_ID,
             task_bindings=(_binding(task),),
