@@ -144,3 +144,44 @@ def test_skill_assignment_preserves_runtime_reload_path_without_planner_state_ac
     planner.run.assert_not_called()
     assert application.session_frame is original_frame
     assert response.content == "Assigned skill 'review' to 'planner'."
+
+
+def test_skill_unassignment_reloads_tooling_and_recreates_planner_agent() -> None:
+    workspace = Mock(spec=Workspace)
+    planner = Mock(spec=Planner)
+    planner.reload = AsyncMock()
+    agent_factory = Mock()
+    application = Application(
+        workspace=workspace,
+        planner_agent=planner,
+        dispatcher=cast(ExecutorDispatcher, object()),
+        agent_factory=cast(AgentFactoryPort, agent_factory),
+    )
+
+    response = asyncio.run(application.submit_message("/skill unassign planner review"))
+
+    workspace.remove_worker_skill.assert_called_once_with("planner", "review")
+    agent_factory.reload_tooling.assert_called_once_with()
+    planner.reload.assert_awaited_once_with(recreate_agent=True)
+    assert response.content == "Removed skill 'review' from 'planner'."
+
+
+def test_reload_instructions_reads_current_workspace_planner_instruction() -> None:
+    workspace = Mock(spec=Workspace)
+    workspace.load_planner_agent_instruction.return_value = "current workspace guidance"
+    planner = Mock(spec=Planner)
+    planner.reload = AsyncMock()
+    application = Application(
+        workspace=workspace,
+        planner_agent=planner,
+        dispatcher=cast(ExecutorDispatcher, object()),
+        agent_factory=cast(AgentFactoryPort, object()),
+    )
+
+    response = asyncio.run(application.submit_message("/reload instructions"))
+
+    workspace.load_planner_agent_instruction.assert_called_once_with()
+    planner.reload.assert_awaited_once_with(
+        agent_instruction="current workspace guidance"
+    )
+    assert response.content == "Planner instructions reloaded."

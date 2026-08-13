@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic_ai import Agent
 
 from cognieda.agents.utilities import instruction
@@ -10,6 +12,8 @@ from .context import Context, PlanningContext
 from .dependencies import PlannerDeps
 from .graph import build_graph
 from .types import PlannerControlledError, PlannerErrorCode, PlannerOutput, State
+
+_INSTRUCTION_DIR = Path(__file__).with_name("instruction")
 
 
 class Planner:
@@ -35,10 +39,18 @@ class Planner:
 
     def _assemble_instructions(self) -> None:
         self._answer_instructions = tuple(
-            instruction.assemble("answer.txt", self._workspace_instruction)
+            instruction.assemble(
+                _INSTRUCTION_DIR,
+                "answer.txt",
+                workspace_instruction=self._workspace_instruction,
+            )
         )
         self._decide_instructions = tuple(
-            instruction.assemble("decide.txt", self._workspace_instruction)
+            instruction.assemble(
+                _INSTRUCTION_DIR,
+                "decide.txt",
+                workspace_instruction=self._workspace_instruction,
+            )
         )
 
     def _recreate_agent(self) -> None:

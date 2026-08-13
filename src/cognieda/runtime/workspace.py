@@ -171,8 +171,8 @@ class Workspace:
         return self.cognieda_dir / "mcp.toml"
 
     @property
-    def planner_instruction_path(self) -> Path:
-        return self.root / "AGENTS.md"
+    def planner_agent_instruction_path(self) -> Path:
+        return self.cognieda_dir / "planner.md"
     
     @property
     def env_path(self) -> Path:
@@ -182,11 +182,11 @@ class Workspace:
     # Planner instruction
     # -------------------------------------------------------------------------
 
-    def load_planner_instruction(self) -> str:
-        if not self.planner_instruction_path.exists():
+    def load_planner_agent_instruction(self) -> str:
+        if not self.planner_agent_instruction_path.exists():
             return ""
 
-        return self.planner_instruction_path.read_text(
+        return self.planner_agent_instruction_path.read_text(
             encoding="utf-8"
         )
 

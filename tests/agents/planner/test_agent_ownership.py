@@ -72,6 +72,31 @@ class RecordingFactory:
         pass
 
 
+class SequenceFactory:
+    def __init__(self, *agents: RecordingAgent) -> None:
+        self._agents = iter(agents)
+        self.calls: list[dict[str, object]] = []
+
+    def create_agent(self, **kwargs: object) -> RecordingAgent:
+        self.calls.append(kwargs)
+        return next(self._agents)
+
+    def reload_tooling(self) -> None:
+        pass
+
+
+class ToolingAwareFactory:
+    def __init__(self, initial: RecordingAgent, reloaded: RecordingAgent) -> None:
+        self._current = initial
+        self._reloaded = reloaded
+
+    def create_agent(self, **_: object) -> RecordingAgent:
+        return self._current
+
+    def reload_tooling(self) -> None:
+        self._current = self._reloaded
+
+
 class NeverDispatcher:
     async def dispatch(self, request: object) -> None:
         raise AssertionError(f"Unexpected dispatch: {request}")
@@ -81,6 +106,15 @@ def _messages(request: str, response: str) -> tuple[ModelMessage, ...]:
     return (
         ModelRequest(parts=[UserPromptPart(content=request)]),
         ModelResponse(parts=[TextPart(content=response)]),
+    )
+
+
+def _recording_agent(label: str) -> RecordingAgent:
+    return RecordingAgent(
+        PlannerDecision(action=PlannerAction.STATE_SUMMARY),
+        PlannerResponseDraft(text=label),
+        (),
+        (),
     )
 
 
@@ -174,3 +208,65 @@ def test_graph_nodes_invoke_same_planner_agent_and_preserve_native_messages() ->
     assert agent.calls[1]["deps"] is planner.deps
     assert agent.calls[0]["instructions"] == planner._decide_instructions
     assert agent.calls[1]["instructions"] == planner._answer_instructions
+
+
+def test_instruction_reload_updates_layers_without_recreating_agent() -> None:
+    agent = _recording_agent("current")
+    factory = RecordingFactory(agent)
+    planner = Planner(
+        deps=PlannerDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
+        agent_factory=factory,  # type: ignore[arg-type]
+        model_config=ModelConfig(provider="openai", model_name="initial", api_key="key"),
+    )
+
+    asyncio.run(planner.reload(agent_instruction="workspace-specific guidance"))
+
+    assert planner._agent is agent
+    assert len(factory.calls) == 1
+    assert planner._workspace_instruction == "workspace-specific guidance"
+    assert planner._decide_instructions[1] == "workspace-specific guidance"
+    assert planner._answer_instructions[1] == "workspace-specific guidance"
+    assert "Classify the latest request" in planner._decide_instructions[-1]
+    assert "Answer the latest request" in planner._answer_instructions[-1]
+
+
+def test_explicit_recreation_and_model_change_replace_agent_with_current_config() -> None:
+    first = _recording_agent("first")
+    second = _recording_agent("second")
+    third = _recording_agent("third")
+    factory = SequenceFactory(first, second, third)
+    initial_config = ModelConfig(
+        provider="openai", model_name="initial", api_key="initial-key"
+    )
+    updated_config = ModelConfig(
+        provider="google", model_name="updated", api_key="updated-key"
+    )
+    planner = Planner(
+        deps=PlannerDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
+        agent_factory=factory,  # type: ignore[arg-type]
+        model_config=initial_config,
+    )
+
+    asyncio.run(planner.reload(recreate_agent=True))
+    assert planner._agent is second
+    assert factory.calls[-1]["config"] == initial_config
+
+    asyncio.run(planner.reload(model_config=updated_config))
+    assert planner._agent is third
+    assert factory.calls[-1]["config"] == updated_config
+
+
+def test_recreation_uses_agent_factory_current_tooling_state() -> None:
+    initial = _recording_agent("initial tooling")
+    reloaded = _recording_agent("reloaded tooling")
+    factory = ToolingAwareFactory(initial, reloaded)
+    planner = Planner(
+        deps=PlannerDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
+        agent_factory=factory,  # type: ignore[arg-type]
+        model_config=ModelConfig(provider="openai", model_name="test", api_key="key"),
+    )
+
+    factory.reload_tooling()
+    asyncio.run(planner.reload(recreate_agent=True))
+
+    assert planner._agent is reloaded

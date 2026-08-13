@@ -84,3 +84,21 @@ def test_set_provider_api_key_updates_process_environment(tmp_path: Path) -> Non
     workspace.set_provider_api_key("google", "example-google-key")
 
     assert os.environ.get("GOOGLE_API_KEY") == "example-google-key"
+
+
+def test_only_workspace_planner_file_is_loaded_as_runtime_instruction(tmp_path: Path) -> None:
+    workspace = Workspace.open(tmp_path / "planner-instructions")
+    (workspace.root / "AGENTS.md").write_text(
+        "repository coding-agent instructions",
+        encoding="utf-8",
+    )
+
+    assert workspace.load_planner_agent_instruction() == ""
+
+    workspace.planner_agent_instruction_path.write_text(
+        "workspace Planner guidance",
+        encoding="utf-8",
+    )
+
+    assert workspace.load_planner_agent_instruction() == "workspace Planner guidance"
+    assert workspace.planner_agent_instruction_path != workspace.root / "AGENTS.md"
