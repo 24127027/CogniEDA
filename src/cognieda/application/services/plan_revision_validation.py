@@ -12,6 +12,7 @@ from cognieda.infrastructure.persistence.repositories import (
     ObjectiveRepository,
     TaskRepository,
 )
+from cognieda.schemas.artifacts import Task
 from cognieda.schemas.plan_revision import (
     PLAN_REVISION_CONTRACT_VERSION,
     PlanRevision,
@@ -64,7 +65,7 @@ class PlanRevisionValidator:
                 "PlanRevision candidate requires an authoritative Objective.",
             )
 
-        authoritative_tasks = []
+        persisted_tasks: list[Task] = []
         for binding in candidate.task_bindings:
             task = self._tasks.get_by_id(binding.task_id)
             if task is None:
@@ -77,7 +78,7 @@ class PlanRevisionValidator:
                     PlanRevisionValidationErrorCode.TASK_OBJECTIVE_MISMATCH,
                     "Every authoritative Task must belong to the candidate Objective.",
                 )
-            authoritative_tasks.append(task)
+            persisted_tasks.append(task)
 
         try:
             canonical = PlanRevision.model_validate(
@@ -87,7 +88,6 @@ class PlanRevisionValidator:
                     "task_bindings": [
                         {
                             "task_id": binding.task_id,
-                            "required_capability": binding.required_capability,
                             "order_rank": binding.order_rank,
                             "priority": binding.priority,
                         }
@@ -102,7 +102,7 @@ class PlanRevisionValidator:
                     ],
                     "contract_version": candidate.contract_version,
                 },
-                context={"authoritative_tasks": tuple(authoritative_tasks)},
+                context={"tasks": tuple(persisted_tasks)},
             )
         except (TypeError, ValueError, ValidationError) as exc:
             raise PlanRevisionValidationError(

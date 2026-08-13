@@ -10,7 +10,6 @@ from sqlalchemy import delete, event
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from cognieda.execution import Capability
 from cognieda.infrastructure.persistence.models import (
     PlanDependencyRecord,
     PlanRevisionRecord,
@@ -55,14 +54,8 @@ def _binding(
     order_rank: int = 0,
     priority: PlanPriority = PlanPriority.NORMAL,
 ) -> PlanTaskBinding:
-    capability = {
-        TaskKind.DATA: Capability.DATA_ANALYSIS,
-        TaskKind.SCIENTIFIC: Capability.HYPOTHESIS_TESTING,
-        TaskKind.GRAPH: Capability.GRAPH_MINING,
-    }[task.kind]
     return PlanTaskBinding(
         task_id=task.task_id,
-        required_capability=capability,
         order_rank=order_rank,
         priority=priority,
     )
@@ -86,7 +79,7 @@ def _revision(
             else tuple(bindings)
         ),
         dependencies=dependencies,
-        authoritative_tasks=task_tuple,
+        tasks=task_tuple,
     )
 
 
@@ -152,10 +145,8 @@ def test_multi_root_multi_leaf_dag_round_trips_all_content(db_session: Session) 
         PlanPriority.NORMAL,
         PlanPriority.HIGH,
     }
-    assert all(
-        binding.required_capability is Capability.DATA_ANALYSIS
-        for binding in loaded.task_bindings
-    )
+    assert "required_capability" not in PlanTaskBindingRecord.model_fields
+    assert "required_capability" not in loaded.model_dump_json()
 
 
 def test_storage_order_does_not_change_reconstructed_content(db_session: Session) -> None:
