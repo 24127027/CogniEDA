@@ -173,7 +173,7 @@ direct Evidence path is transitional.
 The complete target architecture is not yet a supported end-to-end runtime.
 The immutable PlanRevision V1 domain contract and side-effect-free candidate
 validation are **Implemented**, and its append-only repository foundation is
-**Verified on SQLite**. No application path persists an unapproved candidate.
+**Verified on SQLite**. No application path currently persists a PlanRevision.
 Planner authoring, human approval, exact post-approval validation and
 persistence, activation, active selection, Task DAG runtime, scientific
 investigation and protocol, canonical Evidence lineage, protected evaluation,

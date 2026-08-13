@@ -24,6 +24,7 @@ from cognieda.schemas.enums import PlanPriority
 PlanRevisionContractVersion = Literal["plan-revision/v1"]
 PLAN_REVISION_CONTRACT_VERSION: PlanRevisionContractVersion = "plan-revision/v1"
 
+
 class PlanTaskBinding(ImmutableCogniEDABaseModel):
     """Revision-specific coordination for one semantic Task."""
 
@@ -98,9 +99,7 @@ class PlanRevision(ImmutableCogniEDABaseModel):
 
         member_ids = {binding.task_id for binding in self.task_bindings}
         if member_ids != set(tasks_by_id):
-            raise ValueError(
-                "PlanRevision Task inputs must exactly match binding membership."
-            )
+            raise ValueError("PlanRevision Task inputs must exactly match binding membership.")
 
         for binding in self.task_bindings:
             task = tasks_by_id[binding.task_id]

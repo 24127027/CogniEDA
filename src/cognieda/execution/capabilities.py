@@ -12,4 +12,5 @@ class Capability(StrEnum):
     GRAPH_MINING = "graph_mining"
     HYPOTHESIS_TESTING = "hypothesis_testing"
 
+
 __all__ = ("Capability",)

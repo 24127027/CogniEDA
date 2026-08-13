@@ -42,8 +42,8 @@ The fingerprint binds contract version, Objective identity, canonical bindings
 including Task identity, rank, and priority, and canonical dependencies. It
 excludes Task execution status and semantic payload, exact DataProfile
 identity, runtime or lifecycle policy and state, conversation, timestamps,
-provider and worker identity, Planner identity, model configuration, and dataset location. Canonicalization
-is structural only.
+provider and worker identity, Planner identity, model configuration, and
+dataset location. Canonicalization is structural only.
 
 ## Role-native boundary contracts
 

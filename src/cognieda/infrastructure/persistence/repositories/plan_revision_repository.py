@@ -102,9 +102,7 @@ class PlanRevisionRepository:
                 ],
             },
             context={
-                "tasks": tuple(
-                    record_to_schema(Task, task_record) for task_record in task_rows
-                )
+                "tasks": tuple(record_to_schema(Task, task_record) for task_record in task_rows)
             },
         )
         if revision.fingerprint != header.fingerprint:

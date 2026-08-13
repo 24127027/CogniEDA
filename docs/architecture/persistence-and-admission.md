@@ -246,10 +246,12 @@ same-ID replay or collision cannot overwrite the existing snapshot; and
 different IDs with the same content fingerprint remain distinct. The
 repository is append-only and exposes no update or delete surface.
 
-No application path currently persists an unapproved candidate. Persistence of
-the exact human-approved candidate, its required second validation, and
-activation are **Deferred**; repository existence alone does not make a Planner
-draft authoritative.
+No application path currently persists a PlanRevision candidate. Human review
+precedes the intended application commit boundary; no mandatory separate
+application preflight is required before review. Commit-boundary validation and
+atomic persistence, adoption, and activation of the exact approved objects are
+**Deferred**; repository existence alone does not make pending Planner objects
+authoritative.
 
 The complete target boundary is not implemented. Canonical PlanRevision
 activation, durable role-native result inbox processing, complete replay

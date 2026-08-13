@@ -152,11 +152,10 @@ user request
      -> yes: draft a high-level plan
         -> gaps identified
         -> bounded Graph Miner or Data Explorer planning support when needed
-        -> candidate PlanRevision revised
-        -> application validates candidate without persistence
-        -> Human reviews and approves exact candidate
-        -> application validates exact approved candidate again
-        -> immutable PlanRevision persisted and activated
+        -> transient canonical Objective, Tasks, and PlanRevision revised
+        -> Human reviews and approves those exact pending objects
+        -> application performs commit-boundary validation
+        -> exact approved objects atomically persisted, adopted, and activated
         -> eligible Task DAG work executes
 ```
 
@@ -169,9 +168,11 @@ dependencies remain explicit DAG edges. Related workflow-lifecycle state owns
 approval and activation metadata. Capability, provider, specialist, tool, and
 other execution-routing choices are not PlanRevision content.
 
-An unapproved candidate is not durable authoritative PlanRevision state.
-Validation alone is not admission; persistence and activation belong to the
-later exact-approval transition.
+Domain construction may enforce structural validity before review, but there
+is no mandatory separate application preflight or admission stage. Unapproved
+pending objects are not durable authoritative state; commit-boundary validation,
+persistence, adoption, and activation belong to the later exact-approval
+transition.
 
 The DAG alone determines eligibility. Rank ties are valid for concurrent or
 independent Tasks, canonical Task-ID ordering is only a deterministic

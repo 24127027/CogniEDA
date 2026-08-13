@@ -140,14 +140,20 @@ meaning. Proposed Tasks cannot execute.
 
 The planning sequence is:
 
-1. The Planner drafts a complete candidate `PlanRevision` and its Task DAG.
-2. Application validates the candidate without persistence or another
-   authoritative side effect.
-3. The Planner presents that exact candidate to the Human.
-4. The Human approves, rejects, holds, or requests revision.
-5. After approval, application authority validates the exact approved
-   candidate again, persists the immutable PlanRevision, and activates it with
-   eligible Task state.
+1. The Planner constructs transient canonical Objective, Task, and
+   `PlanRevision` objects, including the complete Task DAG. Domain construction
+   performs structural validation but creates no durable authority.
+2. The Planner presents those exact pending canonical objects to the Human.
+3. The Human approves, rejects, holds, or requests revision.
+4. Only after approval, application authority performs commit-boundary
+   validation and atomically persists, adopts, and activates the exact approved
+   objects.
+
+There is no mandatory separate application preflight or admission stage before
+Human review. The implemented `PlanRevisionValidator` is a side-effect-free
+foundation for resolving persisted references and verifying an exact canonical
+candidate at an application boundary; approval and the commit transaction are
+**Deferred**.
 
 Approval is not activation. The plan visible to a user must be the same plan
 fingerprint or exact version that application authority activates. A changed
@@ -207,7 +213,7 @@ the Planner must be able to recover:
 - the applicable SessionFrame and validity warnings.
 
 Duplicate decisions and replayed messages must be idempotent. A resumed
-approval must apply only to the proposal version originally presented. Lost or
+approval must apply only to the exact objects originally presented. Lost or
 ambiguous identity fails closed and returns a typed recovery blocker.
 
 ## Scientific non-authority
@@ -254,11 +260,11 @@ SessionFrame is durably restored after restart.
 
 The immutable `PlanRevision`, `PlanTaskBinding`, and `PlanDependency` V1 domain
 contracts and side-effect-free application validation are **Implemented** with
-authoritative Objective and Task checks, structural canonicalization, DAG
+persisted Objective and Task checks, structural canonicalization, DAG
 guards, and deterministic fingerprinting. Append-only snapshot persistence and
 fail-closed collision/fingerprint reconstruction are **Verified on SQLite** as
-infrastructure for the later approval boundary. Validation does not persist an
-unapproved candidate, and no application caller currently persists one.
+infrastructure for the later approval boundary. Validation does not persist a
+candidate, and no application caller currently persists a PlanRevision.
 Planner does not author or consume PlanRevision, and approval, exact
 post-approval revalidation, activation, active-plan selection, and replanning
 runtime are **Deferred**. Active Task exposes all three canonical kinds, but

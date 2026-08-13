@@ -178,9 +178,7 @@ def test_duplicate_binding_is_rejected(db_session: Session) -> None:
 @pytest.mark.parametrize("case", ["outside", "self", "duplicate", "direct", "indirect"])
 def test_invalid_dependency_graph_is_rejected(db_session: Session, case: str) -> None:
     objective = _persisted_objective(db_session)
-    tasks = tuple(
-        _task(objective.objective_id, persisted_in=db_session) for _ in range(3)
-    )
+    tasks = tuple(_task(objective.objective_id, persisted_in=db_session) for _ in range(3))
     first, second, third = tasks
     dependencies: tuple[PlanDependency, ...]
     if case == "outside":
@@ -289,6 +287,35 @@ def test_invalid_rank_or_priority_is_rejected(
         PlanRevisionValidationErrorCode.INVALID_CANDIDATE,
     )
     assert task.task_id == invalid_binding.task_id
+
+
+def test_noncanonical_candidate_representation_is_rejected(
+    db_session: Session,
+) -> None:
+    objective = _persisted_objective(db_session)
+    first = _task(objective.objective_id, persisted_in=db_session)
+    second = _task(objective.objective_id, persisted_in=db_session)
+    canonical = _revision(
+        objective.objective_id,
+        [first, second],
+        bindings=(
+            _binding(first, order_rank=0),
+            _binding(second, order_rank=1),
+        ),
+    )
+    candidate = PlanRevision.model_construct(
+        plan_revision_id=canonical.plan_revision_id,
+        objective_id=canonical.objective_id,
+        task_bindings=tuple(reversed(canonical.task_bindings)),
+        dependencies=canonical.dependencies,
+        contract_version=canonical.contract_version,
+    )
+
+    _assert_rejected(
+        PlanRevisionValidator(db_session),
+        candidate,
+        PlanRevisionValidationErrorCode.INVALID_CANDIDATE,
+    )
 
 
 class _FingerprintMismatchCandidate:

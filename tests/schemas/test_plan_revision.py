@@ -29,6 +29,7 @@ from cognieda.schemas import enums as schema_enums
 
 OBJECTIVE_ID = UUID("10000000-0000-0000-0000-000000000000")
 
+
 def _task(
     *,
     task_id: UUID | None = None,
@@ -262,6 +263,27 @@ def test_binding_rejects_removed_assigned_role() -> None:
         PlanTaskBinding.model_validate(payload)
 
 
+def test_plan_contract_fields_exclude_execution_routing() -> None:
+    prohibited = {
+        "required_capability",
+        "capability",
+        "assigned_role",
+        "provider",
+        "provider_id",
+        "specialist",
+        "worker",
+        "worker_id",
+        "tool",
+        "tool_id",
+        "executor",
+        "executor_id",
+        "data_profile_id",
+    }
+
+    assert prohibited.isdisjoint(PlanRevision.model_fields)
+    assert prohibited.isdisjoint(PlanTaskBinding.model_fields)
+
+
 def test_plan_task_role_is_removed_from_schema_surfaces() -> None:
     assert not hasattr(schema_enums, "PlanTaskRole")
     assert not hasattr(schemas, "PlanTaskRole")
@@ -449,6 +471,19 @@ def test_task_execution_status_does_not_change_fingerprint() -> None:
     )
 
     assert _revision([pending]).fingerprint == _revision([completed]).fingerprint
+
+
+def test_task_semantic_payload_does_not_change_fingerprint() -> None:
+    original = _task(kind=TaskKind.DATA)
+    changed = Task(
+        task_id=original.task_id,
+        objective_id=original.objective_id,
+        kind=TaskKind.GRAPH,
+        instruction="Ask a different bounded graph question.",
+        status=TaskStatus.FAILED,
+    )
+
+    assert _revision([original]).fingerprint == _revision([changed]).fingerprint
 
 
 def test_concrete_data_profile_identity_is_not_fingerprint_content() -> None:

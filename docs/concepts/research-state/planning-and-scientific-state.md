@@ -59,15 +59,14 @@ response synthesis is Planner behavior, not executable Task work.
 `PlanRevision` is the non-FCO version of an entire proposed or approved Task
 DAG. Exactly one immutable `PlanTaskBinding` represents each member Task and
 owns non-negative `order_rank` and finite `LOW`, `NORMAL`, or `HIGH` priority.
-Membership is
-derived from binding Task identities, while dependencies remain explicit
-edges. Those coordination concerns do not define Task identity.
+Membership is derived from binding Task identities, while dependencies remain
+explicit edges. Those coordination concerns do not define Task identity.
 
 The dependency DAG determines eligibility. `order_rank` expresses preference
 among otherwise compatible work, permits ties, and never overrides a
 dependency. Priority defaults to `NORMAL` and is scheduling metadata only; it
-does not establish epistemic importance, authority, or Task meaning. Required
-execution route, rank, priority, dependencies, parentage,
+does not establish epistemic importance, authority, or Task meaning. Execution
+route, rank, priority, dependencies, parentage,
 PlanRevision identity, approval, and activation are absent from Task semantic
 identity.
 
@@ -108,11 +107,13 @@ coordination. It does not author the scientific Hypothesis, InvestigationPlan,
 InvestigationProtocol, Evidence obligations, decision rule, or protected final
 evaluation.
 
-A candidate PlanRevision crosses side-effect-free application validation before
-the Planner presents it. Human approval authorizes only that exact candidate;
-application authority must validate it again before later persistence and
-activation. Validation alone is not admission and an unapproved candidate is
-not durable authoritative PlanRevision state. See [Scientific authority](../scientific-lifecycle/scientific-authority.md)
+The Planner constructs transient canonical Objective, Task, and PlanRevision
+objects and presents those exact pending objects to the Human. Domain
+construction performs structural validation, but there is no mandatory
+application preflight or admission stage before review. Human approval
+authorizes only those exact objects; application authority performs
+commit-boundary validation before atomically persisting, adopting, and
+activating them. See [Scientific authority](../scientific-lifecycle/scientific-authority.md)
 for the complete authority split.
 
 ## Eligibility for scientific investigation
@@ -149,10 +150,10 @@ Evidence loops, typed non-completion, and authoritative admission are owned by
 **Partially implemented.** The active Task semantic core is Objective-scoped
 and uses the canonical three-kind taxonomy. The immutable PlanRevision V1
 domain and side-effect-free application validator are **Implemented** with
-binding membership, routing compatibility, DAG validation, structural
-fingerprinting, and authoritative Objective/Task checks. The append-only
+binding membership, DAG validation, structural fingerprinting, and persisted
+Objective/Task checks. The append-only
 repository foundation is **Verified on SQLite**, but has no application caller
-for unapproved candidates. Planner authoring, human approval, exact
+for PlanRevision. Planner authoring, human approval, exact
 revalidation, persistence at the approval boundary, activation, active
 selection, replanning, canonical scientific execution, and the complete
 lifecycle linked above remain **Deferred**; only bounded `DATA` execution is

@@ -38,7 +38,7 @@ class PlanRevisionValidationError(ValueError):
 
 
 class PlanRevisionValidator:
-    """Validate a candidate against authoritative references without persistence."""
+    """Validate a candidate against persisted references without persistence."""
 
     def __init__(self, session: Session) -> None:
         self._objectives = ObjectiveRepository(session)
@@ -62,7 +62,7 @@ class PlanRevisionValidator:
         if self._objectives.get_by_id(candidate.objective_id) is None:
             raise PlanRevisionValidationError(
                 PlanRevisionValidationErrorCode.OBJECTIVE_NOT_FOUND,
-                "PlanRevision candidate requires an authoritative Objective.",
+                "PlanRevision candidate requires a persisted Objective.",
             )
 
         persisted_tasks: list[Task] = []
@@ -71,12 +71,12 @@ class PlanRevisionValidator:
             if task is None:
                 raise PlanRevisionValidationError(
                     PlanRevisionValidationErrorCode.TASK_NOT_FOUND,
-                    "PlanRevision candidate references a missing authoritative Task.",
+                    "PlanRevision candidate references a missing persisted Task.",
                 )
             if task.objective_id != candidate.objective_id:
                 raise PlanRevisionValidationError(
                     PlanRevisionValidationErrorCode.TASK_OBJECTIVE_MISMATCH,
-                    "Every authoritative Task must belong to the candidate Objective.",
+                    "Every persisted Task must belong to the candidate Objective.",
                 )
             persisted_tasks.append(task)
 

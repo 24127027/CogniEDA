@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from uuid import UUID, uuid4
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import delete, event
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
@@ -14,6 +15,7 @@ from cognieda.infrastructure.persistence.models import (
     PlanDependencyRecord,
     PlanRevisionRecord,
     PlanTaskBindingRecord,
+    TaskRecord,
 )
 from cognieda.infrastructure.persistence.repositories import (
     ObjectiveRepository,
@@ -145,8 +147,25 @@ def test_multi_root_multi_leaf_dag_round_trips_all_content(db_session: Session) 
         PlanPriority.NORMAL,
         PlanPriority.HIGH,
     }
-    assert "required_capability" not in PlanTaskBindingRecord.model_fields
-    assert "required_capability" not in loaded.model_dump_json()
+    prohibited = {
+        "required_capability",
+        "capability",
+        "assigned_role",
+        "provider",
+        "provider_id",
+        "specialist",
+        "worker",
+        "worker_id",
+        "tool",
+        "tool_id",
+        "executor",
+        "executor_id",
+        "data_profile_id",
+    }
+    assert prohibited.isdisjoint(PlanRevisionRecord.model_fields)
+    assert prohibited.isdisjoint(PlanTaskBindingRecord.model_fields)
+    assert prohibited.isdisjoint(PlanDependencyRecord.model_fields)
+    assert all(field not in loaded.model_dump_json() for field in prohibited)
 
 
 def test_storage_order_does_not_change_reconstructed_content(db_session: Session) -> None:
@@ -225,6 +244,22 @@ def test_unknown_revision_returns_none(db_session: Session) -> None:
     assert PlanRevisionRepository(db_session).get_by_id(uuid4()) is None
 
 
+def test_missing_persisted_task_fails_closed(db_session: Session) -> None:
+    objective = ObjectiveRepository(db_session).create(Objective(text="Missing Task"))
+    transient_task = Task(
+        objective_id=objective.objective_id,
+        kind=TaskKind.DATA,
+        instruction="This Task was not persisted.",
+    )
+    revision = _revision(objective.objective_id, [transient_task])
+
+    with pytest.raises(IntegrityError):
+        PlanRevisionRepository(db_session).add(revision)
+    db_session.rollback()
+
+    assert db_session.get(PlanRevisionRecord, revision.plan_revision_id) is None
+
+
 def test_identity_collision_never_overwrites_existing_revision(db_session: Session) -> None:
     objective = ObjectiveRepository(db_session).create(Objective(text="Collision"))
     first = _persisted_task(db_session, objective.objective_id)
@@ -287,6 +322,42 @@ def test_corrupt_stored_fingerprint_fails_closed(db_session: Session) -> None:
     db_session.commit()
 
     with pytest.raises(ValueError, match="fingerprint does not match"):
+        PlanRevisionRepository(db_session).get_by_id(revision.plan_revision_id)
+
+
+def test_malformed_stored_contract_fails_closed(db_session: Session) -> None:
+    objective = ObjectiveRepository(db_session).create(Objective(text="Malformed contract"))
+    task = _persisted_task(db_session, objective.objective_id)
+    revision = _revision(objective.objective_id, [task])
+    _persist_revision(db_session, revision)
+    record = db_session.get(PlanRevisionRecord, revision.plan_revision_id)
+    assert record is not None
+    record.contract_version = "plan-revision/v2"
+    db_session.add(record)
+    db_session.commit()
+
+    with pytest.raises(ValidationError, match="plan-revision/v1"):
+        PlanRevisionRepository(db_session).get_by_id(revision.plan_revision_id)
+
+
+def test_missing_task_during_reconstruction_fails_closed(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    objective = ObjectiveRepository(db_session).create(Objective(text="Missing load Task"))
+    task = _persisted_task(db_session, objective.objective_id)
+    revision = _revision(objective.objective_id, [task])
+    _persist_revision(db_session, revision)
+    session_get = db_session.get
+
+    def get_without_tasks(entity, ident):
+        if entity is TaskRecord:
+            return None
+        return session_get(entity, ident)
+
+    monkeypatch.setattr(db_session, "get", get_without_tasks)
+
+    with pytest.raises(ValueError, match="missing Task"):
         PlanRevisionRepository(db_session).get_by_id(revision.plan_revision_id)
 
 

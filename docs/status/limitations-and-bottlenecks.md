@@ -10,8 +10,8 @@ These are verified constraints of the bounded current implementation.
 - Active bounded Task has no runtime-selected PlanRevision membership,
   dependency eligibility, approval, activation, or parent/leaf execution
   semantics. Immutable PlanRevision candidates can represent membership,
-  capability requirements, dependencies, rank, and priority and can be
-  validated without persistence. The append-only repository is an isolated
+  dependencies, rank, and priority and can be validated without persistence.
+  The append-only repository is an isolated
   infrastructure foundation; only `DATA` is executable and no PlanRevision
   drives execution.
 - The current materialized SessionFrame can hold one Objective and one
@@ -30,8 +30,8 @@ These are verified constraints of the bounded current implementation.
   restart/recovery and complete-loop composition are **Deferred**.
 - PlanRevision V1 domain and side-effect-free candidate validation are
   **Implemented**, and append-only repository behavior is **Verified on
-  SQLite**. No application path persists an unapproved candidate. Planner
-  authoring, human approval, exact post-approval validation and persistence,
+  SQLite**. No application path currently persists a PlanRevision. Planner
+  authoring, human approval, commit-boundary validation and persistence,
   activation, active selection, and Task DAG runtime are **Deferred**.
   `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,

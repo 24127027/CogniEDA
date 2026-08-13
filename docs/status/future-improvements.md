@@ -13,9 +13,9 @@ These are established architecture, not speculative enhancements:
   identity separate from PlanRevision dependency and coordination
   metadata;
 - integrate the implemented PlanRevision V1 domain and pure validator plus the
-  SQLite repository foundation with Planner authoring, human approval, exact
-  post-approval validation and persistence, active revision selection,
-  activation, and Task DAG runtime;
+  SQLite repository foundation with Planner authoring, human approval,
+  exact-object commit-boundary validation and persistence, active revision
+  selection, activation, and Task DAG runtime;
 - preserve Planner-only human interaction while preventing Planner ownership
   of scientific feasibility, methods, parameters, protocols, obligations,
   evaluation, or proposal content;

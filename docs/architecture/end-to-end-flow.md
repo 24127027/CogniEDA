@@ -56,18 +56,21 @@ observation is not automatically Evidence.
 
 ## Plan proposal, approval, and activation
 
-1. The Planner drafts a complete candidate PlanRevision with canonical Tasks,
-   exactly one immutable binding per member Task, and explicit dependency edges.
-   Each binding owns non-negative `order_rank` and `LOW`, `NORMAL`, or `HIGH`
-   priority. The revision contains no capability, provider, specialist, tool,
-   exact DataProfile identity, or configurable stopping-condition or
-   replan-trigger policy.
-2. Application validates the exact candidate without persisting, approving, or
-   activating it.
-3. The Planner presents that exact candidate to the Human.
-4. Human approval authorizes only that exact candidate version.
-5. Application authority validates the approved candidate again, persists the
-   immutable PlanRevision, and atomically activates it with eligible Task state.
+1. The Planner constructs transient canonical Objective, Task, and PlanRevision
+   objects, with exactly one immutable binding per member Task and explicit
+   dependency edges. Each binding owns non-negative `order_rank` and `LOW`,
+   `NORMAL`, or `HIGH` priority. The revision contains no capability, provider,
+   specialist, tool, exact DataProfile identity, or configurable stopping-
+   condition or replan-trigger policy.
+2. Domain construction enforces structural validity without making the pending
+   objects authoritative or durable.
+3. The Planner presents those exact pending canonical objects to the Human.
+4. Human approval authorizes only those exact objects.
+5. Application authority performs commit-boundary validation and atomically
+   persists, adopts, and activates the exact approved objects.
+
+There is no mandatory separate application preflight or admission stage before
+Human review.
 
 A rejection, hold, or requested revision returns to the Planner without
 creating authoritative PlanRevision state. Any separately retained draft or
