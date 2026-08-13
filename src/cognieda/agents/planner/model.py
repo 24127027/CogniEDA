@@ -7,6 +7,7 @@ from typing import Protocol, TypeVar
 from pydantic_ai.messages import ModelMessage
 
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
+from cognieda.agents.utilities import instruction
 
 from .dependencies import PlannerDeps
 from .types import (
@@ -41,6 +42,14 @@ class PlannerDecisionModel(Protocol):
         self, answer_input: PlannerAnswerInput
     ) -> PlannerModelResult[PlannerResponseDraft]: ...
 
+    async def reload(
+        self,
+        *,
+        model_config: ModelConfig | None = None,
+        agent_instruction: str | None = None,
+        recreate_agent: bool = False,
+    ) -> None: ...
+
 
 class PlannerModel:
     def __init__(
@@ -48,10 +57,17 @@ class PlannerModel:
         deps: PlannerDeps,
         agent_factory: AgentFactoryPort,
         model_config: ModelConfig,
+        agent_instruction: str | None = None
+
     ):
         self.deps = deps
+        self.agent_instruction = agent_instruction
         self._agent_factory = agent_factory
         self._model_config = model_config
+
+
+        self._answer_instruction = instruction.assemble("answer.txt", agent_instruction)
+        self._decide_instruction = instruction.assemble("decide.txt", agent_instruction)
 
         self._reload_agent()
 
@@ -63,14 +79,31 @@ class PlannerModel:
             builtin_tools=(),
         )
 
-    def reload_model(
+    def reload(
         self,
+        *,
+        agent_instruction: str | None = None,
         model_config: ModelConfig | None = None,
-    ):
+        recreate_agent: bool = False,
+    ) -> None:
         if model_config is not None:
             self._model_config = model_config
+            recreate_agent = True
 
-        self._reload_agent()
+        if agent_instruction is not None:
+            self._agent_instruction = agent_instruction
+
+        self._decide_instruction = instruction.assemble(
+            "decide.txt",
+            agent_instruction=self._agent_instruction,
+        )
+        self._answer_instruction = instruction.assemble(
+            "answer.txt",
+            agent_instruction=self._agent_instruction,
+        )
+
+        if recreate_agent:
+            self._reload_agent()
 
     async def decide(
         self,
@@ -79,15 +112,6 @@ class PlannerModel:
         message_history: Sequence[ModelMessage] = (),
     ) -> PlannerModelResult[PlannerDecision]:
         prompt = (
-            "Classify the latest request into exactly one bounded MVP Planner action.\n"
-            "Use only the typed research-state projection below as authoritative state.\n"
-            "Assumptions are planning context, never empirical support.\n"
-            "For data work, propose one bounded Task instruction and select exactly one "
-            "Capability enum. If no Objective exists, include objective_text only when the "
-            "request states a sufficiently clear research Objective; otherwise return "
-            "invalid_or_unsupported with a clarification message.\n"
-            "Do not author a Hypothesis, protocol, method, decision rule, Evidence, Discovery, "
-            "approval flow, Task DAG, or executor identifier.\n"
             f"Typed input:\n{model_input.model_dump_json()}"
         )
         result = await self._agent.run(
@@ -95,6 +119,7 @@ class PlannerModel:
             output_type=PlannerDecision,
             deps=self.deps,
             message_history=list(message_history),
+            instructions=self._decide_instruction
         )
         return PlannerModelResult(
             output=PlannerDecision.model_validate(result.output),
@@ -105,15 +130,13 @@ class PlannerModel:
         self, answer_input: PlannerAnswerInput
     ) -> PlannerModelResult[PlannerResponseDraft]:
         prompt = (
-            "Answer the latest request using only the admitted Evidence in this typed input.\n"
-            "Do not invent analysis, strengthen the Evidence, or treat omitted planning "
-            "Assumptions as support. Mention material provenance or scope limits when useful.\n"
             f"Typed evidence input:\n{answer_input.model_dump_json()}"
         )
         result = await self._agent.run(
             prompt,
             output_type=PlannerResponseDraft,
             deps=self.deps,
+            instructions=self._answer_instruction
         )
         return PlannerModelResult(
             output=PlannerResponseDraft.model_validate(result.output),

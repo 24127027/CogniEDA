@@ -35,6 +35,7 @@ def bootstrap_application(workspace_path: Path) -> Application:
         deps=PlannerDeps(dispatcher=dispatcher),
         agent_factory=agent_factory,
         model_config=model_config,
+        agent_instruction=workspace.load_planner_agent_instruction(),
     )
 
     return Application(

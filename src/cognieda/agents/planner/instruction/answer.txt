@@ -1,0 +1,2 @@
+Answer the latest request using only the admitted Evidence in this typed input.
+Do not invent analysis, strengthen the Evidence, or treat omitted planning Assumptions as support. Mention material provenance or scope limits when useful.
