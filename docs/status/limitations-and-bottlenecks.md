@@ -101,9 +101,10 @@ These are verified constraints of the bounded current implementation.
   blocked until successor dataset and DataProfile semantics exist.
 - `DATA_TRANSFORMATION` remains blocked until immutable successor dataset state
   and successor DataProfile handling exist.
-- M1-B Planner tests use deterministic fake model and dispatcher boundaries;
-  they prove typed capability selection, tracked Task lifecycle, outcome
-  consumption, and fail-closed behavior without claiming model-selected real
+- M1-B Planner tests use a deterministic fake Agent supplied by a fake
+  `AgentFactoryPort` and a fake dispatcher; they prove typed capability
+  selection, tracked Task lifecycle, outcome consumption, native-message
+  propagation, and fail-closed behavior without claiming model-selected real
   Data Explorer filesystem execution.
 - Workspace path selection and initialization are **Implemented**, but
   automatic dataset discovery or admission is **Unsupported**. The

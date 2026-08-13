@@ -245,6 +245,21 @@ terminal `created_task` results to its own successor frame. Planner graph state
 contains per-run control and typed result fields only; Planner neither mutates
 nor returns SessionFrame.
 
+Planner directly owns one PydanticAI `Agent` created through the inward-facing
+`AgentFactoryPort`. For each invocation it supplies that current Agent,
+`PlannerDeps`, immutable `PlanningContext`, and assembled operation
+instructions to LangGraph. Request understanding and Evidence-grounded answer
+composition invoke the same Agent directly with operation-specific output
+types and instructions. LangGraph still coordinates the fixed transitional
+`understand_request -> prepare_results -> dispatch_work -> compose_response`
+control flow; this ownership cutover does not implement the target lifecycle
+graph.
+
+The built-in Planner role and authority instruction remains source-owned.
+Optional project guidance is loaded only from `.cognieda/planner.md` and is
+inserted between that built-in baseline and the current operation instruction.
+Repository-root `AGENTS.md` content is not a Planner runtime instruction.
+
 Current bounded Planner behavior can understand a
 finite set of requests, establish or refine an Objective, retain planning-only
 Assumptions, create and track bounded data Tasks, route work through the

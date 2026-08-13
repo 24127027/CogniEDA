@@ -3,7 +3,7 @@
 This page answers one question: **what is supported by the current
 implementation?** It describes source and tests inspected on 2026-08-13 on an
 implementation branch based on fetched `origin/main`
-`c1a57c7de3a3d838979cdbdcef231139368f9100`. A
+`77123d66c4c632f66158e497c6f2e2f717c14b81`. A
 schema, table, interface, stub, fixture, configuration entry, or directory is
 not a supported workflow by itself.
 
@@ -28,7 +28,7 @@ remain **Deferred** or **Unsupported**.
 | Bounded persistence | **Verified on SQLite** | Concrete models, sessions, migrations, and repositories under `infrastructure.persistence` round-trip minimum Objective, Assumption, Task, DataProfile, Evidence, SessionFrame, and immutable PlanRevision state on fresh SQLite. PlanRevision uses normalized `plan_revisions`, `plan_task_bindings`, and `plan_dependencies` tables; binding rows store only Task identity, rank, and priority, with no execution-routing field. One caller-owned transaction flushes the header, every binding, and every edge, and a child-write failure rolls back the complete snapshot. The append-only repository rejects same-ID replay or collision without overwrite, fails closed on stored fingerprint mismatch, and permits different identities with the same fingerprint. It exposes no update or delete surface. No application caller currently persists a PlanRevision. Task persistence retains exact semantic identity and changes status only. M3-A Evidence retains its existing bounded admission behavior. Durable upgrade of legacy rows, Objective and Assumption update composition, and restart/recovery are not claimed. |
 | Executor registry and dispatch | **Implemented** | The role-neutral `execution` package owns the single typed `Capability` definition, explicit dependency-aware provider factories, provider reuse, typed async dispatch, fail-closed missing registration, controlled provider errors, and role-native results. Runtime provider registration is not PlanRevision content. Specialist roles are peer packages under `agents`; Planner is not registered or represented as a Task executor, and no compatibility `agents.executor` path remains. |
 | Data Explorer | **Implemented** | At the bounded M3-A library surface, execution-internal capability plumbing can invoke Data Explorer outside PlanRevision. Data Explorer rejects direct `SCIENTIFIC` and `GRAPH` Task dispatch. It owns typed operationalization of the DATA Task instruction plus the supplied authoritative DataProfile projection into one finite `DataAnalysisPlan`; deterministic validation and tools alone compute values. Supported operations are row count, column summary, missingness, bounded value counts, descriptive statistics, bounded group summary, and bounded Pearson or Spearman correlation. Exact column names are required. Analysis contracts live under `agents.data_explorer`, not role-neutral `execution`. Data Explorer remains persistence-free and never creates Evidence. General-purpose Python execution is **Unsupported**. Transformation remains a typed blocker. |
-| Planner behavior, native conversation history, and `PlannerWorkOutcome` consumption | **Implemented** | The bounded library graph receives required read-only `PlanningContext`, performs typed request understanding, returns explicit Objective or Assumption results, constructs one Objective-bound `DATA` Task, invokes the selected data capability, identity-checks the outcome, and returns the exact terminal Task. Planner graph state and output contain no SessionFrame. Evidence-only follow-up answering and controlled human-facing responses remain supported; this Planner response synthesis is not Task execution. One complete model-backed Planner run is retained as a `ConversationTurn` of native PydanticAI `ModelMessage` values; append-only `ConversationHistory` is supplied to later request-understanding model calls through its separate non-authoritative context field and is absent from the Evidence-only answer input. Planner does not admit Evidence or create executable `SCIENTIFIC` or `GRAPH` work. |
+| Planner behavior, native conversation history, and `PlannerWorkOutcome` consumption | **Implemented** | Planner directly owns one PydanticAI `Agent` constructed through `AgentFactoryPort`; the factory retains provider-model and current external-tooling composition. The fixed transitional LangGraph receives that current Agent, `PlannerDeps`, required read-only `PlanningContext`, and built-in/workspace/operation instruction layers. Its request-understanding and Evidence-answer nodes invoke the same Agent directly, preserve native message history, and return new messages through `PlannerOutput`. The graph returns explicit Objective or Assumption results, constructs one Objective-bound `DATA` Task, invokes the selected data capability, identity-checks the outcome, and returns the exact terminal Task. Graph state and output contain no SessionFrame. Evidence-only follow-up answering and controlled human-facing responses remain supported; response synthesis is not Task execution. Planner does not admit Evidence or create executable `SCIENTIFIC` or `GRAPH` work. The current four-node graph is transitional and has not been redesigned into the target lifecycle. |
 | M3-A Data Explorer execution and Evidence integration | **Implemented** | The bounded library/data-authority surface proves immutable path-plus-content DataProfile binding, Data Explorer-owned bounded planning, deterministic real tool execution, typed provenance with the actual execution digest, application-owned atomic profile/binding admission, and application-owned immutable Evidence admission. Exact replay is idempotent; wrong-path, wrong-profile, same-path mutation, planning failure, blocker, lineage mismatch, and invalid payload paths create zero Evidence. Retained runtime composition is outside this claim. |
 | Multi-provider model construction | **Partially implemented** | Required provider/name/key configuration resolves workspace-first. Canonical provider identity is exactly OpenAI, Google, or Anthropic; the `gemini` input alias normalizes to Google before the generic factory dispatches. API key and optional base URL fall back first to provider-neutral environment values and then to legacy OpenAI-named values. Deterministic unit tests cover resolution and construction without external calls; no live provider call or supported multi-provider end-to-end runtime is verified. |
 | Retained runtime composition | **Deferred** | No supported Planner-to-real-Data-Explorer-to-Evidence-to-SessionFrame user workflow is composed, and the current in-process frame and conversation are not restored after restart. |
@@ -37,7 +37,7 @@ remain **Deferred** or **Unsupported**.
 | PlanRevision lifecycle and replanning | **Deferred** | The target PlanRevision content contains no configurable stopping-condition or replan-trigger policy. Approval, activation, plan completion, interruption, successor creation, and the finite typed taxonomy of actual causes requiring reconsideration remain workflow-lifecycle contracts that are not implemented. Scientific stopping remains InvestigationProtocol-owned, and bounded execution stopping remains work-order-owned. |
 | Semantic graph and Graph Miner | **Deferred** | Objective, Hypothesis, Evidence, and Discovery remain the exact target semantic graph membership, but no supported semantic projection or read-only Graph Miner runtime is composed. The Graph Miner package is an unregistered scaffold that raises `NotImplementedError`. |
 | Runtime entry boundary | **Partially implemented** | An editable uv tool installation exposes `cognieda [PATH]`; `python -m cognieda` delegates to the same package entrypoint. Help parsing is bootstrap-free. Runtime bootstrap composes the registry, Data Explorer provider, dispatcher, M1-B Planner, model factory, and workspace-local agent tooling. One in-process `Application` is the sole active owner of the current SessionFrame: it builds Planner context, invokes Planner, applies explicit bounded results to a successor frame, and retains append-only native conversation history across REPL turns. That state is not durably persisted or recovered, and the REPL does not supply composed dataset execution context, so it is not M5-A or a supported product CLI. |
-| Workspace filesystem ownership | **Implemented** | `Workspace.open()` normalizes the selected user research project root. Conventional `data/`, private `.cognieda/`, `state/`, and `sessions/` paths derive from that root and remain independent of process CWD. Initialization creates `.cognieda/project.toml` and `data/`; specific data and operational subdirectories remain lazy. External absolute dataset paths remain loadable and are not forced into the Workspace. Filesystem presence does not perform DataProfile admission. |
+| Workspace filesystem ownership | **Implemented** | `Workspace.open()` normalizes the selected user research project root. Conventional `data/`, private `.cognieda/`, `state/`, and `sessions/` paths derive from that root and remain independent of process CWD. Optional workspace Planner guidance is read only from `.cognieda/planner.md`; absence is valid, and repository-root `AGENTS.md` is not loaded into the product Planner. Initialization creates `.cognieda/project.toml` and `data/`; specific data and operational subdirectories remain lazy. External absolute dataset paths remain loadable and are not forced into the Workspace. Filesystem presence does not perform DataProfile admission. |
 | External integrations | **Unsupported** | DVC execution, graph-database integration, external MCP composition, deployment adapters, and non-SQLite database support are not verified. |
 
 ## Active M1-A contracts
@@ -130,7 +130,8 @@ selection, lifecycle progression, and runtime use remain **Deferred**.
 
 ## Verification qualification
 
-M1-B focused tests use deterministic fake model and dispatcher boundaries to
+M1-B focused tests use a deterministic fake Agent returned through the real
+`AgentFactoryPort` seam plus fake dispatcher boundaries to
 verify typed-state inspection, natural-language and explicit action parity,
 explicit Objective and Assumption results with Application-side application,
 bounded terminal Task construction, all three data
@@ -152,21 +153,18 @@ operationalization, successful and replayed Evidence admission, same-path
 mutation, wrong-profile/path, unsupported/invalid planning, and zero-Evidence
 failure paths.
 
-Focused verification on 2026-08-11 ran:
+Focused Planner ownership and instruction verification on 2026-08-13 ran:
 
 ```text
-uv run pytest -q \
-  tests/runtime/test_conversation.py \
-  tests/agents/planner/test_model_adapter.py \
-  tests/runtime/test_bootstrap_config.py \
-  tests/agents/test_llm.py
+uv run pytest tests/agents/planner tests/agents/test_instruction.py \
+  tests/runtime/test_workspace.py tests/runtime/test_conversation.py \
+  tests/architecture/test_layer_boundaries.py -q
 ```
 
-Result after the bounded multi-provider configuration repair: **23 passed**.
-Native conversation-history tests remain green. The four post-PR-#41 failures
-were repaired by supplying canonical providers in Planner/bootstrap tests and
-testing the generic `AgentFactory`; no active source or test references the
-removed `OpenAICompatibleAgentFactory` name.
+Result: **54 passed**. These tests prove direct Planner Agent ownership,
+same-Agent decision and answer calls, native history/new-message propagation,
+reload and recreation behavior, explicit instruction assembly, optional
+workspace instructions, and the root-`AGENTS.md` exclusion.
 
 ## Design target: dependency inversion
 

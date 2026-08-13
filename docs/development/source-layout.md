@@ -6,7 +6,7 @@ boundary explicit so that new work enters the correct package.
 
 | Package | Current responsibility |
 | --- | --- |
-| `agents` | Planner and peer specialist role adapters. Planner owns human-facing coordination tools; Data Explorer owns direct dataset operations. Hypothesis Analyst and Graph Miner remain deferred scaffolds. |
+| `agents` | Planner and peer specialist role adapters. Planner directly owns its PydanticAI Agent, LangGraph control flow, dependencies, and built-in/operation instructions; Data Explorer owns direct dataset operations. Hypothesis Analyst and Graph Miner remain deferred scaffolds. |
 | `application` | Inward-facing ports plus application-authority services for execution admission, Planner-operation commit, and guarded transitions. These services do not establish the complete canonical workflow. |
 | `cli` | Installed command parsing, the development REPL, and terminal rendering. |
 | `execution` | Role-neutral capability, request/result transport, provider registry, and dispatcher contracts. |
@@ -52,7 +52,8 @@ The enforced boundaries are more important than package names:
 **Implemented.** Focused architecture tests enforce the Planner dataset-access
 boundary, inward-layer independence from CLI, peer specialist package paths,
 removed-package hard cutovers, and the absence of non-Python artifacts in the
-production package tree. Workspace ownership regressions also reject
+production package tree except the three explicit Planner instruction assets.
+Workspace ownership regressions also reject
 product-root research-state directories, package-relative user-data lookup,
 and production references to test fixture paths.
 

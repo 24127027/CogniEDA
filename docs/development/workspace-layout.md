@@ -15,6 +15,7 @@ my-study/
 |   `-- derived/              # optional authorized successor datasets
 `-- .cognieda/                # CogniEDA-owned operational state
     |-- project.toml
+    |-- planner.md            # optional project-specific Planner guidance
     |-- state/                # created when a state owner needs it
     `-- sessions/             # created when a session owner needs it
 ```
@@ -22,8 +23,9 @@ my-study/
 **Implemented.** `Workspace.open()` normalizes the selected root with user
 expansion and absolute resolution. `Workspace.data_dir`, `state_dir`, and
 `session_dir` derive only from that normalized root. Initialization eagerly
-creates `<workspace>/.cognieda/project.toml` and `<workspace>/data/`; `raw/`,
-`derived/`, `state/`, and `sessions/` remain lazy.
+creates `<workspace>/.cognieda/project.toml`, the current agent-tooling TOML
+files, and `<workspace>/data/`; `planner.md`, `raw/`, `derived/`, `state/`, and
+`sessions/` remain optional or lazy.
 
 `data/` is user-visible research material. `.cognieda/` is private operational
 configuration and state. `.cognieda/data/` is not a canonical dataset
@@ -54,6 +56,12 @@ future tracked dataset fixtures belong under `tests/fixtures/datasets/`.
 Root `config/*.toml` files remain development examples. Installed runtime
 bootstrap reads optional agent tooling configuration only from the selected
 Workspace's `.cognieda/` directory.
+
+**Implemented.** Planner runtime instructions have separate ownership from
+repository coding-agent instructions. CogniEDA always retains its source-owned
+built-in Planner authority baseline. Optional workspace guidance from
+`.cognieda/planner.md` supplements that baseline before the operation-specific
+instruction. A Workspace-root `AGENTS.md` is not read as product Planner input.
 
 DVC execution is **Unsupported**. The fail-closed
 `cognieda.infrastructure.dvc` adapter remains an integration boundary, but the
