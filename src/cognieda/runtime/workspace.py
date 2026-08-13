@@ -1,9 +1,11 @@
 import os
 import textwrap
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import toml
+
+from dotenv import set_key
 
 from cognieda.application.ports.llm import ModelConfig, ProviderType
 from cognieda.application.ports.llm import ProviderType
@@ -14,6 +16,13 @@ class ProviderProfile:
     model: str
     api_key_env: str
     base_url: str = ""
+
+    def api_key_configured(self) -> bool:
+        return bool(os.environ.get(self.api_key_env))
+
+
+class MissingModelCredentialError(Exception):
+    """The selected provider has no configured API key."""
 
 
 @dataclass(slots=True)
@@ -40,12 +49,21 @@ class ProjectConfig:
             providers=providers,
         )
 
+    def validate(self) -> None:
+        if self.default_provider not in self.providers:
+            raise ValueError(
+                f"Unknown provider '{self.default_provider}'."
+            )
+
     def resolve_model(self) -> ModelConfig:
+        self.validate()
+
         profile = self.providers[self.default_provider]
 
         api_key = os.environ.get(profile.api_key_env)
+
         if not api_key:
-            raise ValueError(
+            raise MissingModelCredentialError(
                 f"Environment variable '{profile.api_key_env}' is not set."
             )
 
@@ -56,7 +74,11 @@ class ProjectConfig:
             api_key=api_key,
         )
 
-
+    def try_resolve_model(self) -> ModelConfig | None:
+        try:
+            return self.resolve_model()
+        except MissingModelCredentialError:
+            return None
 class Workspace:
     def __init__(
         self,
@@ -65,7 +87,6 @@ class Workspace:
     ) -> None:
         self.root = root
         self.project_config = project_config
-        self.model_config: ModelConfig = project_config.resolve_model()
 
     # -------------------------------------------------------------------------
     # Workspace lifecycle
@@ -152,6 +173,10 @@ class Workspace:
     @property
     def planner_instruction_path(self) -> Path:
         return self.root / "AGENTS.md"
+    
+    @property
+    def env_path(self) -> Path:
+        return self.root / ".env"
 
     # -------------------------------------------------------------------------
     # Planner instruction
@@ -234,6 +259,69 @@ class Workspace:
             + "\n",
             encoding="utf-8",
         )
+    def use_provider(self, profile: str) -> None:
+        config = self._load_toml(self.project_config_path)
+
+        providers = config.get("providers", {})
+        if profile not in providers:
+            raise ValueError(f"Unknown provider '{profile}'.")
+
+        config["default_provider"] = profile
+
+        self._save_toml(
+            self.project_config_path,
+            config,
+        )
+
+        self.project_config = ProjectConfig.load(
+            self.project_config_path,
+        )
+
+    def set_provider_model(
+        self,
+        profile: str,
+        model: str,
+    ) -> None:
+        config = self._load_toml(self.project_config_path)
+
+        providers = config.get("providers", {})
+        if profile not in providers:
+            raise ValueError(f"Unknown provider '{profile}'.")
+
+        providers[profile]["model"] = model
+
+        self._save_toml(
+            self.project_config_path,
+            config,
+        )
+
+        self.project_config = ProjectConfig.load(
+            self.project_config_path,
+        )
+
+    def set_provider_api_key(
+        self,
+        profile: str,
+        api_key: str,
+    ) -> None:
+        provider = self.project_config.providers.get(profile)
+
+        if provider is None:
+            raise ValueError(f"Unknown provider '{profile}'.")
+
+        self.env_path.parent.mkdir(parents=True, exist_ok=True)
+        self.env_path.touch(exist_ok=True)
+
+        # Persist provider credentials in the workspace .env file.
+        set_key(
+            str(self.env_path),
+            provider.api_key_env,
+            api_key,
+            quote_mode="never",
+        )
+
+        # Make the key immediately available without restarting.
+        os.environ[provider.api_key_env] = api_key
 
     # -------------------------------------------------------------------------
     # TODO: Configuration editing
@@ -299,24 +387,6 @@ class Workspace:
             skills.remove(skill)
 
         self.save_agents_config(config)
-
-    def use_provider(self, profile: str) -> None:
-        config = self._load_toml(self.project_config_path)
-
-        if profile not in config["providers"]:
-            raise ValueError(f"Unknown provider '{profile}'.")
-
-        config["default_provider"] = profile
-
-        self._save_toml(
-            self.project_config_path,
-            config,
-        )
-
-        self.project_config = ProjectConfig.load(
-            self.project_config_path,
-        )
-        self.model_config = self.project_config.resolve_model()
 
     # -------------------------------------------------------------------------
     # TODO: Instruction loading

@@ -25,20 +25,21 @@ class Planner:
         agent_instruction: str = "",
     ) -> None:
         if planner_model is not None:
-            if agent_factory is not None or model_config is not None:
+            if agent_factory is not None:
                 raise ValueError(
-                    "Provide either planner_model or agent_factory plus model_config, not both."
+                    "Provide either planner_model or agent_factory, not both."
                 )
             self.model = planner_model
         else:
-            if agent_factory is None or model_config is None:
+            if agent_factory is None:
                 raise ValueError(
-                    "Planner requires a typed planner_model or agent_factory plus model_config."
+                    "Planner requires either planner_model or agent_factory."
                 )
+
             self.model = PlannerModel(
                 deps=deps,
                 agent_factory=agent_factory,
-                model_config=model_config,
+                model_config=model_config,      # may be None
                 agent_instruction=agent_instruction,
             )
 

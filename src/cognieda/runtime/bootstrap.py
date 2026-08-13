@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 from cognieda.infrastructure.llm import AgentFactory
 from cognieda.agents.data_explorer import DataExplorer
@@ -10,12 +11,25 @@ from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
 
 from .application import Application
+from .workspace import MissingModelCredentialError
 from .workspace import Workspace
 
 
+def _load_workspace_environment(workspace_path: Path) -> None:
+    env_path = workspace_path.expanduser().resolve() / ".env"
+    env_path.parent.mkdir(parents=True, exist_ok=True)
+    env_path.touch(exist_ok=True)
+    load_dotenv(dotenv_path=env_path, override=False)
+
+
 def bootstrap_application(workspace_path: Path) -> Application:
+    _load_workspace_environment(workspace_path)
     workspace = Workspace.open(workspace_path)
-    model_config = workspace.model_config
+
+    try:
+        model_config = workspace.project_config.resolve_model()
+    except MissingModelCredentialError:
+        model_config = None
 
     agent_factory = AgentFactory(tooling_config=workspace)
 

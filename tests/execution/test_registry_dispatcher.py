@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from uuid import uuid4
 
 import pytest
@@ -198,3 +199,22 @@ def test_bootstrap_composes_real_dispatcher_and_data_provider(tmp_path) -> None:
 
     assert result.status == ExecutionStatus.BLOCKED
     assert result.source_role == "data_explorer"
+
+
+def test_bootstrap_creates_workspace_env_file(tmp_path) -> None:
+    bootstrap_application(tmp_path)
+
+    assert (tmp_path / ".env").is_file()
+
+
+def test_bootstrap_loads_api_key_from_workspace_env(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    (tmp_path / ".env").write_text(
+        "GOOGLE_API_KEY=example-google-key\n",
+        encoding="utf-8",
+    )
+
+    application = bootstrap_application(tmp_path)
+
+    assert os.environ.get("GOOGLE_API_KEY") == "example-google-key"
+    assert application.workspace.project_config.resolve_model().api_key == "example-google-key"
