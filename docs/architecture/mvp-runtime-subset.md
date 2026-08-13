@@ -162,12 +162,12 @@ user request
 
 Planning-support observations are not Evidence. `PlanRevision` represents the
 full approved Task DAG. A Task is an independently governed semantic work
-unit; required capability is not Task semantics. Exactly one immutable
-`PlanTaskBinding` represents each member Task and owns required capability,
-non-negative `order_rank`, and finite `LOW`, `NORMAL`, or `HIGH` priority.
+unit. Exactly one immutable `PlanTaskBinding` represents each member Task and
+owns non-negative `order_rank` and finite `LOW`, `NORMAL`, or `HIGH` priority.
 Membership is derived from the bindings;
 dependencies remain explicit DAG edges. Related workflow-lifecycle state owns
-approval and activation metadata.
+approval and activation metadata. Capability, provider, specialist, tool, and
+other execution-routing choices are not PlanRevision content.
 
 An unapproved candidate is not durable authoritative PlanRevision state.
 Validation alone is not admission; persistence and activation belong to the
@@ -179,12 +179,14 @@ serialization tie-breaker, and neither rank nor priority overrides a
 dependency. A binding coordination change changes PlanRevision content and its
 fingerprint without, by itself, creating a successor Task.
 
-Capability is execution/dispatch-owned. PlanRevision states the requirement;
-`ExecutorRegistry` resolves a concrete runtime provider. Role, provider,
-worker, process, model, and Planner identity are excluded from plan content and
-its fingerprint. Planner coordinates but is not a Task executor. When retained
-authoritative state already answers a request, Planner synthesizes the response
-without creating a Task, capability, or provider path.
+Capability remains execution-internal plumbing where current providers require
+it. PlanRevision states no capability requirement or provider route. Role,
+provider, specialist, worker, process, model, tool, and Planner identity are
+excluded from plan content and its fingerprint. Application determines
+eligibility and the governed tool set; Planner reasons over interactions inside
+that allowed set but is not a Task executor. When retained authoritative state
+already answers a request, Planner synthesizes the response without creating a
+Task, capability, or provider path.
 
 PlanRevision and its bindings contain no concrete DataProfile identity or data
 selection. Planner describes intended data scope only through Task semantics.

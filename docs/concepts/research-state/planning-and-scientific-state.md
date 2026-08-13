@@ -58,8 +58,8 @@ response synthesis is Planner behavior, not executable Task work.
 
 `PlanRevision` is the non-FCO version of an entire proposed or approved Task
 DAG. Exactly one immutable `PlanTaskBinding` represents each member Task and
-owns required capability, non-negative `order_rank`, and finite `LOW`,
-`NORMAL`, or `HIGH` priority. Membership is
+owns non-negative `order_rank` and finite `LOW`, `NORMAL`, or `HIGH` priority.
+Membership is
 derived from binding Task identities, while dependencies remain explicit
 edges. Those coordination concerns do not define Task identity.
 
@@ -67,14 +67,16 @@ The dependency DAG determines eligibility. `order_rank` expresses preference
 among otherwise compatible work, permits ties, and never overrides a
 dependency. Priority defaults to `NORMAL` and is scheduling metadata only; it
 does not establish epistemic importance, authority, or Task meaning. Required
-capability, rank, priority, dependencies, parentage,
+execution route, rank, priority, dependencies, parentage,
 PlanRevision identity, approval, and activation are absent from Task semantic
 identity.
 
-Capability is an execution/dispatch contract. PlanRevision states only what
-capability a Task requires; `ExecutorRegistry` resolves the concrete provider
-at runtime. Provider or worker changes therefore do not change plan content or
-its fingerprint. Planner coordinates and dispatches but is not a Task executor.
+Capability is execution-internal runtime plumbing, not approved plan content.
+PlanRevision contains no provider, specialist, worker, tool, or routing hint.
+Application authority determines eligibility and the governed action space;
+Planner reasons about specialist interactions within that allowed space.
+Provider or worker changes therefore do not change plan content or its
+fingerprint. Planner coordinates but is not a Task executor.
 There is no Planner or synthesis capability, provider, role, or compatibility
 branch.
 

@@ -234,9 +234,9 @@ non-FCO provenance/authority record and does not expand the semantic graph.
 
 Side-effect-free PlanRevision candidate validation is **Implemented**.
 Application resolves the Objective and every bound Task from persistence,
-revalidates capability and DAG structure, verifies canonical representation,
-and recomputes the structural fingerprint without writing or committing. It
-does not consult current provider availability.
+revalidates exact membership and DAG structure, verifies canonical
+representation, and recomputes the structural fingerprint without writing or
+committing. It does not consult provider or capability availability.
 
 Immutable PlanRevision repository infrastructure is **Verified on SQLite**.
 Normalized revision, binding, and dependency rows preserve exact V1 content
