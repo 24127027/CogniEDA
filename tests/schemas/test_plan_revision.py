@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Iterable
 from uuid import UUID, uuid4
 
 import pytest
 from pydantic import ValidationError
 
+import cognieda.schemas as schemas
+import cognieda.schemas.plan_revision as plan_revision_module
 from cognieda.agents.planner.context import PlanningContext
 from cognieda.agents.planner.types import PlannerOutput, State
-from cognieda.execution import Capability
 from cognieda.schemas import (
     PLAN_REVISION_CONTRACT_VERSION,
     FirstClassObjectType,
@@ -18,24 +20,14 @@ from cognieda.schemas import (
     PlanPriority,
     PlanRevision,
     PlanTaskBinding,
-    PlanTaskRole,
     SessionFrame,
     Task,
     TaskKind,
     TaskStatus,
 )
+from cognieda.schemas import enums as schema_enums
 
 OBJECTIVE_ID = UUID("10000000-0000-0000-0000-000000000000")
-
-_DEFAULT_BINDING: dict[TaskKind, tuple[Capability | None, PlanTaskRole]] = {
-    TaskKind.DATA: (Capability.DATA_ANALYSIS, PlanTaskRole.DATA_EXPLORER),
-    TaskKind.SCIENTIFIC: (
-        Capability.HYPOTHESIS_TESTING,
-        PlanTaskRole.HYPOTHESIS_ANALYST,
-    ),
-    TaskKind.GRAPH: (Capability.GRAPH_MINING, PlanTaskRole.GRAPH_MINER),
-    TaskKind.SYNTHESIS: (None, PlanTaskRole.PLANNER),
-}
 
 
 def _task(
@@ -57,18 +49,11 @@ def _task(
 def _binding(
     task: Task,
     *,
-    capability: Capability | None | object = ...,
-    role: PlanTaskRole | None = None,
     order_rank: int = 0,
     priority: PlanPriority = PlanPriority.NORMAL,
 ) -> PlanTaskBinding:
-    default_capability, default_role = _DEFAULT_BINDING[task.kind]
-    selected_capability = default_capability if capability is ... else capability
-    assert isinstance(selected_capability, Capability) or selected_capability is None
     return PlanTaskBinding(
         task_id=task.task_id,
-        required_capability=selected_capability,
-        assigned_role=role or default_role,
         order_rank=order_rank,
         priority=priority,
     )
@@ -90,7 +75,7 @@ def _revision(
             tuple(_binding(task) for task in task_tuple) if bindings is None else tuple(bindings)
         ),
         dependencies=dependencies,
-        authoritative_tasks=task_tuple,
+        tasks=task_tuple,
     )
 
 
@@ -163,25 +148,36 @@ def test_duplicate_binding_is_rejected() -> None:
         _revision([task], bindings=(binding, binding))
 
 
-def test_missing_authoritative_task_is_rejected() -> None:
+def test_binding_without_member_task_is_rejected() -> None:
     task = _task()
 
-    with pytest.raises(ValidationError, match="without an authoritative Task"):
+    with pytest.raises(ValidationError, match="exactly match binding membership"):
         PlanRevision.create(
             objective_id=OBJECTIVE_ID,
             task_bindings=(_binding(task),),
-            authoritative_tasks=(),
+            tasks=(),
         )
 
 
-def test_duplicate_authoritative_task_is_rejected() -> None:
+def test_unbound_member_task_is_rejected() -> None:
+    bound, unbound = _task(), _task()
+
+    with pytest.raises(ValidationError, match="exactly match binding membership"):
+        PlanRevision.create(
+            objective_id=OBJECTIVE_ID,
+            task_bindings=(_binding(bound),),
+            tasks=(bound, unbound),
+        )
+
+
+def test_duplicate_member_task_is_rejected() -> None:
     task = _task()
 
-    with pytest.raises(ValidationError, match="duplicate authoritative Task"):
+    with pytest.raises(ValidationError, match="duplicate member Task"):
         PlanRevision.create(
             objective_id=OBJECTIVE_ID,
             task_bindings=(_binding(task),),
-            authoritative_tasks=(task, task),
+            tasks=(task, task),
         )
 
 
@@ -241,84 +237,56 @@ def test_indirect_cycle_is_rejected() -> None:
         )
 
 
-@pytest.mark.parametrize(
-    "capability",
-    [
-        Capability.DATA_ANALYSIS,
-        Capability.DATA_PROFILING,
-        Capability.DATA_TRANSFORMATION,
-    ],
-)
-def test_data_capability_and_data_explorer_role_are_valid(capability: Capability) -> None:
-    task = _task(kind=TaskKind.DATA)
-
-    revision = _revision([task], bindings=(_binding(task, capability=capability),))
-
-    assert revision.task_bindings[0].assigned_role is PlanTaskRole.DATA_EXPLORER
-
-
-def test_data_with_hypothesis_testing_is_rejected() -> None:
-    task = _task(kind=TaskKind.DATA)
-
-    with pytest.raises(ValidationError, match="incompatible required capability"):
-        _revision(
-            [task],
-            bindings=(_binding(task, capability=Capability.HYPOTHESIS_TESTING),),
-        )
-
-
-def test_scientific_hypothesis_testing_and_analyst_role_are_valid() -> None:
-    task = _task(kind=TaskKind.SCIENTIFIC)
+@pytest.mark.parametrize("kind", list(TaskKind))
+def test_every_task_kind_is_structural_plan_membership_without_a_route(
+    kind: TaskKind,
+) -> None:
+    task = _task(kind=kind)
 
     revision = _revision([task])
 
-    assert revision.task_bindings[0].required_capability is Capability.HYPOTHESIS_TESTING
-    assert revision.task_bindings[0].assigned_role is PlanTaskRole.HYPOTHESIS_ANALYST
+    assert revision.task_ids == frozenset({task.task_id})
+    assert set(PlanTaskBinding.model_fields) == {
+        "task_id",
+        "order_rank",
+        "priority",
+    }
 
 
-def test_scientific_with_data_analysis_is_rejected() -> None:
-    task = _task(kind=TaskKind.SCIENTIFIC)
-
-    with pytest.raises(ValidationError, match="incompatible required capability"):
-        _revision(
-            [task],
-            bindings=(_binding(task, capability=Capability.DATA_ANALYSIS),),
-        )
-
-
-def test_graph_mining_and_graph_miner_role_are_valid() -> None:
-    task = _task(kind=TaskKind.GRAPH)
-
-    revision = _revision([task])
-
-    assert revision.task_bindings[0].required_capability is Capability.GRAPH_MINING
-    assert revision.task_bindings[0].assigned_role is PlanTaskRole.GRAPH_MINER
-
-
-def test_synthesis_none_capability_and_planner_role_are_valid() -> None:
-    task = _task(kind=TaskKind.SYNTHESIS)
-
-    revision = _revision([task])
-
-    assert revision.task_bindings[0].required_capability is None
-    assert revision.task_bindings[0].assigned_role is PlanTaskRole.PLANNER
-
-
-def test_synthesis_with_dispatcher_capability_is_rejected() -> None:
-    task = _task(kind=TaskKind.SYNTHESIS)
-
-    with pytest.raises(ValidationError, match="incompatible required capability"):
-        _revision(
-            [task],
-            bindings=(_binding(task, capability=Capability.DATA_ANALYSIS),),
-        )
-
-
-def test_task_kind_and_role_mismatch_is_rejected() -> None:
+def test_binding_rejects_removed_assigned_role() -> None:
     task = _task(kind=TaskKind.DATA)
+    payload = _binding(task).model_dump()
+    payload["assigned_role"] = "data_explorer"
 
-    with pytest.raises(ValidationError, match="incompatible assigned role"):
-        _revision([task], bindings=(_binding(task, role=PlanTaskRole.PLANNER),))
+    assert "assigned_role" not in PlanTaskBinding.model_fields
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        PlanTaskBinding.model_validate(payload)
+
+
+def test_plan_contract_fields_exclude_execution_routing() -> None:
+    prohibited = {
+        "required_capability",
+        "capability",
+        "assigned_role",
+        "provider",
+        "provider_id",
+        "specialist",
+        "worker",
+        "worker_id",
+        "tool",
+        "tool_id",
+        "executor",
+        "executor_id",
+        "data_profile_id",
+    }
+
+    assert prohibited.isdisjoint(PlanRevision.model_fields)
+    assert prohibited.isdisjoint(PlanTaskBinding.model_fields)
+
+
+def test_plan_task_role_is_removed_from_schema_surfaces() -> None:
+    assert not hasattr(schema_enums, "PlanTaskRole")
+    assert not hasattr(schemas, "PlanTaskRole")
 
 
 def test_negative_order_rank_is_rejected() -> None:
@@ -437,36 +405,26 @@ def test_dependency_input_order_does_not_change_fingerprint() -> None:
     )
 
 
-def test_changing_capability_changes_fingerprint() -> None:
-    task = _task()
-
-    assert (
-        _revision(
-            [task], bindings=(_binding(task, capability=Capability.DATA_ANALYSIS),)
-        ).fingerprint
-        != _revision(
-            [task], bindings=(_binding(task, capability=Capability.DATA_PROFILING),)
-        ).fingerprint
-    )
-
-
-def test_changing_role_changes_fingerprint_contribution() -> None:
+def test_fingerprint_payload_has_only_plan_coordination_content() -> None:
     task = _task()
     revision = _revision([task])
-    changed_binding = revision.task_bindings[0].model_copy(
-        update={"assigned_role": PlanTaskRole.PLANNER}
-    )
-    structurally_changed = PlanRevision.model_construct(
-        plan_revision_id=revision.plan_revision_id,
-        objective_id=revision.objective_id,
-        task_bindings=(changed_binding,),
-        dependencies=revision.dependencies,
-        contract_version=revision.contract_version,
-    )
 
-    assert structurally_changed.fingerprint != revision.fingerprint
-    with pytest.raises(ValidationError, match="incompatible assigned role"):
-        _revision([task], bindings=(changed_binding,))
+    payload = revision._fingerprint_payload()
+    binding_payload = payload["task_bindings"][0]
+    assert set(binding_payload) == {"task_id", "order_rank", "priority"}
+    serialized = revision.model_dump_json()
+    assert "provider" not in serialized
+    assert "capability" not in serialized
+
+
+def test_plan_revision_source_has_no_execution_routing_contract() -> None:
+    source = inspect.getsource(plan_revision_module)
+
+    assert "required_capability" not in source
+    assert "_COMPATIBLE_CAPABILITIES" not in source
+    assert "Capability" not in source
+    assert not hasattr(schema_enums, "Capability")
+    assert not hasattr(schemas, "Capability")
 
 
 @pytest.mark.parametrize(
@@ -513,6 +471,19 @@ def test_task_execution_status_does_not_change_fingerprint() -> None:
     )
 
     assert _revision([pending]).fingerprint == _revision([completed]).fingerprint
+
+
+def test_task_semantic_payload_does_not_change_fingerprint() -> None:
+    original = _task(kind=TaskKind.DATA)
+    changed = Task(
+        task_id=original.task_id,
+        objective_id=original.objective_id,
+        kind=TaskKind.GRAPH,
+        instruction="Ask a different bounded graph question.",
+        status=TaskStatus.FAILED,
+    )
+
+    assert _revision([original]).fingerprint == _revision([changed]).fingerprint
 
 
 def test_concrete_data_profile_identity_is_not_fingerprint_content() -> None:
@@ -582,11 +553,11 @@ def test_dependency_eligibility_overrides_lower_dependent_order_rank() -> None:
     )
 
 
-def test_plan_revision_is_immutable_and_requires_authoritative_construction() -> None:
+def test_plan_revision_is_immutable_and_requires_member_task_construction() -> None:
     task = _task()
     revision = _revision([task])
 
-    with pytest.raises(ValidationError, match="authoritative Tasks"):
+    with pytest.raises(ValidationError, match="requires Tasks"):
         PlanRevision(
             objective_id=OBJECTIVE_ID,
             task_bindings=(_binding(task),),

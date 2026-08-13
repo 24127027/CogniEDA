@@ -19,48 +19,16 @@ from pydantic import (
 
 from cognieda.schemas.artifacts import Task
 from cognieda.schemas.common import ImmutableCogniEDABaseModel
-from cognieda.schemas.enums import (
-    Capability,
-    PlanPriority,
-    PlanTaskRole,
-    TaskKind,
-)
+from cognieda.schemas.enums import PlanPriority
 
 PlanRevisionContractVersion = Literal["plan-revision/v1"]
 PLAN_REVISION_CONTRACT_VERSION: PlanRevisionContractVersion = "plan-revision/v1"
 
-_COMPATIBLE_BINDINGS: dict[
-    TaskKind,
-    tuple[frozenset[Capability | None], PlanTaskRole],
-] = {
-    TaskKind.DATA: (
-        frozenset(
-            {
-                Capability.DATA_ANALYSIS,
-                Capability.DATA_PROFILING,
-                Capability.DATA_TRANSFORMATION,
-            }
-        ),
-        PlanTaskRole.DATA_EXPLORER,
-    ),
-    TaskKind.SCIENTIFIC: (
-        frozenset({Capability.HYPOTHESIS_TESTING}),
-        PlanTaskRole.HYPOTHESIS_ANALYST,
-    ),
-    TaskKind.GRAPH: (
-        frozenset({Capability.GRAPH_MINING}),
-        PlanTaskRole.GRAPH_MINER,
-    ),
-    TaskKind.SYNTHESIS: (frozenset({None}), PlanTaskRole.PLANNER),
-}
-
 
 class PlanTaskBinding(ImmutableCogniEDABaseModel):
-    """Revision-specific coordination and routing for one semantic Task."""
+    """Revision-specific coordination for one semantic Task."""
 
     task_id: UUID
-    required_capability: Capability | None
-    assigned_role: PlanTaskRole
     order_rank: NonNegativeInt
     priority: PlanPriority = PlanPriority.NORMAL
 
@@ -121,49 +89,35 @@ class PlanRevision(ImmutableCogniEDABaseModel):
         )
 
     @model_validator(mode="after")
-    def _validate_against_authoritative_tasks(self, info: ValidationInfo) -> PlanRevision:
-        tasks = self._authoritative_tasks(info)
+    def _validate_against_member_tasks(self, info: ValidationInfo) -> PlanRevision:
+        tasks = self._member_tasks(info)
         tasks_by_id: dict[UUID, Task] = {}
         for task in tasks:
             if task.task_id in tasks_by_id:
-                raise ValueError("PlanRevision rejects duplicate authoritative Task IDs.")
+                raise ValueError("PlanRevision rejects duplicate member Task IDs.")
             tasks_by_id[task.task_id] = task
 
         member_ids = {binding.task_id for binding in self.task_bindings}
-        missing_ids = member_ids.difference(tasks_by_id)
-        if missing_ids:
-            raise ValueError("PlanRevision rejects a binding without an authoritative Task.")
+        if member_ids != set(tasks_by_id):
+            raise ValueError("PlanRevision Task inputs must exactly match binding membership.")
 
         for binding in self.task_bindings:
             task = tasks_by_id[binding.task_id]
             if task.objective_id != self.objective_id:
                 raise ValueError("Every bound Task must belong to the PlanRevision Objective.")
-            self._validate_binding_compatibility(task, binding)
 
         self._validate_dependency_graph(member_ids)
         return self
 
     @staticmethod
-    def _authoritative_tasks(info: ValidationInfo) -> tuple[Task, ...]:
+    def _member_tasks(info: ValidationInfo) -> tuple[Task, ...]:
         context = info.context
         if not isinstance(context, dict):
-            raise ValueError(
-                "PlanRevision requires authoritative Tasks through PlanRevision.create()."
-            )
-        tasks = context.get("authoritative_tasks")
+            raise ValueError("PlanRevision requires Tasks through PlanRevision.create().")
+        tasks = context.get("tasks")
         if not isinstance(tasks, tuple) or not all(isinstance(task, Task) for task in tasks):
-            raise ValueError(
-                "PlanRevision requires authoritative Tasks through PlanRevision.create()."
-            )
+            raise ValueError("PlanRevision requires Tasks through PlanRevision.create().")
         return tasks
-
-    @staticmethod
-    def _validate_binding_compatibility(task: Task, binding: PlanTaskBinding) -> None:
-        capabilities, role = _COMPATIBLE_BINDINGS[task.kind]
-        if binding.required_capability not in capabilities:
-            raise ValueError(f"{task.kind.name} Task has an incompatible required capability.")
-        if binding.assigned_role is not role:
-            raise ValueError(f"{task.kind.name} Task has an incompatible assigned role.")
 
     def _validate_dependency_graph(self, member_ids: set[UUID]) -> None:
         in_degree = dict.fromkeys(member_ids, 0)
@@ -196,10 +150,10 @@ class PlanRevision(ImmutableCogniEDABaseModel):
         objective_id: UUID,
         task_bindings: Iterable[PlanTaskBinding],
         dependencies: Iterable[PlanDependency] = (),
-        authoritative_tasks: Iterable[Task],
+        tasks: Iterable[Task],
         plan_revision_id: UUID | None = None,
     ) -> Self:
-        """Validate and construct a revision against authoritative Task objects."""
+        """Validate and construct a revision against exact member Task values."""
 
         data: dict[str, object] = {
             "objective_id": objective_id,
@@ -208,8 +162,8 @@ class PlanRevision(ImmutableCogniEDABaseModel):
         }
         if plan_revision_id is not None:
             data["plan_revision_id"] = plan_revision_id
-        tasks = tuple(authoritative_tasks)
-        return cls.model_validate(data, context={"authoritative_tasks": tasks})
+        member_tasks = tuple(tasks)
+        return cls.model_validate(data, context={"tasks": member_tasks})
 
     @property
     def task_ids(self) -> frozenset[UUID]:
@@ -245,12 +199,6 @@ class PlanRevision(ImmutableCogniEDABaseModel):
             "task_bindings": [
                 {
                     "task_id": str(binding.task_id),
-                    "required_capability": (
-                        binding.required_capability.value
-                        if binding.required_capability is not None
-                        else None
-                    ),
-                    "assigned_role": binding.assigned_role.value,
                     "order_rank": binding.order_rank,
                     "priority": binding.priority.value,
                 }

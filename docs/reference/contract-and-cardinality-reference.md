@@ -20,17 +20,17 @@ fingerprint. It contains no DataProfile identity, stopping condition, replan
 trigger, approval, activation, or successor state.
 
 Each member Task appears in exactly one immutable `PlanTaskBinding` with
-`task_id`, `required_capability`, `assigned_role`, `order_rank`, and `priority`.
+`task_id`, `order_rank`, and `priority`.
 Membership is derived from those bindings. Duplicate bindings, missing Tasks,
 cross-Objective Tasks, non-member dependency endpoints, self-edges, duplicate
 edges, and direct or indirect cycles fail closed.
 
-| Task kind | Required capability | Assigned role |
-| --- | --- | --- |
-| `DATA` | `DATA_ANALYSIS`, `DATA_PROFILING`, or `DATA_TRANSFORMATION` | `DATA_EXPLORER` |
-| `SCIENTIFIC` | `HYPOTHESIS_TESTING` | `HYPOTHESIS_ANALYST` |
-| `GRAPH` | `GRAPH_MINING` | `GRAPH_MINER` |
-| `SYNTHESIS` | `None` | `PLANNER` |
+Task kind is a semantic and epistemic class, not a provider-routing rule.
+Capability, provider, specialist, worker, model, process, tool, routing hint,
+and Planner identity are not plan content. Application authority establishes
+eligibility and allowed tools; Planner reasons over permitted specialist
+interactions. Planner may synthesize an answer from eligible state, but it is
+not a Task executor and response synthesis is not a capability or Task kind.
 
 `order_rank` is non-negative and permits ties. The DAG determines eligibility;
 rank is a preference only. Priority is exactly `LOW`, `NORMAL`, or `HIGH`,
@@ -39,11 +39,11 @@ serialization sorts bindings by rank and then Task ID, and sorts dependency
 edges by their endpoint IDs. Tie-breaking is non-semantic.
 
 The fingerprint binds contract version, Objective identity, canonical bindings
-including capability, role, rank, and priority, and canonical dependencies. It
+including Task identity, rank, and priority, and canonical dependencies. It
 excludes Task execution status and semantic payload, exact DataProfile
 identity, runtime or lifecycle policy and state, conversation, timestamps,
-executor instances, model configuration, and dataset location. Canonicalization
-is structural only.
+provider and worker identity, Planner identity, model configuration, and
+dataset location. Canonicalization is structural only.
 
 ## Role-native boundary contracts
 

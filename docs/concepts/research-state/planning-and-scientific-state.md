@@ -41,7 +41,6 @@ A `Task` is a durable semantic work unit of exactly one canonical kind:
 DATA
 SCIENTIFIC
 GRAPH
-SYNTHESIS
 ```
 
 | Kind | Reader-facing purpose |
@@ -49,27 +48,36 @@ SYNTHESIS
 | `DATA` | explore, profile, or create an authorized successor data state through Data Explorer |
 | `SCIENTIFIC` | govern one scientific investigation through Hypothesis Analyst |
 | `GRAPH` | ask a bounded read-only question about semantic research-state relationships |
-| `SYNTHESIS` | let Planner derive a GeneratedView from eligible admitted state |
 
 A Task is an independently managed deliverable. A short planning consultation
 with Data Explorer or Graph Miner is not automatically a Task; it becomes one
 only when the plan needs a governed work unit with its own identity and
-lifecycle.
+lifecycle. A direct question that needs no project work, or that can already be
+answered from retained authoritative state, does not become a Task. Planner
+response synthesis is Planner behavior, not executable Task work.
 
 `PlanRevision` is the non-FCO version of an entire proposed or approved Task
 DAG. Exactly one immutable `PlanTaskBinding` represents each member Task and
-owns required capability, assigned specialist or control role, non-negative
-`order_rank`, and finite `LOW`, `NORMAL`, or `HIGH` priority. Membership is
-derived from binding Task identities, while dependencies remain explicit
-edges. Those coordination concerns do not define Task identity.
+owns non-negative `order_rank` and finite `LOW`, `NORMAL`, or `HIGH` priority.
+Membership is derived from binding Task identities, while dependencies remain
+explicit edges. Those coordination concerns do not define Task identity.
 
 The dependency DAG determines eligibility. `order_rank` expresses preference
 among otherwise compatible work, permits ties, and never overrides a
 dependency. Priority defaults to `NORMAL` and is scheduling metadata only; it
-does not establish epistemic importance, authority, or Task meaning. Required
-capability, assigned role, rank, priority, dependencies, parentage,
+does not establish epistemic importance, authority, or Task meaning. Execution
+route, rank, priority, dependencies, parentage,
 PlanRevision identity, approval, and activation are absent from Task semantic
 identity.
+
+Capability is execution-internal runtime plumbing, not approved plan content.
+PlanRevision contains no provider, specialist, worker, tool, or routing hint.
+Application authority determines eligibility and the governed action space;
+Planner reasons about specialist interactions within that allowed space.
+Provider or worker changes therefore do not change plan content or its
+fingerprint. Planner coordinates but is not a Task executor.
+There is no Planner or synthesis capability, provider, role, or compatibility
+branch.
 
 PlanRevision and its bindings contain no exact DataProfile identity or concrete
 data selection. Planner describes intended data scope only in the Task
@@ -99,8 +107,13 @@ coordination. It does not author the scientific Hypothesis, InvestigationPlan,
 InvestigationProtocol, Evidence obligations, decision rule, or protected final
 evaluation.
 
-Planner proposals cross application-authority validation and admission before
-durable transition. See [Scientific authority](../scientific-lifecycle/scientific-authority.md)
+The Planner constructs transient canonical Objective, Task, and PlanRevision
+objects and presents those exact pending objects to the Human. Domain
+construction performs structural validation, but there is no mandatory
+application preflight or admission stage before review. Human approval
+authorizes only those exact objects; application authority performs
+commit-boundary validation before atomically persisting, adopting, and
+activating them. See [Scientific authority](../scientific-lifecycle/scientific-authority.md)
 for the complete authority split.
 
 ## Eligibility for scientific investigation
@@ -135,9 +148,13 @@ Evidence loops, typed non-completion, and authoritative admission are owned by
 ## Implementation status
 
 **Partially implemented.** The active Task semantic core is Objective-scoped
-and uses the canonical four-kind taxonomy, while the immutable in-memory
-PlanRevision V1 domain contract implements binding membership, routing
-compatibility, DAG validation, and structural fingerprinting. Planner authoring,
-persistence/admission, approval/activation, replanning, canonical scientific
-execution, and the complete lifecycle linked above remain a **Design target**;
-only bounded `DATA` execution is supported.
+and uses the canonical three-kind taxonomy. The immutable PlanRevision V1
+domain and side-effect-free application validator are **Implemented** with
+binding membership, DAG validation, structural fingerprinting, and persisted
+Objective/Task checks. The append-only
+repository foundation is **Verified on SQLite**, but has no application caller
+for PlanRevision. Planner authoring, human approval, exact
+revalidation, persistence at the approval boundary, activation, active
+selection, replanning, canonical scientific execution, and the complete
+lifecycle linked above remain **Deferred**; only bounded `DATA` execution is
+supported, and PlanRevision state does not drive it.

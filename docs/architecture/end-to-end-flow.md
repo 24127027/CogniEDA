@@ -56,23 +56,25 @@ observation is not automatically Evidence.
 
 ## Plan proposal, approval, and activation
 
-1. The Planner drafts a complete PlanRevision with canonical Tasks, exactly one
-   immutable binding per member Task, and explicit dependency edges. Each
-   binding owns required capability, assigned role, non-negative `order_rank`,
-   and `LOW`, `NORMAL`, or `HIGH` priority. The revision contains no exact
-   DataProfile identity and no configurable stopping-condition or
-   replan-trigger policy.
-2. Application authority validates the proposal and assigns or verifies exact
-   proposal identity without activation.
-3. The Planner presents the same version through `ALWAYS_ASK`,
-   `POLICY_GUARDED`, or `ALWAYS_ACCEPT` policy. Policy-guarded is the default,
-   and initial plan approval is required unless explicit policy says otherwise.
-4. Approval authorizes only the exact proposal version.
-5. Application authority atomically activates the PlanRevision and eligible
-   Task state.
+1. The Planner constructs transient canonical Objective, Task, and PlanRevision
+   objects, with exactly one immutable binding per member Task and explicit
+   dependency edges. Each binding owns non-negative `order_rank` and `LOW`,
+   `NORMAL`, or `HIGH` priority. The revision contains no capability, provider,
+   specialist, tool, exact DataProfile identity, or configurable stopping-
+   condition or replan-trigger policy.
+2. Domain construction enforces structural validity without making the pending
+   objects authoritative or durable.
+3. The Planner presents those exact pending canonical objects to the Human.
+4. Human approval authorizes only those exact objects.
+5. Application authority performs commit-boundary validation and atomically
+   persists, adopts, and activates the exact approved objects.
 
-A rejection or requested revision returns to the Planner. A hold preserves the
-pending proposal and its exact identity without execution.
+There is no mandatory separate application preflight or admission stage before
+Human review.
+
+A rejection, hold, or requested revision returns to the Planner without
+creating authoritative PlanRevision state. Any separately retained draft or
+interaction provenance is not the approved PlanRevision.
 
 Plan completion, interruption, and replanning are workflow-lifecycle concerns.
 An actual cause that later requires reconsideration is recorded by that
@@ -81,33 +83,37 @@ Planner-authored trigger policy inside the PlanRevision. Scientific stopping
 remains `InvestigationProtocol`-owned, and bounded execution stopping remains
 owned by the applicable role-native work order such as `DataWorkOrder`.
 
-## Routing overview
+## Governed execution overview
 
 ```mermaid
 flowchart TD
-    A[Activated Task] --> K{Task kind}
-    K -->|DATA| D[Data Explorer<br/>Direct DataTask]
-    K -->|SCIENTIFIC| H[Hypothesis Analyst<br/>Scientific investigation]
-    K -->|GRAPH| G[Graph Miner<br/>Read-only inquiry]
-    K -->|SYNTHESIS| S[Planner-coordinated<br/>GeneratedView]
-    D --> O[Normalized PlannerWorkOutcome]
-    G --> O
-    S --> O
+    A[Eligible approved Task] --> P[Planner reasoning over current goal]
+    P --> D[Governed Data Explorer interaction]
+    P --> H[Governed Hypothesis Analyst interaction]
+    P --> G[Governed Graph Miner interaction]
+    D --> N[Validated role-native result]
+    G --> N
+    N --> P
     H --> ER[EvidenceRequest]
     ER --> D2[Data Explorer<br/>Scientific observation]
     D2 --> EA[Evidence admission]
     EA --> H
     H --> Q{Protected evaluation}
-    Q -->|typed non-completion| O
+    Q -->|typed non-completion| P
     Q -->|DiscoveryProposal| GV[Governance]
     GV -->|approved exact proposal| DA[Discovery admission]
-    DA --> O
+    DA --> P
+    P --> O[Final response or blocker]
 ```
 
-Before any route executes, the dispatcher verifies the required capability and
-plan binding. Capability absence returns a typed unavailable or blocked outcome
-and preserves Task meaning. There is no legacy fallback or semantic-guess
-route.
+Application authority determines Task eligibility and which governed
+specialist tools are available. The Planner receives the eligible Task as a
+goal and reasons over zero, one, or multiple allowed specialist interactions;
+Task kind may constrain authority but is not a compile-time route. Execution
+internals may retain capability-based provider resolution behind a role-level
+tool boundary, but capability and provider selection are not PlanRevision
+content. Planner response synthesis is not a Task kind, capability, provider,
+or dispatch path.
 
 The dependency DAG determines eligibility; binding `order_rank` only expresses
 a scheduling preference and may tie, while priority is coordination metadata.
@@ -171,7 +177,7 @@ manufacturing a Discovery.
 Graph Miner cannot mutate the graph or admit a cross-Objective relation. The
 path does not require a Hypothesis and cannot create Evidence or Discovery.
 
-## SYNTHESIS path
+## Planner response synthesis
 
 1. The Planner requests a purpose-specific, validity-aware projection of
    admitted state and normalized outcomes.
@@ -183,8 +189,8 @@ path does not require a Hypothesis and cannot create Evidence or Discovery.
    remains derived and non-authoritative.
 5. The Planner presents the view to the human.
 
-SYNTHESIS does not force inputs into a scientific investigation and does not
-turn a summary into a Discovery.
+Planner response synthesis does not create a Task, force inputs into a
+scientific investigation, or turn a summary into a Discovery.
 
 ## Capability blocked or unavailable
 

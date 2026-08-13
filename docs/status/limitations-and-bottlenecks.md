@@ -7,10 +7,13 @@ These are verified constraints of the bounded current implementation.
 
 - The active typed research-state foundation is transitional and does not
   implement the minimum complete scientific loop defined by MVP-v2.
-- Active bounded Task has no PlanRevision membership, dependencies, assignment,
-  ordering, approval, or parent/leaf semantics. Its four canonical kinds are
-  represented, but only `DATA` is executable; the remaining coordination and
-  execution contracts are **Deferred** rather than represented by legacy fields.
+- Active bounded Task has no runtime-selected PlanRevision membership,
+  dependency eligibility, approval, activation, or parent/leaf execution
+  semantics. Immutable PlanRevision candidates can represent membership,
+  dependencies, rank, and priority and can be validated without persistence.
+  The append-only repository is an isolated
+  infrastructure foundation; only `DATA` is executable and no PlanRevision
+  drives execution.
 - The current materialized SessionFrame can hold one Objective and one
   DataProfile but is not the canonical reference-based session-membership FCO
   and does not implement Objective-bound multi-session isolation.
@@ -25,9 +28,12 @@ These are verified constraints of the bounded current implementation.
   at bounded library surfaces. The in-process Application retains its current
   successor SessionFrame and model-backed conversation turns, but durable
   restart/recovery and complete-loop composition are **Deferred**.
-- PlanRevision V1 domain validation is **Implemented**, but Planner authoring,
-  persistence/admission, approval/activation, and Task DAG runtime are
-  **Deferred**. `ScientificInvestigationRun`, `InvestigationPlan`,
+- PlanRevision V1 domain and side-effect-free candidate validation are
+  **Implemented**, and append-only repository behavior is **Verified on
+  SQLite**. No application path currently persists a PlanRevision. Planner
+  authoring, human approval, commit-boundary validation and persistence,
+  activation, active selection, and Task DAG runtime are **Deferred**.
+  `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
   and `GovernanceDecision` have no supported implementation.

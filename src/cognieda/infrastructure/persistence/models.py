@@ -18,6 +18,7 @@ from cognieda.schemas.enums import (
     PlannerNodeName,
     PlannerOperationApprovalState,
     PlannerOperationType,
+    PlanPriority,
     TaskKind,
     TaskStatus,
     UserDecisionStatus,
@@ -132,6 +133,48 @@ class TaskRecord(SQLModel, table=True):
     kind: TaskKind = Field(nullable=False, index=True)
     instruction: str = Field(sa_column=Column(Text, nullable=False))
     status: TaskStatus = Field(default=TaskStatus.PENDING, nullable=False, index=True)
+
+
+class PlanRevisionRecord(SQLModel, table=True):
+    """Immutable header for one exact authoritative PlanRevision snapshot."""
+
+    __tablename__ = "plan_revisions"
+
+    plan_revision_id: UUID = Field(primary_key=True)
+    objective_id: UUID = Field(
+        foreign_key="objectives.objective_id",
+        nullable=False,
+        index=True,
+    )
+    contract_version: str = Field(nullable=False)
+    fingerprint: str = Field(nullable=False, index=True)
+
+
+class PlanTaskBindingRecord(SQLModel, table=True):
+    """One immutable Task binding belonging to one PlanRevision."""
+
+    __tablename__ = "plan_task_bindings"
+
+    plan_revision_id: UUID = Field(
+        foreign_key="plan_revisions.plan_revision_id",
+        primary_key=True,
+    )
+    task_id: UUID = Field(foreign_key="tasks.task_id", primary_key=True)
+    order_rank: int = Field(ge=0, nullable=False)
+    priority: PlanPriority = Field(nullable=False)
+
+
+class PlanDependencyRecord(SQLModel, table=True):
+    """One immutable prerequisite edge belonging to one PlanRevision."""
+
+    __tablename__ = "plan_dependencies"
+
+    plan_revision_id: UUID = Field(
+        foreign_key="plan_revisions.plan_revision_id",
+        primary_key=True,
+    )
+    prerequisite_task_id: UUID = Field(foreign_key="tasks.task_id", primary_key=True)
+    dependent_task_id: UUID = Field(foreign_key="tasks.task_id", primary_key=True)
 
 
 class HypothesisRecord(TimestampedRecord, table=True):

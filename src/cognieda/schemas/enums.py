@@ -177,26 +177,6 @@ class TaskKind(StrEnum):
     DATA = "data"
     SCIENTIFIC = "scientific"
     GRAPH = "graph"
-    SYNTHESIS = "synthesis"
-
-
-class Capability(StrEnum):
-    """Finite dispatcher capabilities reusable by plan bindings."""
-
-    DATA_ANALYSIS = "data_analysis"
-    DATA_PROFILING = "data_profiling"
-    DATA_TRANSFORMATION = "data_transformation"
-    GRAPH_MINING = "graph_mining"
-    HYPOTHESIS_TESTING = "hypothesis_testing"
-
-
-class PlanTaskRole(StrEnum):
-    """Specialist or control role assigned by one PlanTaskBinding."""
-
-    DATA_EXPLORER = "data_explorer"
-    HYPOTHESIS_ANALYST = "hypothesis_analyst"
-    GRAPH_MINER = "graph_miner"
-    PLANNER = "planner"
 
 
 class PlanPriority(StrEnum):
