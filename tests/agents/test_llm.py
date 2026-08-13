@@ -7,9 +7,12 @@ from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.graph_miner import GraphMiner
 from cognieda.agents.hypothesis_analyst import HypothesisAnalyst
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.tools import invoke_data_capability
 from cognieda.application.ports import ModelConfig
 from cognieda.infrastructure.llm import factory as llm_factory
+
+
+def _builtin_tool() -> str:
+    return "tool result"
 
 
 @pytest.mark.parametrize(
@@ -40,7 +43,7 @@ def test_create_agent_selects_canonical_provider_and_forwards_builtin_tools(
     monkeypatch.setattr(llm_factory, model_attribute, model_factory)
     monkeypatch.setattr(llm_factory, "Agent", agent_factory)
 
-    builtin_tools = (invoke_data_capability,)
+    builtin_tools = (_builtin_tool,)
     deps_type = object
 
     result = llm_factory.AgentFactory(tooling).create_agent(
