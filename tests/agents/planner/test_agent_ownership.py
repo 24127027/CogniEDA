@@ -13,15 +13,16 @@ from pydantic_ai.messages import (
 )
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.dependencies import PlannerDeps
-from cognieda.agents.planner.types import (
-    PlannerAction,
+from cognieda.agents.planner.contracts import (
+    AnswerFromContextDecision,
     PlannerDecision,
     PlannerResponseDraft,
+    StateSummaryDecision,
 )
+from cognieda.agents.planner.graph import build_graph
 from cognieda.application.ports import ModelConfig
 from cognieda.runtime.conversation import ConversationHistory
-from cognieda.runtime.planner_context import build_planning_context
+from cognieda.runtime.planner_context import build_planner_context
 from cognieda.schemas.artifacts import DataProfile, Evidence, Objective, SessionFrame, Task
 from cognieda.schemas.common import EvidenceProvenance
 from cognieda.schemas.enums import TaskKind, TaskStatus
@@ -41,8 +42,8 @@ class RecordingAgent:
         self,
         decision: PlannerDecision,
         response: PlannerResponseDraft,
-        decision_messages: tuple[ModelMessage, ...],
-        response_messages: tuple[ModelMessage, ...],
+        decision_messages: tuple[ModelMessage, ...] = (),
+        response_messages: tuple[ModelMessage, ...] = (),
     ) -> None:
         self._decision = decision
         self._response = response
@@ -60,19 +61,6 @@ class RecordingAgent:
 
 
 class RecordingFactory:
-    def __init__(self, agent: RecordingAgent) -> None:
-        self.agent = agent
-        self.calls: list[dict[str, object]] = []
-
-    def create_agent(self, **kwargs: object) -> RecordingAgent:
-        self.calls.append(kwargs)
-        return self.agent
-
-    def reload_tooling(self) -> None:
-        pass
-
-
-class SequenceFactory:
     def __init__(self, *agents: RecordingAgent) -> None:
         self._agents = iter(agents)
         self.calls: list[dict[str, object]] = []
@@ -85,23 +73,6 @@ class SequenceFactory:
         pass
 
 
-class ToolingAwareFactory:
-    def __init__(self, initial: RecordingAgent, reloaded: RecordingAgent) -> None:
-        self._current = initial
-        self._reloaded = reloaded
-
-    def create_agent(self, **_: object) -> RecordingAgent:
-        return self._current
-
-    def reload_tooling(self) -> None:
-        self._current = self._reloaded
-
-
-class NeverDispatcher:
-    async def dispatch(self, request: object) -> None:
-        raise AssertionError(f"Unexpected dispatch: {request}")
-
-
 def _messages(request: str, response: str) -> tuple[ModelMessage, ...]:
     return (
         ModelRequest(parts=[UserPromptPart(content=request)]),
@@ -109,13 +80,8 @@ def _messages(request: str, response: str) -> tuple[ModelMessage, ...]:
     )
 
 
-def _recording_agent(label: str) -> RecordingAgent:
-    return RecordingAgent(
-        PlannerDecision(action=PlannerAction.STATE_SUMMARY),
-        PlannerResponseDraft(text=label),
-        (),
-        (),
-    )
+def _agent(label: str = "unused") -> RecordingAgent:
+    return RecordingAgent(StateSummaryDecision(), PlannerResponseDraft(text=label))
 
 
 def _evidence_frame() -> SessionFrame:
@@ -148,17 +114,10 @@ def _evidence_frame() -> SessionFrame:
 
 def test_planner_constructs_and_owns_agent_from_factory() -> None:
     config = ModelConfig(provider="openai", model_name="test", api_key="test-key")
-    agent = RecordingAgent(
-        PlannerDecision(action=PlannerAction.STATE_SUMMARY),
-        PlannerResponseDraft(text="unused"),
-        (),
-        (),
-    )
+    agent = _agent()
     factory = RecordingFactory(agent)
-    deps = PlannerDeps(dispatcher=NeverDispatcher())  # type: ignore[arg-type]
 
     planner = Planner(
-        deps=deps,
         agent_factory=factory,  # type: ignore[arg-type]
         model_config=config,
     )
@@ -168,33 +127,54 @@ def test_planner_constructs_and_owns_agent_from_factory() -> None:
         {
             "worker": "planner",
             "config": config,
-            "deps_type": PlannerDeps,
+            "deps_type": type(None),
             "builtin_tools": (),
         }
     ]
     assert "planner_model" not in inspect.signature(Planner).parameters
+    assert "deps" not in inspect.signature(Planner).parameters
 
 
-def test_graph_nodes_invoke_same_planner_agent_and_preserve_native_messages() -> None:
+def test_langgraph_has_only_current_routing_free_lifecycle_nodes() -> None:
+    graph = build_graph().get_graph()
+
+    assert set(graph.nodes) == {
+        "__start__",
+        "understand_request",
+        "prepare_results",
+        "compose_response",
+        "__end__",
+    }
+    assert {(edge.source, edge.target) for edge in graph.edges} == {
+        ("__start__", "understand_request"),
+        ("understand_request", "prepare_results"),
+        ("prepare_results", "compose_response"),
+        ("compose_response", "__end__"),
+    }
+
+
+def test_graph_nodes_use_same_agent_and_keep_new_messages_as_delta() -> None:
     prior_messages = _messages("Earlier request", "Earlier response")
     decision_messages = _messages("Current request", "Typed decision")
-    response_messages = _messages("Evidence input", "Grounded response")
+    response_messages = _messages("Answer context", "Grounded response")
     agent = RecordingAgent(
-        PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE),
+        AnswerFromContextDecision(),
         PlannerResponseDraft(text="The admitted Evidence reports 42 rows."),
         decision_messages,
         response_messages,
     )
     planner = Planner(
-        deps=PlannerDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
         agent_factory=RecordingFactory(agent),  # type: ignore[arg-type]
-        model_config=ModelConfig(provider="openai", model_name="test", api_key="test-key"),
+        model_config=ModelConfig(provider="openai", model_name="test", api_key="key"),
     )
     history = ConversationHistory().add_turn(prior_messages)
-    context = build_planning_context(_evidence_frame(), history)
 
     output = asyncio.run(
-        planner.run("How many rows are present?", planning_context=context)
+        planner.run(
+            "How many rows are present?",
+            planner_context=build_planner_context(_evidence_frame()),
+            conversation_history=history,
+        )
     )
 
     assert output.response == "The admitted Evidence reports 42 rows."
@@ -204,17 +184,15 @@ def test_graph_nodes_invoke_same_planner_agent_and_preserve_native_messages() ->
         PlannerResponseDraft,
     ]
     assert agent.calls[0]["message_history"] == list(prior_messages)
-    assert agent.calls[0]["deps"] is planner.deps
-    assert agent.calls[1]["deps"] is planner.deps
-    assert agent.calls[0]["instructions"] == planner._decide_instructions
-    assert agent.calls[1]["instructions"] == planner._answer_instructions
+    assert "message_history" not in agent.calls[1]
+    assert "deps" not in agent.calls[0]
+    assert "deps" not in agent.calls[1]
 
 
 def test_instruction_reload_updates_layers_without_recreating_agent() -> None:
-    agent = _recording_agent("current")
+    agent = _agent()
     factory = RecordingFactory(agent)
     planner = Planner(
-        deps=PlannerDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
         agent_factory=factory,  # type: ignore[arg-type]
         model_config=ModelConfig(provider="openai", model_name="initial", api_key="key"),
     )
@@ -223,50 +201,24 @@ def test_instruction_reload_updates_layers_without_recreating_agent() -> None:
 
     assert planner._agent is agent
     assert len(factory.calls) == 1
-    assert planner._workspace_instruction == "workspace-specific guidance"
     assert planner._decide_instructions[1] == "workspace-specific guidance"
     assert planner._answer_instructions[1] == "workspace-specific guidance"
-    assert "Classify the latest request" in planner._decide_instructions[-1]
-    assert "Answer the latest request" in planner._answer_instructions[-1]
+    assert "Classify the current request" in planner._decide_instructions[-1]
+    assert "Answer the current request" in planner._answer_instructions[-1]
 
 
-def test_explicit_recreation_and_model_change_replace_agent_with_current_config() -> None:
-    first = _recording_agent("first")
-    second = _recording_agent("second")
-    third = _recording_agent("third")
-    factory = SequenceFactory(first, second, third)
-    initial_config = ModelConfig(
-        provider="openai", model_name="initial", api_key="initial-key"
-    )
-    updated_config = ModelConfig(
-        provider="google", model_name="updated", api_key="updated-key"
-    )
+def test_recreation_uses_current_model_configuration() -> None:
+    first, second, third = _agent("first"), _agent("second"), _agent("third")
+    factory = RecordingFactory(first, second, third)
+    initial = ModelConfig(provider="openai", model_name="initial", api_key="key")
+    updated = ModelConfig(provider="google", model_name="updated", api_key="key")
     planner = Planner(
-        deps=PlannerDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
         agent_factory=factory,  # type: ignore[arg-type]
-        model_config=initial_config,
+        model_config=initial,
     )
 
     asyncio.run(planner.reload(recreate_agent=True))
     assert planner._agent is second
-    assert factory.calls[-1]["config"] == initial_config
-
-    asyncio.run(planner.reload(model_config=updated_config))
+    asyncio.run(planner.reload(model_config=updated))
     assert planner._agent is third
-    assert factory.calls[-1]["config"] == updated_config
-
-
-def test_recreation_uses_agent_factory_current_tooling_state() -> None:
-    initial = _recording_agent("initial tooling")
-    reloaded = _recording_agent("reloaded tooling")
-    factory = ToolingAwareFactory(initial, reloaded)
-    planner = Planner(
-        deps=PlannerDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
-        agent_factory=factory,  # type: ignore[arg-type]
-        model_config=ModelConfig(provider="openai", model_name="test", api_key="key"),
-    )
-
-    factory.reload_tooling()
-    asyncio.run(planner.reload(recreate_agent=True))
-
-    assert planner._agent is reloaded
+    assert factory.calls[-1]["config"] == updated

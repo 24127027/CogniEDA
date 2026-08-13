@@ -3,30 +3,29 @@ from __future__ import annotations
 from typing import cast
 
 from langgraph.runtime import Runtime
+from pydantic import TypeAdapter
 from pydantic_ai import Agent
 
-from cognieda.execution import (
-    Capability,
-    ExecutionRequest,
-    ExecutionStatus,
-    ExecutorInput,
-    normalize_for_planner,
-)
-from cognieda.schemas.artifacts import Assumption, Objective, Task
-from cognieda.schemas.enums import TaskKind, TaskStatus
+from cognieda.schemas.artifacts import Objective
+from cognieda.schemas.enums import AssumptionTestability
 
 from .context import Context
-from .dependencies import PlannerDeps
-from .types import (
-    PlannerAction,
-    PlannerAnswerInput,
+from .contracts import (
+    AnswerFromContextDecision,
+    AssumptionAssessment,
+    AssumptionAssessmentDecision,
+    PlannerAnswerContext,
     PlannerControlledError,
     PlannerDecision,
-    PlannerDecisionInput,
     PlannerErrorCode,
     PlannerResponseDraft,
-    State,
+    SetOrRefineObjectiveDecision,
+    StateSummaryDecision,
+    UnsupportedDecision,
 )
+from .state import PlannerState
+
+_DECISION_ADAPTER = TypeAdapter(PlannerDecision)
 
 
 def _error(code: PlannerErrorCode, message: str) -> PlannerControlledError:
@@ -34,9 +33,9 @@ def _error(code: PlannerErrorCode, message: str) -> PlannerControlledError:
 
 
 def _explicit_decision(
-    query: str,
+    request: str,
 ) -> tuple[PlannerDecision | None, PlannerControlledError | None] | None:
-    stripped = query.strip()
+    stripped = request.strip()
     if not stripped.startswith("/"):
         return None
 
@@ -50,43 +49,41 @@ def _explicit_decision(
                 PlannerErrorCode.INVALID_COMMAND,
                 "The /summary command does not accept additional text.",
             )
-        return PlannerDecision(action=PlannerAction.STATE_SUMMARY), None
+        return StateSummaryDecision(), None
 
-    if command in {"/objective", "/assumption", "/answer", "/profile", "/analyze", "/transform"}:
+    if command in {
+        "/objective",
+        "/assumption",
+        "/answer",
+        "/profile",
+        "/analyze",
+        "/transform",
+    }:
         if not payload:
             return None, _error(
                 PlannerErrorCode.INVALID_COMMAND,
                 f"The {command} command requires request text.",
             )
         if command == "/objective":
-            return (
-                PlannerDecision(
-                    action=PlannerAction.SET_OR_REFINE_OBJECTIVE,
-                    objective_text=payload,
-                ),
-                None,
-            )
+            return SetOrRefineObjectiveDecision(objective=Objective(text=payload)), None
         if command == "/assumption":
             return (
-                PlannerDecision(
-                    action=PlannerAction.ADD_ASSUMPTION,
-                    assumption_text=payload,
+                AssumptionAssessmentDecision(
+                    assessment=AssumptionAssessment(
+                        source_text=payload,
+                        testability=AssumptionTestability.UNTESTABLE_IN_PROJECT,
+                    )
                 ),
                 None,
             )
         if command == "/answer":
-            return PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE), None
-
-        capability = {
-            "/profile": Capability.DATA_PROFILING,
-            "/analyze": Capability.DATA_ANALYSIS,
-            "/transform": Capability.DATA_TRANSFORMATION,
-        }[command]
+            return AnswerFromContextDecision(), None
         return (
-            PlannerDecision(
-                action=PlannerAction.CREATE_OR_RUN_DATA_TASK,
-                task_instruction=payload,
-                capability=capability,
+            UnsupportedDecision(
+                message=(
+                    f"{command} DATA work is deferred until canonical plan approval and "
+                    "semantic specialist-tool admission are implemented."
+                )
             ),
             None,
         )
@@ -100,31 +97,31 @@ def _explicit_decision(
     )
 
 
-async def understand_request(state: State, runtime: Runtime[Context]) -> State:
-    """Produce one typed intent from explicit syntax or the latest natural-language request."""
+async def understand_request(
+    state: PlannerState,
+    runtime: Runtime[Context],
+) -> PlannerState:
+    """Produce one typed intent from the current request and authorized context."""
 
-    explicit = _explicit_decision(state.query)
+    explicit = _explicit_decision(state.request)
     if explicit is not None:
         state.decision, state.error = explicit
         return state
 
     try:
-        agent = cast(Agent[PlannerDeps, object], runtime.context.agent)
-        deps = cast(PlannerDeps, runtime.context.deps)
-        model_input = PlannerDecisionInput.from_planning_context(
-            state.query,
-            runtime.context.planning_context,
+        agent = cast(Agent[None, object], runtime.context.agent)
+        prompt = (
+            f"Current Human request:\n{state.request}\n\n"
+            "Authorized Planner research context:\n"
+            f"{runtime.context.planner_context.model_dump_json()}"
         )
         result = await agent.run(
-            f"Typed input:\n{model_input.model_dump_json()}",
+            prompt,
             output_type=PlannerDecision,
-            deps=deps,
-            message_history=(
-                runtime.context.planning_context.conversation_history.model_messages()
-            ),
+            message_history=runtime.context.conversation_history.model_messages(),
             instructions=runtime.context.decide_instructions,
         )
-        state.decision = PlannerDecision.model_validate(result.output)
+        state.decision = _DECISION_ADAPTER.validate_python(result.output)
         state.new_messages = (*state.new_messages, *result.new_messages())
     except Exception as exc:
         state.error = _error(
@@ -134,136 +131,34 @@ async def understand_request(state: State, runtime: Runtime[Context]) -> State:
     return state
 
 
-async def prepare_results(state: State, runtime: Runtime[Context]) -> State:
-    """Construct explicit bounded domain results without mutating input context."""
+async def prepare_results(
+    state: PlannerState,
+    runtime: Runtime[Context],
+) -> PlannerState:
+    """Expose only application-authorized proposals and assessments."""
 
+    del runtime
     if state.error is not None or state.decision is None:
         return state
 
     decision = state.decision
-    planning_context = runtime.context.planning_context
-    try:
-        if decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE:
-            assert decision.objective_text is not None
-            current = planning_context.objective
-            if current is None or current.text != decision.objective_text:
-                state.created_objective = Objective(text=decision.objective_text)
-        elif decision.action is PlannerAction.ADD_ASSUMPTION:
-            assert decision.assumption_text is not None
-            state.created_assumption = Assumption(text=decision.assumption_text)
-        elif decision.action is PlannerAction.CREATE_OR_RUN_DATA_TASK:
-            assert decision.task_instruction is not None
-            assert decision.capability is not None
-            objective = planning_context.objective
-            if objective is None:
-                if decision.objective_text is None:
-                    state.error = _error(
-                        PlannerErrorCode.MISSING_OBJECTIVE,
-                        "Data work requires a clear active Objective before a Task can run.",
-                    )
-                    return state
-                objective = Objective(text=decision.objective_text)
-                state.created_objective = objective
-            state.created_task = Task(
-                objective_id=objective.objective_id,
-                kind=TaskKind.DATA,
-                instruction=decision.task_instruction,
-                status=TaskStatus.PENDING,
-            )
-            state.selected_capability = decision.capability
-        elif decision.action is PlannerAction.INVALID_OR_UNSUPPORTED:
-            state.error = _error(
-                PlannerErrorCode.UNSUPPORTED_ACTION,
-                decision.message or "The requested action is unsupported by the MVP Planner.",
-            )
-    except (TypeError, ValueError) as exc:
-        state.error = _error(
-            PlannerErrorCode.INVALID_SUCCESSOR_STATE,
-            f"Planner rejected an invalid typed result: {exc}",
-        )
+    if isinstance(decision, SetOrRefineObjectiveDecision):
+        state.objective_proposal = decision.objective
+    elif isinstance(decision, AssumptionAssessmentDecision):
+        state.assumption_assessment = decision.assessment
+    elif isinstance(decision, UnsupportedDecision):
+        state.error = _error(PlannerErrorCode.UNSUPPORTED_ACTION, decision.message)
     return state
 
 
-def _with_task_status(task: Task, status: TaskStatus) -> Task:
-    return Task(
-        task_id=task.task_id,
-        objective_id=task.objective_id,
-        kind=task.kind,
-        instruction=task.instruction,
-        status=status,
-    )
-
-
-async def dispatch_work(state: State, runtime: Runtime[Context]) -> State:
-    """Run only a tracked Task and consume its bounded PlannerWorkOutcome projection."""
-
-    if (
-        state.error is not None
-        or state.created_task is None
-        or state.selected_capability is None
-    ):
-        return state
-
-    task = state.created_task
-    task_id = task.task_id
-    try:
-        running_task = _with_task_status(task, TaskStatus.RUNNING)
-        state.created_task = running_task
-        deps = cast(PlannerDeps, runtime.context.deps)
-        result = await deps.dispatcher.dispatch(
-            ExecutionRequest(
-                capability=state.selected_capability,
-                input=ExecutorInput(task=running_task),
-                context=state.execution_context,
-            )
-        )
-        outcome = normalize_for_planner(result)
-        state.work_outcome = outcome
-        if outcome.task_id != task_id:
-            state.created_task = _with_task_status(running_task, TaskStatus.FAILED)
-            state.error = _error(
-                PlannerErrorCode.TASK_OUTCOME_MISMATCH,
-                "Executor outcome Task identity did not match the dispatched Task.",
-            )
-            return state
-
-        terminal_status = (
-            TaskStatus.COMPLETED
-            if outcome.status is ExecutionStatus.SUCCEEDED
-            else TaskStatus.FAILED
-        )
-        state.created_task = _with_task_status(running_task, terminal_status)
-    except Exception as exc:
-        state.created_task = _with_task_status(task, TaskStatus.FAILED)
-        state.error = _error(
-            PlannerErrorCode.DISPATCH_FAILED,
-            f"Planner could not complete dispatcher work: {exc}",
-        )
-    return state
-
-
-def _outcome_details(state: State) -> str:
-    if (
-        state.error is not None
-        and state.error.code is PlannerErrorCode.TASK_OUTCOME_MISMATCH
-    ):
-        return ""
-    outcome = state.work_outcome
-    if outcome is None:
-        return ""
-    details = [*outcome.blockers, *outcome.limitations]
-    if outcome.permitted_next_actions:
-        details.append(
-            "Permitted next actions: " + ", ".join(outcome.permitted_next_actions) + "."
-        )
-    return " " + " ".join(details) if details else ""
-
-
-async def compose_response(state: State, runtime: Runtime[Context]) -> State:
-    """Compose a human-facing response without upgrading non-admitted work to Evidence."""
+async def compose_response(
+    state: PlannerState,
+    runtime: Runtime[Context],
+) -> PlannerState:
+    """Present state without upgrading conversation or planning context to support."""
 
     if state.error is not None:
-        state.response = state.error.message + _outcome_details(state)
+        state.response = state.error.message
         return state
 
     decision = state.decision
@@ -275,28 +170,27 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
         state.response = state.error.message
         return state
 
-    if decision.action is PlannerAction.ANSWER_FROM_STATE:
-        planning_context = runtime.context.planning_context
-        if not planning_context.evidences:
+    planner_context = runtime.context.planner_context
+    if isinstance(decision, AnswerFromContextDecision):
+        if not planner_context.evidences and not planner_context.discoveries:
             state.error = _error(
-                PlannerErrorCode.NO_ADMITTED_EVIDENCE,
-                "No admitted Evidence is available to support an empirical answer.",
+                PlannerErrorCode.NO_AUTHORITATIVE_SUPPORT,
+                "No admitted Evidence or governed Discovery is available to support an answer.",
             )
             state.response = state.error.message
             return state
         try:
-            agent = cast(Agent[PlannerDeps, object], runtime.context.agent)
-            deps = cast(PlannerDeps, runtime.context.deps)
-            answer_input = PlannerAnswerInput(
-                latest_request=state.query,
-                objective=planning_context.objective,
-                data_profile=planning_context.data_profile,
-                evidences=planning_context.evidences,
+            agent = cast(Agent[None, object], runtime.context.agent)
+            answer_context = PlannerAnswerContext(
+                request=state.request,
+                objective=planner_context.objective,
+                data_profile=planner_context.data_profile,
+                evidences=planner_context.evidences,
+                discoveries=planner_context.discoveries,
             )
             result = await agent.run(
-                f"Typed evidence input:\n{answer_input.model_dump_json()}",
+                f"Authorized answer context:\n{answer_context.model_dump_json()}",
                 output_type=PlannerResponseDraft,
-                deps=deps,
                 instructions=runtime.context.answer_instructions,
             )
             response = PlannerResponseDraft.model_validate(result.output)
@@ -305,50 +199,40 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
         except Exception as exc:
             state.error = _error(
                 PlannerErrorCode.RESPONSE_FAILED,
-                f"Planner could not compose a typed Evidence-grounded response: {exc}",
+                f"Planner could not compose an authoritative-context response: {exc}",
             )
             state.response = state.error.message
         return state
 
-    if decision.action is PlannerAction.STATE_SUMMARY:
-        planning_context = runtime.context.planning_context
+    if isinstance(decision, StateSummaryDecision):
         objective_text = (
-            planning_context.objective.text
-            if planning_context.objective is not None
+            planner_context.objective.text
+            if planner_context.objective is not None
             else "not established"
         )
         state.response = (
             f"Active Objective: {objective_text}. "
-            f"Planning Assumptions (not Evidence): {len(planning_context.assumptions)}. "
-            f"Tasks: {len(planning_context.tasks)}. "
-            f"Admitted Evidence items: {len(planning_context.evidences)}."
+            f"Planning Assumptions (not support): {len(planner_context.assumptions)}. "
+            f"Tasks: {len(planner_context.tasks)}. "
+            f"Admitted Evidence items: {len(planner_context.evidences)}. "
+            f"Governed Discoveries: {len(planner_context.discoveries)}."
         )
-    elif decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE:
-        active_objective = state.created_objective or runtime.context.planning_context.objective
-        assert active_objective is not None
-        state.response = f"Active Objective set to: {active_objective.text}"
-    elif decision.action is PlannerAction.ADD_ASSUMPTION:
-        assert decision.assumption_text is not None
-        state.response = (
-            f"Planning Assumption recorded: {decision.assumption_text} "
-            "It is not empirical Evidence."
-        )
-    elif decision.action is PlannerAction.CREATE_OR_RUN_DATA_TASK:
-        outcome = state.work_outcome
-        if outcome is None:
-            state.response = "The bounded Task was created but no executor outcome was returned."
-        elif outcome.status is ExecutionStatus.SUCCEEDED:
+    elif isinstance(decision, SetOrRefineObjectiveDecision):
+        state.response = f"Objective proposed: {decision.objective.text}"
+    elif isinstance(decision, AssumptionAssessmentDecision):
+        if (
+            decision.assessment.testability
+            is AssumptionTestability.UNTESTABLE_IN_PROJECT
+        ):
             state.response = (
-                "The requested work completed at the executor boundary. No Evidence was "
-                "admitted, so the outcome is not an authoritative empirical finding."
-                + _outcome_details(state)
+                f"Planning Assumption accepted from exact Human text: "
+                f"{decision.assessment.source_text} It is not empirical support."
             )
         else:
             state.response = (
-                f"The requested work ended with executor status {outcome.status.value}. "
-                "No Evidence was created."
-                + _outcome_details(state)
+                "The statement is reasonably testable and was not admitted as an "
+                "Assumption."
             )
     else:
-        state.response = decision.message or "The requested action is unsupported."
+        state.response = decision.message
     return state

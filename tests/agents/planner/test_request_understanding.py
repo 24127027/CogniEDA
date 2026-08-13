@@ -4,34 +4,25 @@ import asyncio
 from dataclasses import dataclass
 
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from pydantic_ai.messages import ModelMessage
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.dependencies import PlannerDeps
-from cognieda.agents.planner.types import (
+from cognieda.agents.planner.contracts import (
+    AnswerFromContextDecision,
+    AssumptionAssessmentDecision,
     PlannerAction,
-    PlannerAnswerInput,
     PlannerDecision,
-    PlannerDecisionInput,
     PlannerErrorCode,
-    PlannerResponseDraft,
+    SetOrRefineObjectiveDecision,
+    StateSummaryDecision,
+    UnsupportedDecision,
 )
 from cognieda.application.ports import ModelConfig
-from cognieda.execution import ExecutionRequest
 from cognieda.runtime.conversation import ConversationHistory
-from cognieda.runtime.planner_context import build_planning_context
+from cognieda.runtime.planner_context import build_planner_context
 from cognieda.schemas.artifacts import Assumption, Objective, SessionFrame, Task
 from cognieda.schemas.enums import TaskKind
-
-
-class NeverDispatcher:
-    def __init__(self) -> None:
-        self.requests: list[ExecutionRequest] = []
-
-    async def dispatch(self, request: ExecutionRequest):
-        self.requests.append(request)
-        raise AssertionError("This request must not dispatch executor work.")
 
 
 @dataclass
@@ -45,22 +36,11 @@ class FakeRunResult:
 class RecordingPlannerAgent:
     def __init__(self, decision: PlannerDecision) -> None:
         self.decision = decision
-        self.decision_inputs: list[PlannerDecisionInput] = []
-        self.answer_inputs: list[PlannerAnswerInput] = []
-        self.message_histories: list[tuple[ModelMessage, ...]] = []
+        self.calls: list[dict[str, object]] = []
 
     async def run(self, prompt: str, **kwargs: object) -> FakeRunResult:
-        output_type = kwargs["output_type"]
-        payload = prompt.split("\n", 1)[1]
-        if output_type is PlannerDecision:
-            self.decision_inputs.append(PlannerDecisionInput.model_validate_json(payload))
-            history = kwargs.get("message_history", ())
-            self.message_histories.append(tuple(history))  # type: ignore[arg-type]
-            return FakeRunResult(output=self.decision)
-        if output_type is PlannerResponseDraft:
-            self.answer_inputs.append(PlannerAnswerInput.model_validate_json(payload))
-            return FakeRunResult(output=PlannerResponseDraft(text="grounded answer"))
-        raise AssertionError(f"Unexpected output type: {output_type}")
+        self.calls.append({"prompt": prompt, **kwargs})
+        return FakeRunResult(output=self.decision)
 
 
 class FakeAgentFactory:
@@ -74,19 +54,29 @@ class FakeAgentFactory:
         pass
 
 
-def _planner(agent: RecordingPlannerAgent, dispatcher: NeverDispatcher) -> Planner:
+def _planner(agent: RecordingPlannerAgent) -> Planner:
     return Planner(
-        deps=PlannerDeps(dispatcher=dispatcher),
         agent_factory=FakeAgentFactory(agent),  # type: ignore[arg-type]
         model_config=ModelConfig(provider="openai", model_name="test", api_key="test"),
     )
 
 
-def _context(frame: SessionFrame | None = None):
-    return build_planning_context(frame or SessionFrame(), ConversationHistory())
+def _run(
+    planner: Planner,
+    request: str,
+    frame: SessionFrame | None = None,
+    history: ConversationHistory | None = None,
+):
+    return asyncio.run(
+        planner.run(
+            request,
+            planner_context=build_planner_context(frame or SessionFrame()),
+            conversation_history=history or ConversationHistory(),
+        )
+    )
 
 
-def test_natural_language_understanding_receives_latest_request_and_typed_state() -> None:
+def test_understanding_uses_request_and_exact_context_without_flattening_dto() -> None:
     objective = Objective(text="Understand customer retention.")
     assumption = Assumption(text="Rows represent customers.")
     task = Task(
@@ -95,120 +85,76 @@ def test_natural_language_understanding_receives_latest_request_and_typed_state(
         instruction="Profile the active dataset.",
     )
     frame = SessionFrame(objective=objective, assumptions=(assumption,), tasks=(task,))
-    model = RecordingPlannerAgent(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
-    dispatcher = NeverDispatcher()
+    model = RecordingPlannerAgent(StateSummaryDecision())
 
-    output = asyncio.run(
-        _planner(model, dispatcher).run(
-            "Summarize the active research state.",
-            planning_context=_context(frame),
-        )
+    output = _run(_planner(model), "Summarize the active state.", frame)
+
+    assert isinstance(output.decision, StateSummaryDecision)
+    assert output.objective_proposal is None
+    assert output.assumption_assessment is None
+    prompt = str(model.calls[0]["prompt"])
+    assert "Current Human request:\nSummarize the active state." in prompt
+    assert str(objective.objective_id) in prompt
+    assert assumption.text in prompt
+    assert task.instruction in prompt
+    assert "PlannerDecisionInput" not in prompt
+
+
+def test_explicit_and_model_objective_requests_use_canonical_objective_payload() -> None:
+    natural_objective = Objective(text="Understand customer churn.")
+    natural = _run(
+        _planner(
+            RecordingPlannerAgent(
+                SetOrRefineObjectiveDecision(objective=natural_objective)
+            )
+        ),
+        "Investigate customer churn.",
+    )
+    explicit = _run(
+        _planner(RecordingPlannerAgent(StateSummaryDecision())),
+        "/objective Understand customer churn.",
     )
 
-    assert output.decision is not None
-    assert output.decision.action is PlannerAction.STATE_SUMMARY
-    assert output.created_objective is None
-    assert output.created_assumption is None
-    assert output.created_task is None
-    assert len(model.decision_inputs) == 1
-    model_input = model.decision_inputs[0]
-    assert model_input.latest_request == "Summarize the active research state."
-    assert model_input.objective == objective
-    assert model_input.assumptions == (assumption,)
-    assert model_input.tasks == (task,)
-    assert dispatcher.requests == []
+    assert natural.objective_proposal is natural_objective
+    assert explicit.objective_proposal is not None
+    assert explicit.objective_proposal.text == natural_objective.text
 
 
-def test_explicit_and_natural_language_objective_requests_reach_same_typed_action() -> None:
-    natural_model = RecordingPlannerAgent(
-        PlannerDecision(
-            action=PlannerAction.SET_OR_REFINE_OBJECTIVE,
-            objective_text="Understand customer churn.",
-        )
-    )
-    explicit_model = RecordingPlannerAgent(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
-    dispatcher = NeverDispatcher()
+@pytest.mark.parametrize("command", ["/profile data", "/analyze data", "/transform data"])
+def test_legacy_data_commands_fail_controlled_without_routing(command: str) -> None:
+    model = RecordingPlannerAgent(StateSummaryDecision())
 
-    natural = asyncio.run(
-        _planner(natural_model, dispatcher).run(
-            "Investigate customer churn.",
-            planning_context=_context(),
-        )
-    )
-    explicit = asyncio.run(
-        _planner(explicit_model, dispatcher).run(
-            "/objective Understand customer churn.",
-            planning_context=_context(),
-        )
-    )
+    output = _run(_planner(model), command)
 
-    assert natural.decision is not None
-    assert explicit.decision is not None
-    assert natural.decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE
-    assert explicit.decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE
-    assert natural.created_objective is not None
-    assert explicit.created_objective is not None
-    assert natural.created_objective.text == explicit.created_objective.text
-    assert explicit_model.decision_inputs == []
+    assert isinstance(output.decision, UnsupportedDecision)
+    assert output.error is not None
+    assert output.error.code is PlannerErrorCode.UNSUPPORTED_ACTION
+    assert model.calls == []
 
 
-def test_objective_semantic_refinement_allocates_new_identity_without_mutation() -> None:
-    original = Objective(text="Understand churn.")
-    frame = SessionFrame(objective=original)
-    model = RecordingPlannerAgent(
-        PlannerDecision(
-            action=PlannerAction.SET_OR_REFINE_OBJECTIVE,
-            objective_text="Understand churn drivers.",
-        )
-    )
+def test_unknown_explicit_command_fails_without_model_fallback() -> None:
+    model = RecordingPlannerAgent(StateSummaryDecision())
 
-    output = asyncio.run(
-        _planner(model, NeverDispatcher()).run(
-            "Refine the objective to focus on drivers.",
-            planning_context=_context(frame),
-        )
-    )
-
-    assert output.created_objective is not None
-    assert output.created_objective.objective_id != original.objective_id
-    assert output.created_objective.text == "Understand churn drivers."
-    assert original.text == "Understand churn."
-
-
-def test_unknown_explicit_command_fails_without_model_fallback_or_state_change() -> None:
-    frame = SessionFrame(objective=Objective(text="Keep this Objective."))
-    model = RecordingPlannerAgent(PlannerDecision(action=PlannerAction.STATE_SUMMARY))
-    dispatcher = NeverDispatcher()
-
-    output = asyncio.run(
-        _planner(model, dispatcher).run(
-            "/unknown remove everything",
-            planning_context=_context(frame),
-        )
-    )
+    output = _run(_planner(model), "/unknown remove everything")
 
     assert output.error is not None
     assert output.error.code is PlannerErrorCode.INVALID_COMMAND
-    assert output.created_objective is None
-    assert output.created_assumption is None
-    assert output.created_task is None
-    assert model.decision_inputs == []
-    assert dispatcher.requests == []
+    assert output.objective_proposal is None
+    assert output.assumption_assessment is None
+    assert model.calls == []
 
 
-def test_planner_decision_rejects_untyped_or_mixed_core_changes() -> None:
+def test_action_variants_expose_only_their_own_fields() -> None:
+    assert set(AnswerFromContextDecision.model_fields) == {"action"}
+    assert set(StateSummaryDecision.model_fields) == {"action"}
+    assert set(SetOrRefineObjectiveDecision.model_fields) == {"action", "objective"}
+    assert set(AssumptionAssessmentDecision.model_fields) == {"action", "assessment"}
+    assert set(UnsupportedDecision.model_fields) == {"action", "message"}
+
     with pytest.raises(ValidationError):
-        PlannerDecision.model_validate(
+        TypeAdapter(PlannerDecision).validate_python(
             {
-                "action": PlannerAction.CREATE_OR_RUN_DATA_TASK,
-                "task_instruction": "Profile the dataset.",
-                "capability": "not_a_capability",
+                "action": PlannerAction.STATE_SUMMARY,
+                "message": "unrelated payload",
             }
-        )
-
-    with pytest.raises(ValidationError):
-        PlannerDecision(
-            action=PlannerAction.ADD_ASSUMPTION,
-            assumption_text="Rows are customers.",
-            task_instruction="Profile the dataset.",
         )

@@ -16,17 +16,17 @@ from pydantic_ai.messages import (
 )
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.dependencies import PlannerDeps
-from cognieda.agents.planner.types import (
-    PlannerAction,
+from cognieda.agents.planner.contracts import (
     PlannerDecision,
-    PlannerDecisionInput,
+    SetOrRefineObjectiveDecision,
+    StateSummaryDecision,
 )
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
-from cognieda.execution import ExecutionRequest, ExecutorDispatcher
+from cognieda.execution import ExecutorDispatcher
 from cognieda.runtime.application import Application
 from cognieda.runtime.conversation import ConversationHistory, ConversationTurn
 from cognieda.runtime.workspace import Workspace
+from cognieda.schemas.artifacts import Objective
 
 
 def _messages(request: str, response: str) -> tuple[ModelMessage, ...]:
@@ -34,11 +34,6 @@ def _messages(request: str, response: str) -> tuple[ModelMessage, ...]:
         ModelRequest(parts=[UserPromptPart(content=request)]),
         ModelResponse(parts=[TextPart(content=response)]),
     )
-
-
-class NeverDispatcher:
-    async def dispatch(self, request: ExecutionRequest):
-        raise AssertionError(f"Unexpected dispatch: {request}")
 
 
 @dataclass
@@ -57,12 +52,12 @@ class SequencePlannerAgent:
 
     async def run(self, prompt: str, **kwargs: object) -> FakeRunResult:
         assert kwargs["output_type"] is PlannerDecision
-        model_input = PlannerDecisionInput.model_validate_json(prompt.split("\n", 1)[1])
+        request = prompt.split("\n", 1)[1].split("\n\n", 1)[0]
         history = kwargs.get("message_history", ())
         self.message_histories.append(tuple(history))  # type: ignore[arg-type]
         return FakeRunResult(
             output=next(self._decisions),
-            messages=_messages(model_input.latest_request, "typed decision"),
+            messages=_messages(request, "typed decision"),
         )
 
 
@@ -94,22 +89,19 @@ def test_conversation_history_appends_complete_native_message_turns() -> None:
 
 def test_application_retains_original_history_alongside_current_session_frame() -> None:
     model = SequencePlannerAgent(
-        PlannerDecision(
-            action=PlannerAction.SET_OR_REFINE_OBJECTIVE,
-            objective_text="Understand customer churn.",
+        SetOrRefineObjectiveDecision(
+            objective=Objective(text="Understand customer churn."),
         ),
-        PlannerDecision(action=PlannerAction.STATE_SUMMARY),
+        StateSummaryDecision(),
     )
-    dispatcher = NeverDispatcher()
     planner = Planner(
-        deps=PlannerDeps(dispatcher=dispatcher),
         agent_factory=FakeAgentFactory(model),  # type: ignore[arg-type]
         model_config=ModelConfig(provider="openai", model_name="test", api_key="test"),
     )
     application = Application(
         workspace=cast(Workspace, object()),
         planner_agent=planner,
-        dispatcher=cast(ExecutorDispatcher, dispatcher),
+        dispatcher=cast(ExecutorDispatcher, object()),
         agent_factory=cast(AgentFactoryPort, object()),
     )
 

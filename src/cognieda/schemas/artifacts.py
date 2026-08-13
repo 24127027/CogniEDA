@@ -231,6 +231,7 @@ class SessionFrame(ImmutableCogniEDABaseModel):
     assumptions: tuple[Assumption, ...] = ()
     tasks: tuple[Task, ...] = ()
     evidences: tuple[Evidence, ...] = ()
+    discoveries: tuple[Discovery, ...] = ()
     data_profile: DataProfile | None = None
 
     @model_validator(mode="after")
@@ -250,6 +251,10 @@ class SessionFrame(ImmutableCogniEDABaseModel):
         self._reject_duplicate_ids(
             [evidence.evidence_id for evidence in self.evidences],
             object_name="Evidence",
+        )
+        self._reject_duplicate_ids(
+            [discovery.discovery_id for discovery in self.discoveries],
+            object_name="Discovery",
         )
 
         tasks_by_id = {task.task_id: task for task in self.tasks}
@@ -275,6 +280,7 @@ class SessionFrame(ImmutableCogniEDABaseModel):
             "assumptions": self.assumptions,
             "tasks": self.tasks,
             "evidences": self.evidences,
+            "discoveries": self.discoveries,
             "data_profile": self.data_profile,
         }
         values.update(updates)
@@ -314,6 +320,9 @@ class SessionFrame(ImmutableCogniEDABaseModel):
 
     def add_evidence(self, evidence: Evidence) -> SessionFrame:
         return self._validated_copy(evidences=(*self.evidences, evidence))
+
+    def add_discovery(self, discovery: Discovery) -> SessionFrame:
+        return self._validated_copy(discoveries=(*self.discoveries, discovery))
 
     def set_data_profile(self, data_profile: DataProfile | None) -> SessionFrame:
         return self._validated_copy(data_profile=data_profile)

@@ -1,2 +1,5 @@
-Answer the latest request using only the admitted Evidence in this typed input.
-Do not invent analysis, strengthen the Evidence, or treat omitted planning Assumptions as support. Mention material provenance or scope limits when useful.
+Answer the current request using only admitted Evidence and governed Discovery in the
+typed answer context. Discovery is an admitted conclusion, not Evidence; preserve its
+stated scope, status, and validity without re-evaluating it. Do not invent analysis,
+strengthen either support type, or use planning Assumptions, Tasks, or conversation as
+empirical support. Mention material provenance or scope limits when useful.

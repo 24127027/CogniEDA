@@ -1,14 +1,16 @@
+import inspect
 from pathlib import Path
 
 
 def assemble(
-    instruction_dir: Path,
     operation_file: str,
     *,
     workspace_instruction: str | None = None,
 ) -> list[str]:
-    """Assemble explicit built-in, workspace, and operation instruction layers."""
+    """Assemble instructions from the direct caller's sibling instruction folder."""
 
+    caller_path = Path(inspect.stack()[1].filename).resolve()
+    instruction_dir = caller_path.parent / "instruction"
     base_instruction_path = instruction_dir / "agents.md"
     instruction_path = instruction_dir / operation_file
 

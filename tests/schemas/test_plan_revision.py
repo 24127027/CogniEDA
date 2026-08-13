@@ -11,8 +11,9 @@ from pydantic import ValidationError
 
 import cognieda.schemas as schemas
 import cognieda.schemas.plan_revision as plan_revision_module
-from cognieda.agents.planner.context import PlanningContext
-from cognieda.agents.planner.types import PlannerOutput, State
+from cognieda.agents.planner.context import PlannerContext
+from cognieda.agents.planner.contracts import PlannerOutput
+from cognieda.agents.planner.state import PlannerState
 from cognieda.schemas import (
     PLAN_REVISION_CONTRACT_VERSION,
     FirstClassObjectType,
@@ -520,20 +521,21 @@ def test_plan_revision_is_not_an_fco_or_semantic_graph_member() -> None:
     assert all(member.value != "plan_revision" for member in semantic_graph_members)
 
 
-def test_session_frame_contract_is_unchanged() -> None:
+def test_plan_revision_does_not_change_materialized_session_frame_categories() -> None:
     assert set(SessionFrame.model_fields) == {
         "objective",
         "assumptions",
         "tasks",
         "evidences",
+        "discoveries",
         "data_profile",
     }
 
 
 def test_planner_does_not_author_or_receive_plan_revision() -> None:
-    assert "plan_revision" not in PlanningContext.model_fields
+    assert "plan_revision" not in PlannerContext.model_fields
     assert "plan_revision" not in PlannerOutput.model_fields
-    assert "plan_revision" not in State.model_fields
+    assert "plan_revision" not in PlannerState.model_fields
 
 
 def test_dependency_eligibility_overrides_lower_dependent_order_rank() -> None:

@@ -21,6 +21,9 @@ from cognieda.infrastructure.persistence.repositories import (
 from cognieda.schemas import (
     Assumption,
     DataProfile,
+    Discovery,
+    DiscoveryClaim,
+    DiscoveryEpistemicStatus,
     Evidence,
     EvidenceProvenance,
     Objective,
@@ -28,6 +31,7 @@ from cognieda.schemas import (
     Task,
     TaskKind,
     TaskStatus,
+    ValidityBasis,
 )
 
 
@@ -127,7 +131,28 @@ def test_data_profile_evidence_and_session_frame_round_trip_with_direct_lineage(
     )
 
     persisted = EvidenceRepository(db_session).create(evidence)
-    frame = SessionFrame(tasks=[task], data_profile=profile, evidences=[persisted])
+    hypothesis_id = uuid4()
+    discovery = Discovery(
+        hypothesis_id=hypothesis_id,
+        evidence_ids=[persisted.evidence_id],
+        claim=DiscoveryClaim(statement="The dataset contains three rows.", scope="dataset:v1"),
+        epistemic_status=DiscoveryEpistemicStatus.SUPPORTED,
+        scope="dataset:v1",
+        validity_basis=ValidityBasis(
+            data_profile_id=profile.data_profile_id,
+            analysis_frame_refs=["analysis:row-count"],
+            hypothesis_id=hypothesis_id,
+            evidence_ids=[persisted.evidence_id],
+            method="row count",
+            decision_rule="Report the exact admitted count.",
+        ),
+    )
+    frame = SessionFrame(
+        tasks=[task],
+        data_profile=profile,
+        evidences=[persisted],
+        discoveries=[discovery],
+    )
     persisted_frame = SessionFrameRepository(db_session).create(frame)
 
     assert DataProfileRepository(db_session).get_by_id(profile.data_profile_id) == profile
@@ -136,6 +161,7 @@ def test_data_profile_evidence_and_session_frame_round_trip_with_direct_lineage(
     assert persisted.task_id == task.task_id
     assert persisted.data_profile_id == profile.data_profile_id
     assert persisted_frame == frame
+    assert persisted_frame.discoveries == (discovery,)
     assert SessionFrameRepository(db_session).get_latest() == frame
 
 

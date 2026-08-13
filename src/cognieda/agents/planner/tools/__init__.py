@@ -1,3 +1,1 @@
-from .delegate_data import invoke_data_capability
-
-__all__ = ("invoke_data_capability",)
+"""Planner-facing semantic tools will be introduced by a later milestone."""

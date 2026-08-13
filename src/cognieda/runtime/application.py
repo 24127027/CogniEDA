@@ -7,7 +7,7 @@ from cognieda.schemas.artifacts import SessionFrame
 
 from .conversation import ConversationHistory
 from .messages import Message, MessageRole, MessageType
-from .planner_context import apply_planner_output, build_planning_context
+from .planner_context import apply_planner_output, build_planner_context
 from .workspace import Workspace, MissingModelCredentialError
 
 
@@ -30,14 +30,12 @@ class Application:
         if message.startswith("/"):
             return await self._handle_command(message)
 
-        planning_context = build_planning_context(
-            self.session_frame,
-            self.conversation_history,
-        )
+        planner_context = build_planner_context(self.session_frame)
         try:
             planner_output = await self.planner_agent.run(
                 message,
-                planning_context=planning_context,
+                planner_context=planner_context,
+                conversation_history=self.conversation_history,
             )
         except MissingModelCredentialError as e:
             return self._text(
@@ -45,7 +43,11 @@ class Application:
                 "Run '/provider key <provider>' to configure an API key."
             )
 
-        self.session_frame = apply_planner_output(self.session_frame, planner_output)
+        self.session_frame = apply_planner_output(
+            self.session_frame,
+            planner_output,
+            request=message,
+        )
         if planner_output.new_messages:
             self.conversation_history = self.conversation_history.add_turn(
                 planner_output.new_messages

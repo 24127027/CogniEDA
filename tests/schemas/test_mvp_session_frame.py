@@ -8,6 +8,9 @@ from pydantic import ValidationError
 from cognieda.schemas import (
     Assumption,
     DataProfile,
+    Discovery,
+    DiscoveryClaim,
+    DiscoveryEpistemicStatus,
     Evidence,
     EvidenceProvenance,
     Objective,
@@ -15,6 +18,7 @@ from cognieda.schemas import (
     Task,
     TaskKind,
     TaskStatus,
+    ValidityBasis,
 )
 
 
@@ -51,6 +55,26 @@ def _evidence(task: Task, profile: DataProfile) -> Evidence:
     )
 
 
+def _discovery() -> Discovery:
+    hypothesis_id = uuid4()
+    evidence_id = uuid4()
+    return Discovery(
+        hypothesis_id=hypothesis_id,
+        evidence_ids=[evidence_id],
+        claim=DiscoveryClaim(statement="A governed claim.", scope="scope:v1"),
+        epistemic_status=DiscoveryEpistemicStatus.SUPPORTED,
+        scope="scope:v1",
+        validity_basis=ValidityBasis(
+            data_profile_id=uuid4(),
+            analysis_frame_refs=["analysis:v1"],
+            hypothesis_id=hypothesis_id,
+            evidence_ids=[evidence_id],
+            method="governed method",
+            decision_rule="Apply the governed rule.",
+        ),
+    )
+
+
 def test_session_frame_retains_typed_state_in_insertion_order() -> None:
     objective = Objective(text="Understand retention")
     assumptions = [Assumption(text="First"), Assumption(text="Second")]
@@ -60,12 +84,14 @@ def test_session_frame_retains_typed_state_in_insertion_order() -> None:
     ]
     profile = _profile()
     evidences = [_evidence(tasks[0], profile), _evidence(tasks[1], profile)]
+    discoveries = [_discovery(), _discovery()]
 
     frame = SessionFrame(
         objective=objective,
         assumptions=assumptions,
         tasks=tasks,
         evidences=evidences,
+        discoveries=discoveries,
         data_profile=profile,
     )
 
@@ -77,6 +103,7 @@ def test_session_frame_retains_typed_state_in_insertion_order() -> None:
         evidences[1].evidence_id,
     ]
     assert frame.data_profile is profile
+    assert frame.discoveries == tuple(discoveries)
 
 
 @pytest.mark.parametrize(
@@ -85,6 +112,7 @@ def test_session_frame_retains_typed_state_in_insertion_order() -> None:
         ("assumptions", lambda item: [item, item], "Assumption"),
         ("tasks", lambda item: [item, item], "Task"),
         ("evidences", lambda item: [item, item], "Evidence"),
+        ("discoveries", lambda item: [item, item], "Discovery"),
     ],
 )
 def test_session_frame_rejects_duplicate_ids(field, value_factory, message) -> None:
@@ -94,12 +122,14 @@ def test_session_frame_rejects_duplicate_ids(field, value_factory, message) -> N
         "assumptions": [],
         "tasks": [task],
         "evidences": [],
+        "discoveries": [],
         "data_profile": profile,
     }
     item = {
         "assumptions": Assumption(text="Duplicate"),
         "tasks": task,
         "evidences": _evidence(task, profile),
+        "discoveries": _discovery(),
     }[field]
     values[field] = value_factory(item)
 
@@ -162,6 +192,35 @@ def test_mutation_seams_preserve_invariants_and_order() -> None:
         frame.add_evidence(_evidence(_task("Orphan"), profile))
     with pytest.raises(ValueError, match="DataProfile"):
         frame.set_data_profile(_profile())
+
+
+def test_add_discovery_returns_successor_and_all_mutation_seams_preserve_it() -> None:
+    discovery = _discovery()
+    objective = Objective(text="Preserve retained Discovery.")
+    task = _task(
+        "Prepare work",
+        status=TaskStatus.COMPLETED,
+        objective_id=objective.objective_id,
+    )
+    profile = _profile()
+    original = SessionFrame(
+        objective=objective,
+        tasks=(task,),
+        data_profile=profile,
+    ).add_discovery(discovery)
+
+    successors = (
+        original.set_objective(Objective(text="Refined Objective.")),
+        original.add_assumption(Assumption(text="Planning-only premise")),
+        original.add_task(_task("Second work", objective_id=objective.objective_id)),
+        original.set_task_status(task.task_id, TaskStatus.COMPLETED),
+        original.add_evidence(_evidence(task, profile)),
+        original.set_data_profile(profile),
+    )
+
+    assert original.discoveries == (discovery,)
+    assert all(frame.discoveries == (discovery,) for frame in successors)
+    assert original.add_discovery(_discovery()).discoveries[0] is discovery
 
 
 @pytest.mark.parametrize(

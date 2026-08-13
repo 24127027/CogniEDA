@@ -45,7 +45,6 @@ def test_planner_cannot_access_dataset_implementation_directly() -> None:
 
 def test_mvp_planner_does_not_import_deferred_scientific_or_plan_contracts() -> None:
     forbidden_symbols = {
-        "Discovery",
         "EvidenceRequest",
         "GovernanceDecision",
         "Hypothesis",
@@ -76,14 +75,16 @@ def test_planner_has_no_session_frame_dependency_or_result_surface() -> None:
     ]
 
     from cognieda.agents.planner.agent import Planner
-    from cognieda.agents.planner.types import PlannerOutput, State
+    from cognieda.agents.planner.contracts import PlannerOutput
+    from cognieda.agents.planner.state import PlannerState
 
     signature = inspect.signature(Planner.run)
     assert violations == []
     assert "session_frame" not in signature.parameters
-    assert signature.parameters["planning_context"].default is inspect.Parameter.empty
+    assert signature.parameters["planner_context"].default is inspect.Parameter.empty
+    assert signature.parameters["conversation_history"].default is inspect.Parameter.empty
     assert inspect.iscoroutinefunction(Planner.reload)
-    assert "session_frame" not in State.model_fields
+    assert "session_frame" not in PlannerState.model_fields
     assert "session_frame" not in PlannerOutput.model_fields
 
 
@@ -103,6 +104,60 @@ def test_planner_model_wrapper_family_is_removed_from_production() -> None:
     ]
 
     assert not (planner_root / "model.py").exists()
+    assert violations == []
+
+
+def test_planner_cognitive_contracts_exclude_legacy_routing_and_adapter_state() -> None:
+    from cognieda.agents.planner.contracts import PlannerOutput
+    from cognieda.agents.planner.state import PlannerState
+
+    planner_root = SOURCE_ROOT / "agents" / "planner"
+    forbidden = (
+        "PlannerDecision" + "Input",
+        "latest_" + "request",
+        "selected_" + "capability",
+        "dispatch_" + "work",
+        "Execution" + "Request",
+        "Executor" + "Input",
+        "_INSTRUCTION" + "_DIR",
+    )
+    violations = [
+        f"{path.relative_to(PROJECT_ROOT)} contains {name}"
+        for path in planner_root.rglob("*.py")
+        for name in forbidden
+        if name in path.read_text(encoding="utf-8")
+    ]
+
+    assert not (planner_root / "types.py").exists()
+    assert not (planner_root / "dependencies.py").exists()
+    assert violations == []
+    assert set(PlannerState.model_fields) == {
+        "request",
+        "decision",
+        "objective_proposal",
+        "assumption_assessment",
+        "response",
+        "new_messages",
+        "error",
+    }
+    assert set(PlannerOutput.model_fields) == {
+        "response",
+        "decision",
+        "objective_proposal",
+        "assumption_assessment",
+        "new_messages",
+        "error",
+    }
+
+
+def test_planner_production_python_has_no_execution_capability_or_dispatcher_import() -> None:
+    violations = [
+        str(path.relative_to(PROJECT_ROOT))
+        for path in _python_files("agents/planner")
+        if "Capability" in path.read_text(encoding="utf-8")
+        or "cognieda.execution" in path.read_text(encoding="utf-8")
+    ]
+
     assert violations == []
 
 

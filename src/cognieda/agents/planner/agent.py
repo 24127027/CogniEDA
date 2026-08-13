@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from pydantic_ai import Agent
 
 from cognieda.agents.utilities import instruction
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
-from cognieda.execution import ExecutorContext
+from cognieda.runtime.conversation import ConversationHistory
 
-from .context import Context, PlanningContext
-from .dependencies import PlannerDeps
+from .context import Context, PlannerContext
+from .contracts import PlannerControlledError, PlannerErrorCode, PlannerOutput
 from .graph import build_graph
-from .types import PlannerControlledError, PlannerErrorCode, PlannerOutput, State
-
-_INSTRUCTION_DIR = Path(__file__).with_name("instruction")
+from .state import PlannerState
 
 
 class Planner:
@@ -23,13 +19,11 @@ class Planner:
 
     def __init__(
         self,
-        deps: PlannerDeps,
         *,
         agent_factory: AgentFactoryPort,
         model_config: ModelConfig,
         agent_instruction: str | None = None,
     ) -> None:
-        self.deps = deps
         self._agent_factory = agent_factory
         self._model_config = model_config
         self._workspace_instruction = agent_instruction
@@ -40,24 +34,22 @@ class Planner:
     def _assemble_instructions(self) -> None:
         self._answer_instructions = tuple(
             instruction.assemble(
-                _INSTRUCTION_DIR,
                 "answer.txt",
                 workspace_instruction=self._workspace_instruction,
             )
         )
         self._decide_instructions = tuple(
             instruction.assemble(
-                _INSTRUCTION_DIR,
                 "decide.txt",
                 workspace_instruction=self._workspace_instruction,
             )
         )
 
     def _recreate_agent(self) -> None:
-        self._agent: Agent[PlannerDeps, object] = self._agent_factory.create_agent(
+        self._agent: Agent[None, object] = self._agent_factory.create_agent(
             worker="planner",
             config=self._model_config,
-            deps_type=PlannerDeps,
+            deps_type=type(None),
             builtin_tools=self.builtin_tools,
         )
 
@@ -82,33 +74,30 @@ class Planner:
 
     async def run(
         self,
-        query: str,
+        request: str,
         *,
-        planning_context: PlanningContext,
-        execution_context: ExecutorContext | None = None,
+        planner_context: PlannerContext,
+        conversation_history: ConversationHistory,
     ) -> PlannerOutput:
         """Run one request against explicit read-only context and return typed results."""
 
-        if not query.strip():
+        if not request.strip():
             error = PlannerControlledError(
                 code=PlannerErrorCode.INVALID_COMMAND,
                 message="Planner requests cannot be empty.",
             )
             return PlannerOutput(response=error.message, error=error)
 
-        state = State(
-            query=query,
-            execution_context=execution_context or ExecutorContext(),
-        )
+        state = PlannerState(request=request)
         context = Context(
             agent=self._agent,
-            deps=self.deps,
-            planning_context=planning_context,
+            planner_context=planner_context,
+            conversation_history=conversation_history,
             decide_instructions=self._decide_instructions,
             answer_instructions=self._answer_instructions,
         )
         result = await self.graph.ainvoke(state, context=context)
-        final_state = State.model_validate(result)
+        final_state = PlannerState.model_validate(result)
 
         if final_state.response is None:
             error = PlannerControlledError(
@@ -121,11 +110,8 @@ class Planner:
         return PlannerOutput(
             response=final_state.response,
             decision=final_state.decision,
-            created_objective=final_state.created_objective,
-            created_assumption=final_state.created_assumption,
-            created_task=final_state.created_task,
-            selected_capability=final_state.selected_capability,
-            work_outcome=final_state.work_outcome,
+            objective_proposal=final_state.objective_proposal,
+            assumption_assessment=final_state.assumption_assessment,
             new_messages=final_state.new_messages,
             error=final_state.error,
         )
