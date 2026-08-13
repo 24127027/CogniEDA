@@ -52,6 +52,7 @@ class PlannerModel:
         model_config: ModelConfig,
     ) -> None:
         self.deps = deps
+        self.model_config = model_config
         self._agent = agent_factory.create_agent(
             worker="planner",
             config=model_config,
@@ -66,15 +67,6 @@ class PlannerModel:
         message_history: Sequence[ModelMessage] = (),
     ) -> PlannerModelResult[PlannerDecision]:
         prompt = (
-            "Classify the latest request into exactly one bounded MVP Planner action.\n"
-            "Use only the typed research-state projection below as authoritative state.\n"
-            "Assumptions are planning context, never empirical support.\n"
-            "For data work, propose one bounded Task instruction and select exactly one "
-            "Capability enum. If no Objective exists, include objective_text only when the "
-            "request states a sufficiently clear research Objective; otherwise return "
-            "invalid_or_unsupported with a clarification message.\n"
-            "Do not author a Hypothesis, protocol, method, decision rule, Evidence, Discovery, "
-            "approval flow, Task DAG, or executor identifier.\n"
             f"Typed input:\n{model_input.model_dump_json()}"
         )
         result = await self._agent.run(

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from dotenv import load_dotenv
 
+from .mock_application import run_mock_repl
 from .main import repl
 from .renderer import Renderer
 
@@ -27,6 +28,12 @@ def bootstrap_application(workspace_path: Path) -> Application:
 def build_parser() -> ArgumentParser:
     """Build the CLI parser without initializing application services."""
     parser = ArgumentParser(description="CogniEDA CLI")
+    parser.add_argument(
+        "--mode",
+        choices=("real", "mock"),
+        default="real",
+        help="Run the real planner runtime or the mock UI playground",
+    )
     parser.add_argument(
         "path",
         nargs="?",
@@ -51,5 +58,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     """Open the selected workspace and run the Planner REPL."""
     args = parse_args(argv)
     load_workspace_environment(args.path)
+
+    if args.mode == "mock":
+        asyncio.run(run_mock_repl(workspace_root=args.path))
+        return
+
     app = bootstrap_application(args.path)
     asyncio.run(repl(app, Renderer()))

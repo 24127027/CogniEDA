@@ -19,3 +19,11 @@ class Message:
     role: MessageRole
     type: MessageType
     content: Any
+    model: str | None = None
+
+@dataclass
+class MockMessage:
+    role: MessageRole
+    type: MessageType
+    content: Any
+    model: str | None = None
