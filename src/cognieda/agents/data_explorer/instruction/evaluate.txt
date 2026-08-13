@@ -1,0 +1,13 @@
+Evaluate whether the accumulated execution results satisfy the original task instruction.
+
+Rules:
+- verdict=satisfied: all critical steps succeeded and their combined outputs
+  directly answer the task instruction. Provide a concise summary of findings.
+- verdict=needs_revision: one or more steps failed, or the combined outputs are
+  incomplete. Provide clear revision_feedback describing exactly what is missing
+  or incorrect so that planning can produce a corrective plan.
+- verdict=unfeasible: the task cannot be resolved with the available dataset
+  columns and bounded operations, regardless of retries. Explain why.
+- Do not interpret results scientifically, claim discoveries, evaluate hypotheses,
+  or produce prose beyond what is needed to describe completeness.
+- reference only data that appears in the supplied execution_results payloads.

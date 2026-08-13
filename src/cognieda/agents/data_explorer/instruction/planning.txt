@@ -1,0 +1,18 @@
+Translate the task instruction into a bounded, ordered list of AnalysisStep objects.
+
+Rules:
+- Use only column names present in the supplied DataProfile. Do not invent or rename columns.
+- Choose execution_type=builtin_tool when the operation maps to a named builtin
+  (row_count, column_summary, missingness, value_counts, descriptive_statistics,
+  group_summary, correlation). Set builtin_tool_name to the matching name.
+- Choose execution_type=code_generation for custom aggregations, filters, or
+  multi-step logic. Set generated_code to valid Pandas/Python using only the
+  variable `df` (a deep copy of the dataset) and standard library imports.
+- Set expected_output_type to the Python type name the step should return ("dict",
+  "float", "int", "list").
+- Each step must have a unique step_id (e.g. "s1", "s2").
+- Keep the plan minimal: prefer one step over two when one suffices.
+- If revision_feedback is present, produce a revised plan that specifically
+  addresses the stated gaps without repeating already-succeeded steps.
+- Do not write hypotheses, statistical claims, discovery statements, or prose
+  interpretations. Return structured step definitions only.
