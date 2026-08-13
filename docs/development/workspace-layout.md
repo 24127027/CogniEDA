@@ -61,7 +61,10 @@ Workspace's `.cognieda/` directory.
 repository coding-agent instructions. CogniEDA always retains its source-owned
 built-in Planner authority baseline. Optional workspace guidance from
 `.cognieda/planner.md` supplements that baseline before the operation-specific
-instruction. A Workspace-root `AGENTS.md` is not read as product Planner input.
+instruction. The instruction utility resolves the direct caller module's
+sibling `instruction/` directory; callers do not register or pass their own
+instruction paths. A Workspace-root `AGENTS.md` is not read as product Planner
+input.
 
 DVC execution is **Unsupported**. The fail-closed
 `cognieda.infrastructure.dvc` adapter remains an integration boundary, but the

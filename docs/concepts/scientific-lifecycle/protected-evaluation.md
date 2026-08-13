@@ -115,8 +115,9 @@ cardinality expectation.
 
 ## Implementation status
 
-**Design target.** Current bounded Planner answer drafting excludes Assumptions
-from its Evidence-only empirical input, but that is not protected scientific
+**Design target.** Current bounded Planner answer drafting excludes Assumptions,
+Tasks, and conversation from an authorized context containing admitted Evidence
+and/or governed Discovery, but that presentation is not protected scientific
 evaluation. The canonical EvaluationBundle, exact contract and digest binding,
 protected decision-rule execution, canonical scientific outcomes, and complete
 Hypothesis Analyst investigation controller remain **Deferred**. Uncomposed

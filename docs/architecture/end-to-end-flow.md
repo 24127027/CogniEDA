@@ -252,15 +252,17 @@ agent's retained transcript or hidden memory.
 
 ## Implementation status
 
-**Unsupported end to end.** Current main contains partial Planner proposal,
-approval, and commit behavior; generic capability dispatch foundations; and
-several durable execution-safety transitions. 
+**Unsupported end to end.** Current source contains bounded Planner proposal
+behavior, isolated PlanRevision validation/persistence foundations, generic
+capability dispatch foundations, and several durable execution-safety
+transitions. Human plan approval and active-plan execution are **Deferred**.
 
 The S0 infrastructure boundary is **Implemented**: bootstrap composes an
-explicit registry, dispatcher, Data Explorer provider factory, and Planner
-dependency; a PydanticAI adapter performs typed capability dispatch; and
-focused tests exercise that adapter through a registered provider. This proves
-the invocation seam, not the end-to-end research-state flow.
+explicit registry, dispatcher, and Data Explorer provider factory for
+execution-internal library use. Planner does not receive that dispatcher or
+select Capability. Correct approved-plan eligibility and Planner-facing
+semantic specialist tools remain **Deferred**, so these execution seams do not
+establish the end-to-end research-state flow.
 
 The canonical PlanRevision, role-native contracts, full specialist
 implementations, EvidenceRequest-to-Evidence admission, protected evaluation,

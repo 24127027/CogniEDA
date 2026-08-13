@@ -15,8 +15,11 @@ These are verified constraints of the bounded current implementation.
   infrastructure foundation; only `DATA` is executable and no PlanRevision
   drives execution.
 - The current materialized SessionFrame can hold one Objective and one
-  DataProfile but is not the canonical reference-based session-membership FCO
-  and does not implement Objective-bound multi-session isolation.
+  DataProfile plus ordered Assumption, Task, Evidence, and Discovery values,
+  but is not the canonical reference-based session-membership FCO and does not
+  implement Objective-bound multi-session isolation. Retained Discovery
+  membership is context membership, not ownership of its complete provenance
+  graph.
 - Direct Task-to-Evidence linkage is a bounded transitional capability. Canonical
   Hypothesis, EvidenceRequest, ExecutionRun, AnalysisFrame, evaluation, and
   admission lineage remain **Deferred** and are required by MVP-v2.
@@ -39,11 +42,14 @@ These are verified constraints of the bounded current implementation.
   and `GovernanceDecision` have no supported implementation.
 - Hypothesis Analyst and Graph Miner remain unregistered scaffolds. Discovery
   and Hypothesis remain canonical FCO names but have no active bounded runtime.
-- Planner typed Objective creation/refinement, Assumption addition, and terminal
-  DATA Task results are **Implemented**. Application alone applies those results
-  to its in-memory successor SessionFrame. Durable Objective and Assumption
-  persistence updates remain **Deferred**. Task persistence supports status
-  change only. Active Task
+- Planner typed Objective proposal and exact-Human-text Assumption testability
+  assessment are **Implemented**. Application alone applies an Objective result
+  or constructs a genuinely project-untestable Assumption in its in-memory
+  successor SessionFrame. Planner-authored and reasonably testable Assumptions
+  fail closed. Direct Planner DATA Task creation and Capability dispatch are
+  removed; correct approved-plan and semantic specialist-tool execution remain
+  **Deferred**. Durable Objective and Assumption persistence updates remain
+  **Deferred**. Task persistence supports status change only. Active Task
   values are immutable; changing Task meaning requires a new identity, while
   status change produces a replacement with the same identity and instruction.
 - Application-authority Evidence admission is **Implemented** for the direct
@@ -101,11 +107,11 @@ These are verified constraints of the bounded current implementation.
   blocked until successor dataset and DataProfile semantics exist.
 - `DATA_TRANSFORMATION` remains blocked until immutable successor dataset state
   and successor DataProfile handling exist.
-- M1-B Planner tests use a deterministic fake Agent supplied by a fake
-  `AgentFactoryPort` and a fake dispatcher; they prove typed capability
-  selection, tracked Task lifecycle, outcome consumption, native-message
-  propagation, and fail-closed behavior without claiming model-selected real
-  Data Explorer filesystem execution.
+- Planner tests use a deterministic fake Agent supplied by a fake
+  `AgentFactoryPort`; they prove action-specific contracts, routing-free graph
+  state/output, native-message delta propagation, separated conversation,
+  Evidence/Discovery answer support, Assumption quarantine, and fail-closed
+  behavior without claiming real Data Explorer filesystem execution.
 - Workspace path selection and initialization are **Implemented**, but
   automatic dataset discovery or admission is **Unsupported**. The
   conventional `data/` directory does not itself establish a DataProfile.
@@ -120,7 +126,9 @@ These are verified constraints of the bounded current implementation.
 - Durable restart/resume, replay, claims, leases, result inbox, and multi-store
   migration are outside M1-A.
 - SessionFrame snapshots use an internal serialized SQLite envelope; this is a
-  bounded round-trip seam, not M5-A/M5-B durable runtime authority.
+  bounded round-trip seam that preserves retained Discovery exactly, not
+  M5-A/M5-B durable runtime authority or the future reference-membership
+  design.
 - The persistence helper is not composed with `Workspace`; without an explicit
   `COGNIEDA_DB_URL`, it retains a provisional package-local SQLite default.
   Binding authoritative persistence under `<workspace>/.cognieda/state/` is

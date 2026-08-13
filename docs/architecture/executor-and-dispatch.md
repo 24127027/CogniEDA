@@ -203,16 +203,16 @@ provider instance is reused. Duplicate and absent registrations fail closed.
 The thin async dispatcher invokes the resolved provider and preserves provider
 failure as a controlled error.
 
-The current PydanticAI adapter exposes a typed data-capability request through
-Planner dependencies. Focused tests validate adapter to dispatcher to
-registered-provider invocation without a model endpoint. Bootstrap explicitly
-composes a registry, Data Explorer provider factory, dispatcher, and
-`PlannerDeps`; availability no longer depends on executor module import order.
+The execution package retains typed capability request/dispatcher plumbing for
+non-Planner library seams. Bootstrap composes a registry, Data Explorer
+provider factory, and dispatcher, but Planner no longer receives the
+dispatcher, selects Capability, or exposes a data-capability adapter. Correct
+Planner-facing semantic specialist tools remain **Deferred**.
 
 `ExecutionResult` now contains only shared transport metadata.
 `DataExplorerResult` and the deferred `HypothesisAnalystResult` own their
-role-native fields. A minimal `PlannerWorkOutcome` projection seam consumes
-only shared metadata; full Planner consumption remains **Deferred**.
+role-native fields. A minimal `PlannerWorkOutcome` projection remains in the
+execution package but has no current Planner consumer.
 
 At the bounded M3-A direct-DATA library surface, an execution-internal
 `DATA_ANALYSIS` request reaches Data Explorer outside PlanRevision. This

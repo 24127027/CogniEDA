@@ -19,16 +19,16 @@ remain **Deferred** or **Unsupported**.
 | Reader-visible capability | Status | Current boundary |
 | --- | --- | --- |
 | M1-A research-state contracts | **Implemented** | The active `Objective`, `Assumption`, `Task`, `DataProfile`, `Evidence`, and materialized `SessionFrame` schemas implement a bounded transitional foundation. They are not the complete canonical contracts required by MVP-v2, and no parallel FCO family exists. |
-| Objective and Assumption | **Implemented** | `Objective` and planning-only `Assumption` each have stable UUID identity and non-empty text. Bounded Planner returns explicit `created_objective` and `created_assumption` results: semantic Objective refinement allocates a new identity, and Application applies either result through the immutable SessionFrame successor seams. Durable behavioral persistence remains outside this boundary. |
+| Objective and Assumption | **Implemented** | `Objective` and planning-only `Assumption` each have stable UUID identity and non-empty text. Bounded Planner may return a canonical transient Objective proposal. For Assumption, Planner returns an exact-Human-text testability assessment rather than authoring an Assumption FCO; Application admits only exact text assessed as genuinely untestable in the project and rejects testable claims as Assumptions. Durable behavioral persistence remains outside this boundary. |
 | Task semantic core and execution status | **Implemented** | Active Task has immutable `task_id`, required exact `objective_id`, exactly one of `DATA`, `SCIENTIFIC`, or `GRAPH`, non-empty `instruction`, and exactly `PENDING`, `RUNNING`, `COMPLETED`, or `FAILED`. A status transition produces a validated replacement Task preserving `task_id`, `objective_id`, kind, and instruction. The repository update seam changes status only. Legacy taxonomy, `SYNTHESIS` Task work, scientific operationalization, dataset locators, and plan-coordination fields are not accepted by the active schema. Only bounded `DATA` work is executable. |
 | PlanRevision V1 domain contract and candidate validation | **Implemented** | Immutable non-FCO `PlanRevision`, `PlanTaskBinding`, and `PlanDependency` values provide one binding per member Task, binding-owned non-negative tie-permitting order rank/LOW-NORMAL-HIGH priority, explicit Objective-scoped acyclic dependencies, deterministic canonical ordering, and a `sha256:` fingerprint bound only to contract version, Objective identity, Task binding coordination, and dependencies. The side-effect-free application validator resolves persisted Objective and Task records, rejects duplicate, missing, extra, or cross-Objective Tasks, non-member or cyclic edges, non-canonical representation, and fingerprint mismatch, then returns the exact canonical candidate without persistence. PlanRevision and its bindings contain no capability, provider, specialist, worker, tool, DataProfile identity, stopping/replan policy, approval, or activation state. |
 | DataProfile and deterministic profiling | **Implemented** | Immutable DataProfile has `data_profile_id`, row and column counts, and ordered typed columns. Data Explorer produces a task-free initial candidate from an explicit absolute CSV or Parquet path with the normalized path and `sha256:<hex>` digest observed from the exact loaded bytes. Application authority atomically admits the profile and its one-to-one non-FCO physical dataset binding on SQLite without activating or switching it. Exact replay is idempotent; conflicting profile, path, or digest reuse fails closed. |
 | Transitional direct Evidence | **Implemented** | Immutable Evidence retains deterministic JSON-safe content, artifact references, bounded producer/work/dataset/tool provenance, and real `task_id` plus `data_profile_id` lineage. The M3-A application service admits exactly one successful Data Explorer observation only after matching the persisted `COMPLETED` Task, authoritative DataProfile and dataset binding, request path, independently observed execution path and digest, capability, role-native plan, source role, and provenance contract. Failed, blocked, mismatched, empty, or invalid work creates no Evidence. This direct Task-to-Evidence path is bounded current capability, not the canonical scientific Evidence lineage required by MVP-v2. |
-| Bounded materialized SessionFrame | **Implemented** | The current M1-A value retains one optional materialized Objective, ordered read-only materialized Assumption, Task, and Evidence collections, and one optional materialized DataProfile. Application exact-copies all five member categories into immutable Planner `PlanningContext` without filtering, ranking, or truncation, then applies explicit Planner results through controlled successor seams. The frame rejects duplicate IDs, orphan Evidence, Evidence for any Task not exactly `COMPLETED`, Evidence without a DataProfile, and Evidence for a different profile. It has no `session_frame_id`, Objective-bound session identity, typed reference manifest, active selectors, successor lineage, purpose/mode binding, or runtime reload authority. |
-| Bounded persistence | **Verified on SQLite** | Concrete models, sessions, migrations, and repositories under `infrastructure.persistence` round-trip minimum Objective, Assumption, Task, DataProfile, Evidence, SessionFrame, and immutable PlanRevision state on fresh SQLite. PlanRevision uses normalized `plan_revisions`, `plan_task_bindings`, and `plan_dependencies` tables; binding rows store only Task identity, rank, and priority, with no execution-routing field. One caller-owned transaction flushes the header, every binding, and every edge, and a child-write failure rolls back the complete snapshot. The append-only repository rejects same-ID replay or collision without overwrite, fails closed on stored fingerprint mismatch, and permits different identities with the same fingerprint. It exposes no update or delete surface. No application caller currently persists a PlanRevision. Task persistence retains exact semantic identity and changes status only. M3-A Evidence retains its existing bounded admission behavior. Durable upgrade of legacy rows, Objective and Assumption update composition, and restart/recovery are not claimed. |
+| Bounded materialized SessionFrame | **Implemented** | The current M1-A value retains one optional materialized Objective, ordered read-only materialized Assumption, Task, Evidence, and Discovery collections, and one optional materialized DataProfile. Application exact-copies all six member categories into immutable Planner `PlannerContext` without filtering, ranking, or truncation. The frame rejects duplicate IDs for every retained collection and preserves Discovery through every immutable successor seam; Discovery membership does not require co-retaining its complete Hypothesis/Evidence provenance graph. Existing Evidence closure checks remain unchanged. It has no `session_frame_id`, Objective-bound session identity, typed reference manifest, active selectors, successor lineage, purpose/mode binding, or runtime reload authority. |
+| Bounded persistence | **Verified on SQLite** | Concrete models, sessions, migrations, and repositories under `infrastructure.persistence` round-trip minimum Objective, Assumption, Task, DataProfile, Evidence, materialized SessionFrame including exact retained Discovery membership, and immutable PlanRevision state on fresh SQLite. SessionFrame uses the existing serialized snapshot envelope rather than the future reference-membership design. PlanRevision uses normalized `plan_revisions`, `plan_task_bindings`, and `plan_dependencies` tables; binding rows store only Task identity, rank, and priority, with no execution-routing field. One caller-owned transaction flushes the header, every binding, and every edge, and a child-write failure rolls back the complete snapshot. The append-only repository rejects same-ID replay or collision without overwrite, fails closed on stored fingerprint mismatch, and permits different identities with the same fingerprint. It exposes no update or delete surface. No application caller currently persists a PlanRevision. Task persistence retains exact semantic identity and changes status only. M3-A Evidence retains its existing bounded admission behavior. Durable upgrade of legacy rows, Objective and Assumption update composition, and restart/recovery are not claimed. |
 | Executor registry and dispatch | **Implemented** | The role-neutral `execution` package owns the single typed `Capability` definition, explicit dependency-aware provider factories, provider reuse, typed async dispatch, fail-closed missing registration, controlled provider errors, and role-native results. Runtime provider registration is not PlanRevision content. Specialist roles are peer packages under `agents`; Planner is not registered or represented as a Task executor, and no compatibility `agents.executor` path remains. |
 | Data Explorer | **Implemented** | At the bounded M3-A library surface, execution-internal capability plumbing can invoke Data Explorer outside PlanRevision. Data Explorer rejects direct `SCIENTIFIC` and `GRAPH` Task dispatch. It owns typed operationalization of the DATA Task instruction plus the supplied authoritative DataProfile projection into one finite `DataAnalysisPlan`; deterministic validation and tools alone compute values. Supported operations are row count, column summary, missingness, bounded value counts, descriptive statistics, bounded group summary, and bounded Pearson or Spearman correlation. Exact column names are required. Analysis contracts live under `agents.data_explorer`, not role-neutral `execution`. Data Explorer remains persistence-free and never creates Evidence. General-purpose Python execution is **Unsupported**. Transformation remains a typed blocker. |
-| Planner behavior, native conversation history, and `PlannerWorkOutcome` consumption | **Implemented** | Planner directly owns one PydanticAI `Agent` constructed through `AgentFactoryPort`; the factory retains provider-model and current external-tooling composition. The fixed transitional LangGraph receives that current Agent, `PlannerDeps`, required read-only `PlanningContext`, and built-in/workspace/operation instruction layers. Its request-understanding and Evidence-answer nodes invoke the same Agent directly, preserve native message history, and return new messages through `PlannerOutput`. The graph returns explicit Objective or Assumption results, constructs one Objective-bound `DATA` Task, invokes the selected data capability, identity-checks the outcome, and returns the exact terminal Task. Graph state and output contain no SessionFrame. Evidence-only follow-up answering and controlled human-facing responses remain supported; response synthesis is not Task execution. Planner does not admit Evidence or create executable `SCIENTIFIC` or `GRAPH` work. The current four-node graph is transitional and has not been redesigned into the target lifecycle. |
+| Planner behavior and native conversation history | **Implemented** | Planner directly owns one PydanticAI `Agent` constructed through `AgentFactoryPort`; the factory retains provider-model and current external-tooling composition. The transitional three-node LangGraph receives that Agent, required read-only `PlannerContext`, separate `ConversationHistory`, and built-in/workspace/operation instruction layers. Request understanding receives prior native messages; `PlannerOutput.new_messages` contains only the current-run delta, which Application appends once. Protected answer composition receives no arbitrary conversation and accepts admitted Evidence and/or governed Discovery while excluding Assumptions and Tasks. Planner decisions are action-discriminated variants and Planner state/output contain no execution Capability, dispatcher state, created Task, or work outcome. Legacy direct DATA dispatch is removed; `/profile`, `/analyze`, and `/transform` return controlled deferred results. Graph state and output contain no SessionFrame. Planner does not admit Evidence, create Discovery, or create executable Tasks. |
 | M3-A Data Explorer execution and Evidence integration | **Implemented** | The bounded library/data-authority surface proves immutable path-plus-content DataProfile binding, Data Explorer-owned bounded planning, deterministic real tool execution, typed provenance with the actual execution digest, application-owned atomic profile/binding admission, and application-owned immutable Evidence admission. Exact replay is idempotent; wrong-path, wrong-profile, same-path mutation, planning failure, blocker, lineage mismatch, and invalid payload paths create zero Evidence. Retained runtime composition is outside this claim. |
 | Multi-provider model construction | **Partially implemented** | Required provider/name/key configuration resolves workspace-first. Canonical provider identity is exactly OpenAI, Google, or Anthropic; the `gemini` input alias normalizes to Google before the generic factory dispatches. API key and optional base URL fall back first to provider-neutral environment values and then to legacy OpenAI-named values. Deterministic unit tests cover resolution and construction without external calls; no live provider call or supported multi-provider end-to-end runtime is verified. |
 | Retained runtime composition | **Deferred** | No supported Planner-to-real-Data-Explorer-to-Evidence-to-SessionFrame user workflow is composed, and the current in-process frame and conversation are not restored after restart. |
@@ -50,7 +50,8 @@ Assumption(assumption_id, text)
 Task(task_id, objective_id, kind, instruction, status)
 DataProfile(data_profile_id, row_count, column_count, columns)
 Evidence(evidence_id, task_id, data_profile_id, content, provenance, artifact_refs)
-SessionFrame(objective, assumptions, tasks, evidences, data_profile)
+Discovery(discovery_id, hypothesis_id, evidence_ids, claim, validity_basis, ...)
+SessionFrame(objective, assumptions, tasks, evidences, discoveries, data_profile)
 ```
 
 `ColumnProfile` retains name, raw dtype, `DISCRETE` or `CONTINUOUS` variable
@@ -69,7 +70,7 @@ AnalysisFrame or ExecutionRun references.
 `DATA_ANALYSIS` requires an explicit absolute `dataset_path`, exact
 `data_profile_id`, and a `DataExplorerInput` carrying the matching authoritative
 DataProfile projection.
-Planner selects the capability but does not construct analytical semantics.
+Planner does not select this execution-internal capability or invoke this path.
 Data Explorer passes the Task instruction, DataProfile/schema, and finite
 operation set through its typed planning port, validates the returned
 role-native `DataAnalysisPlan`, and invokes the deterministic tool. Runtime and
@@ -130,20 +131,19 @@ selection, lifecycle progression, and runtime use remain **Deferred**.
 
 ## Verification qualification
 
-M1-B focused tests use a deterministic fake Agent returned through the real
-`AgentFactoryPort` seam plus fake dispatcher boundaries to
-verify typed-state inspection, natural-language and explicit action parity,
-explicit Objective and Assumption results with Application-side application,
-bounded terminal Task construction, all three data
-capabilities, successful and failed lifecycle transitions, blocked
-transformation, Task/outcome mismatch rejection, Evidence-free execution,
-Evidence-grounded follow-up, Assumption quarantine, native model-history pass-
-through, append-only complete-run turns, and in-process history retention. Full pytest collection
+Planner focused tests use a deterministic fake Agent returned through the real
+`AgentFactoryPort` seam to verify exact-context inspection, action-specific
+decision variants, canonical Objective proposals, exact-Human-text Assumption
+assessment, controlled deferred DATA commands, Evidence-only, Discovery-only,
+and combined answer support, Assumption/conversation exclusion, native model-
+history pass-through, delta-only new messages, append-only complete-run turns,
+and in-process history retention. Full pytest collection
 includes the rewritten Planner modules; the former three donor import blockers
 are removed. Layer tests verify that Planner cannot import pandas, dataset
 loaders, Data Explorer implementations, or deferred scientific and
 PlanRevision contracts or SessionFrame directly. Architecture tests also prove
-that Planner.run, graph State, and PlannerOutput have no SessionFrame surface.
+that Planner.run, `PlannerState`, and `PlannerOutput` have no SessionFrame or
+Capability surface and no direct dispatcher path.
 Workspace ownership and documentation
 regressions retain their existing boundaries. M3-A focused tests additionally
 execute real CSV and Parquet data, all seven allowlisted operations, explicit
@@ -157,19 +157,24 @@ Focused Planner ownership and instruction verification on 2026-08-13 ran:
 
 ```text
 uv run pytest tests/agents/planner tests/agents/test_instruction.py \
-  tests/runtime/test_workspace.py tests/runtime/test_conversation.py \
-  tests/architecture/test_layer_boundaries.py -q
+  tests/runtime/test_planner_context.py tests/runtime/test_conversation.py \
+  tests/schemas/test_mvp_session_frame.py \
+  tests/infrastructure/persistence/test_mvp_state_repositories.py \
+  tests/architecture/test_layer_boundaries.py tests/schemas/test_plan_revision.py -q
 ```
 
-Result: **54 passed**. These tests prove direct Planner Agent ownership,
-same-Agent decision and answer calls, native history/new-message propagation,
-reload and recreation behavior, explicit instruction assembly, optional
-workspace instructions, and the root-`AGENTS.md` exclusion.
+Result: **124 passed**. These tests prove direct Planner Agent ownership, the
+routing-free three-node graph, exact Discovery retention and SQLite snapshot
+round-trip, separated conversation, same-Agent decision and answer calls,
+native history/new-message propagation, reload and recreation behavior, the
+inspect-based direct-caller instruction convention, optional workspace
+instructions, and the root-`AGENTS.md` exclusion.
 
 ## Design target: dependency inversion
 
-**Partially implemented.** Agents consume inward-facing dispatcher and model
-factory contracts; runtime bootstrap constructs concrete execution, LLM, MCP,
+**Partially implemented.** Planner consumes the inward-facing model factory
+contract while execution/application seams retain role-neutral dispatcher
+contracts; runtime bootstrap constructs concrete execution, LLM, MCP,
 skills, and workspace dependencies; dataset and persistence adapters live
 under infrastructure; and CLI presentation is outside runtime core. Some
 application services still use concrete SQLite persistence, and the `schemas`

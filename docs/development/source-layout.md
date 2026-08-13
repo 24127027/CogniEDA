@@ -6,7 +6,7 @@ boundary explicit so that new work enters the correct package.
 
 | Package | Current responsibility |
 | --- | --- |
-| `agents` | Planner and peer specialist role adapters. Planner directly owns its PydanticAI Agent, LangGraph control flow, dependencies, and built-in/operation instructions; Data Explorer owns direct dataset operations. Hypothesis Analyst and Graph Miner remain deferred scaffolds. |
+| `agents` | Planner and peer specialist role adapters. Planner directly owns its PydanticAI Agent, routing-free LangGraph control flow, typed context/contracts, and built-in/operation instructions; Data Explorer owns direct dataset operations. Hypothesis Analyst and Graph Miner remain deferred scaffolds. |
 | `application` | Inward-facing ports plus application-authority services for execution admission, Planner-operation commit, and guarded transitions. These services do not establish the complete canonical workflow. |
 | `cli` | Installed command parsing, the development REPL, and terminal rendering. |
 | `execution` | Role-neutral capability, request/result transport, provider registry, and dispatcher contracts. |
@@ -31,8 +31,10 @@ runtime/bootstrap is allowed to know concrete implementations
 The graph is intentionally practical rather than a textbook layering exercise.
 The enforced boundaries are more important than package names:
 
-- Planner must not import pandas, dataset loaders, or Data Explorer profiling
-  implementations. It delegates through typed execution contracts.
+- Planner must not import pandas, dataset loaders, Data Explorer profiling
+  implementations, execution Capability, or dispatcher contracts. Current
+  Planner DATA execution is deferred pending the semantic specialist-tool
+  boundary.
 - Direct dataset loading is infrastructure; direct dataset operations are Data
   Explorer-owned.
 - The product repository contains code and development resources, while the

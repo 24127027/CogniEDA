@@ -35,7 +35,7 @@ answer generation, recovery, or validity review. Without a known purpose and
 reasoning mode, the system cannot determine which epistemic types are safe.
 
 Purpose also determines whether the result is supplemental Planner context, an
-Evidence-only answer input, an EvaluationBundle input, a read-only inquiry
+authorized Evidence/Discovery answer input, an EvaluationBundle input, a read-only inquiry
 result, a recovery projection, or a GeneratedView source set. SessionFrame
 membership establishes the non-subtractable Planner base, but it is not
 interchangeable with any authority-specific input.

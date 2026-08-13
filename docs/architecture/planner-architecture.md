@@ -239,33 +239,38 @@ scientific proposal.
 ## Implementation status
 
 **Partially implemented.** Application now exact-materializes the current
-SessionFrame into an immutable `PlanningContext`, calls Planner without passing
-the frame, and applies explicit `created_objective`, `created_assumption`, and
-terminal `created_task` results to its own successor frame. Planner graph state
-contains per-run control and typed result fields only; Planner neither mutates
-nor returns SessionFrame.
+SessionFrame into an immutable `PlannerContext`, calls Planner without passing
+the frame, and keeps native `ConversationHistory` as a separate,
+non-authoritative argument. Application may apply an explicit Objective
+proposal or admit exact Human Assumption text only after the Planner's typed
+testability assessment. Planner graph state contains per-run control and typed
+result fields only; Planner neither mutates nor returns SessionFrame.
 
 Planner directly owns one PydanticAI `Agent` created through the inward-facing
 `AgentFactoryPort`. For each invocation it supplies that current Agent,
-`PlannerDeps`, immutable `PlanningContext`, and assembled operation
-instructions to LangGraph. Request understanding and Evidence-grounded answer
-composition invoke the same Agent directly with operation-specific output
-types and instructions. LangGraph still coordinates the fixed transitional
-`understand_request -> prepare_results -> dispatch_work -> compose_response`
-control flow; this ownership cutover does not implement the target lifecycle
-graph.
+immutable `PlannerContext`, separate `ConversationHistory`, and assembled
+operation instructions to LangGraph. Request understanding and authorized-
+context answer composition invoke the same Agent directly with operation-
+specific output types and instructions. LangGraph coordinates the transitional
+`understand_request -> prepare_results -> compose_response` control flow. It
+contains no direct dispatcher call or Planner-selected execution capability;
+this correction does not implement the target lifecycle graph.
 
 The built-in Planner role and authority instruction remains source-owned.
 Optional project guidance is loaded only from `.cognieda/planner.md` and is
 inserted between that built-in baseline and the current operation instruction.
-Repository-root `AGENTS.md` content is not a Planner runtime instruction.
+The instruction utility resolves the direct caller module's sibling
+`instruction/` directory through the source layout convention. Repository-root
+`AGENTS.md` content is not a Planner runtime instruction.
 
-Current bounded Planner behavior can understand a
-finite set of requests, establish or refine an Objective, retain planning-only
-Assumptions, create and track bounded data Tasks, route work through the
-dispatcher, consume identity-checked outcomes, and draft empirical answers
-from admitted Evidence while excluding Assumptions. Planner does not admit
-Evidence.
+Current bounded Planner behavior can understand a finite set of requests,
+establish or refine an Objective, retain planning-only Assumptions through
+exact-text testability assessment, summarize retained state, and draft answers
+from admitted Evidence and/or governed Discovery while excluding Assumptions,
+Tasks, and conversation from authoritative support. Legacy `/profile`,
+`/analyze`, and `/transform` commands return a controlled deferred result.
+Planner does not create Tasks, dispatch work, admit Evidence, or create or
+re-evaluate Discovery.
 
 The current in-process runtime also preserves native model-message history
 across Planner runs so a follow-up can be understood in conversational context.
@@ -282,8 +287,10 @@ infrastructure for the later approval boundary. Validation does not persist a
 candidate, and no application caller currently persists a PlanRevision.
 Planner does not author or consume PlanRevision, and approval, exact
 post-approval revalidation, activation, active-plan selection, and replanning
-runtime are **Deferred**. Active Task exposes all three canonical kinds, but
-only bounded `DATA` work is executable. Full Task DAG runtime behavior,
+runtime are **Deferred**. Active Task exposes all three canonical kinds.
+Bounded `DATA` work remains available only through non-Planner execution and
+application library seams; correct Planner plan approval and specialist-tool
+execution are **Deferred**. Full Task DAG runtime behavior,
 GeneratedView coordination, durable SessionFrame composition, and the
 end-to-end recovery model remain **Deferred** target design. The
 [MVP-v2 definition](mvp-runtime-subset.md) explains the minimum complete
