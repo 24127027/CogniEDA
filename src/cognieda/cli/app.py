@@ -8,8 +8,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dotenv import load_dotenv
-
 from .main import repl
 from .renderer import Renderer
 
@@ -42,14 +40,8 @@ def parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return build_parser().parse_args(argv)
 
 
-def load_workspace_environment(workspace_path: Path) -> None:
-    """Load a selected workspace's optional .env without replacing process values."""
-    load_dotenv(dotenv_path=workspace_path.expanduser().resolve() / ".env", override=False)
-
-
 def main(argv: Sequence[str] | None = None) -> None:
     """Open the selected workspace and run the Planner REPL."""
     args = parse_args(argv)
-    load_workspace_environment(args.path)
     app = bootstrap_application(args.path)
     asyncio.run(repl(app, Renderer()))
