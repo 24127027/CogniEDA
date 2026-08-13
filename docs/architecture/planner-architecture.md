@@ -8,6 +8,13 @@ This page defines the target Planner architecture. The bounded current library
 implements only the transitional behavior described below; canonical planning remains a
 target.
 
+CogniEDA separates a deterministic governed research-state kernel from an
+agentic cognitive plane. The kernel owns authority, persistence, provenance,
+eligibility, validity constraints, and lifecycle transitions. Agents own
+reasoning, operationalization within their role, allowed tool selection, and
+iterative work decisions. Governance defines what is allowed; it does not
+precompile the reasoning workflow.
+
 ## Planner responsibility
 
 The Planner owns:
@@ -16,7 +23,7 @@ The Planner owns:
 - bounded planning consultations;
 - complete `PlanRevision` proposals;
 - Task DAG construction and presentation;
-- routing by required capability;
+- reasoning over governed specialist and tool interactions;
 - approval coordination;
 - replanning and successor-plan proposals;
 - `SessionFrame` coordination;
@@ -76,14 +83,13 @@ Objective. Its content owns plan-version concerns such as:
 
 - exactly one immutable `PlanTaskBinding` for each member Task;
 - explicit dependency edges between member Tasks;
-- binding-owned required capability;
 - binding-owned non-negative `order_rank` and finite `LOW`, `NORMAL`, or `HIGH`
   priority;
 - a deterministic plan-content fingerprint.
 
 Membership is derived from the binding Task identities; a parallel `task_ids`
-collection is not a second source of truth. Required capability, order rank,
-and priority are coordination semantics. Changing any of them
+collection is not a second source of truth. Order rank and priority are
+coordination semantics. Changing either one
 changes PlanRevision content and its fingerprint without, by itself, creating a
 successor Task.
 
@@ -109,19 +115,19 @@ Scientific stopping conditions remain part of Hypothesis Analyst-owned
 the applicable role-native work order, including `DataWorkOrder`.
 
 A `Task` is the durable semantic work unit. Its canonical kinds are `DATA`,
-`SCIENTIFIC`, and `GRAPH`. Required capability, assignment,
-dependencies, parentage, order, priority, PlanRevision identity, approval, and
-activation are not part of Task identity. Changing binding coordination does
-not change what the Task means; changing semantic work requires a successor
-Task.
+`SCIENTIFIC`, and `GRAPH`; these are semantic and epistemic classes, not
+provider routes. Execution strategy, assignment, dependencies, parentage,
+order, priority, PlanRevision identity, approval, and activation are not part
+of Task identity. Changing binding coordination does not change what the Task
+means; changing semantic work requires a successor Task.
 
 Not every user prompt becomes a Task. The Planner may answer a general/direct
 question with no project work, or synthesize an answer from retained
 authoritative project state, without creating executable work.
 
 The Planner constructs a DAG rather than a bag of instructions. It must expose
-dependencies, blocked prerequisites, terminal leaves, and capability
-requirements before activation. The dependency DAG determines eligibility.
+dependencies, blocked prerequisites, and terminal leaves before activation.
+The dependency DAG determines eligibility.
 `order_rank` is only a scheduling preference among otherwise compatible work,
 permits ties for concurrent or independent Tasks, and never overrides a
 dependency. Equal-rank bindings use canonical Task-ID ordering only as a
@@ -148,23 +154,21 @@ fingerprint or exact version that application authority activates. A changed
 proposal requires a new approval decision unless explicit policy permits the
 specific change.
 
-## Routing and replanning
+## Governed execution and replanning
 
-| Task kind | Binding capability |
-| --- | --- |
-| `DATA` | exactly one of `DATA_ANALYSIS`, `DATA_PROFILING`, or `DATA_TRANSFORMATION` |
-| `SCIENTIFIC` | `HYPOTHESIS_TESTING` |
-| `GRAPH` | `GRAPH_MINING` |
+Application authority selects an eligible Task from the active approved DAG
+and exposes only the role-level specialist tools allowed for the execution
+context. The Planner receives that Task as its current goal and reasons about
+whether to call zero, one, or multiple allowed tools, whether more work is
+needed, and when to stop or report a blocker. The application owns Task
+lifecycle transitions and validates identity, provenance, and authority at
+every boundary.
 
-The Planner declares the required capability in the `PlanTaskBinding`;
-`ExecutorRegistry` resolves an eligible runtime provider for dispatcher-backed
-work. `Capability` is owned by the execution/dispatch layer. PlanRevision does
-not duplicate role, provider, worker, process, or model identity. Kind and
-capability compatibility is validated structurally. Planner coordinates and
-may invoke the dispatcher, but it does not perform executor-native Task work.
-If the capability is absent, the Planner receives a typed unavailable or
-blocked outcome. It does not choose a legacy executor, reinterpret the Task,
-infer a capability or provider, or route by semantic guess.
+PlanRevision does not contain capability, role, provider, specialist, worker,
+process, model, tool, or routing-hint identity. Execution internals may retain
+capability-based provider resolution behind a specialist tool boundary, but
+the Planner does not select an internal `Capability` while authoring the plan.
+It does not choose a legacy executor or reinterpret the Task.
 
 Capability absence, infeasibility, a blocked dependency, new limitations, a
 correction request, additional Evidence needs, validity change, or a human

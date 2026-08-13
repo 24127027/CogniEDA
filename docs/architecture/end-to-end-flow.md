@@ -58,10 +58,10 @@ observation is not automatically Evidence.
 
 1. The Planner drafts a complete candidate PlanRevision with canonical Tasks,
    exactly one immutable binding per member Task, and explicit dependency edges.
-   Each binding owns required capability, non-negative `order_rank`, and `LOW`,
-   `NORMAL`, or `HIGH` priority. The revision contains no role or provider
-   identity, no exact DataProfile identity, and no configurable
-   stopping-condition or replan-trigger policy.
+   Each binding owns non-negative `order_rank` and `LOW`, `NORMAL`, or `HIGH`
+   priority. The revision contains no capability, provider, specialist, tool,
+   exact DataProfile identity, or configurable stopping-condition or
+   replan-trigger policy.
 2. Application validates the exact candidate without persisting, approving, or
    activating it.
 3. The Planner presents that exact candidate to the Human.
@@ -80,37 +80,37 @@ Planner-authored trigger policy inside the PlanRevision. Scientific stopping
 remains `InvestigationProtocol`-owned, and bounded execution stopping remains
 owned by the applicable role-native work order such as `DataWorkOrder`.
 
-## Routing overview
+## Governed execution overview
 
 ```mermaid
 flowchart TD
-    A[Activated Task] --> K{Task kind}
-    K -->|DATA| D[Data Explorer<br/>Direct DataTask]
-    K -->|SCIENTIFIC| H[Hypothesis Analyst<br/>Scientific investigation]
-    K -->|GRAPH| G[Graph Miner<br/>Read-only inquiry]
-    D --> O[Normalized PlannerWorkOutcome]
-    G --> O
+    A[Eligible approved Task] --> P[Planner reasoning over current goal]
+    P --> D[Governed Data Explorer interaction]
+    P --> H[Governed Hypothesis Analyst interaction]
+    P --> G[Governed Graph Miner interaction]
+    D --> N[Validated role-native result]
+    G --> N
+    N --> P
     H --> ER[EvidenceRequest]
     ER --> D2[Data Explorer<br/>Scientific observation]
     D2 --> EA[Evidence admission]
     EA --> H
     H --> Q{Protected evaluation}
-    Q -->|typed non-completion| O
+    Q -->|typed non-completion| P
     Q -->|DiscoveryProposal| GV[Governance]
     GV -->|approved exact proposal| DA[Discovery admission]
-    DA --> O
+    DA --> P
+    P --> O[Final response or blocker]
 ```
 
-Before any route executes, the dispatcher verifies the required capability and
-plan binding. Capability absence returns a typed unavailable or blocked outcome
-and preserves Task meaning. There is no legacy fallback or semantic-guess
-route.
-
-Capability is execution/dispatch-owned, and `ExecutorRegistry` is the runtime
-mapping from the declared requirement to a provider. Provider registration or
-instance changes do not alter PlanRevision content. Planner coordinates and
-dispatches but is not a Task executor. Planner response synthesis is not a Task
-kind, capability, provider, or dispatch path.
+Application authority determines Task eligibility and which governed
+specialist tools are available. The Planner receives the eligible Task as a
+goal and reasons over zero, one, or multiple allowed specialist interactions;
+Task kind may constrain authority but is not a compile-time route. Execution
+internals may retain capability-based provider resolution behind a role-level
+tool boundary, but capability and provider selection are not PlanRevision
+content. Planner response synthesis is not a Task kind, capability, provider,
+or dispatch path.
 
 The dependency DAG determines eligibility; binding `order_rank` only expresses
 a scheduling preference and may tie, while priority is coordination metadata.
