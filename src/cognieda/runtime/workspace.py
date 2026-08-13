@@ -9,37 +9,117 @@ from cognieda.application.ports.llm import ModelConfig, ProviderType
 from cognieda.application.ports.llm import ProviderType
 
 @dataclass(slots=True)
+class ProviderProfile:
+    type: ProviderType
+    model: str
+    api_key_env: str
+    base_url: str = ""
+
+
+@dataclass(slots=True)
 class ProjectConfig:
-    values: dict[str, object] = field(default_factory=dict)
+    default_provider: str
+    providers: dict[str, ProviderProfile]
 
-    def get(self, key: str, default=None):
-        current = self.values
+    @classmethod
+    def load(cls, path: Path) -> "ProjectConfig":
+        raw = toml.load(path) if path.exists() else {}
 
-        for part in key.split("."):
-            if not isinstance(current, dict):
-                return default
+        providers = {
+            name: ProviderProfile(
+                type=cfg["type"],
+                model=cfg["model"],
+                api_key_env=cfg["api_key_env"],
+                base_url=cfg.get("base_url", ""),
+            )
+            for name, cfg in raw.get("providers", {}).items()
+        }
 
-            current = current.get(part)
+        return cls(
+            default_provider=raw.get("default_provider", ""),
+            providers=providers,
+        )
 
-            if current is None:
-                return default
+    def resolve_model(self) -> ModelConfig:
+        profile = self.providers[self.default_provider]
 
-        return current
+        api_key = os.environ.get(profile.api_key_env)
+        if not api_key:
+            raise ValueError(
+                f"Environment variable '{profile.api_key_env}' is not set."
+            )
+
+        return ModelConfig(
+            provider=profile.type,
+            model_name=profile.model,
+            base_url=profile.base_url,
+            api_key=api_key,
+        )
 
 
 class Workspace:
-    def __init__(self, root: Path, config: ProjectConfig):
-        self.root = self._normalize_root(root)
-        self.config = config
-        self.model_config = self.resolve_model_config()
+    def __init__(
+        self,
+        root: Path,
+        project_config: ProjectConfig,
+    ) -> None:
+        self.root = root
+        self.project_config = project_config
+        self.model_config: ModelConfig = project_config.resolve_model()
 
-    @property
-    def data_dir(self) -> Path:
-        return self.root / "data"
+    # -------------------------------------------------------------------------
+    # Workspace lifecycle
+    # -------------------------------------------------------------------------
+
+    @classmethod
+    def open(cls, root: Path) -> "Workspace":
+        root = cls._normalize(root)
+        cls.initialize(root)
+
+        return cls(
+            root=root,
+            project_config=ProjectConfig.load(
+                root / ".cognieda" / "project.toml"
+            ),
+        )
+
+    @classmethod
+    def initialize(cls, root: Path) -> None:
+        root = cls._normalize(root)
+
+        cognieda = root / ".cognieda"
+
+        (root / "data").mkdir(parents=True, exist_ok=True)
+        (cognieda / "skills").mkdir(parents=True, exist_ok=True)
+        (cognieda / "state").mkdir(parents=True, exist_ok=True)
+        (cognieda / "sessions").mkdir(parents=True, exist_ok=True)
+
+        cls._ensure_default_project_config(
+            cognieda / "project.toml"
+        )
+
+        for name in (
+            "agents.toml",
+            "skills.toml",
+            "mcp.toml",
+        ):
+            (cognieda / name).touch(exist_ok=True)
+
+    @staticmethod
+    def _normalize(root: Path) -> Path:
+        return root.expanduser().resolve()
+
+    # -------------------------------------------------------------------------
+    # Directories
+    # -------------------------------------------------------------------------
 
     @property
     def cognieda_dir(self) -> Path:
         return self.root / ".cognieda"
+
+    @property
+    def data_dir(self) -> Path:
+        return self.root / "data"
 
     @property
     def state_dir(self) -> Path:
@@ -48,6 +128,10 @@ class Workspace:
     @property
     def session_dir(self) -> Path:
         return self.cognieda_dir / "sessions"
+
+    # -------------------------------------------------------------------------
+    # Configuration files
+    # -------------------------------------------------------------------------
 
     @property
     def project_config_path(self) -> Path:
@@ -58,75 +142,111 @@ class Workspace:
         return self.cognieda_dir / "agents.toml"
 
     @property
-    def mcp_config_path(self) -> Path:
-        return self.cognieda_dir / "mcp.toml"
-
-    @property
     def skills_config_path(self) -> Path:
         return self.cognieda_dir / "skills.toml"
 
     @property
-    def planner_agent_instruction_path(self) -> Path:
+    def mcp_config_path(self) -> Path:
+        return self.cognieda_dir / "mcp.toml"
+
+    @property
+    def planner_instruction_path(self) -> Path:
         return self.root / "AGENTS.md"
 
-    @classmethod
-    def open(cls, root: Path) -> "Workspace":
-        root = cls._normalize_root(root)
-        cls.init_workspace(root)
-        config_path = root / ".cognieda" / "project.toml"
+    # -------------------------------------------------------------------------
+    # Planner instruction
+    # -------------------------------------------------------------------------
 
-        config = cls.load_config(config_path)
+    def load_planner_instruction(self) -> str:
+        if not self.planner_instruction_path.exists():
+            return ""
 
-        return cls(
-            root=root,
-            config=config,
+        return self.planner_instruction_path.read_text(
+            encoding="utf-8"
         )
 
-    @classmethod
-    def init_workspace(cls, root: Path) -> None:
-        root = cls._normalize_root(root)
-        cognieda_dir = root / ".cognieda"
+    # -------------------------------------------------------------------------
+    # Agent configuration
+    # -------------------------------------------------------------------------
 
-        cognieda_dir.mkdir(parents=True, exist_ok=True)
-        (root / "data").mkdir(parents=True, exist_ok=True)
-        (cognieda_dir / "skills").mkdir(parents=True, exist_ok=True)
+    def load_agents_config(self) -> dict:
+        return self._load_toml(self.agents_config_path)
 
-        # Initialize project.toml if it doesn't exist
-        project_config_path = cognieda_dir / "project.toml"
-        if not project_config_path.exists():
-            default_config = textwrap.dedent(
-                """\
-                [model]
-                provider = "google"
+    def save_agents_config(self, config: dict) -> None:
+        self._save_toml(self.agents_config_path, config)
+
+    # -------------------------------------------------------------------------
+    # Skill configuration
+    # -------------------------------------------------------------------------
+
+    def load_skills_config(self) -> dict:
+        return self._load_toml(self.skills_config_path)
+
+    def save_skills_config(self, config: dict) -> None:
+        self._save_toml(self.skills_config_path, config)
+
+    # -------------------------------------------------------------------------
+    # Generic TOML helpers
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _load_toml(path: Path) -> dict:
+        if not path.exists():
+            return {}
+
+        return toml.load(path)
+
+    @staticmethod
+    def _save_toml(path: Path, data: dict) -> None:
+        with path.open("w", encoding="utf-8") as f:
+            toml.dump(data, f)
+
+    # -------------------------------------------------------------------------
+    # Default configuration
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _ensure_default_project_config(path: Path) -> None:
+        if path.exists():
+            return
+
+        path.write_text(
+            textwrap.dedent(
                 """
-            )
+                default_provider = "google"
 
-            project_config_path.write_text(
-                default_config,
-                encoding="utf-8",
-            )
+                [providers.google]
+                type = "google"
+                model = "gemini-2.5-flash"
+                api_key_env = "GOOGLE_API_KEY"
 
-        # Initialize agents.toml, skills.toml, and mcp.toml if they don't exist
-        additional_configs = ["agents.toml", "skills.toml", "mcp.toml"]
-        for config_filename in additional_configs:
-            file_path = cognieda_dir / config_filename
-            if not file_path.exists():
-                file_path.touch()
+                [providers.openai]
+                type = "openai"
+                model = "gpt-5"
+                api_key_env = "OPENAI_API_KEY"
 
-    @staticmethod
-    def _normalize_root(root: Path) -> Path:
-        return root.expanduser().resolve()
+                [providers.anthropic]
+                type = "anthropic"
+                model = "claude-sonnet-4"
+                api_key_env = "ANTHROPIC_API_KEY"
+                """
+            ).strip()
+            + "\n",
+            encoding="utf-8",
+        )
 
-    @staticmethod
-    def load_config(config_path: Path) -> ProjectConfig:
-        config_data = toml.load(config_path) if config_path.exists() else {}
+    # -------------------------------------------------------------------------
+    # TODO: Configuration editing
+    #
+    # These methods are temporary. Workspace should only locate files and load
+    # configuration. Editing skills/agents belongs in a dedicated configuration
+    # service (e.g. WorkspaceConfigurator, SkillRegistry, or AgentRegistry).
+    #
+    # Keep these methods here until the configuration subsystem is extracted.
+    # -------------------------------------------------------------------------
 
-        return ProjectConfig(values=config_data)
-
-    # TODO: Temporarily implement add/remove skill methods for workspace, 
-    # but these should be moved to some where else
     def add_skill(self, name: str, directory: str) -> None:
-        config = self._load_skills_config()
+        config = self.load_skills_config()
 
         if name in config:
             raise ValueError(f"Skill '{name}' already exists.")
@@ -135,132 +255,67 @@ class Workspace:
             "directories": directory,
         }
 
-        self._save_skills_config(config)
+        self.save_skills_config(config)
+
 
     def remove_skill(self, name: str) -> None:
-        config = self._load_skills_config()
+        config = self.load_skills_config()
 
         config.pop(name, None)
 
-        self._save_skills_config(config)
+        self.save_skills_config(config)
 
-    def add_worker_skill(self, worker: str, skill: str) -> None:
-        config = self._load_agents_config()
 
-        worker_cfg = config.setdefault(worker, {})
-        skills = worker_cfg.setdefault("skills", [])
+    def add_worker_skill(
+        self,
+        worker: str,
+        skill: str,
+    ) -> None:
+        config = self.load_agents_config()
+
+        worker_config = config.setdefault(worker, {})
+        skills = worker_config.setdefault("skills", [])
 
         if skill not in skills:
             skills.append(skill)
 
-        self._save_agents_config(config)
+        self.save_agents_config(config)
 
-    def remove_worker_skill(self, worker: str, skill: str) -> None:
-        config = self._load_agents_config()
 
-        worker_cfg = config.get(worker)
-        if worker_cfg is None:
+    def remove_worker_skill(
+        self,
+        worker: str,
+        skill: str,
+    ) -> None:
+        config = self.load_agents_config()
+
+        worker_config = config.get(worker)
+        if worker_config is None:
             return
 
-        skills = worker_cfg.get("skills", [])
+        skills = worker_config.get("skills", [])
 
         if skill in skills:
             skills.remove(skill)
 
-        self._save_agents_config(config)
+        self.save_agents_config(config)
 
-    def _load_agents_config(self) -> dict:
-        try:
-            return toml.load(self.agents_config_path)
-        except FileNotFoundError:
-            return {}
-
-    def _save_agents_config(self, config: dict) -> None:
-        with open(self.agents_config_path, "w", encoding="utf-8") as f:
-            toml.dump(config, f)
-
-    def _load_skills_config(self) -> dict:
-        try:
-            return toml.load(self.skills_config_path)
-        except FileNotFoundError:
-            return {}
-
-    def _save_skills_config(self, config: dict) -> None:
-        with open(self.skills_config_path, "w", encoding="utf-8") as f:
-            toml.dump(config, f)
-
-    def load_planner_agent_instruction(self) -> str:
-        path = self.planner_agent_instruction_path
-
-        if not path.is_file():
+    # -------------------------------------------------------------------------
+    # TODO: Instruction loading
+    #
+    # Workspace should only expose filesystem paths. Reading and composing agent
+    # instructions belongs to the instruction subsystem (e.g.
+    # InstructionLoader/InstructionRepository). This helper remains temporarily
+    # because the planner currently loads instructions directly from the workspace.
+    # -------------------------------------------------------------------------
+    @property
+    def agent_instruction_path(self) -> Path:
+        return self.root / "AGENTS.md"
+    
+    def load_agent_instruction(self) -> str:
+        if not self.agent_instruction_path.is_file():
             return ""
 
-        return path.read_text(encoding="utf-8")
-
-    
-    def _resolved_value(
-        self,
-        key: str,
-        *environment_names: str,
-    ) -> str:
-        workspace_value = self.config.get(key)
-        if workspace_value is not None and str(workspace_value).strip():
-            return str(workspace_value).strip()
-
-        for environment_name in environment_names:
-            environment_value = os.environ.get(environment_name, "").strip()
-            if environment_value:
-                return environment_value
-
-        return ""
-
-
-    def _normalize_provider(self, provider: str) -> ProviderType:
-        if provider == "gemini":
-            return "google"
-        if provider == "openai":
-            return "openai"
-        if provider == "google":
-            return "google"
-        if provider == "anthropic":
-            return "anthropic"
-        raise ValueError(f"Unsupported model provider: {provider}")
-
-
-    def resolve_model_config(self) -> ModelConfig:
-        """Resolve workspace-first model configuration without mutating process state."""
-
-        provider = self._resolved_value("model.provider", "COGNIEDA_MODEL_PROVIDER")
-        model_name = self._resolved_value("model.name", "COGNIEDA_MODEL_NAME")
-        base_url = self._resolved_value(
-            "model.base_url",
-            "MODEL_BASE_URL",
-            "COGNIEDA_OPENAI_BASE_URL",
-        )
-        api_key = self._resolved_value(
-            "model.api_key",
-            "MODEL_API_KEY",
-            "COGNIEDA_OPENAI_API_KEY",
-        )
-
-        if not model_name:
-            raise ValueError(
-                "Model name is required in .cognieda/project.toml or COGNIEDA_MODEL_NAME."
-            )
-        if not api_key:
-            raise ValueError(
-                "Model API key is required in .cognieda/project.toml or "
-                "MODEL_API_KEY (legacy fallback: COGNIEDA_OPENAI_API_KEY)."
-            )
-        if not provider:
-            raise ValueError(
-                "Model provider is required in .cognieda/project.toml or "
-                "COGNIEDA_MODEL_PROVIDER."
-            )
-
-        return ModelConfig(
-            provider=self._normalize_provider(provider),
-            model_name=model_name,
-            base_url=base_url,
-            api_key=api_key,
+        return self.agent_instruction_path.read_text(
+            encoding="utf-8",
         )

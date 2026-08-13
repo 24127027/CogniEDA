@@ -93,7 +93,7 @@ class Application:
 
             case ["/reload", "instructions"]:
                 await self.planner_agent.reload(
-                    agent_instruction=self.workspace.load_planner_agent_instruction(),
+                    agent_instruction=self.workspace.load_agent_instruction(),
                 )
 
                 return self._text(
