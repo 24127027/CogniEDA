@@ -6,8 +6,6 @@ from unittest.mock import Mock
 import pytest
 
 from cognieda.cli import app as cli_app
-from cognieda.runtime.bootstrap import resolve_model_config
-from cognieda.runtime.workspace import Workspace
 
 
 def test_help_exits_before_application_bootstrap(monkeypatch, capsys) -> None:

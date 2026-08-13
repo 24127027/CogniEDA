@@ -54,7 +54,9 @@ other workflow/provenance/cache/presentation state into an FCO.
 
 ## Canonical Task and plan rules
 
-- Task kinds are exactly `DATA`, `SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`.
+- Task kinds are exactly `DATA`, `SCIENTIFIC`, and `GRAPH`.
+- Planner response synthesis is Planner behavior, not a Task kind, capability,
+  provider, or executor path. Not every user prompt becomes a Task.
 - Do not add compatibility fallback from legacy `ANALYTICAL`, `ORGANIZING`, or
   `REVIEW` to canonical new-write paths.
 - Task owns semantic work identity. PlanRevision and plan-version state own

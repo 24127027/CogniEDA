@@ -147,19 +147,61 @@ Planning is an active, approval-bound loop:
 
 ```text
 user request
-  -> Planner drafts a high-level plan
-  -> gaps identified
-  -> bounded Graph Miner or Data Explorer planning support when needed
-  -> plan revised
-  -> Human reviews
-  -> PlanRevision approved and activated
-  -> eligible Task DAG work executes
+  -> Planner determines whether project work is required
+     -> no: answer directly from eligible retained state
+     -> yes: draft a high-level plan
+        -> gaps identified
+        -> bounded Graph Miner or Data Explorer planning support when needed
+        -> transient canonical Objective, Tasks, and PlanRevision revised
+        -> Human reviews and approves those exact pending objects
+        -> application performs commit-boundary validation
+        -> exact approved objects atomically persisted, adopted, and activated
+        -> eligible Task DAG work executes
 ```
 
 Planning-support observations are not Evidence. `PlanRevision` represents the
 full approved Task DAG. A Task is an independently governed semantic work
-unit; PlanRevision owns membership, dependencies, assignment, ordering, and
-approval metadata.
+unit. Exactly one immutable `PlanTaskBinding` represents each member Task and
+owns non-negative `order_rank` and finite `LOW`, `NORMAL`, or `HIGH` priority.
+Membership is derived from the bindings;
+dependencies remain explicit DAG edges. Related workflow-lifecycle state owns
+approval and activation metadata. Capability, provider, specialist, tool, and
+other execution-routing choices are not PlanRevision content.
+
+Domain construction may enforce structural validity before review, but there
+is no mandatory separate application preflight or admission stage. Unapproved
+pending objects are not durable authoritative state; commit-boundary validation,
+persistence, adoption, and activation belong to the later exact-approval
+transition.
+
+The DAG alone determines eligibility. Rank ties are valid for concurrent or
+independent Tasks, canonical Task-ID ordering is only a deterministic
+serialization tie-breaker, and neither rank nor priority overrides a
+dependency. A binding coordination change changes PlanRevision content and its
+fingerprint without, by itself, creating a successor Task.
+
+Capability remains execution-internal plumbing where current providers require
+it. PlanRevision states no capability requirement or provider route. Role,
+provider, specialist, worker, process, model, tool, and Planner identity are
+excluded from plan content and its fingerprint. Application determines
+eligibility and the governed tool set; Planner reasons over interactions inside
+that allowed set but is not a Task executor. When retained authoritative state
+already answers a request, Planner synthesizes the response without creating a
+Task, capability, or provider path.
+
+PlanRevision and its bindings contain no concrete DataProfile identity or data
+selection. Planner describes intended data scope only through Task semantics.
+Each specialist or controller receives complete authoritative DataProfile
+context and chooses the concrete applicable profile and scope within its own
+authority. Exact DataProfiles actually used are captured later in execution or
+scientific provenance and are not PlanRevision fingerprint content.
+
+The immutable PlanRevision content does not embed configurable stopping
+conditions, replan triggers, or hypothetical future causes. Plan-execution
+completion, interruption, approval and activation state, and replanning are
+workflow-lifecycle state associated with the revision. Scientific stopping is
+owned by `InvestigationProtocol`; bounded execution stopping is owned by the
+applicable role-native work order.
 
 Canonical Task kinds are exactly:
 
@@ -167,7 +209,6 @@ Canonical Task kinds are exactly:
 DATA
 SCIENTIFIC
 GRAPH
-SYNTHESIS
 ```
 
 New authoritative state accepts only canonical Task meanings; legacy shapes do

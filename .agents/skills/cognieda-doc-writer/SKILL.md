@@ -35,8 +35,10 @@ meaning.
   Evidence, Discovery, and SessionFrame.
 - The semantic graph contains exactly Objective, Hypothesis, Evidence, and
   Discovery.
-- Task kinds are exactly `DATA`, `SCIENTIFIC`, `GRAPH`, and `SYNTHESIS`; legacy
-  kinds are drift, not target compatibility.
+- Task kinds are exactly `DATA`, `SCIENTIFIC`, and `GRAPH`; legacy kinds and
+  `SYNTHESIS` as executable Task work are drift, not target compatibility.
+- Planner response synthesis is Planner behavior, not a Task, capability,
+  provider, or executor path.
 - Planner is the sole human facade and has no scientific operationalization or
   evaluation authority.
 - Data Explorer exclusively accesses datasets and does not evaluate.

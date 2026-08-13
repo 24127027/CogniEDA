@@ -12,7 +12,6 @@ from cognieda.execution.capabilities import Capability as CapabilityOwner
 from cognieda.infrastructure.agent_tooling import AgentTooling
 from cognieda.infrastructure.persistence import create_db_engine
 from cognieda.infrastructure.persistence.repositories import TaskRepository
-from cognieda.retrieval import is_allowed_in_context
 from cognieda.runtime import Application
 from cognieda.schemas import Task
 from cognieda.schemas.artifacts import Task as TaskOwner
@@ -102,6 +101,13 @@ def test_legacy_root_shims_and_root_main_are_absent() -> None:
     assert not (PROJECT_ROOT / "main.py").exists()
 
 
+def test_superseded_retrieval_subsystem_has_no_active_api() -> None:
+    retrieval_root = PROJECT_ROOT / "src" / "cognieda" / "retrieval"
+
+    assert list(retrieval_root.glob("*.py")) == []
+    assert not (PROJECT_ROOT / "src" / "cognieda" / "schemas" / "retrieval.py").exists()
+
+
 def test_major_package_boundaries_import_from_cognieda() -> None:
     assert all(
         value is not None
@@ -110,7 +116,6 @@ def test_major_package_boundaries_import_from_cognieda() -> None:
             Renderer,
             DatasetProfiler,
             create_db_engine,
-            is_allowed_in_context,
             TaskRepository,
             Application,
             AgentTooling,

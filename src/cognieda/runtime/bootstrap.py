@@ -1,30 +1,37 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+from cognieda.infrastructure.llm import AgentFactory
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
-from cognieda.application.ports import ModelConfig, ProviderType
 from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
-from cognieda.infrastructure.agent_tooling import AgentTooling
-from cognieda.infrastructure.llm import AgentFactory
 
 from .application import Application
+from .workspace import MissingModelCredentialError
 from .workspace import Workspace
 
 
+def _load_workspace_environment(workspace_path: Path) -> None:
+    env_path = workspace_path.expanduser().resolve() / ".env"
+    env_path.parent.mkdir(parents=True, exist_ok=True)
+    env_path.touch(exist_ok=True)
+    load_dotenv(dotenv_path=env_path, override=False)
+
+
 def bootstrap_application(workspace_path: Path) -> Application:
+    _load_workspace_environment(workspace_path)
     workspace = Workspace.open(workspace_path)
-    model_config = resolve_model_config(workspace)
-    config_root = workspace.root / ".cognieda"
-    tooling = AgentTooling.from_config_path(
-        path=config_root / "agents.toml",
-        mcp_path=config_root / "mcp.toml",
-        skills_path=config_root / "skills.toml",
-    )
-    agent_factory = AgentFactory(tooling)
+
+    try:
+        model_config = workspace.project_config.resolve_model()
+    except MissingModelCredentialError:
+        model_config = None
+
+    agent_factory = AgentFactory(tooling_config=workspace)
 
     registry = ExecutorRegistry()
     registry.register_provider(
@@ -40,80 +47,13 @@ def bootstrap_application(workspace_path: Path) -> Application:
         deps=PlannerDeps(dispatcher=dispatcher),
         agent_factory=agent_factory,
         model_config=model_config,
+        agent_instruction=workspace.load_agent_instruction(),
     )
 
     return Application(
+        agent_factory=agent_factory,
         workspace=workspace,
         planner_agent=planner,
         dispatcher=dispatcher,
     )
 
-
-def _resolved_value(
-    workspace: Workspace,
-    key: str,
-    *environment_names: str,
-) -> str:
-    workspace_value = workspace.config.get(key)
-    if workspace_value is not None and str(workspace_value).strip():
-        return str(workspace_value).strip()
-
-    for environment_name in environment_names:
-        environment_value = os.environ.get(environment_name, "").strip()
-        if environment_value:
-            return environment_value
-
-    return ""
-
-
-def _normalize_provider(provider: str) -> ProviderType:
-    if provider == "gemini":
-        return "google"
-    if provider == "openai":
-        return "openai"
-    if provider == "google":
-        return "google"
-    if provider == "anthropic":
-        return "anthropic"
-    raise ValueError(f"Unsupported model provider: {provider}")
-
-
-def resolve_model_config(workspace: Workspace) -> ModelConfig:
-    """Resolve workspace-first model configuration without mutating process state."""
-
-    provider = _resolved_value(workspace, "model.provider", "COGNIEDA_MODEL_PROVIDER")
-    model_name = _resolved_value(workspace, "model.name", "COGNIEDA_MODEL_NAME")
-    base_url = _resolved_value(
-        workspace,
-        "model.base_url",
-        "MODEL_BASE_URL",
-        "COGNIEDA_OPENAI_BASE_URL",
-    )
-    api_key = _resolved_value(
-        workspace,
-        "model.api_key",
-        "MODEL_API_KEY",
-        "COGNIEDA_OPENAI_API_KEY",
-    )
-
-    if not model_name:
-        raise ValueError(
-            "Model name is required in .cognieda/project.toml or COGNIEDA_MODEL_NAME."
-        )
-    if not api_key:
-        raise ValueError(
-            "Model API key is required in .cognieda/project.toml or "
-            "MODEL_API_KEY (legacy fallback: COGNIEDA_OPENAI_API_KEY)."
-        )
-    if not provider:
-        raise ValueError(
-            "Model provider is required in .cognieda/project.toml or "
-            "COGNIEDA_MODEL_PROVIDER."
-        )
-
-    return ModelConfig(
-        provider=_normalize_provider(provider),
-        model_name=model_name,
-        base_url=base_url,
-        api_key=api_key,
-    )

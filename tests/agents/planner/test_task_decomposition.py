@@ -25,6 +25,8 @@ from cognieda.execution import (
     ExecutionResult,
     ExecutionStatus,
 )
+from cognieda.runtime.conversation import ConversationHistory
+from cognieda.runtime.planner_context import build_planning_context
 from cognieda.schemas.artifacts import (
     Assumption,
     DataProfile,
@@ -99,11 +101,24 @@ class FakeDispatcher:
         )
 
 
+class RaisingDispatcher:
+    def __init__(self) -> None:
+        self.requests: list[ExecutionRequest] = []
+
+    async def dispatch(self, request: ExecutionRequest) -> ExecutionResult:
+        self.requests.append(request)
+        raise RuntimeError("provider unavailable")
+
+
 def _planner(model: FakePlannerModel, dispatcher: FakeDispatcher) -> Planner:
     return Planner(
         deps=PlannerDeps(dispatcher=dispatcher),
         planner_model=model,
     )
+
+
+def _context(frame: SessionFrame | None = None):
+    return build_planning_context(frame or SessionFrame(), ConversationHistory())
 
 
 def _data_decision(
@@ -143,20 +158,22 @@ def test_typed_capability_selection_dispatches_one_bounded_canonical_task(
     frame = SessionFrame(objective=objective)
 
     output = asyncio.run(
-        _planner(model, dispatcher).run("Do the requested bounded data work.", session_frame=frame)
+        _planner(model, dispatcher).run(
+            "Do the requested bounded data work.",
+            planning_context=_context(frame),
+        )
     )
 
     assert output.selected_capability is capability
-    assert len(output.created_task_ids) == 1
+    assert output.created_task is not None
     assert len(dispatcher.requests) == 1
     request = dispatcher.requests[0]
     assert request.capability is capability
-    assert request.input.task.task_id == output.created_task_ids[0]
+    assert request.input.task.task_id == output.created_task.task_id
     assert request.input.task.objective_id == objective.objective_id
     assert request.input.task.kind is TaskKind.DATA
     assert request.input.task.instruction == instruction
     assert request.input.task.status is TaskStatus.RUNNING
-    assert output.session_frame.evidences == ()
 
 
 def test_successful_work_preserves_task_identity_and_completes_without_evidence() -> None:
@@ -166,11 +183,14 @@ def test_successful_work_preserves_task_identity_and_completes_without_evidence(
     frame = SessionFrame(objective=Objective(text="Assess dataset quality."))
 
     output = asyncio.run(
-        _planner(model, dispatcher).run("Check missingness.", session_frame=frame)
+        _planner(model, dispatcher).run(
+            "Check missingness.",
+            planning_context=_context(frame),
+        )
     )
 
-    task_id = output.created_task_ids[0]
-    task = next(task for task in output.session_frame.tasks if task.task_id == task_id)
+    task = output.created_task
+    assert task is not None
     dispatched_task = dispatcher.requests[0].input.task
     assert task.status is TaskStatus.COMPLETED
     assert (
@@ -188,7 +208,6 @@ def test_successful_work_preserves_task_identity_and_completes_without_evidence(
     assert output.work_outcome is not None
     assert output.work_outcome.status is ExecutionStatus.SUCCEEDED
     assert len(output.work_outcome.result_digest) == 64
-    assert output.session_frame.evidences == ()
     assert "No Evidence was admitted" in output.response
 
 
@@ -201,17 +220,20 @@ def test_failed_or_blocked_work_fails_task_and_surfaces_blocker_without_evidence
     frame = SessionFrame(objective=Objective(text="Prepare data for analysis."))
 
     output = asyncio.run(
-        _planner(model, dispatcher).run("Transform the data.", session_frame=frame)
+        _planner(model, dispatcher).run(
+            "Transform the data.",
+            planning_context=_context(frame),
+        )
     )
 
-    task = output.session_frame.tasks[-1]
+    task = output.created_task
+    assert task is not None
     assert task.status is TaskStatus.FAILED
     assert output.work_outcome is not None
     assert output.work_outcome.status is status
     assert output.work_outcome.blockers == [
         f"Fake dispatcher {status.value} the requested work."
     ]
-    assert output.session_frame.evidences == ()
     assert "No Evidence was created" in output.response
 
 
@@ -224,28 +246,63 @@ def test_task_outcome_identity_mismatch_fails_closed() -> None:
     frame = SessionFrame(objective=Objective(text="Understand the data."))
 
     output = asyncio.run(
-        _planner(model, dispatcher).run("Profile the data.", session_frame=frame)
+        _planner(model, dispatcher).run(
+            "Profile the data.",
+            planning_context=_context(frame),
+        )
     )
 
     assert output.error is not None
     assert output.error.code is PlannerErrorCode.TASK_OUTCOME_MISMATCH
-    task = next(
-        task for task in output.session_frame.tasks if task.task_id == output.created_task_ids[0]
-    )
+    task = output.created_task
+    assert task is not None
     assert task.status is TaskStatus.FAILED
-    assert output.session_frame.evidences == ()
+
+
+def test_dispatcher_exception_returns_the_exact_failed_task_result() -> None:
+    dispatcher = RaisingDispatcher()
+    model = FakePlannerModel(_data_decision("Profile the active dataset."))
+    objective = Objective(text="Understand the data.")
+
+    output = asyncio.run(
+        _planner(model, dispatcher).run(
+            "Profile the data.",
+            planning_context=_context(SessionFrame(objective=objective)),
+        )
+    )
+
+    assert output.error is not None
+    assert output.error.code is PlannerErrorCode.DISPATCH_FAILED
+    assert output.created_task is not None
+    assert output.created_task.status is TaskStatus.FAILED
+    dispatched_task = dispatcher.requests[0].input.task
+    assert (
+        output.created_task.task_id,
+        output.created_task.objective_id,
+        output.created_task.kind,
+        output.created_task.instruction,
+    ) == (
+        dispatched_task.task_id,
+        dispatched_task.objective_id,
+        dispatched_task.kind,
+        dispatched_task.instruction,
+    )
 
 
 def test_data_work_without_objective_returns_blocker_without_creating_task() -> None:
     dispatcher = FakeDispatcher(ExecutionStatus.SUCCEEDED)
     model = FakePlannerModel(_data_decision("Profile the active dataset."))
 
-    output = asyncio.run(_planner(model, dispatcher).run("Profile it."))
+    output = asyncio.run(
+        _planner(model, dispatcher).run(
+            "Profile it.",
+            planning_context=_context(),
+        )
+    )
 
     assert output.error is not None
     assert output.error.code is PlannerErrorCode.MISSING_OBJECTIVE
-    assert output.created_task_ids == ()
-    assert output.session_frame.tasks == ()
+    assert output.created_task is None
     assert dispatcher.requests == []
 
 
@@ -261,16 +318,17 @@ def test_clear_data_request_can_establish_objective_before_creating_task() -> No
 
     output = asyncio.run(
         _planner(model, dispatcher).run(
-            "Understand this dataset by profiling its schema and quality."
+            "Understand this dataset by profiling its schema and quality.",
+            planning_context=_context(),
         )
     )
 
-    assert output.session_frame.objective is not None
-    assert output.session_frame.objective.text == (
+    assert output.created_objective is not None
+    assert output.created_objective.text == (
         "Understand the active dataset schema and quality."
     )
-    assert len(output.session_frame.tasks) == 1
-    assert output.session_frame.tasks[0].status is TaskStatus.COMPLETED
+    assert output.created_task is not None
+    assert output.created_task.status is TaskStatus.COMPLETED
 
 
 def test_semantic_task_change_creates_new_identity_without_rewriting_existing_task() -> None:
@@ -288,14 +346,16 @@ def test_semantic_task_change_creates_new_identity_without_rewriting_existing_ta
     model = FakePlannerModel(_data_decision("Summarize missingness by column."))
 
     output = asyncio.run(
-        _planner(model, dispatcher).run("Now inspect missingness.", session_frame=frame)
+        _planner(model, dispatcher).run(
+            "Now inspect missingness.",
+            planning_context=_context(frame),
+        )
     )
 
-    assert len(output.session_frame.tasks) == 2
-    old_task, new_task = output.session_frame.tasks
-    assert old_task.task_id == existing.task_id
-    assert old_task.instruction == "Profile the dataset."
-    assert old_task.status is TaskStatus.PENDING
+    new_task = output.created_task
+    assert new_task is not None
+    assert frame.tasks == (existing,)
+    old_task = frame.tasks[0]
     assert new_task.task_id != old_task.task_id
     assert new_task.objective_id == objective.objective_id
     assert new_task.kind is TaskKind.DATA
@@ -311,14 +371,13 @@ def test_explicit_assumption_addition_uses_successor_state_and_never_dispatches(
     output = asyncio.run(
         _planner(model, dispatcher).run(
             "/assumption Rows represent customers.",
-            session_frame=frame,
+            planning_context=_context(frame),
         )
     )
 
     assert frame.assumptions == ()
-    assert len(output.session_frame.assumptions) == 1
-    assert output.session_frame.assumptions[0].text == "Rows represent customers."
-    assert output.session_frame.evidences == ()
+    assert output.created_assumption is not None
+    assert output.created_assumption.text == "Rows represent customers."
     assert "not empirical Evidence" in output.response
     assert dispatcher.requests == []
     assert model.decision_inputs == []
@@ -364,12 +423,14 @@ def test_follow_up_answer_uses_admitted_typed_evidence() -> None:
     output = asyncio.run(
         _planner(model, dispatcher).run(
             "How many rows are in the dataset?",
-            session_frame=frame,
+            planning_context=_context(frame),
         )
     )
 
     assert output.response == "The admitted Evidence reports 42 rows."
-    assert output.session_frame == frame
+    assert output.created_objective is None
+    assert output.created_assumption is None
+    assert output.created_task is None
     assert len(model.answer_inputs) == 1
     answer_input = model.answer_inputs[0]
     assert answer_input.latest_request == "How many rows are in the dataset?"
@@ -390,7 +451,7 @@ def test_assumption_only_claim_cannot_support_empirical_answer() -> None:
     output = asyncio.run(
         _planner(model, dispatcher).run(
             "How many rows are in the dataset?",
-            session_frame=frame,
+            planning_context=_context(frame),
         )
     )
 

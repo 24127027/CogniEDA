@@ -26,7 +26,7 @@ Executors should be stateless or restart-safe. Durable progress, leases,
 attempt identity, and replay protection belong to application authority, not
 to hidden in-memory agent state.
 
-## Task semantics and capability
+## Task kind and governed specialist boundaries
 
 Canonical Task kinds are:
 
@@ -34,20 +34,33 @@ Canonical Task kinds are:
 DATA
 SCIENTIFIC
 GRAPH
-SYNTHESIS
 ```
 
-The required capability belongs to Task semantics. Executor assignment belongs
-to `PlanTaskBinding` or equivalent plan-version state, not to Task identity.
-Changing the assigned worker therefore does not change the Task's meaning.
+`TaskKind` is a semantic and epistemic work class. It may constrain authority:
+physical data access crosses Data Explorer, scientific operationalization and
+protected evaluation cross Hypothesis Analyst, and graph inquiry remains
+read-only. It is not a compile-time `TaskKind -> Capability -> Provider`
+routing table.
 
-Dispatch is capability-based and fail closed. For an approved Task whose
-required capability is unavailable, the dispatcher must decline execution,
-preserve the Task meaning and approved plan, return a typed unavailable or
-blocked outcome, and expose permitted next actions to the Planner.
+PlanRevision and `PlanTaskBinding` contain no capability, provider, specialist,
+worker, or tool selection. Application authority determines eligibility and
+which governed role-level tools are available; Planner reasons over the
+interactions needed to pursue the eligible Task. One Task may require zero,
+one, or multiple specialist interactions. Planner response synthesis is not
+Task work and does not justify a synthesis capability, Planner provider, or
+Planner executor role.
 
-It must not fall back to a legacy executor, route by semantic guess, silently
-change capability, or reinterpret the Task.
+Execution internals may remain capability-based and must fail closed when an
+allowed role-level interaction cannot be fulfilled. They must not fall back to
+a legacy executor, reinterpret Task meaning, or expose internal provider
+routing as approved plan content.
+
+Neither PlanRevision nor `PlanTaskBinding` selects a concrete DataProfile.
+Specialists receive the complete authoritative DataProfile context available
+for their work, then select the applicable profile and concrete scope within
+their role-native authority. Receiving metadata does not grant Graph Miner or
+Planner dataset access. Exact profiles actually used remain mandatory
+downstream execution or scientific provenance.
 
 ## Role-native contracts
 
@@ -75,6 +88,10 @@ references, allowed operation, scope, resource limits, required diagnostics or
 artifacts, and stopping conditions. `DataExplorerResult` returns observations,
 `AnalysisFrame` material, diagnostics, artifacts, limitations, blockers, and
 bounded completion status.
+
+Those stopping conditions bound one Data Explorer execution. They are not
+PlanRevision completion policy, replan triggers, or scientific investigation
+stopping conditions.
 
 This direct path is not a scientific `EvidenceRequest`. It may produce useful
 observations and views without creating Evidence or a Discovery.
@@ -138,18 +155,20 @@ human.
 
 ## Capability registry and dispatcher
 
-The capability registry records stable capability identity, compatible
-role-native contract, version and policy eligibility, availability and health,
-and constraints needed for deterministic selection.
+The capability registry is the authoritative runtime mapping from stable
+capability identity to a provider factory. Provider registration, instance
+reuse, availability, and implementation identity remain outside PlanRevision
+content and its fingerprint.
 
-The dispatcher accepts an admitted work identity and required capability. It
-does not infer scientific intent from prose. It verifies plan binding,
-capability availability, contract compatibility, attempt identity, and policy
-before invoking a worker.
+The dispatcher accepts an admitted work identity and an execution-internal
+capability selected behind a governed role-level tool boundary. It does not
+derive that value from PlanRevision or infer scientific intent from Task kind.
+It verifies capability availability, contract compatibility, attempt identity,
+and policy before invoking a worker.
 
 ```mermaid
 flowchart LR
-    T[Approved Task and plan binding] --> R[Required capability]
+    T[Governed role-level tool request] --> R[Internal capability]
     R --> D{Dispatcher lookup}
     D -->|available and eligible| E[Role-native specialist]
     D -->|absent or ineligible| B[Typed blocked outcome]
@@ -157,8 +176,8 @@ flowchart LR
     N --> O[PlannerWorkOutcome normalization]
 ```
 
-Unknown capability, missing registration, incompatible contract, ambiguous
-binding, or stale attempt identity all fail closed.
+Unknown capability, missing registration, incompatible contract, or stale
+attempt identity all fail closed.
 
 ## PlannerWorkOutcome normalization
 
@@ -178,7 +197,7 @@ wire format, or serialization details.
 ## Implementation status
 
 **Partially implemented.** At the S0 library boundary, one lightweight
-`Capability` `StrEnum` drives an explicit `Capability -> ProviderFactory`
+execution-owned `Capability` `StrEnum` drives an explicit `Capability -> ProviderFactory`
 registry. One dependency-aware factory may serve multiple capabilities and its
 provider instance is reused. Duplicate and absent registrations fail closed.
 The thin async dispatcher invokes the resolved provider and preserves provider
@@ -195,8 +214,9 @@ composes a registry, Data Explorer provider factory, dispatcher, and
 role-native fields. A minimal `PlannerWorkOutcome` projection seam consumes
 only shared metadata; full Planner consumption remains **Deferred**.
 
-At the bounded M3-A direct-DATA surface, Planner selects `DATA_ANALYSIS` and
-creates the Task without choosing a Data Explorer operation. Data Explorer owns
+At the bounded M3-A direct-DATA library surface, an execution-internal
+`DATA_ANALYSIS` request reaches Data Explorer outside PlanRevision. This
+transitional plumbing is not a canonical Task-kind route. Data Explorer owns
 the typed `Task.instruction -> DataAnalysisPlan` translation through its
 `DataAnalysisPlannerPort`, using the application-supplied authoritative
 DataProfile projection from `DataExplorerInput` and the finite

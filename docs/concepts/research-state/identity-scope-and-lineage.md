@@ -8,9 +8,9 @@ coordination metadata and separates historical truth from current authority.
 ## Stable identity and mutable metadata
 
 An object's identifier is not permission to change its meaning. Changes to
-priority, ordering, assignment, dependencies, scheduling, or presentation do
-not redefine a `Task`; those properties belong to `PlanRevision` and related
-records.
+priority, ordering, dependencies, scheduling,
+or presentation do not redefine a `Task`; those properties belong to
+`PlanRevision`, `PlanTaskBinding`, and related records.
 
 A substantive change to the semantic work unit creates a successor Task rather
 than mutating the existing identity in place. The old Task remains part of the
@@ -32,6 +32,13 @@ result requires a new DataProfile. The earlier profile is not overwritten.
 Scientific lineage and Evidence refer to the applicable DataProfile. This
 allows a later validity review to determine which observations and claims
 depend on a changed or invalidated data state.
+
+PlanRevision does not pre-bind that DataProfile. Planner expresses intended
+data scope in Task semantics, and the responsible specialist or controller
+selects concrete applicable profiles from the complete authoritative context
+within its own authority. Actual execution and scientific provenance then bind
+the exact profiles used. Concrete profile selection is therefore not existing
+PlanRevision content and does not, by itself, change its fingerprint.
 
 Physical location does not establish dataset identity or admission. A
 Workspace conventionally owns user-visible datasets under `data/`, but a

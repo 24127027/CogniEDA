@@ -63,9 +63,15 @@ def test_task_supports_exact_mvp_statuses(status: TaskStatus) -> None:
     }
 
 
-def test_task_kind_is_exactly_the_canonical_four_kind_taxonomy() -> None:
-    assert {kind.name for kind in TaskKind} == {"DATA", "SCIENTIFIC", "GRAPH", "SYNTHESIS"}
-    assert {kind.value for kind in TaskKind} == {"data", "scientific", "graph", "synthesis"}
+def test_task_kind_is_exactly_the_canonical_three_kind_taxonomy() -> None:
+    assert {kind.name for kind in TaskKind} == {"DATA", "SCIENTIFIC", "GRAPH"}
+    assert {kind.value for kind in TaskKind} == {"data", "scientific", "graph"}
+
+
+def test_removed_synthesis_kind_is_rejected() -> None:
+    assert "SYNTHESIS" not in TaskKind.__members__
+    with pytest.raises(ValidationError):
+        _task(kind="synthesis")  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize("kind", list(TaskKind))

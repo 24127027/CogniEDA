@@ -7,7 +7,7 @@ from pydantic_ai import FunctionToolset
 from pydantic_ai.mcp import MCPToolset
 from pydantic_ai_skills import SkillsCapability
 
-from cognieda.application.ports import AgentTool
+from cognieda.application.ports import AgentTool, ToolingConfig
 from cognieda.infrastructure.mcp import load_mcp_toolsets
 from cognieda.infrastructure.skills import load_skills
 
@@ -51,27 +51,25 @@ class AgentTooling:
         self.skills = skills
 
     @classmethod
-    def from_config_path(
+    def load(
         cls,
-        path: str | Path,
-        mcp_path: str | Path,
-        skills_path: str | Path,
+        tooling_config: ToolingConfig,
     ) -> "AgentTooling":
         config = {worker: values.copy() for worker, values in DEFAULT_WORKER_CONFIG.items()}
         try:
-            with open(path, "rb") as f:
+            with open(tooling_config.agents_config_path, "rb") as f:
                 loaded_config = tomllib.load(f)
                 config.update(loaded_config)
         except FileNotFoundError:
             pass
 
         mcp_toolsets: dict[str, MCPToolset[Any]] = {}
-        if Path(mcp_path).exists():
-            mcp_toolsets = load_mcp_toolsets(mcp_path)
+        if Path(tooling_config.mcp_config_path).exists():
+            mcp_toolsets = load_mcp_toolsets(tooling_config.mcp_config_path)
 
         skills: dict[str, SkillsCapability] = {}
-        if Path(skills_path).exists():
-            skills = load_skills(skills_path)
+        if Path(tooling_config.skills_config_path).exists():
+            skills = load_skills(tooling_config.skills_config_path)
 
         return cls(config=config, mcp_toolsets=mcp_toolsets, skills=skills)
 

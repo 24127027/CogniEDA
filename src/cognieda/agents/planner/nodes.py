@@ -110,7 +110,10 @@ async def understand_request(state: State, runtime: Runtime[Context]) -> State:
     model = cast(PlannerDecisionModel, runtime.context.planner_model)
     try:
         result = await model.decide(
-            PlannerModelInput.from_frame(state.query, state.session_frame),
+            PlannerModelInput.from_planning_context(
+                state.query,
+                runtime.context.planning_context,
+            ),
             message_history=(
                 runtime.context.planning_context.conversation_history.model_messages()
             ),
@@ -125,50 +128,42 @@ async def understand_request(state: State, runtime: Runtime[Context]) -> State:
     return state
 
 
-async def apply_planning_state(state: State, runtime: Runtime[Context]) -> State:
-    """Apply validated Objective, Assumption, or Task proposals through SessionFrame seams."""
+async def prepare_results(state: State, runtime: Runtime[Context]) -> State:
+    """Construct explicit bounded domain results without mutating input context."""
 
-    del runtime
     if state.error is not None or state.decision is None:
         return state
 
     decision = state.decision
+    planning_context = runtime.context.planning_context
     try:
         if decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE:
             assert decision.objective_text is not None
-            current = state.session_frame.objective
+            current = planning_context.objective
             if current is None or current.text != decision.objective_text:
-                state.session_frame = state.session_frame.set_objective(
-                    Objective(text=decision.objective_text)
-                )
+                state.created_objective = Objective(text=decision.objective_text)
         elif decision.action is PlannerAction.ADD_ASSUMPTION:
             assert decision.assumption_text is not None
-            state.session_frame = state.session_frame.add_assumption(
-                Assumption(text=decision.assumption_text)
-            )
+            state.created_assumption = Assumption(text=decision.assumption_text)
         elif decision.action is PlannerAction.CREATE_OR_RUN_DATA_TASK:
             assert decision.task_instruction is not None
             assert decision.capability is not None
-            if state.session_frame.objective is None:
+            objective = planning_context.objective
+            if objective is None:
                 if decision.objective_text is None:
                     state.error = _error(
                         PlannerErrorCode.MISSING_OBJECTIVE,
                         "Data work requires a clear active Objective before a Task can run.",
                     )
                     return state
-                state.session_frame = state.session_frame.set_objective(
-                    Objective(text=decision.objective_text)
-                )
-            objective = state.session_frame.objective
-            assert objective is not None
-            task = Task(
+                objective = Objective(text=decision.objective_text)
+                state.created_objective = objective
+            state.created_task = Task(
                 objective_id=objective.objective_id,
                 kind=TaskKind.DATA,
                 instruction=decision.task_instruction,
                 status=TaskStatus.PENDING,
             )
-            state.session_frame = state.session_frame.add_task(task)
-            state.created_task_id = task.task_id
             state.selected_capability = decision.capability
         elif decision.action is PlannerAction.INVALID_OR_UNSUPPORTED:
             state.error = _error(
@@ -178,16 +173,19 @@ async def apply_planning_state(state: State, runtime: Runtime[Context]) -> State
     except (TypeError, ValueError) as exc:
         state.error = _error(
             PlannerErrorCode.INVALID_SUCCESSOR_STATE,
-            f"Planner rejected an invalid successor SessionFrame: {exc}",
+            f"Planner rejected an invalid typed result: {exc}",
         )
     return state
 
 
-def _task_by_id(state: State, task_id: object) -> Task:
-    for task in state.session_frame.tasks:
-        if task.task_id == task_id:
-            return task
-    raise ValueError("Task is missing from the active SessionFrame.")
+def _with_task_status(task: Task, status: TaskStatus) -> Task:
+    return Task(
+        task_id=task.task_id,
+        objective_id=task.objective_id,
+        kind=task.kind,
+        instruction=task.instruction,
+        status=status,
+    )
 
 
 async def dispatch_work(state: State, runtime: Runtime[Context]) -> State:
@@ -195,16 +193,17 @@ async def dispatch_work(state: State, runtime: Runtime[Context]) -> State:
 
     if (
         state.error is not None
-        or state.created_task_id is None
+        or state.created_task is None
         or state.selected_capability is None
     ):
         return state
 
     dispatcher = cast(ExecutorDispatcherPort, runtime.context.dispatcher)
-    task_id = state.created_task_id
+    task = state.created_task
+    task_id = task.task_id
     try:
-        state.session_frame = state.session_frame.set_task_status(task_id, TaskStatus.RUNNING)
-        running_task = _task_by_id(state, task_id)
+        running_task = _with_task_status(task, TaskStatus.RUNNING)
+        state.created_task = running_task
         result = await dispatcher.dispatch(
             ExecutionRequest(
                 capability=state.selected_capability,
@@ -215,7 +214,7 @@ async def dispatch_work(state: State, runtime: Runtime[Context]) -> State:
         outcome = normalize_for_planner(result)
         state.work_outcome = outcome
         if outcome.task_id != task_id:
-            state.session_frame = state.session_frame.set_task_status(task_id, TaskStatus.FAILED)
+            state.created_task = _with_task_status(running_task, TaskStatus.FAILED)
             state.error = _error(
                 PlannerErrorCode.TASK_OUTCOME_MISMATCH,
                 "Executor outcome Task identity did not match the dispatched Task.",
@@ -227,12 +226,9 @@ async def dispatch_work(state: State, runtime: Runtime[Context]) -> State:
             if outcome.status is ExecutionStatus.SUCCEEDED
             else TaskStatus.FAILED
         )
-        state.session_frame = state.session_frame.set_task_status(task_id, terminal_status)
+        state.created_task = _with_task_status(running_task, terminal_status)
     except Exception as exc:
-        try:
-            state.session_frame = state.session_frame.set_task_status(task_id, TaskStatus.FAILED)
-        except ValueError:
-            pass
+        state.created_task = _with_task_status(task, TaskStatus.FAILED)
         state.error = _error(
             PlannerErrorCode.DISPATCH_FAILED,
             f"Planner could not complete dispatcher work: {exc}",
@@ -274,7 +270,8 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
         return state
 
     if decision.action is PlannerAction.ANSWER_FROM_STATE:
-        if not state.session_frame.evidences:
+        planning_context = runtime.context.planning_context
+        if not planning_context.evidences:
             state.error = _error(
                 PlannerErrorCode.NO_ADMITTED_EVIDENCE,
                 "No admitted Evidence is available to support an empirical answer.",
@@ -286,9 +283,9 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
             result = await model.answer(
                 PlannerAnswerInput(
                     latest_request=state.query,
-                    objective=state.session_frame.objective,
-                    data_profile=state.session_frame.data_profile,
-                    evidences=state.session_frame.evidences,
+                    objective=planning_context.objective,
+                    data_profile=planning_context.data_profile,
+                    evidences=planning_context.evidences,
                 )
             )
             state.response = result.output.text
@@ -302,20 +299,22 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
         return state
 
     if decision.action is PlannerAction.STATE_SUMMARY:
-        objective = (
-            state.session_frame.objective.text
-            if state.session_frame.objective is not None
+        planning_context = runtime.context.planning_context
+        objective_text = (
+            planning_context.objective.text
+            if planning_context.objective is not None
             else "not established"
         )
         state.response = (
-            f"Active Objective: {objective}. "
-            f"Planning Assumptions (not Evidence): {len(state.session_frame.assumptions)}. "
-            f"Tasks: {len(state.session_frame.tasks)}. "
-            f"Admitted Evidence items: {len(state.session_frame.evidences)}."
+            f"Active Objective: {objective_text}. "
+            f"Planning Assumptions (not Evidence): {len(planning_context.assumptions)}. "
+            f"Tasks: {len(planning_context.tasks)}. "
+            f"Admitted Evidence items: {len(planning_context.evidences)}."
         )
     elif decision.action is PlannerAction.SET_OR_REFINE_OBJECTIVE:
-        assert state.session_frame.objective is not None
-        state.response = f"Active Objective set to: {state.session_frame.objective.text}"
+        active_objective = state.created_objective or runtime.context.planning_context.objective
+        assert active_objective is not None
+        state.response = f"Active Objective set to: {active_objective.text}"
     elif decision.action is PlannerAction.ADD_ASSUMPTION:
         assert decision.assumption_text is not None
         state.response = (

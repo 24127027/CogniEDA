@@ -8,11 +8,14 @@ page classifies direction; it does not promise delivery dates or sequencing.
 
 These are established architecture, not speculative enhancements:
 
-- replace legacy Task kinds with `DATA`, `SCIENTIFIC`, `GRAPH`, and
-  `SYNTHESIS`, keeping semantic Task identity separate from PlanRevision
-  assignment and coordination metadata;
-- implement PlanRevision and its versioned Task membership, dependencies,
-  assignments, approval, and activation;
+- preserve the canonical `DATA`, `SCIENTIFIC`, and `GRAPH` Task kinds while
+  keeping Planner response synthesis outside Task execution and keeping Task
+  identity separate from PlanRevision dependency and coordination
+  metadata;
+- integrate the implemented PlanRevision V1 domain and pure validator plus the
+  SQLite repository foundation with Planner authoring, human approval,
+  exact-object commit-boundary validation and persistence, active revision
+  selection, activation, and Task DAG runtime;
 - preserve Planner-only human interaction while preventing Planner ownership
   of scientific feasibility, methods, parameters, protocols, obligations,
   evaluation, or proposal content;

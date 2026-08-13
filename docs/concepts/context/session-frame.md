@@ -6,8 +6,9 @@ objects the session has accumulated, which Objective and DataProfile are
 active, and which authoritative records a later interaction can resolve.
 
 SessionFrame is not conversation memory and is not a scientific conclusion.
-It remembers research-state references; each later operation still decides
-which referenced records are eligible for its particular context.
+It is user-governed Planner context membership: every retained object must be
+resolved and made available to Planner. Each later operation still decides how
+that visible object may be used.
 
 This page defines the **Design target**. Exact fields and physical storage are
 not part of the conceptual contract.
@@ -24,28 +25,31 @@ A SessionFrame may conceptually track references to:
 - Hypotheses and Discoveries when the supported workflow requires them.
 
 The frame preserves membership over time. Moving from one question to another
-within a session may narrow the immediate model context without deleting older
-membership. Similarly, an object needed as a lineage dependency does not
-automatically become a session member merely because another selected object
-refers to it.
+does not authorize context construction to rank, filter, or truncate retained
+members. An object needed as a lineage dependency does not automatically become
+a session member merely because another retained object refers to it; authorized
+supplemental context may resolve such dependencies without changing membership.
 
 ## Membership, selection, and authority
 
 Three questions must remain separate:
 
 ```text
-Was this object historically referenced by the SessionFrame?
-  != Is this object selected for the current operation?
+Was this object retained and therefore visible to Planner?
+  != May this object be used for the current operation?
   != May this object support the current scientific conclusion?
 ```
 
-SessionFrame membership answers the first question only.
+SessionFrame membership answers the first question and requires Planner
+visibility. Planner context is the resolution of all retained members plus any
+authorized supplemental context. Supplemental construction may add but never
+silently subtract the frame-derived base.
 
-An operation-specific context answers the second after applying its purpose,
-scope, size, lifecycle, validity, and lineage rules. A planning context may
-include Assumptions; a protected `EvaluationBundle` must exclude them. An
-answer context may refer to an eligible Discovery; a new scientific evaluation
-cannot use that prior Discovery as substitute Evidence.
+A purpose-specific use boundary answers the second after applying scope,
+lifecycle, validity, lineage, and authority rules. An Assumption remains visible
+to Planner but planning-only; a protected `EvaluationBundle` must exclude it.
+An answer may refer to an eligible Discovery, while a new protected scientific
+evaluation cannot use that Discovery as substitute Evidence.
 
 Scientific authority answers the third question. Selection cannot promote an
 Assumption to Evidence, turn raw execution output into admitted Evidence, or
@@ -127,9 +131,9 @@ A session frame may gain membership, change active selectors, be succeeded,
 and later be restored. Those changes must remain auditable and must not erase
 the earlier truth-to-record.
 
-Recovery resolves the applicable frame and its authoritative references, then
-reapplies current lifecycle and validity rules. Missing identity, ambiguous
-successor state, dangling active selectors, or unresolved authority fails
+Recovery resolves every retained reference for Planner visibility, then
+reapplies current lifecycle and validity rules to permitted use. Missing
+identity, ambiguous successor state, dangling active selectors, or unresolved authority fails
 closed rather than being repaired from prose or “latest record” heuristics.
 
 ## Current implementation
@@ -140,6 +144,13 @@ materialized Assumptions, Tasks, and Evidence, and one optional materialized
 DataProfile. Validated replacement seams protect duplicate identity and direct
 Task/DataProfile/Evidence consistency, and SQLite can round-trip bounded frame
 snapshots.
+
+The in-process application exact-copies all five current materialized member
+categories into an immutable `PlanningContext`. Planner receives that context,
+returns explicit Objective, Assumption, and terminal Task results, and never
+receives, mutates, or returns SessionFrame. Application applies those bounded
+results through the existing copy-returning frame seams. Conversation history
+remains a separate non-authoritative input to request understanding.
 
 The current value is not the canonical typed-reference membership FCO. It has
 no frame identity, Objective-bound session identity, reference manifest,

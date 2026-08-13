@@ -48,7 +48,6 @@ from cognieda.schemas.enums import (
     AssumptionStatus,
     AssumptionTestability,
     ConfidenceLevel,
-    ContextMode,
     DataProfileLifecycleState,
     DataProfileMethod,
     DatasetSourceType,
@@ -67,6 +66,7 @@ from cognieda.schemas.enums import (
     PlannerNodeName,
     PlannerOperationApprovalState,
     PlannerOperationType,
+    PlanPriority,
     QualityFlagSeverity,
     SessionFrameStatus,
     TaskKind,
@@ -74,6 +74,12 @@ from cognieda.schemas.enums import (
     UserDecisionStatus,
     UserDecisionType,
     VariableType,
+)
+from cognieda.schemas.plan_revision import (
+    PLAN_REVISION_CONTRACT_VERSION,
+    PlanDependency,
+    PlanRevision,
+    PlanTaskBinding,
 )
 from cognieda.schemas.planner_operations import PlannerCommitResult, PlannerOperation
 from cognieda.schemas.provenance import (
@@ -96,7 +102,6 @@ __all__ = [
     "ColumnSchemaSummary",
     "ConfidenceLevel",
     "ContinuousColumnSummary",
-    "ContextMode",
     "ContextProvenance",
     "DataProfile",
     "DataProfileDatasetBinding",
@@ -141,6 +146,11 @@ __all__ = [
     "PlannerOperation",
     "PlannerOperationApprovalState",
     "PlannerOperationType",
+    "PlanDependency",
+    "PlanPriority",
+    "PlanRevision",
+    "PlanTaskBinding",
+    "PLAN_REVISION_CONTRACT_VERSION",
     "QualityFlag",
     "QualityFlagSeverity",
     "SchemaSummary",

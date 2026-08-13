@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import toml
@@ -61,3 +62,25 @@ def test_user_datasets_are_not_located_under_private_workspace_state(tmp_path: P
 
     assert workspace.data_dir == workspace.root / "data"
     assert workspace.data_dir != workspace.root / ".cognieda" / "data"
+
+
+def test_set_provider_api_key_creates_workspace_env_file(tmp_path: Path) -> None:
+    workspace = Workspace.open(tmp_path / "project-d")
+
+    assert not workspace.env_path.exists()
+
+    workspace.set_provider_api_key("google", "example-google-key")
+
+    assert workspace.env_path.is_file()
+    assert "GOOGLE_API_KEY=example-google-key" in workspace.env_path.read_text(
+        encoding="utf-8"
+    )
+
+
+def test_set_provider_api_key_updates_process_environment(tmp_path: Path) -> None:
+    workspace = Workspace.open(tmp_path / "project-e")
+    os.environ.pop("GOOGLE_API_KEY", None)
+
+    workspace.set_provider_api_key("google", "example-google-key")
+
+    assert os.environ.get("GOOGLE_API_KEY") == "example-google-key"
