@@ -6,7 +6,6 @@ import pytest
 from sqlmodel import Session, select
 
 from cognieda.application.services import ApprovedPlanCommitError, commit_approved_plan
-from cognieda.execution import Capability
 from cognieda.infrastructure.persistence.models import (
     ActivePlanRevisionRecord,
     ObjectiveRecord,
@@ -55,14 +54,13 @@ def _plan(
         task_bindings=(
             PlanTaskBinding(
                 task_id=task.task_id,
-                required_capability=Capability.DATA_ANALYSIS,
                 order_rank=index,
                 priority=PlanPriority.HIGH if index == 0 else PlanPriority.NORMAL,
             )
             for index, task in enumerate(tasks)
         ),
         dependencies=dependencies,
-        authoritative_tasks=tasks,
+        tasks=tasks,
     )
     return objective, tasks, revision
 

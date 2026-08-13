@@ -5,7 +5,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field, InstanceOf, model_validator
 from pydantic_ai.messages import ModelMessage
 
-from cognieda.execution import Capability, ExecutorContext
+from cognieda.execution import ExecutorContext
 from cognieda.schemas.artifacts import Assumption, DataProfile, Evidence, Objective, Task
 from cognieda.schemas.plan_revision import PlanRevision
 
@@ -18,7 +18,7 @@ class PlannerAction(StrEnum):
     ANSWER_FROM_STATE = "answer_from_state"
     SET_OR_REFINE_OBJECTIVE = "set_or_refine_objective"
     ADD_ASSUMPTION = "add_assumption"
-    CREATE_OR_RUN_DATA_TASK = "create_or_run_data_task"
+    PROPOSE_DATA_TASK = "propose_data_task"
     STATE_SUMMARY = "state_summary"
     INVALID_OR_UNSUPPORTED = "invalid_or_unsupported"
 
@@ -55,7 +55,6 @@ class PlannerDecision(BaseModel):
     assumption_text: str | None = Field(default=None, min_length=1)
     assumption_is_reasonably_testable: bool | None = None
     task_instruction: str | None = Field(default=None, min_length=1)
-    capability: Capability | None = None
     message: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
@@ -69,7 +68,6 @@ class PlannerDecision(BaseModel):
                     self.assumption_text,
                     self.assumption_is_reasonably_testable,
                     self.task_instruction,
-                    self.capability,
                 )
             ):
                 raise ValueError("Objective actions cannot propose other state changes.")
@@ -84,23 +82,17 @@ class PlannerDecision(BaseModel):
                 )
             if any(
                 value is not None
-                for value in (self.objective_text, self.task_instruction, self.capability)
+                for value in (self.objective_text, self.task_instruction)
             ):
                 raise ValueError("Assumption actions cannot propose other state changes.")
-        elif self.action is PlannerAction.CREATE_OR_RUN_DATA_TASK:
-            if self.task_instruction is None or self.capability is None:
-                raise ValueError("Data work requires task_instruction and capability.")
+        elif self.action is PlannerAction.PROPOSE_DATA_TASK:
+            if self.task_instruction is None:
+                raise ValueError("Data work requires task_instruction.")
             if (
                 self.assumption_text is not None
                 or self.assumption_is_reasonably_testable is not None
             ):
                 raise ValueError("A data-work decision cannot add an Assumption.")
-            if self.capability not in {
-                Capability.DATA_ANALYSIS,
-                Capability.DATA_PROFILING,
-                Capability.DATA_TRANSFORMATION,
-            }:
-                raise ValueError("MVP Planner data work requires a Data Explorer capability.")
         elif self.action is PlannerAction.INVALID_OR_UNSUPPORTED and (
             self.assumption_is_reasonably_testable is True
         ):
@@ -108,7 +100,7 @@ class PlannerDecision(BaseModel):
                 raise ValueError("A testable Human claim requires its exact source text.")
             if any(
                 value is not None
-                for value in (self.objective_text, self.task_instruction, self.capability)
+                for value in (self.objective_text, self.task_instruction)
             ):
                 raise ValueError("A testable Human claim cannot propose other state changes.")
         elif any(
@@ -118,7 +110,6 @@ class PlannerDecision(BaseModel):
                 self.assumption_text,
                 self.assumption_is_reasonably_testable,
                 self.task_instruction,
-                self.capability,
             )
         ):
             raise ValueError("This Planner action cannot propose research-state changes.")

@@ -4,7 +4,6 @@ import pytest
 from pydantic import ValidationError
 
 from cognieda.agents.planner.types import PlannerOutput
-from cognieda.execution import Capability
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.planner_context import apply_planner_output, build_planning_context
 from cognieda.schemas.artifacts import (
@@ -99,11 +98,10 @@ def test_application_boundary_does_not_apply_transient_canonical_plan_objects() 
         task_bindings=(
             PlanTaskBinding(
                 task_id=task.task_id,
-                required_capability=Capability.DATA_ANALYSIS,
                 order_rank=0,
             ),
         ),
-        authoritative_tasks=(task,),
+        tasks=(task,),
     )
     current = SessionFrame()
 

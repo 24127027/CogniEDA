@@ -186,7 +186,7 @@ def test_planner_decision_rejects_untyped_or_mixed_core_changes() -> None:
     with pytest.raises(ValidationError):
         PlannerDecision.model_validate(
             {
-                "action": PlannerAction.CREATE_OR_RUN_DATA_TASK,
+                "action": PlannerAction.PROPOSE_DATA_TASK,
                 "task_instruction": "Profile the dataset.",
                 "capability": "not_a_capability",
             }

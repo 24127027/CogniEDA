@@ -17,7 +17,7 @@ from cognieda.agents.planner.types import (
     PlannerModelInput,
     PlannerResponseDraft,
 )
-from cognieda.execution import Capability, ExecutionRequest
+from cognieda.execution import ExecutionRequest
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.planner_context import build_planning_context
 from cognieda.schemas.artifacts import (
@@ -86,34 +86,31 @@ def _context(frame: SessionFrame | None = None):
 
 def _data_decision(
     instruction: str,
-    capability: Capability = Capability.DATA_ANALYSIS,
     *,
     objective_text: str | None = None,
 ) -> PlannerDecision:
     return PlannerDecision(
-        action=PlannerAction.CREATE_OR_RUN_DATA_TASK,
+        action=PlannerAction.PROPOSE_DATA_TASK,
         objective_text=objective_text,
         task_instruction=instruction,
-        capability=capability,
     )
 
 
 @pytest.mark.parametrize(
-    ("instruction", "capability"),
+    "instruction",
     [
-        ("Profile the active dataset.", Capability.DATA_PROFILING),
-        ("Summarize monthly_spend.", Capability.DATA_ANALYSIS),
-        ("Create a cleaned successor dataset.", Capability.DATA_TRANSFORMATION),
+        "Profile the active dataset.",
+        "Summarize monthly_spend.",
+        "Create a cleaned successor dataset.",
     ],
 )
 def test_typed_data_request_proposes_exact_canonical_objects_without_dispatch(
     instruction: str,
-    capability: Capability,
 ) -> None:
     dispatcher = NeverDispatcher()
     objective = Objective(text="Understand the active dataset.")
     output = asyncio.run(
-        _planner(FakePlannerModel(_data_decision(instruction, capability)), dispatcher).run(
+        _planner(FakePlannerModel(_data_decision(instruction)), dispatcher).run(
             "Do the requested bounded data work.",
             planning_context=_context(SessionFrame(objective=objective)),
         )
@@ -127,11 +124,20 @@ def test_typed_data_request_proposes_exact_canonical_objects_without_dispatch(
     revision = output.proposed_plan_revision
     assert revision is not None
     assert revision.task_ids == {task.task_id}
-    assert revision.task_bindings[0].required_capability is capability
+    assert set(revision.task_bindings[0].model_dump()) == {
+        "task_id",
+        "order_rank",
+        "priority",
+    }
     assert revision.task_bindings[0].order_rank == 0
     assert str(revision.plan_revision_id) in output.response
     assert "No authoritative state or execution exists yet" in output.response
     assert dispatcher.requests == []
+
+
+def test_planner_plan_proposal_schema_has_no_execution_route() -> None:
+    assert "capability" not in PlannerDecision.model_fields
+    assert "required_capability" not in PlannerDecision.model_fields
 
 
 def test_clear_data_request_proposes_objective_and_task_in_one_draft() -> None:
@@ -141,7 +147,6 @@ def test_clear_data_request_proposes_objective_and_task_in_one_draft() -> None:
             FakePlannerModel(
                 _data_decision(
                     "Profile the active dataset.",
-                    Capability.DATA_PROFILING,
                     objective_text="Understand the active dataset schema and quality.",
                 )
             ),

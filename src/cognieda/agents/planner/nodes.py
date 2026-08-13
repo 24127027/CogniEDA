@@ -5,7 +5,6 @@ from typing import cast
 
 from langgraph.runtime import Runtime
 
-from cognieda.execution import Capability
 from cognieda.schemas.artifacts import Assumption, Objective, Task
 from cognieda.schemas.enums import TaskKind
 from cognieda.schemas.plan_revision import PlanRevision, PlanTaskBinding
@@ -65,16 +64,10 @@ def _explicit_decision(
         if command == "/answer":
             return PlannerDecision(action=PlannerAction.ANSWER_FROM_STATE), None
 
-        capability = {
-            "/profile": Capability.DATA_PROFILING,
-            "/analyze": Capability.DATA_ANALYSIS,
-            "/transform": Capability.DATA_TRANSFORMATION,
-        }[command]
         return (
             PlannerDecision(
-                action=PlannerAction.CREATE_OR_RUN_DATA_TASK,
+                action=PlannerAction.PROPOSE_DATA_TASK,
                 task_instruction=payload,
-                capability=capability,
             ),
             None,
         )
@@ -163,9 +156,8 @@ async def prepare_results(state: State, runtime: Runtime[Context]) -> State:
         elif decision.action is PlannerAction.ADD_ASSUMPTION:
             assert decision.assumption_text is not None
             state.created_assumption = Assumption(text=decision.assumption_text)
-        elif decision.action is PlannerAction.CREATE_OR_RUN_DATA_TASK:
+        elif decision.action is PlannerAction.PROPOSE_DATA_TASK:
             assert decision.task_instruction is not None
-            assert decision.capability is not None
             objective = planning_context.objective
             if objective is None:
                 if decision.objective_text is None:
@@ -185,11 +177,10 @@ async def prepare_results(state: State, runtime: Runtime[Context]) -> State:
                 task_bindings=(
                     PlanTaskBinding(
                         task_id=task.task_id,
-                        required_capability=decision.capability,
                         order_rank=0,
                     ),
                 ),
-                authoritative_tasks=(task,),
+                tasks=(task,),
             )
             state.proposed_objective = objective
             state.proposed_tasks = (task,)
@@ -286,7 +277,7 @@ async def compose_response(state: State, runtime: Runtime[Context]) -> State:
             "The Human supplied this statement, and Planner classified it as not reasonably "
             "testable. It is planning context, not empirical Evidence."
         )
-    elif decision.action is PlannerAction.CREATE_OR_RUN_DATA_TASK:
+    elif decision.action is PlannerAction.PROPOSE_DATA_TASK:
         objective = state.proposed_objective
         revision = state.proposed_plan_revision
         assert objective is not None

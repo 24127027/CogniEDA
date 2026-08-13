@@ -55,10 +55,9 @@ class OneDataPlanModel:
         del message_history
         return PlannerModelResult(
             output=PlannerDecision(
-                action=PlannerAction.CREATE_OR_RUN_DATA_TASK,
+                action=PlannerAction.PROPOSE_DATA_TASK,
                 objective_text="Establish the exact active dataset size.",
                 task_instruction="Count rows in the active dataset.",
-                capability=Capability.DATA_ANALYSIS,
             ),
             new_messages=(),
         )
