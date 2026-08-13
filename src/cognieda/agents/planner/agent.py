@@ -1,19 +1,28 @@
 from __future__ import annotations
 
+from cognieda.application.planner_data_work import run_data_work
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
-from cognieda.execution import ExecutionStatus, ExecutorContext, PlannerWorkOutcome
+from cognieda.execution import ExecutorContext
+from cognieda.schemas.artifacts import DataProfile, Task
 
 from .context import Context, PlanningContext
 from .dependencies import PlannerDeps
 from .graph import build_graph
 from .model import PlannerDecisionModel, PlannerModel
-from .types import PlannerControlledError, PlannerErrorCode, PlannerOutput, State
+from .types import (
+    PlannerControlledError,
+    PlannerErrorCode,
+    PlannerOutput,
+    PlannerTaskExecutionInput,
+    PlannerTaskExecutionOutput,
+    State,
+)
 
 
 class Planner:
     """Human-facing coordinator over typed MVP research state."""
 
-    builtin_tools: tuple[()] = ()
+    builtin_tools = (run_data_work,)
 
     def __init__(
         self,
@@ -53,19 +62,33 @@ class Planner:
             )
         self.model.reload_model()
 
-    def respond_to_work(self, outcome: PlannerWorkOutcome) -> str:
-        """Present one role-native execution projection without admitting Evidence."""
+    async def execute_task(
+        self,
+        *,
+        task: Task,
+        data_profile: DataProfile,
+        execution_context: ExecutorContext,
+        dataset_digest: str,
+    ) -> PlannerTaskExecutionOutput:
+        """Reason over governed tools for one application-selected Task goal."""
 
-        if outcome.status is ExecutionStatus.SUCCEEDED:
-            return (
-                f"The approved DATA Task completed. {outcome.semantic_summary} "
-                "This computed result was not admitted as Evidence."
-            )
-        details = " ".join((*outcome.blockers, *outcome.limitations))
-        return (
-            f"The approved DATA Task ended with status {outcome.status.value}. {details} "
-            "No Evidence was created."
-        ).strip()
+        execution_deps = PlannerDeps(
+            dispatcher=self.deps.dispatcher,
+            active_task=task,
+            data_profile=data_profile,
+            execution_context=execution_context,
+            dataset_digest=dataset_digest,
+        )
+        result = await self.model.execute_task(
+            PlannerTaskExecutionInput(task=task, data_profile=data_profile),
+            deps=execution_deps,
+        )
+        return PlannerTaskExecutionOutput(
+            response=result.output.response,
+            blocker=result.output.blocker,
+            data_results=tuple(execution_deps.data_results),
+            new_messages=result.new_messages,
+        )
 
     async def run(
         self,
@@ -107,7 +130,6 @@ class Planner:
             response=final_state.response,
             decision=final_state.decision,
             created_objective=final_state.created_objective,
-            created_assumption=final_state.created_assumption,
             proposed_objective=final_state.proposed_objective,
             proposed_tasks=final_state.proposed_tasks,
             proposed_plan_revision=final_state.proposed_plan_revision,

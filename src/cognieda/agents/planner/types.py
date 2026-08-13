@@ -5,7 +5,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field, InstanceOf, model_validator
 from pydantic_ai.messages import ModelMessage
 
-from cognieda.execution import ExecutorContext
+from cognieda.execution import ExecutionResult, ExecutorContext
 from cognieda.schemas.artifacts import Assumption, DataProfile, Evidence, Objective, Task
 from cognieda.schemas.plan_revision import PlanRevision
 
@@ -170,6 +170,35 @@ class PlannerResponseDraft(BaseModel):
     text: str = Field(min_length=1)
 
 
+class PlannerTaskExecutionInput(BaseModel):
+    """Eligible authoritative Task goal and safe DataProfile projection."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    task: Task
+    data_profile: DataProfile
+
+
+class PlannerTaskExecutionResponse(BaseModel):
+    """Model-composed terminal response for one approved Task interaction."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    response: str = Field(min_length=1)
+    blocker: str | None = Field(default=None, min_length=1)
+
+
+class PlannerTaskExecutionOutput(BaseModel):
+    """Application-facing Planner result with governed interaction records."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    response: str = Field(min_length=1)
+    blocker: str | None = Field(default=None, min_length=1)
+    data_results: tuple[InstanceOf[ExecutionResult], ...] = ()
+    new_messages: tuple[ModelMessage, ...] = ()
+
+
 class State(BaseModel):
     """Transient state for one deterministic MVP Planner invocation."""
 
@@ -179,7 +208,6 @@ class State(BaseModel):
     execution_context: ExecutorContext = Field(default_factory=ExecutorContext)
     decision: PlannerDecision | None = None
     created_objective: Objective | None = None
-    created_assumption: Assumption | None = None
     proposed_objective: Objective | None = None
     proposed_tasks: tuple[Task, ...] = ()
     proposed_plan_revision: InstanceOf[PlanRevision] | None = None
@@ -196,7 +224,6 @@ class PlannerOutput(BaseModel):
     response: str = Field(min_length=1)
     decision: PlannerDecision | None = None
     created_objective: Objective | None = None
-    created_assumption: Assumption | None = None
     proposed_objective: Objective | None = None
     proposed_tasks: tuple[Task, ...] = ()
     proposed_plan_revision: InstanceOf[PlanRevision] | None = None

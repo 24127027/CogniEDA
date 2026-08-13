@@ -113,6 +113,7 @@ class DataExplorerInput(ExecutorInput):
     """Role-specific typed input carrying authoritative DataProfile planning context."""
 
     data_profile: DataProfile
+    requested_work: str | None = Field(default=None, min_length=1)
 
 
 class DataExplorerObservation(BaseModel):

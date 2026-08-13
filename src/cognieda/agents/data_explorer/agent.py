@@ -230,7 +230,9 @@ class DataExplorer:
             try:
                 proposed_plan = await self.analysis_planner.propose(
                     DataAnalysisPlanningRequest(
-                        task_instruction=request.input.task.instruction,
+                        task_instruction=(
+                            request.input.requested_work or request.input.task.instruction
+                        ),
                         data_profile=profile,
                     )
                 )

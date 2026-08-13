@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from cognieda.agents.planner.context import PlanningContext
-from cognieda.agents.planner.types import PlannerOutput
-from cognieda.schemas.artifacts import SessionFrame
+from cognieda.agents.planner.types import PlannerAction, PlannerOutput
+from cognieda.schemas.artifacts import Assumption, SessionFrame
 
 from .conversation import ConversationHistory
 
@@ -26,12 +26,25 @@ def build_planning_context(
 def apply_planner_output(
     current_frame: SessionFrame,
     planner_output: PlannerOutput,
+    *,
+    human_request: str,
 ) -> SessionFrame:
-    """Apply the bounded typed results from one Planner turn to a successor frame."""
+    """Apply application-owned state changes from one Planner turn."""
 
     successor = current_frame
     if planner_output.created_objective is not None:
         successor = successor.set_objective(planner_output.created_objective)
-    if planner_output.created_assumption is not None:
-        successor = successor.add_assumption(planner_output.created_assumption)
+    decision = planner_output.decision
+    if decision is not None and decision.action is PlannerAction.ADD_ASSUMPTION:
+        assumption_text = decision.assumption_text
+        if (
+            assumption_text is None
+            or decision.assumption_is_reasonably_testable is not False
+            or assumption_text not in human_request
+        ):
+            raise ValueError(
+                "Assumption admission requires exact Human text classified as not "
+                "reasonably testable."
+            )
+        successor = successor.add_assumption(Assumption(text=assumption_text))
     return successor

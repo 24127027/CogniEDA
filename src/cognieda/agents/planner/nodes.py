@@ -5,7 +5,7 @@ from typing import cast
 
 from langgraph.runtime import Runtime
 
-from cognieda.schemas.artifacts import Assumption, Objective, Task
+from cognieda.schemas.artifacts import Objective, Task
 from cognieda.schemas.enums import TaskKind
 from cognieda.schemas.plan_revision import PlanRevision, PlanTaskBinding
 
@@ -153,9 +153,6 @@ async def prepare_results(state: State, runtime: Runtime[Context]) -> State:
             current = planning_context.objective
             if current is None or current.text != decision.objective_text:
                 state.created_objective = Objective(text=decision.objective_text)
-        elif decision.action is PlannerAction.ADD_ASSUMPTION:
-            assert decision.assumption_text is not None
-            state.created_assumption = Assumption(text=decision.assumption_text)
         elif decision.action is PlannerAction.PROPOSE_DATA_TASK:
             assert decision.task_instruction is not None
             objective = planning_context.objective

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Sequence
+from types import SimpleNamespace
 from typing import cast
 
 import pandas as pd
@@ -23,7 +24,10 @@ from cognieda.agents.planner.types import (
     PlannerDecision,
     PlannerModelInput,
     PlannerResponseDraft,
+    PlannerTaskExecutionInput,
+    PlannerTaskExecutionResponse,
 )
+from cognieda.application.planner_data_work import run_data_work
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.application.services import MvpDataProfileAdmissionService
 from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
@@ -66,6 +70,28 @@ class OneDataPlanModel:
         self, answer_input: PlannerAnswerInput
     ) -> PlannerModelResult[PlannerResponseDraft]:
         raise AssertionError(f"Computed DATA output is not admitted Evidence: {answer_input}")
+
+    async def execute_task(
+        self,
+        execution_input: PlannerTaskExecutionInput,
+        *,
+        deps: PlannerDeps,
+        message_history: Sequence[ModelMessage] = (),
+    ) -> PlannerModelResult[PlannerTaskExecutionResponse]:
+        del execution_input, message_history
+        outcome = await run_data_work(
+            SimpleNamespace(deps=deps),  # type: ignore[arg-type]
+            "Count rows in the active dataset.",
+        )
+        return PlannerModelResult(
+            output=PlannerTaskExecutionResponse(
+                response=(
+                    f"{outcome.semantic_summary} The DATA result is not admitted as Evidence."
+                ),
+                blocker=outcome.blockers[0] if outcome.blockers else None,
+            ),
+            new_messages=(),
+        )
 
 
 class AssumptionGateModel:

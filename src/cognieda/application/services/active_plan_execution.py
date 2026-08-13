@@ -2,24 +2,16 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass
 from enum import StrEnum
 from uuid import UUID
 
 from sqlmodel import Session
 
-from cognieda.agents.data_explorer import DataExplorerInput, DataExplorerResult
-from cognieda.application.ports import ExecutorDispatcherPort
-from cognieda.execution import (
-    ExecutionRequest,
-    ExecutionStatus,
-    ExecutorContext,
-    PlannerWorkOutcome,
-    normalize_for_planner,
-)
-from cognieda.execution.registry import CapabilityNotRegisteredError
+from cognieda.agents.data_explorer import DataExplorerResult
+from cognieda.agents.planner.agent import Planner
+from cognieda.agents.planner.types import PlannerTaskExecutionOutput
+from cognieda.execution import ExecutionStatus, ExecutorContext
 from cognieda.infrastructure.persistence.repositories import (
     ActivePlanRevisionRepository,
     DataProfileDatasetBindingRepository,
@@ -34,7 +26,7 @@ from cognieda.schemas.plan_revision import PlanRevision
 
 
 class ActivePlanExecutionErrorCode(StrEnum):
-    """Finite failures before a dispatcher request can be constructed."""
+    """Finite failures while resolving authoritative execution state."""
 
     ACTIVE_PLAN_NOT_FOUND = "active_plan_not_found"
     ACTIVE_PLAN_CORRUPT = "active_plan_corrupt"
@@ -51,13 +43,11 @@ class ActivePlanExecutionError(ValueError):
 
 @dataclass(frozen=True)
 class ActivePlanExecutionResult:
-    """Terminal Task state plus role-native and Planner-facing execution results."""
+    """Application-validated terminal state for one Planner Task interaction."""
 
     plan_revision: PlanRevision
     task: Task
-    request: ExecutionRequest | None
-    data_result: DataExplorerResult | None
-    planner_outcome: PlannerWorkOutcome
+    planner_execution: PlannerTaskExecutionOutput
 
 
 def _task_with_status(task: Task, status: TaskStatus) -> Task:
@@ -70,30 +60,11 @@ def _task_with_status(task: Task, status: TaskStatus) -> Task:
     )
 
 
-def _typed_blocked_outcome(task: Task, *, code: str, message: str) -> PlannerWorkOutcome:
-    payload = json.dumps(
-        {"task_id": str(task.task_id), "code": code, "message": message},
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    return PlannerWorkOutcome(
-        source_role="application",
-        task_id=task.task_id,
-        work_id=f"blocked:{code}:{task.task_id}",
-        status=ExecutionStatus.BLOCKED,
-        semantic_summary="The active plan Task could not execute.",
-        blockers=[message],
-        permitted_next_actions=["hold", "replan"],
-        result_digest=hashlib.sha256(payload).hexdigest(),
-    )
-
-
 class ActivePlanExecutor:
-    """Simple deterministic scheduler for the current DATA-only runtime subset."""
+    """Resolve eligibility and authority around Planner-led DATA interactions."""
 
-    def __init__(self, session: Session, dispatcher: ExecutorDispatcherPort) -> None:
+    def __init__(self, session: Session) -> None:
         self._session = session
-        self._dispatcher = dispatcher
         self._active = ActivePlanRevisionRepository(session)
         self._revisions = PlanRevisionRepository(session)
         self._tasks = TaskRepository(session)
@@ -103,61 +74,20 @@ class ActivePlanExecutor:
     async def execute_next(
         self,
         *,
+        planner: Planner,
         objective_id: UUID,
         data_profile_id: UUID,
     ) -> ActivePlanExecutionResult:
-        selection = self._active.get_by_objective_id(objective_id)
-        if selection is None:
-            raise ActivePlanExecutionError(
-                ActivePlanExecutionErrorCode.ACTIVE_PLAN_NOT_FOUND,
-                "Execution requires an explicit active PlanRevision.",
-            )
-        revision = self._revisions.get_by_id(selection.plan_revision_id)
-        if revision is None or revision.objective_id != objective_id:
-            raise ActivePlanExecutionError(
-                ActivePlanExecutionErrorCode.ACTIVE_PLAN_CORRUPT,
-                "Active PlanRevision selection does not resolve to its Objective.",
-            )
+        revision = self._resolve_active_revision(objective_id)
+        tasks_by_id = self._resolve_member_tasks(revision, objective_id)
+        selected_task = self._select_eligible_task(revision, tasks_by_id)
 
-        tasks_by_id: dict[UUID, Task] = {}
-        for task_id in revision.task_ids:
-            task = self._tasks.get_by_id(task_id)
-            if task is None or task.objective_id != objective_id:
-                raise ActivePlanExecutionError(
-                    ActivePlanExecutionErrorCode.ACTIVE_PLAN_CORRUPT,
-                    "Active PlanRevision membership does not resolve to authoritative Tasks.",
-                )
-            tasks_by_id[task_id] = task
-
-        completed_ids = {
-            task_id
-            for task_id, task in tasks_by_id.items()
-            if task.status is TaskStatus.COMPLETED
-        }
-        eligible_ids = revision.eligible_task_ids(completed_task_ids=completed_ids)
-        selected_task = next(
-            (
-                tasks_by_id[task_id]
-                for task_id in eligible_ids
-                if tasks_by_id[task_id].status is TaskStatus.PENDING
-            ),
-            None,
-        )
-        if selected_task is None:
-            raise ActivePlanExecutionError(
-                ActivePlanExecutionErrorCode.NO_ELIGIBLE_TASK,
-                "The active PlanRevision has no eligible pending Task.",
-            )
-
-        binding = next(
-            item for item in revision.task_bindings if item.task_id == selected_task.task_id
-        )
         if selected_task.kind is not TaskKind.DATA:
-            return self._finish_blocked(
+            return self._finish_failed(
                 revision,
                 selected_task,
-                code="unsupported_task_kind",
-                message="The active MVP runtime executes only DATA Tasks.",
+                response="The active MVP runtime executes only DATA Tasks.",
+                blocker="The selected Task kind is not supported by this DATA-only runtime.",
             )
 
         data_profile = self._profiles.get_by_id(data_profile_id)
@@ -180,83 +110,42 @@ class ActivePlanExecutor:
         if running_task is None:
             raise ActivePlanExecutionError(
                 ActivePlanExecutionErrorCode.ACTIVE_PLAN_CORRUPT,
-                "Eligible Task disappeared before dispatch.",
+                "Eligible Task disappeared before Planner execution.",
             )
-        request = ExecutionRequest(
-            capability=binding.required_capability,
-            input=DataExplorerInput(task=running_task, data_profile=data_profile),
-            context=ExecutorContext(
-                dataset_path=dataset_binding.dataset_reference,
-                data_profile_id=data_profile.data_profile_id,
-            ),
-        )
 
         try:
-            dispatched = await self._dispatcher.dispatch(request)
-        except CapabilityNotRegisteredError as exc:
-            return self._finish_blocked(
-                revision,
-                running_task,
-                request=request,
-                code="capability_unavailable",
-                message=str(exc),
+            planner_execution = await planner.execute_task(
+                task=running_task,
+                data_profile=data_profile,
+                execution_context=ExecutorContext(
+                    dataset_path=dataset_binding.dataset_reference,
+                    data_profile_id=data_profile.data_profile_id,
+                ),
+                dataset_digest=dataset_binding.dataset_digest,
+            )
+            planner_execution = PlannerTaskExecutionOutput.model_validate(planner_execution)
+            self._validate_data_results(
+                planner_execution,
+                task=running_task,
+                data_profile_id=data_profile_id,
+                dataset_reference=dataset_binding.dataset_reference,
+                dataset_digest=dataset_binding.dataset_digest,
             )
         except Exception as exc:
-            return self._finish_blocked(
+            return self._finish_failed(
                 revision,
                 running_task,
-                request=request,
-                code="provider_failure",
-                message=str(exc),
+                response="Planner could not complete the active DATA Task.",
+                blocker=str(exc),
             )
 
-        if not isinstance(dispatched, DataExplorerResult):
-            return self._finish_blocked(
-                revision,
-                running_task,
-                request=request,
-                code="invalid_provider_result",
-                message="DATA execution requires a role-native DataExplorerResult.",
-            )
-        if dispatched.task_id != running_task.task_id:
-            return self._finish_blocked(
-                revision,
-                running_task,
-                request=request,
-                data_result=dispatched,
-                code="task_outcome_mismatch",
-                message="Executor result Task identity does not match the dispatched Task.",
-            )
-        provenance = dispatched.provenance
-        if dispatched.status is ExecutionStatus.SUCCEEDED and (
-            provenance is None
-            or provenance.data_profile_id != data_profile_id
-            or provenance.dataset_reference != dataset_binding.dataset_reference
-            or provenance.dataset_digest != dataset_binding.dataset_digest
-        ):
-            return self._finish_blocked(
-                revision,
-                running_task,
-                request=request,
-                data_result=dispatched,
-                code="dataset_binding_mismatch",
-                message="Successful DATA output does not match authoritative dataset state.",
-            )
-
-        outcome = normalize_for_planner(dispatched)
-        if dispatched.observations:
-            outcome = outcome.model_copy(
-                update={
-                    "semantic_summary": " ".join(
-                        f"{observation.summary} Result: "
-                        f"{json.dumps(observation.payload, sort_keys=True)}"
-                        for observation in dispatched.observations
-                    )
-                }
-            )
+        succeeded = any(
+            result.status is ExecutionStatus.SUCCEEDED
+            for result in planner_execution.data_results
+        )
         terminal_status = (
             TaskStatus.COMPLETED
-            if dispatched.status is ExecutionStatus.SUCCEEDED
+            if planner_execution.blocker is None and succeeded
             else TaskStatus.FAILED
         )
         terminal_task = self._tasks.update(
@@ -266,25 +155,105 @@ class ActivePlanExecutor:
         if terminal_task is None:
             raise ActivePlanExecutionError(
                 ActivePlanExecutionErrorCode.ACTIVE_PLAN_CORRUPT,
-                "Dispatched Task disappeared before terminal persistence.",
+                "Executed Task disappeared before terminal persistence.",
             )
         return ActivePlanExecutionResult(
             plan_revision=revision,
             task=terminal_task,
-            request=request,
-            data_result=dispatched,
-            planner_outcome=outcome,
+            planner_execution=planner_execution,
         )
 
-    def _finish_blocked(
+    def _resolve_active_revision(self, objective_id: UUID) -> PlanRevision:
+        selection = self._active.get_by_objective_id(objective_id)
+        if selection is None:
+            raise ActivePlanExecutionError(
+                ActivePlanExecutionErrorCode.ACTIVE_PLAN_NOT_FOUND,
+                "Execution requires an explicit active PlanRevision.",
+            )
+        revision = self._revisions.get_by_id(selection.plan_revision_id)
+        if revision is None or revision.objective_id != objective_id:
+            raise ActivePlanExecutionError(
+                ActivePlanExecutionErrorCode.ACTIVE_PLAN_CORRUPT,
+                "Active PlanRevision selection does not resolve to its Objective.",
+            )
+        return revision
+
+    def _resolve_member_tasks(
+        self,
+        revision: PlanRevision,
+        objective_id: UUID,
+    ) -> dict[UUID, Task]:
+        tasks_by_id: dict[UUID, Task] = {}
+        for task_id in revision.task_ids:
+            task = self._tasks.get_by_id(task_id)
+            if task is None or task.objective_id != objective_id:
+                raise ActivePlanExecutionError(
+                    ActivePlanExecutionErrorCode.ACTIVE_PLAN_CORRUPT,
+                    "Active PlanRevision membership does not resolve to authoritative Tasks.",
+                )
+            tasks_by_id[task_id] = task
+        return tasks_by_id
+
+    def _select_eligible_task(
+        self,
+        revision: PlanRevision,
+        tasks_by_id: dict[UUID, Task],
+    ) -> Task:
+        completed_ids = {
+            task_id
+            for task_id, task in tasks_by_id.items()
+            if task.status is TaskStatus.COMPLETED
+        }
+        eligible_ids = revision.eligible_task_ids(completed_task_ids=completed_ids)
+        selected_task = next(
+            (
+                tasks_by_id[task_id]
+                for task_id in eligible_ids
+                if tasks_by_id[task_id].status is TaskStatus.PENDING
+            ),
+            None,
+        )
+        if selected_task is None:
+            raise ActivePlanExecutionError(
+                ActivePlanExecutionErrorCode.NO_ELIGIBLE_TASK,
+                "The active PlanRevision has no eligible pending Task.",
+            )
+        return selected_task
+
+    @staticmethod
+    def _validate_data_results(
+        planner_execution: PlannerTaskExecutionOutput,
+        *,
+        task: Task,
+        data_profile_id: UUID,
+        dataset_reference: str,
+        dataset_digest: str,
+    ) -> None:
+        for result in planner_execution.data_results:
+            if not isinstance(result, DataExplorerResult):
+                raise ValueError("Planner DATA interactions require DataExplorerResult values.")
+            if result.task_id != task.task_id or result.source_role != "data_explorer":
+                raise ValueError(
+                    "Data Explorer result identity does not match the eligible Task."
+                )
+            provenance = result.provenance
+            if result.status is ExecutionStatus.SUCCEEDED and (
+                provenance is None
+                or provenance.data_profile_id != data_profile_id
+                or provenance.dataset_reference != dataset_reference
+                or provenance.dataset_digest != dataset_digest
+            ):
+                raise ValueError(
+                    "Data Explorer result provenance does not match authoritative state."
+                )
+
+    def _finish_failed(
         self,
         revision: PlanRevision,
         task: Task,
         *,
-        code: str,
-        message: str,
-        request: ExecutionRequest | None = None,
-        data_result: DataExplorerResult | None = None,
+        response: str,
+        blocker: str,
     ) -> ActivePlanExecutionResult:
         failed_task = self._tasks.update(task.task_id, TaskUpdate(status=TaskStatus.FAILED))
         if failed_task is None:
@@ -292,9 +261,10 @@ class ActivePlanExecutor:
         return ActivePlanExecutionResult(
             plan_revision=revision,
             task=failed_task,
-            request=request,
-            data_result=data_result,
-            planner_outcome=_typed_blocked_outcome(task, code=code, message=message),
+            planner_execution=PlannerTaskExecutionOutput(
+                response=response,
+                blocker=blocker,
+            ),
         )
 
 

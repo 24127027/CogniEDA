@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from cognieda.agents.planner.types import PlannerOutput
+from cognieda.agents.planner.types import PlannerAction, PlannerDecision, PlannerOutput
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.planner_context import apply_planner_output, build_planning_context
 from cognieda.schemas.artifacts import (
@@ -68,7 +68,6 @@ def test_builder_exactly_materializes_every_retained_session_frame_member() -> N
 def test_application_boundary_applies_objective_and_assumption_results() -> None:
     original = Objective(text="Understand retention.")
     refined = Objective(text="Understand retention drivers.")
-    assumption = Assumption(text="Rows represent customers.")
     current = SessionFrame(objective=original)
 
     successor = apply_planner_output(
@@ -76,14 +75,37 @@ def test_application_boundary_applies_objective_and_assumption_results() -> None
         PlannerOutput(
             response="Updated planning state.",
             created_objective=refined,
-            created_assumption=assumption,
+            decision=PlannerDecision(
+                action=PlannerAction.ADD_ASSUMPTION,
+                assumption_text="Rows represent customers.",
+                assumption_is_reasonably_testable=False,
+            ),
         ),
+        human_request="Please retain the assumption Rows represent customers.",
     )
 
     assert current.objective == original
     assert current.assumptions == ()
     assert successor.objective == refined
-    assert successor.assumptions == (assumption,)
+    assert tuple(item.text for item in successor.assumptions) == (
+        "Rows represent customers.",
+    )
+
+
+def test_application_boundary_rejects_non_verbatim_assumption_text() -> None:
+    with pytest.raises(ValueError, match="exact Human text"):
+        apply_planner_output(
+            SessionFrame(),
+            PlannerOutput(
+                response="Invalid rewrite.",
+                decision=PlannerDecision(
+                    action=PlannerAction.ADD_ASSUMPTION,
+                    assumption_text="Rows represent customers.",
+                    assumption_is_reasonably_testable=False,
+                ),
+            ),
+            human_request="Please retain the assumption that rows represent users.",
+        )
 
 
 def test_application_boundary_does_not_apply_transient_canonical_plan_objects() -> None:
@@ -113,6 +135,7 @@ def test_application_boundary_does_not_apply_transient_canonical_plan_objects() 
             proposed_tasks=(task,),
             proposed_plan_revision=revision,
         ),
+        human_request="Analyze the dataset.",
     )
 
     assert successor is current

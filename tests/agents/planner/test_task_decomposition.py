@@ -224,8 +224,9 @@ def test_explicit_assumption_addition_uses_successor_state_and_never_dispatches(
     assert model.decision_inputs[0].latest_request == (
         "/assumption Rows represent customers."
     )
-    assert output.created_assumption is not None
-    assert output.created_assumption.text == "Rows represent customers."
+    assert not hasattr(output, "created_assumption")
+    assert output.decision is not None
+    assert output.decision.assumption_text == "Rows represent customers."
     assert "not reasonably testable" in output.response
     assert "not empirical Evidence" in output.response
     assert output.proposed_plan_revision is None
@@ -249,8 +250,10 @@ def test_natural_language_human_assumption_retains_only_exact_source_text() -> N
         )
     )
 
-    assert output.created_assumption is not None
-    assert output.created_assumption.text == "Customer identity is stable across exports."
+    assert output.decision is not None
+    assert output.decision.assumption_text == (
+        "Customer identity is stable across exports."
+    )
     assert dispatcher.requests == []
 
 
@@ -273,7 +276,7 @@ def test_planner_cannot_spontaneously_author_assumption_for_normal_request() -> 
 
     assert output.error is not None
     assert output.error.code is PlannerErrorCode.INVALID_MODEL_DECISION
-    assert output.created_assumption is None
+    assert not hasattr(output, "created_assumption")
     assert "cannot author or rewrite" in output.response
     assert dispatcher.requests == []
 
@@ -297,7 +300,7 @@ def test_reasonably_testable_human_claim_requires_unavailable_scientific_runtime
 
     assert output.error is not None
     assert output.error.code is PlannerErrorCode.UNSUPPORTED_ACTION
-    assert output.created_assumption is None
+    assert not hasattr(output, "created_assumption")
     assert "reasonably testable" in output.response
     assert "scientific investigation" in output.response
     assert "not executable in the current DATA-only runtime" in output.response

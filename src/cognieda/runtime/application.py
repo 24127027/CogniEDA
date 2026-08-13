@@ -48,7 +48,11 @@ class Application:
             message,
             planning_context=planning_context,
         )
-        self.session_frame = apply_planner_output(self.session_frame, planner_output)
+        self.session_frame = apply_planner_output(
+            self.session_frame,
+            planner_output,
+            human_request=message,
+        )
         if planner_output.proposed_plan_revision is not None:
             if self._pending_plan_revision is not None:
                 return self._text(
@@ -147,7 +151,8 @@ class Application:
             successor = successor.add_task(task)
         self.session_frame = successor
 
-        executed = await ActivePlanExecutor(self.session, self.dispatcher).execute_next(
+        executed = await ActivePlanExecutor(self.session).execute_next(
+            planner=self.planner_agent,
             objective_id=objective.objective_id,
             data_profile_id=data_profile.data_profile_id,
         )
@@ -155,7 +160,11 @@ class Application:
             executed.task.task_id,
             executed.task.status,
         )
-        return self._text(self.planner_agent.respond_to_work(executed.planner_outcome))
+        if executed.planner_execution.new_messages:
+            self.conversation_history = self.conversation_history.add_turn(
+                executed.planner_execution.new_messages
+            )
+        return self._text(executed.planner_execution.response)
 
     def _reject_pending_plan(self) -> Message:
         if self._pending_plan_revision is None:
