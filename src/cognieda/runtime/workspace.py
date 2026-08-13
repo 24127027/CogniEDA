@@ -7,7 +7,6 @@ import toml
 
 from cognieda.application.ports.llm import ModelConfig, ProviderType
 from cognieda.application.ports.llm import ProviderType
-from cognieda.runtime import workspace
 
 @dataclass(slots=True)
 class ProjectConfig:
