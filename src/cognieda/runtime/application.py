@@ -55,49 +55,63 @@ class Application:
         parts = command.split()
 
         match parts:
-            #
-            # Register a skill in skills.toml
-            #
-            case ["/skill", "register", name, directory]:
+            case ["/skill", "add", name, directory]:
                 self.workspace.add_skill(name, directory)
-                return self._text(
-                    f"Registered skill '{name}' at '{directory}'."
-                )
 
-            case ["/skill", "unregister", name]:
+                await self._reload_runtime(
+                    reload_tooling=True,
+                    recreate_agent=True,
+                )
+                return self._text(f"Added skill '{name}'.")
+
+            case ["/skill", "rm", name]:
                 self.workspace.remove_skill(name)
-                return self._text(
-                    f"Unregistered skill '{name}'."
-                )
 
-            #
-            # Assign a skill to a worker in agents.toml
-            #
-            case ["/skill", "assign", worker, skill]:
+                await self._reload_runtime(
+                    reload_tooling=True,
+                    recreate_agent=True,
+                )
+                return self._text(f"Removed skill '{name}'.")
+
+            case ["/skill", "use", worker, skill]:
                 self.workspace.add_worker_skill(worker, skill)
-                self.agent_factory.reload_tooling()  # Reload the tooling to reflect the updated skills
-                await self.planner_agent.reload(recreate_agent=True)  # Reload the planner agent to reflect the updated skills
 
+                await self._reload_runtime(
+                    reload_tooling=True,
+                    recreate_agent=True,
+                )
                 return self._text(
-                    f"Assigned skill '{skill}' to '{worker}'."
+                    f"Assigned '{skill}' to '{worker}'."
                 )
 
-            case ["/skill", "unassign", worker, skill]:
+            case ["/skill", "drop", worker, skill]:
                 self.workspace.remove_worker_skill(worker, skill)
-                self.agent_factory.reload_tooling()  # Reload the tooling to reflect the updated skills
-                await self.planner_agent.reload(recreate_agent=True)
 
+                await self._reload_runtime(
+                    reload_tooling=True,
+                    recreate_agent=True,
+                )
                 return self._text(
-                    f"Removed skill '{skill}' from '{worker}'."
+                    f"Removed '{skill}' from '{worker}'."
                 )
 
-            case ["/reload", "instructions"]:
-                await self.planner_agent.reload(
-                    agent_instruction=self.workspace.load_agent_instruction(),
+            case ["/reload", "instruction"]:
+                await self._reload_runtime(
+                    reload_instruction=True,
                 )
-
                 return self._text(
                     "Planner instructions reloaded."
+                )
+
+            case ["/provider", "use", profile]:
+                self.workspace.use_provider(profile)
+
+                await self._reload_runtime(
+                    recreate_agent=True,
+                )
+
+                return self._text(
+                    f"Using provider '{profile}'."
                 )
 
             case _:
@@ -110,4 +124,24 @@ class Application:
             type=MessageType.TEXT,
             role=MessageRole.ASSISTANT,
             content=content,
+        )
+    
+    async def _reload_runtime(
+        self,
+        *,
+        reload_tooling: bool = False,
+        reload_instruction: bool = False,
+        recreate_agent: bool = False,
+    ) -> None:
+        if reload_tooling:
+            self.agent_factory.reload_tooling()
+
+        await self.planner_agent.reload(
+            model_config=self.workspace.model_config,
+            agent_instruction=(
+                self.workspace.load_agent_instruction()
+                if reload_instruction
+                else None
+            ),
+            recreate_agent=recreate_agent,
         )

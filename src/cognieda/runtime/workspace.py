@@ -300,6 +300,24 @@ class Workspace:
 
         self.save_agents_config(config)
 
+    def use_provider(self, profile: str) -> None:
+        config = self._load_toml(self.project_config_path)
+
+        if profile not in config["providers"]:
+            raise ValueError(f"Unknown provider '{profile}'.")
+
+        config["default_provider"] = profile
+
+        self._save_toml(
+            self.project_config_path,
+            config,
+        )
+
+        self.project_config = ProjectConfig.load(
+            self.project_config_path,
+        )
+        self.model_config = self.project_config.resolve_model()
+
     # -------------------------------------------------------------------------
     # TODO: Instruction loading
     #
