@@ -40,7 +40,6 @@ class PlanRevisionRepository:
                 PlanTaskBindingRecord(
                     plan_revision_id=revision.plan_revision_id,
                     task_id=binding.task_id,
-                    required_capability=binding.required_capability,
                     order_rank=binding.order_rank,
                     priority=binding.priority,
                 )
@@ -89,7 +88,6 @@ class PlanRevisionRepository:
                 "task_bindings": [
                     {
                         "task_id": binding.task_id,
-                        "required_capability": binding.required_capability,
                         "order_rank": binding.order_rank,
                         "priority": binding.priority,
                     }
@@ -104,7 +102,7 @@ class PlanRevisionRepository:
                 ],
             },
             context={
-                "authoritative_tasks": tuple(
+                "tasks": tuple(
                     record_to_schema(Task, task_record) for task_record in task_rows
                 )
             },

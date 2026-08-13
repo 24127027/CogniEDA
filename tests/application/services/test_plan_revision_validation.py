@@ -14,7 +14,6 @@ from cognieda.application.services import (
     PlanRevisionValidationErrorCode,
     PlanRevisionValidator,
 )
-from cognieda.execution import Capability
 from cognieda.infrastructure.persistence.repositories import (
     ObjectiveRepository,
     PlanRevisionRepository,
@@ -54,20 +53,11 @@ def _task(
 def _binding(
     task: Task,
     *,
-    capability: Capability | object = ...,
     order_rank: int = 0,
     priority: PlanPriority = PlanPriority.NORMAL,
 ) -> PlanTaskBinding:
-    default_capability = {
-        TaskKind.DATA: Capability.DATA_ANALYSIS,
-        TaskKind.SCIENTIFIC: Capability.HYPOTHESIS_TESTING,
-        TaskKind.GRAPH: Capability.GRAPH_MINING,
-    }[task.kind]
-    selected = default_capability if capability is ... else capability
-    assert isinstance(selected, Capability)
     return PlanTaskBinding(
         task_id=task.task_id,
-        required_capability=selected,
         order_rank=order_rank,
         priority=priority,
     )
@@ -91,7 +81,7 @@ def _revision(
             else tuple(bindings)
         ),
         dependencies=dependencies,
-        authoritative_tasks=task_tuple,
+        tasks=task_tuple,
     )
 
 
@@ -163,37 +153,6 @@ def test_wrong_objective_authoritative_task_is_rejected(db_session: Session) -> 
         PlanRevisionValidator(db_session),
         candidate,
         PlanRevisionValidationErrorCode.TASK_OBJECTIVE_MISMATCH,
-    )
-
-
-@pytest.mark.parametrize(
-    ("kind", "capability"),
-    [
-        (TaskKind.DATA, Capability.HYPOTHESIS_TESTING),
-        (TaskKind.SCIENTIFIC, Capability.DATA_ANALYSIS),
-        (TaskKind.GRAPH, Capability.DATA_PROFILING),
-    ],
-)
-def test_invalid_task_kind_capability_is_rejected(
-    db_session: Session,
-    kind: TaskKind,
-    capability: Capability,
-) -> None:
-    objective = _persisted_objective(db_session)
-    task = _task(objective.objective_id, kind=kind, persisted_in=db_session)
-    invalid_binding = _binding(task, capability=capability)
-    candidate = PlanRevision.model_construct(
-        plan_revision_id=uuid4(),
-        objective_id=objective.objective_id,
-        task_bindings=(invalid_binding,),
-        dependencies=(),
-        contract_version="plan-revision/v1",
-    )
-
-    _assert_rejected(
-        PlanRevisionValidator(db_session),
-        candidate,
-        PlanRevisionValidationErrorCode.INVALID_CANDIDATE,
     )
 
 
@@ -296,13 +255,11 @@ def test_invalid_revision_identity_is_rejected(db_session: Session) -> None:
     [
         PlanTaskBinding.model_construct(
             task_id=UUID("00000000-0000-0000-0000-000000000001"),
-            required_capability=Capability.DATA_ANALYSIS,
             order_rank=-1,
             priority=PlanPriority.NORMAL,
         ),
         PlanTaskBinding.model_construct(
             task_id=UUID("00000000-0000-0000-0000-000000000001"),
-            required_capability=Capability.DATA_ANALYSIS,
             order_rank=0,
             priority="urgent",
         ),
@@ -370,18 +327,21 @@ def test_candidate_fingerprint_mismatch_is_rejected(db_session: Session) -> None
     )
 
 
-def test_unavailable_provider_does_not_block_or_rewrite_validation(
+@pytest.mark.parametrize("kind", list(TaskKind))
+def test_all_task_kinds_validate_without_provider_or_capability_lookup(
     db_session: Session,
+    kind: TaskKind,
 ) -> None:
     objective = _persisted_objective(db_session)
     task = _task(
         objective.objective_id,
-        kind=TaskKind.GRAPH,
+        kind=kind,
         persisted_in=db_session,
     )
     candidate = _revision(objective.objective_id, [task])
 
     validated = PlanRevisionValidator(db_session).validate(candidate)
 
-    assert validated.task_bindings[0].required_capability is Capability.GRAPH_MINING
+    assert validated == candidate
+    assert "capability" not in validated.model_dump_json()
     assert PlanRevisionRepository(db_session).get_by_id(candidate.plan_revision_id) is None
