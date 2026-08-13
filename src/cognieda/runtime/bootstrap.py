@@ -7,9 +7,7 @@ from cognieda.infrastructure.llm import AgentFactory
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
-from cognieda.application.ports import ModelConfig, ProviderType
 from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
-from cognieda.infrastructure.agent_tooling import AgentTooling
 
 from .application import Application
 from .workspace import Workspace
