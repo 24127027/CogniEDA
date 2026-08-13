@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 
 from langgraph.runtime import Runtime
 from pydantic import TypeAdapter
@@ -25,7 +25,7 @@ from .contracts import (
 )
 from .state import PlannerState
 
-_DECISION_ADAPTER = TypeAdapter(PlannerDecision)
+_DECISION_ADAPTER: TypeAdapter[PlannerDecision] = TypeAdapter(PlannerDecision)
 
 
 def _error(code: PlannerErrorCode, message: str) -> PlannerControlledError:
@@ -117,7 +117,7 @@ async def understand_request(
         )
         result = await agent.run(
             prompt,
-            output_type=PlannerDecision,
+            output_type=cast(Any, PlannerDecision),
             message_history=runtime.context.conversation_history.model_messages(),
             instructions=runtime.context.decide_instructions,
         )
