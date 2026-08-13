@@ -247,14 +247,31 @@ testability assessment. Planner graph state contains per-run control and typed
 result fields only; Planner neither mutates nor returns SessionFrame.
 
 Planner directly owns one PydanticAI `Agent` created through the inward-facing
-`AgentFactoryPort`. For each invocation it supplies that current Agent,
-immutable `PlannerContext`, separate `ConversationHistory`, and assembled
-operation instructions to LangGraph. Request understanding and authorized-
-context answer composition invoke the same Agent directly with operation-
-specific output types and instructions. LangGraph coordinates the transitional
-`understand_request -> prepare_results -> compose_response` control flow. It
-contains no direct dispatcher call or Planner-selected execution capability;
-this correction does not implement the target lifecycle graph.
+`AgentFactoryPort`. Runtime bootstrap supplies one intentionally empty,
+immutable `PlannerDeps` instance as the stable governed-tool dependency
+boundary. Agent construction declares `deps_type=PlannerDeps`, and every
+Planner-owned PydanticAI run receives that exact instance through `deps=`.
+`PlannerDeps` exposes no dispatcher, execution `Capability`, dataset path,
+repository, or database session; Planner-facing semantic specialist tools are
+**Deferred**.
+
+For each invocation Planner supplies its current Agent, immutable
+`PlannerContext`, separate `ConversationHistory`, `PlannerDeps`, and assembled
+operation instructions to LangGraph through `PlannerGraphContext`. The same
+Agent performs both the main cognitive turn and, when requested, protected
+answer synthesis. There is no global `PlannerDecision` or `PlannerAction`
+classifier. Independent typed results represent real application boundaries:
+direct response, Objective proposal, exact-text Assumption assessment, or the
+narrow request to enter protected answer synthesis.
+
+LangGraph owns meaningful Planner lifecycle and control-state transitions;
+PydanticAI owns reasoning and tool use within a state; Application owns
+authoritative state transitions. The current graph is intentionally minimal:
+`START -> run_planner -> END`, with a conditional
+`compose_authoritative_answer` node only for Evidence/Discovery-isolated
+answering. It does not manually script model reasoning and contains no DTO-copy
+or generic prose-composition stage. Approval, execution, pause/resume, and
+replanning graph states remain **Deferred**.
 
 The built-in Planner role and authority instruction remains source-owned.
 Optional project guidance is loaded only from `.cognieda/planner.md` and is
@@ -263,14 +280,14 @@ The instruction utility resolves the direct caller module's sibling
 `instruction/` directory through the source layout convention. Repository-root
 `AGENTS.md` content is not a Planner runtime instruction.
 
-Current bounded Planner behavior can understand a finite set of requests,
-establish or refine an Objective, retain planning-only Assumptions through
-exact-text testability assessment, summarize retained state, and draft answers
-from admitted Evidence and/or governed Discovery while excluding Assumptions,
-Tasks, and conversation from authoritative support. Legacy `/profile`,
-`/analyze`, and `/transform` commands return a controlled deferred result.
-Planner does not create Tasks, dispatch work, admit Evidence, or create or
-re-evaluate Discovery.
+Current bounded Planner behavior returns one typed final result and may propose
+an Objective, assess exact Human Assumption text, respond directly, or request
+protected answer synthesis. Protected synthesis accepts admitted Evidence
+and/or governed Discovery while excluding Assumptions, Tasks, and conversation
+from authoritative support. Application owns administrative slash commands;
+dead Planner-specific research slash parsing is removed, so syntax cannot
+bypass Assumption testability assessment. Planner does not create Tasks,
+dispatch work, admit Evidence, or create or re-evaluate Discovery.
 
 The current in-process runtime also preserves native model-message history
 across Planner runs so a follow-up can be understood in conversational context.

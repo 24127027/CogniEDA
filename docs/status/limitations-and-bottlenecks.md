@@ -52,6 +52,10 @@ These are verified constraints of the bounded current implementation.
   **Deferred**. Task persistence supports status change only. Active Task
   values are immutable; changing Task meaning requires a new identity, while
   status change produces a replacement with the same identity and instruction.
+- Planner's `PlannerDeps` boundary is intentionally empty. No governed DATA,
+  scientific-investigation, or graph-query tool is active, so the model cannot
+  reach the retained execution registry through this seam. Those semantic
+  specialist tools are **Deferred**.
 - Application-authority Evidence admission is **Implemented** for the direct
   bounded Task-to-Evidence contract and **Verified on SQLite**. It is not the
   canonical scientific admission contract and does not fabricate
@@ -108,9 +112,10 @@ These are verified constraints of the bounded current implementation.
 - `DATA_TRANSFORMATION` remains blocked until immutable successor dataset state
   and successor DataProfile handling exist.
 - Planner tests use a deterministic fake Agent supplied by a fake
-  `AgentFactoryPort`; they prove action-specific contracts, routing-free graph
-  state/output, native-message delta propagation, separated conversation,
-  Evidence/Discovery answer support, Assumption quarantine, and fail-closed
+  `AgentFactoryPort`; they prove independent typed result contracts, exact
+  `PlannerDeps` injection, minimal lifecycle/epistemic graph state, native-
+  message delta propagation, separated conversation, Evidence/Discovery answer
+  support, Assumption quarantine without command bypass, and fail-closed
   behavior without claiming real Data Explorer filesystem execution.
 - Workspace path selection and initialization are **Implemented**, but
   automatic dataset discovery or admission is **Unsupported**. The

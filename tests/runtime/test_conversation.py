@@ -141,6 +141,28 @@ def test_skill_assignment_preserves_runtime_reload_path_without_planner_state_ac
     assert response.content == "Assigned skill 'review' to 'planner'."
 
 
+def test_assumption_slash_syntax_cannot_bypass_planner_assessment() -> None:
+    planner = Mock(spec=Planner)
+    application = Application(
+        workspace=cast(Workspace, object()),
+        planner_agent=planner,
+        dispatcher=cast(ExecutorDispatcher, object()),
+        agent_factory=cast(AgentFactoryPort, object()),
+    )
+    original_frame = application.session_frame
+
+    response = asyncio.run(
+        application.submit_message("/assumption Customer age predicts churn.")
+    )
+
+    planner.run.assert_not_called()
+    assert application.session_frame is original_frame
+    assert application.session_frame.assumptions == ()
+    assert response.content == (
+        "Unknown command: '/assumption Customer age predicts churn.'."
+    )
+
+
 def test_skill_unassignment_reloads_tooling_and_recreates_planner_agent() -> None:
     workspace = Mock(spec=Workspace)
     planner = Mock(spec=Planner)

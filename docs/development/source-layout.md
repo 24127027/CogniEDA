@@ -6,7 +6,7 @@ boundary explicit so that new work enters the correct package.
 
 | Package | Current responsibility |
 | --- | --- |
-| `agents` | Planner and peer specialist role adapters. Planner directly owns its PydanticAI Agent, routing-free LangGraph control flow, typed context/contracts, and built-in/operation instructions; Data Explorer owns direct dataset operations. Hypothesis Analyst and Graph Miner remain deferred scaffolds. |
+| `agents` | Planner and peer specialist role adapters. Planner directly owns its PydanticAI Agent, typed `PlannerDeps`, minimal lifecycle/epistemic LangGraph control flow, typed context/result contracts, and built-in/operation instructions; Data Explorer owns direct dataset operations. Hypothesis Analyst and Graph Miner remain deferred scaffolds. |
 | `application` | Inward-facing ports plus application-authority services for execution admission, Planner-operation commit, and guarded transitions. These services do not establish the complete canonical workflow. |
 | `cli` | Installed command parsing, the development REPL, and terminal rendering. |
 | `execution` | Role-neutral capability, request/result transport, provider registry, and dispatcher contracts. |
@@ -60,7 +60,10 @@ product-root research-state directories, package-relative user-data lookup,
 and production references to test fixture paths.
 
 **Partially implemented.** Dependency injection is explicit for execution,
-model construction, and agent tooling, but some application services still use
-the current concrete SQLite persistence boundary. The `schemas` package also
-retains mixed active and deferred contracts. A future split must classify those
-contracts first and must not create parallel FCO definitions.
+model construction, agent tooling, and Planner PydanticAI runs. Runtime supplies
+one empty immutable `PlannerDeps` instance; it is intentionally ready for later
+governed semantic tools but exposes no execution route today. Some application
+services still use the current concrete SQLite persistence boundary. The
+`schemas` package also retains mixed active and deferred contracts. A future
+split must classify those contracts first and must not create parallel FCO
+definitions.
