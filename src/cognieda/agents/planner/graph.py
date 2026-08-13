@@ -1,17 +1,17 @@
 from langgraph.graph import END, START
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 
-from .context import Context
+from .context import PlannerGraphContext
 from .nodes import compose_response, prepare_results, understand_request
 from .state import PlannerState
 
 
 def build_graph() -> CompiledStateGraph[
-    PlannerState, Context, PlannerState, PlannerState
+    PlannerState, PlannerGraphContext, PlannerState, PlannerState
 ]:
     builder = StateGraph(
         PlannerState,
-        context_schema=Context,
+        context_schema=PlannerGraphContext,
     )
 
     builder.add_node("understand_request", understand_request)

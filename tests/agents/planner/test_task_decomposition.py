@@ -17,6 +17,7 @@ from cognieda.agents.planner.contracts import (
     PlannerResponseDraft,
     StateSummaryDecision,
 )
+from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.application.ports import ModelConfig
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.planner_context import apply_planner_output, build_planner_context
@@ -68,6 +69,7 @@ class FakeFactory:
 
 def _planner(agent: AnswerAgent) -> Planner:
     return Planner(
+        PlannerDeps(),
         agent_factory=FakeFactory(agent),  # type: ignore[arg-type]
         model_config=ModelConfig(provider="openai", model_name="test", api_key="test"),
     )

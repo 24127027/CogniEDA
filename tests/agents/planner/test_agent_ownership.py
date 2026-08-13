@@ -19,6 +19,7 @@ from cognieda.agents.planner.contracts import (
     PlannerResponseDraft,
     StateSummaryDecision,
 )
+from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.graph import build_graph
 from cognieda.application.ports import ModelConfig
 from cognieda.runtime.conversation import ConversationHistory
@@ -117,7 +118,9 @@ def test_planner_constructs_and_owns_agent_from_factory() -> None:
     agent = _agent()
     factory = RecordingFactory(agent)
 
+    deps = PlannerDeps()
     planner = Planner(
+        deps,
         agent_factory=factory,  # type: ignore[arg-type]
         model_config=config,
     )
@@ -127,12 +130,13 @@ def test_planner_constructs_and_owns_agent_from_factory() -> None:
         {
             "worker": "planner",
             "config": config,
-            "deps_type": type(None),
+            "deps_type": PlannerDeps,
             "builtin_tools": (),
         }
     ]
     assert "planner_model" not in inspect.signature(Planner).parameters
-    assert "deps" not in inspect.signature(Planner).parameters
+    assert planner._deps is deps
+    assert inspect.signature(Planner).parameters["deps"].default is inspect.Parameter.empty
 
 
 def test_langgraph_has_only_current_routing_free_lifecycle_nodes() -> None:
@@ -163,7 +167,9 @@ def test_graph_nodes_use_same_agent_and_keep_new_messages_as_delta() -> None:
         decision_messages,
         response_messages,
     )
+    deps = PlannerDeps()
     planner = Planner(
+        deps,
         agent_factory=RecordingFactory(agent),  # type: ignore[arg-type]
         model_config=ModelConfig(provider="openai", model_name="test", api_key="key"),
     )
@@ -185,14 +191,15 @@ def test_graph_nodes_use_same_agent_and_keep_new_messages_as_delta() -> None:
     ]
     assert agent.calls[0]["message_history"] == list(prior_messages)
     assert "message_history" not in agent.calls[1]
-    assert "deps" not in agent.calls[0]
-    assert "deps" not in agent.calls[1]
+    assert agent.calls[0]["deps"] is deps
+    assert agent.calls[1]["deps"] is deps
 
 
 def test_instruction_reload_updates_layers_without_recreating_agent() -> None:
     agent = _agent()
     factory = RecordingFactory(agent)
     planner = Planner(
+        PlannerDeps(),
         agent_factory=factory,  # type: ignore[arg-type]
         model_config=ModelConfig(provider="openai", model_name="initial", api_key="key"),
     )
@@ -213,6 +220,7 @@ def test_recreation_uses_current_model_configuration() -> None:
     initial = ModelConfig(provider="openai", model_name="initial", api_key="key")
     updated = ModelConfig(provider="google", model_name="updated", api_key="key")
     planner = Planner(
+        PlannerDeps(),
         agent_factory=factory,  # type: ignore[arg-type]
         model_config=initial,
     )

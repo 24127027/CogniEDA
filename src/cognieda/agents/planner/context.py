@@ -13,6 +13,8 @@ from cognieda.schemas.artifacts import (
 )
 from cognieda.schemas.common import ImmutableCogniEDABaseModel
 
+from .dependencies import PlannerDeps
+
 
 class PlannerContext(ImmutableCogniEDABaseModel):
     """Exact read-only materialization of retained authorized research state."""
@@ -25,12 +27,13 @@ class PlannerContext(ImmutableCogniEDABaseModel):
     data_profile: DataProfile | None = None
 
 
-class Context(BaseModel):
+class PlannerGraphContext(BaseModel):
     """Injected non-transient dependencies available to Planner graph nodes."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     agent: object
+    deps: PlannerDeps
     planner_context: PlannerContext
     conversation_history: ConversationHistory
     decide_instructions: tuple[str, ...]

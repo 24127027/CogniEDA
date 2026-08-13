@@ -16,6 +16,7 @@ from pydantic_ai.messages import (
 )
 
 from cognieda.agents.planner.agent import Planner
+from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.contracts import (
     PlannerDecision,
     SetOrRefineObjectiveDecision,
@@ -95,6 +96,7 @@ def test_application_retains_original_history_alongside_current_session_frame() 
         StateSummaryDecision(),
     )
     planner = Planner(
+        PlannerDeps(),
         agent_factory=FakeAgentFactory(model),  # type: ignore[arg-type]
         model_config=ModelConfig(provider="openai", model_name="test", api_key="test"),
     )

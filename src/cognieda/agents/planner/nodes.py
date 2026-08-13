@@ -9,7 +9,7 @@ from pydantic_ai import Agent
 from cognieda.schemas.artifacts import Objective
 from cognieda.schemas.enums import AssumptionTestability
 
-from .context import Context
+from .context import PlannerGraphContext
 from .contracts import (
     AnswerFromContextDecision,
     AssumptionAssessment,
@@ -99,7 +99,7 @@ def _explicit_decision(
 
 async def understand_request(
     state: PlannerState,
-    runtime: Runtime[Context],
+    runtime: Runtime[PlannerGraphContext],
 ) -> PlannerState:
     """Produce one typed intent from the current request and authorized context."""
 
@@ -109,7 +109,7 @@ async def understand_request(
         return state
 
     try:
-        agent = cast(Agent[None, object], runtime.context.agent)
+        agent = cast(Agent[object, object], runtime.context.agent)
         prompt = (
             f"Current Human request:\n{state.request}\n\n"
             "Authorized Planner research context:\n"
@@ -120,6 +120,7 @@ async def understand_request(
             output_type=cast(Any, PlannerDecision),
             message_history=runtime.context.conversation_history.model_messages(),
             instructions=runtime.context.decide_instructions,
+            deps=runtime.context.deps,
         )
         state.decision = _DECISION_ADAPTER.validate_python(result.output)
         state.new_messages = (*state.new_messages, *result.new_messages())
@@ -133,7 +134,7 @@ async def understand_request(
 
 async def prepare_results(
     state: PlannerState,
-    runtime: Runtime[Context],
+    runtime: Runtime[PlannerGraphContext],
 ) -> PlannerState:
     """Expose only application-authorized proposals and assessments."""
 
@@ -153,7 +154,7 @@ async def prepare_results(
 
 async def compose_response(
     state: PlannerState,
-    runtime: Runtime[Context],
+    runtime: Runtime[PlannerGraphContext],
 ) -> PlannerState:
     """Present state without upgrading conversation or planning context to support."""
 
@@ -180,7 +181,7 @@ async def compose_response(
             state.response = state.error.message
             return state
         try:
-            agent = cast(Agent[None, object], runtime.context.agent)
+            agent = cast(Agent[object, object], runtime.context.agent)
             answer_context = PlannerAnswerContext(
                 request=state.request,
                 objective=planner_context.objective,
@@ -192,6 +193,7 @@ async def compose_response(
                 f"Authorized answer context:\n{answer_context.model_dump_json()}",
                 output_type=PlannerResponseDraft,
                 instructions=runtime.context.answer_instructions,
+                deps=runtime.context.deps,
             )
             response = PlannerResponseDraft.model_validate(result.output)
             state.response = response.text

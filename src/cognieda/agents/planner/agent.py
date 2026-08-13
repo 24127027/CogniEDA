@@ -6,8 +6,9 @@ from cognieda.agents.utilities import instruction
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.runtime.conversation import ConversationHistory
 
-from .context import Context, PlannerContext
+from .context import PlannerContext, PlannerGraphContext
 from .contracts import PlannerControlledError, PlannerErrorCode, PlannerOutput
+from .dependencies import PlannerDeps
 from .graph import build_graph
 from .state import PlannerState
 
@@ -19,11 +20,13 @@ class Planner:
 
     def __init__(
         self,
+        deps: PlannerDeps,
         *,
         agent_factory: AgentFactoryPort,
         model_config: ModelConfig,
         agent_instruction: str | None = None,
     ) -> None:
+        self._deps = deps
         self._agent_factory = agent_factory
         self._model_config = model_config
         self._workspace_instruction = agent_instruction
@@ -46,10 +49,10 @@ class Planner:
         )
 
     def _recreate_agent(self) -> None:
-        self._agent: Agent[None, object] = self._agent_factory.create_agent(
+        self._agent: Agent[PlannerDeps, object] = self._agent_factory.create_agent(
             worker="planner",
             config=self._model_config,
-            deps_type=type(None),
+            deps_type=PlannerDeps,
             builtin_tools=self.builtin_tools,
         )
 
@@ -89,8 +92,9 @@ class Planner:
             return PlannerOutput(response=error.message, error=error)
 
         state = PlannerState(request=request)
-        context = Context(
+        context = PlannerGraphContext(
             agent=self._agent,
+            deps=self._deps,
             planner_context=planner_context,
             conversation_history=conversation_history,
             decide_instructions=self._decide_instructions,
