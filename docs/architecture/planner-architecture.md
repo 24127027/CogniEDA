@@ -244,16 +244,20 @@ passing the frame. Planner graph state contains per-run control and typed result
 fields only; Planner neither mutates nor returns SessionFrame.
 
 Current bounded Planner behavior can understand a
-finite set of requests, establish or refine an Objective, retain planning-only
-Human-authored Assumptions after the testability gate, or propose exact
+finite set of requests, establish or refine an Objective, coordinate
+application-owned retention of exact Human-authored Assumptions after the
+testability gate, or propose exact
 transient canonical Objective, DATA Task, and PlanRevision objects. Application
 retains those objects in process and accepts `/approve` or `/reject` for the
 sole pending plan. Before approval, no proposed Task is authoritative and no
 executor dispatch occurs. After approval, application authority atomically
-persists and activates those exact canonical objects, executes the next
-eligible DATA Task, and gives the normalized result back to Planner for the
-Human-facing response. Planner does not admit Evidence, and this direct computed
-result is not automatically Evidence.
+persists and activates those exact canonical objects, selects the next eligible
+DATA Task, and supplies its authoritative DataProfile and physical-binding
+context to Planner as the current goal. Planner may make zero, one, or multiple
+semantic Data Explorer tool calls, inspect their normalized outcomes, and
+compose the Human-facing response. Application validates interaction identity
+and provenance and alone persists terminal Task status. Planner does not admit
+Evidence, and these direct computed results are not automatically Evidence.
 
 The current in-process runtime also preserves native model-message history
 across Planner runs so a follow-up can be understood in conversational context.
@@ -269,8 +273,9 @@ fail-closed collision/fingerprint reconstruction are **Verified on SQLite** as
 infrastructure for the approval boundary. Transient is a lifecycle and
 authority state, not a separate domain type; the pending objects are not
 persisted. Exact approval, post-approval revalidation, atomic first
-activation, explicit active-plan selection, and deterministic sequential DATA
-eligibility are **Implemented**. A second plan for an already-active Objective
+activation, explicit active-plan selection, application-owned deterministic
+DATA eligibility, and Planner-led governed Data Explorer interaction are
+**Implemented**. A second plan for an already-active Objective
 fails closed because successor/replanning semantics are **Deferred**. Active
 Task exposes all three canonical kinds, but only bounded `DATA` work is
 executable. A reasonably testable Human claim produces zero Assumption and a

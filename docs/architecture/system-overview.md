@@ -165,8 +165,9 @@ The detailed contracts belong to [Authority boundaries](authority-boundaries.md)
 
 **Partially implemented.** The current implementation provides a bounded typed
 research-state foundation, transient canonical Objective, Task, and
-PlanRevision proposal state, atomic first PlanRevision activation, sequential
-bounded DATA execution, deterministic Data Explorer
+PlanRevision proposal state, atomic first PlanRevision activation,
+application-selected DATA eligibility, Planner-led governed Data Explorer
+interaction, deterministic Data Explorer
 operations, separate direct Task-to-Evidence admission, in-process conversation
 continuity, model-provider configuration, dispatch infrastructure, and SQLite
 persistence seams. These
@@ -178,7 +179,8 @@ The immutable PlanRevision V1 domain contract and side-effect-free candidate
 validation are **Implemented**, and its append-only repository foundation is
 **Verified on SQLite**. No application path persists an unapproved proposal. Exact
 in-process Human approval, post-approval validation and persistence, first
-active selection, and dependency-aware DATA execution are **Implemented**.
+active selection, dependency-aware DATA eligibility, and Planner-led semantic
+Data Explorer interaction are **Implemented**.
 Durable approval/recovery, successor/replanning runtime, scientific
 investigation and protocol, canonical Evidence lineage, protected evaluation,
 governance, Discovery admission, semantic graph inquiry, and restart-safe
