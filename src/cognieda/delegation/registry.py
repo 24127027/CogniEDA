@@ -1,67 +1,101 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from .capabilities import Capability
 from .contracts import Executor
 
 ExecutorFactory = Callable[[], Executor]
 
-
 class CapabilityNotRegisteredError(LookupError):
     pass
 
+@dataclass(slots=True)
+class _Registration:
+    factory: ExecutorFactory
+    instance: Executor | None = None
 
 class ExecutorRegistry:
-    """Explicit Capability -> ExecutorFactory registry with lazy provider reuse."""
+    """Capability -> Executor registry with lazy executor creation."""
 
     def __init__(self) -> None:
-        self._providers: dict[Capability, ExecutorFactory] = {}
-        self._instances: dict[ExecutorFactory, Executor] = {}
+        self._registrations: dict[Capability, _Registration] = {}
 
-    def register_provider(
-        self,
-        provider_factory: ExecutorFactory,
-        *,
-        capabilities: Iterable[Capability],
-    ) -> None:
-        registered = tuple(capabilities)
-        if not registered:
-            raise ValueError("At least one capability must be registered.")
-        if not callable(provider_factory):
-            raise TypeError("provider_factory must be callable.")
-        if any(not isinstance(capability, Capability) for capability in registered):
-            raise TypeError("Registered capabilities must be Capability values.")
-        if len(set(registered)) != len(registered):
-            raise ValueError("A registration cannot contain duplicate capabilities.")
+    def register(self, factory: ExecutorFactory) -> None:
+        if not callable(factory):
+            raise TypeError("factory must be callable.")
 
-        duplicate = next(
-            (capability for capability in registered if capability in self._providers),
-            None,
-        )
-        if duplicate is not None:
-            raise ValueError(f"Capability already registered: {duplicate}")
+        # Construct once for validation and metadata extraction.
+        executor = factory()
 
-        for capability in registered:
-            self._providers[capability] = provider_factory
+        if not isinstance(executor, Executor):
+            raise TypeError("Factory returned an incompatible executor.")
+
+        capabilities = getattr(executor, "CAPABILITIES", None)
+        if capabilities is None:
+            raise TypeError(
+                f"{type(executor).__name__} must define CAPABILITIES."
+            )
+        
+        capabilities = tuple(capabilities)
+
+        if len(set(capabilities)) != len(capabilities):
+            raise ValueError(
+                f"{type(executor).__name__} declares duplicate capabilities."
+            )
+
+        registration = _Registration(factory=factory)
+
+        for capability in capabilities:
+            if not isinstance(capability, Capability):
+                raise TypeError(
+                    f"{type(executor).__name__} declares an invalid capability: {capability!r}"
+                )
+
+            if capability in self._registrations:
+                raise ValueError(
+                    f"Capability already registered: {capability}"
+                )
+
+            self._registrations[capability] = registration
 
     def resolve(self, capability: Capability) -> Executor:
         if not isinstance(capability, Capability):
-            raise TypeError("Resolved capability must be a Capability value.")
+            raise TypeError("capability must be a Capability.")
 
         try:
-            factory = self._providers[capability]
+            registration = self._registrations[capability]
         except KeyError:
             raise CapabilityNotRegisteredError(
-                f"No provider registered for capability: {capability}"
+                f"No executor registered for capability: {capability}"
             ) from None
 
-        if factory not in self._instances:
-            provider = factory()
-            if not isinstance(provider, Executor):
-                raise TypeError("Provider factory returned an incompatible provider.")
-            self._instances[factory] = provider
-        return self._instances[factory]
+        if registration.instance is None:
+            executor = registration.factory()
+
+            if not isinstance(executor, Executor):
+                raise TypeError(
+                    "Factory returned an incompatible executor."
+                )
+
+            registration.instance = executor
+
+        return registration.instance
+
+    def reload(self, capability: Capability) -> None:
+        """Recreate the executor on next resolve()."""
+        try:
+            self._registrations[capability].instance = None
+        except KeyError:
+            raise CapabilityNotRegisteredError(
+                f"No executor registered for capability: {capability}"
+            ) from None
+
+    def reload_all(self) -> None:
+        """Recreate all executors on next resolve()."""
+        for registration in self._registrations.values():
+            registration.instance = None
 
     def list_capabilities(self) -> tuple[Capability, ...]:
-        return tuple(self._providers)
+        return tuple(self._registrations)

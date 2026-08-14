@@ -88,7 +88,11 @@ class ExecutionResult(BaseModel):
 
 @runtime_checkable
 class Executor(Protocol):
-    """Structural boundary implemented by capability providers."""
+    """Structural boundary implemented by capability providers.\\
+        **REQUIREMENTS:** 
+        - Each Executor must define a class-level attribute `CAPABILITIES` 
+        as a tuple of `Capability` instances that it can handle.
+    """
 
     async def run(self, request: ExecutionRequest) -> ExecutionResult: ...
 
