@@ -56,10 +56,10 @@ observation is not automatically Evidence.
 
 ## Plan proposal, approval, and activation
 
-1. The Planner constructs transient canonical Objective, Task, and PlanRevision
+1. The Planner constructs transient canonical Objective, Task, and Plan
    objects, with exactly one immutable binding per member Task and explicit
    dependency edges. Each binding owns non-negative `order_rank` and `LOW`,
-   `NORMAL`, or `HIGH` priority. The revision contains no capability, provider,
+   `NORMAL`, or `HIGH` priority. The Plan contains no capability, provider,
    specialist, tool, exact DataProfile identity, or configurable stopping-
    condition or replan-trigger policy.
 2. Domain construction enforces structural validity without making the pending
@@ -73,13 +73,13 @@ There is no mandatory separate application preflight or admission stage before
 Human review.
 
 A rejection, hold, or requested revision returns to the Planner without
-creating authoritative PlanRevision state. Any separately retained draft or
-interaction provenance is not the approved PlanRevision.
+creating authoritative Plan state. Any separately retained draft or
+interaction provenance is not the approved Plan.
 
 Plan completion, interruption, and replanning are workflow-lifecycle concerns.
 An actual cause that later requires reconsideration is recorded by that
-workflow against the affected immutable revision; it is not hypothetical
-Planner-authored trigger policy inside the PlanRevision. Scientific stopping
+workflow against the affected immutable Plan; it is not hypothetical
+Planner-authored trigger policy inside the Plan. Scientific stopping
 remains `InvestigationProtocol`-owned, and bounded execution stopping remains
 owned by the applicable role-native work order such as `DataWorkOrder`.
 
@@ -111,7 +111,7 @@ specialist tools are available. The Planner receives the eligible Task as a
 goal and reasons over zero, one, or multiple allowed specialist interactions;
 Task kind may constrain authority but is not a compile-time route. Execution
 internals may retain capability-based provider resolution behind a role-level
-tool boundary, but capability and provider selection are not PlanRevision
+tool boundary, but capability and provider selection are not Plan
 content. Planner response synthesis is not a Task kind, capability, provider,
 or dispatch path.
 
@@ -215,7 +215,7 @@ Governance or approval may produce several non-terminal branches:
   EvidenceRequest construction and bounded observation;
 - **conflict review** gathers eligible contradiction and validity information
   without rewriting scientific content;
-- **replanning** creates a successor PlanRevision or restarts grounded planning.
+- **replanning** creates a successor Plan or restarts grounded planning.
 
 Governance never edits a Hypothesis, protocol, evaluation, or
 DiscoveryProposal. Hypothesis Analyst or the appropriate scientific authority
@@ -245,7 +245,7 @@ Planner presents a prior result, application authority determines current-use
 eligibility for that purpose and scope.
 
 GeneratedViews distinguish historical truth-to-record from present validity.
-On restart, the system reconstructs the active PlanRevision, Task state,
+On restart, the system reconstructs the active Plan, Task state,
 pending approvals, attempts, admitted Evidence and Discoveries, blockers,
 SessionFrame, and validity warnings from durable state. It does not rely on an
 agent's retained transcript or hidden memory.
@@ -262,7 +262,7 @@ dependency; a PydanticAI adapter performs typed capability dispatch; and
 focused tests exercise that adapter through a registered provider. This proves
 the invocation seam, not the end-to-end research-state flow.
 
-The canonical PlanRevision, role-native contracts, full specialist
+The canonical Plan, role-native contracts, full specialist
 implementations, EvidenceRequest-to-Evidence admission, protected evaluation,
 governance, Discovery admission, full PlannerWorkOutcome consumption, and
 validity-aware presentation sequence remain incomplete or absent. Data

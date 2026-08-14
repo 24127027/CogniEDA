@@ -72,7 +72,7 @@ research intent, planning state, data state, scientific commitments,
 observations, claims, active context, provenance, and operational recovery.
 Execution moves bounded work between those layers; it does not collapse them.
 
-A `Task` says what governed work exists. A plan version says how that work is
+A `Task` says what governed work exists. An immutable `Plan` says how that work is
 coordinated. An execution attempt says what was run. An observation says what
 the bounded operation returned. `Evidence` says which observation was admitted
 under the applicable scientific and provenance obligations. A `Discovery`
@@ -171,9 +171,10 @@ foundations demonstrate important authority and traceability rules, but the
 direct Evidence path is transitional.
 
 The complete target architecture is not yet a supported end-to-end runtime.
-The immutable PlanRevision V1 domain contract and side-effect-free candidate
+The immutable Plan V1 domain contract and side-effect-free candidate
 validation are **Implemented**, and its append-only repository foundation is
-**Verified on SQLite**. No application path currently persists a PlanRevision.
+**Verified on SQLite** with exact historical Objective and Assumption content
+snapshots. No application path currently persists a Plan.
 Planner authoring, human approval, exact post-approval validation and
 persistence, activation, active selection, Task DAG runtime, scientific
 investigation and protocol, canonical Evidence lineage, protected evaluation,

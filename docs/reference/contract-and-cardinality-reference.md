@@ -9,21 +9,27 @@ and [Discovery governance](../concepts/scientific-lifecycle/discovery-governance
 pages for explanation.
 
 All entries describe **target design**. Exact field layouts are intentionally
-not frozen here except for the bounded PlanRevision V1 contract below.
+not frozen here except for the bounded Plan V1 contract below.
 
-## PlanRevision V1 contract
+## Plan V1 contract
 
-`PlanRevision` is an immutable non-FCO and non-semantic-graph plan-content
-record. It contains revision identity, Objective identity, a contract version,
-canonical Task bindings, canonical dependency edges, and a deterministic
-fingerprint. It contains no DataProfile identity, stopping condition, replan
-trigger, approval, activation, or successor state.
+`Plan` is an immutable non-FCO and non-semantic-graph coordination aggregate.
+It contains `plan_id`, the exact `Objective`, exact admitted Human
+`Assumption` planning basis, a contract version, canonical Task bindings,
+canonical dependency edges, and a deterministic fingerprint. It contains no
+DataProfile identity, stopping condition, replan trigger, approval, activation,
+or successor state.
 
 Each member Task appears in exactly one immutable `PlanTaskBinding` with
 `task_id`, `order_rank`, and `priority`.
 Membership is derived from those bindings. Duplicate bindings, missing Tasks,
 cross-Objective Tasks, non-member dependency endpoints, self-edges, duplicate
 edges, and direct or indirect cycles fail closed.
+
+The fingerprint covers contract version, exact Objective and Assumption
+representations, Task membership, rank, priority, and dependency edges. It
+excludes Task runtime status and all execution-routing, lifecycle, timestamp,
+conversation, model, and DataProfile-selection state.
 
 Task kind is a semantic and epistemic class, not a provider-routing rule.
 Capability, provider, specialist, worker, model, process, tool, routing hint,

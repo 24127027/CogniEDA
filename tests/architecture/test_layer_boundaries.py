@@ -50,7 +50,7 @@ def test_mvp_planner_does_not_import_deferred_scientific_or_plan_contracts() -> 
         "GovernanceDecision",
         "Hypothesis",
         "InvestigationProtocol",
-        "PlanRevision",
+        "Plan",
     }
     violations: list[str] = []
     for path in _python_files("agents/planner"):

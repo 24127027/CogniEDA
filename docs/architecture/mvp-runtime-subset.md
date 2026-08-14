@@ -47,7 +47,7 @@ Workspace
   -> active DataProfile
   -> Human request through Planner
   -> Objective
-  -> approved and active PlanRevision
+  -> approved and active Plan
   -> eligible leaf SCIENTIFIC Task
   -> Hypothesis Analyst feasibility
   -> exactly one Hypothesis for the feasible Task
@@ -80,7 +80,7 @@ MVP-v2 implements a narrow but real instance of the canonical chain:
 
 ```text
 Objective
-  -> PlanRevision
+  -> Plan
   -> Task
   -> ScientificInvestigationRun
   -> Hypothesis
@@ -135,7 +135,7 @@ Evidence
 Discovery
 ```
 
-`PlanRevision`, `ScientificInvestigationRun`, `InvestigationPlan`,
+`Plan`, `ScientificInvestigationRun`, `InvestigationPlan`,
 `InvestigationProtocol`, `EvidenceRequest`, `ExecutionRun`, `AnalysisFrame`,
 `EvaluationBundle`, `DiscoveryProposal`, `GovernanceDecision`,
 `GeneratedView`, and recovery records are important non-FCO state. They do
@@ -152,21 +152,21 @@ user request
      -> yes: draft a high-level plan
         -> gaps identified
         -> bounded Graph Miner or Data Explorer planning support when needed
-        -> transient canonical Objective, Tasks, and PlanRevision revised
+        -> transient canonical Objective, Tasks, and Plan revised
         -> Human reviews and approves those exact pending objects
         -> application performs commit-boundary validation
         -> exact approved objects atomically persisted, adopted, and activated
         -> eligible Task DAG work executes
 ```
 
-Planning-support observations are not Evidence. `PlanRevision` represents the
+Planning-support observations are not Evidence. `Plan` represents the
 full approved Task DAG. A Task is an independently governed semantic work
 unit. Exactly one immutable `PlanTaskBinding` represents each member Task and
 owns non-negative `order_rank` and finite `LOW`, `NORMAL`, or `HIGH` priority.
 Membership is derived from the bindings;
 dependencies remain explicit DAG edges. Related workflow-lifecycle state owns
 approval and activation metadata. Capability, provider, specialist, tool, and
-other execution-routing choices are not PlanRevision content.
+other execution-routing choices are not Plan content.
 
 Domain construction may enforce structural validity before review, but there
 is no mandatory separate application preflight or admission stage. Unapproved
@@ -177,11 +177,11 @@ transition.
 The DAG alone determines eligibility. Rank ties are valid for concurrent or
 independent Tasks, canonical Task-ID ordering is only a deterministic
 serialization tie-breaker, and neither rank nor priority overrides a
-dependency. A binding coordination change changes PlanRevision content and its
+dependency. A binding coordination change changes Plan content and its
 fingerprint without, by itself, creating a successor Task.
 
 Capability remains execution-internal plumbing where current providers require
-it. PlanRevision states no capability requirement or provider route. Role,
+it. Plan states no capability requirement or provider route. Role,
 provider, specialist, worker, process, model, tool, and Planner identity are
 excluded from plan content and its fingerprint. Application determines
 eligibility and the governed tool set; Planner reasons over interactions inside
@@ -189,17 +189,17 @@ that allowed set but is not a Task executor. When retained authoritative state
 already answers a request, Planner synthesizes the response without creating a
 Task, capability, or provider path.
 
-PlanRevision and its bindings contain no concrete DataProfile identity or data
+Plan and its bindings contain no concrete DataProfile identity or data
 selection. Planner describes intended data scope only through Task semantics.
 Each specialist or controller receives complete authoritative DataProfile
 context and chooses the concrete applicable profile and scope within its own
 authority. Exact DataProfiles actually used are captured later in execution or
-scientific provenance and are not PlanRevision fingerprint content.
+scientific provenance and are not Plan fingerprint content.
 
-The immutable PlanRevision content does not embed configurable stopping
+The immutable Plan content does not embed configurable stopping
 conditions, replan triggers, or hypothetical future causes. Plan-execution
 completion, interruption, approval and activation state, and replanning are
-workflow-lifecycle state associated with the revision. Scientific stopping is
+workflow-lifecycle state associated with the Plan. Scientific stopping is
 owned by `InvestigationProtocol`; bounded execution stopping is owned by the
 applicable role-native work order.
 
@@ -213,7 +213,7 @@ GRAPH
 
 New authoritative state accepts only canonical Task meanings; legacy shapes do
 not become fallback authority. A semantic Task change creates a successor
-identity. A coordination-only change belongs in a PlanRevision. Proposed Tasks
+identity. A coordination-only change belongs in a Plan. Proposed Tasks
 cannot execute.
 
 Only an eligible feasible leaf `SCIENTIFIC` Task may enter scientific
@@ -224,7 +224,7 @@ parent Task produces neither a Hypothesis nor a Discovery.
 ## Authority boundaries
 
 The Human communicates only with Planner. Planner is the control plane and
-owns Objective interaction, high-level planning, PlanRevision coordination,
+owns Objective interaction, high-level planning, Plan coordination,
 Task DAG decomposition, routing, replanning, session coordination,
 GeneratedViews, and the Human approval boundary.
 
@@ -449,7 +449,7 @@ observe, at minimum:
 
 - one real dataset is explicitly adopted and bound to an active DataProfile;
 - one Human request passes only through Planner;
-- one full approved PlanRevision and Task DAG is retained;
+- one full approved Plan and Task DAG is retained;
 - only an eligible feasible leaf `SCIENTIFIC` Task creates one Hypothesis;
 - the protocol is locked before Evidence-producing execution;
 - Data Explorer alone reads the dataset and executes deterministic work;

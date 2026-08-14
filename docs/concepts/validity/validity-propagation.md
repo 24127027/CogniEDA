@@ -33,7 +33,7 @@ CogniEDA distinguishes at least three kinds of relationship:
 | Relationship | Example | Validity meaning |
 | --- | --- | --- |
 | epistemic dependency | Evidence was produced from a particular DataProfile, AnalysisFrame, and ExecutionRun | a defect in the bound data or analytical lineage may change whether the Evidence or a dependent Discovery is safe to use |
-| workflow dependency | one Task depends on another in an approved PlanRevision | coordinates order and eligibility to work; it does not by itself make one Task scientific support for another |
+| workflow dependency | one Task depends on another in an approved Plan | coordinates order and eligibility to work; it does not by itself make one Task scientific support for another |
 | motivational or navigation relationship | an Assumption motivates a Task, or Graph Miner points to related work | explains why work was considered; it carries no evidential force |
 
 This distinction prevents naive graph-edge propagation. A system that treated

@@ -13,7 +13,7 @@ prescribe a database or message transport.
 Resume recovers, as applicable:
 
 - Objective;
-- active PlanRevision;
+- active Plan;
 - Task lifecycle and dependency state;
 - ScientificInvestigationRun;
 - active protocol revision;
@@ -122,7 +122,7 @@ does not send every command again or admit every stored result.
 ## Pause, approval, and resume
 
 Pausing preserves exact active state and permitted next actions. Approval
-holds preserve the exact proposal or plan version presented for decision. A
+holds preserve the exact proposal or Plan presented for decision. A
 resumed decision applies only to that identity; any substantive change
 requires a new proposal and the applicable approval.
 
@@ -156,7 +156,7 @@ operational records expose some attempt, outbox, lease, fencing, retry, and
 idempotency fields. Those uncomposed seams do not establish supported restart
 or recovery behavior.
 
-Canonical SessionFrame membership, PlanRevision,
+Canonical SessionFrame membership, Plan,
 ScientificInvestigationRun, protocol and EvidenceRequest recovery, complete
 result replay, Objective-bound session ownership, governance and validity
 reconstruction, and permitted-next-action projection remain **Deferred**. The
