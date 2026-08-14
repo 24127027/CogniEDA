@@ -41,6 +41,7 @@ class Application:
         self._pending_plan: Plan | None = None
         self._pending_tasks: tuple[Task, ...] = ()
         self._pending_request: str | None = None
+        self._active_plan: Plan | None = None
 
     async def submit_message(self, message: str) -> Message:
         if message.startswith("/"):
@@ -54,6 +55,7 @@ class Application:
         planner_context = build_planner_context(
             self.session_frame,
             self.conversation_history,
+            active_plan=self._active_plan,
         )
         try:
             planner_output = await self.planner_agent.run(
@@ -305,6 +307,7 @@ class Application:
             except Exception as exc:
                 return self._text(f"Plan approval failed closed: {exc}")
             self.session_frame = successor
+            self._active_plan = plan
 
         self._clear_pending_plan()
         planner_output = await self.planner_agent.resume(
@@ -312,7 +315,12 @@ class Application:
                 action=action,
                 plan_id=plan_id,
                 feedback=feedback,
-            )
+            ),
+            context=build_planner_context(
+                self.session_frame,
+                self.conversation_history,
+                active_plan=self._active_plan,
+            ),
         )
         return self._accept_planner_output(planner_output, request=request)
 
@@ -322,6 +330,17 @@ class Application:
         *,
         request: str,
     ) -> Message:
+        latest_context = self.planner_agent.last_context
+        if latest_context is not None:
+            self.session_frame = SessionFrame(
+                objective=latest_context.objective,
+                assumptions=latest_context.assumptions,
+                tasks=latest_context.tasks,
+                evidences=latest_context.evidences,
+                discoveries=latest_context.discoveries,
+                data_profile=latest_context.data_profile,
+            )
+            self._active_plan = latest_context.active_plan
         result = planner_output.result
         if result.plan is not None:
             if self._pending_plan is not None:

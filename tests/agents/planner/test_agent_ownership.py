@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 from dataclasses import dataclass
+from uuid import UUID
 
 from pydantic_ai.messages import (
     ModelMessage,
@@ -21,9 +22,9 @@ from cognieda.agents.planner.contracts import (
 )
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.tools import RUN_DATA_WORK_TOOL
-from cognieda.application.ports import ModelConfig
+from cognieda.application.ports import ExecutorDispatcherPort, ModelConfig
 from cognieda.execution import ExecutorDispatcher, ExecutorRegistry
-from cognieda.schemas import Objective, Plan, PlanTaskBinding, Task, TaskKind
+from cognieda.schemas import Evidence, Objective, Plan, PlanTaskBinding, Task, TaskKind
 
 
 @dataclass
@@ -38,7 +39,7 @@ class FakeRunResult:
 class RecordingAgent:
     def __init__(
         self,
-        outputs: list[PlannerResult],
+        outputs: list[object],
         messages: list[tuple[ModelMessage, ...]] | None = None,
     ) -> None:
         self._outputs = iter(outputs)
@@ -86,9 +87,49 @@ def _candidate(label: str = "original") -> PlannerResult:
     return PlannerResult(plan=plan, tasks=(task,), response="Review the Plan.")
 
 
-def _planner(agent: RecordingAgent) -> Planner:
+class FakeExecutionSession:
+    def __init__(self, context: PlannerContext, progress_count: int = 1) -> None:
+        self.context = context
+        self.progress_count = progress_count
+
+    async def run_data_work(
+        self,
+        dispatcher: ExecutorDispatcherPort,
+        *,
+        task_id: UUID,
+        requested_work: str,
+    ) -> Evidence:
+        del dispatcher, task_id, requested_work
+        raise AssertionError("This fake execution does not expect a tool call.")
+
+
+class FakeExecutionSessionFactory:
+    def __init__(self, progress_count: int = 1) -> None:
+        self.progress_count = progress_count
+        self.sessions: list[FakeExecutionSession] = []
+
+    def create(
+        self,
+        *,
+        context: PlannerContext,
+        active_plan: Plan,
+    ) -> FakeExecutionSession:
+        assert context.active_plan == active_plan
+        session = FakeExecutionSession(context, self.progress_count)
+        self.sessions.append(session)
+        return session
+
+
+def _planner(
+    agent: RecordingAgent,
+    *,
+    execution_factory: FakeExecutionSessionFactory | None = None,
+) -> Planner:
     return Planner(
-        PlannerDeps(ExecutorDispatcher(ExecutorRegistry())),
+        PlannerDeps(
+            ExecutorDispatcher(ExecutorRegistry()),
+            execution_session_factory=execution_factory or FakeExecutionSessionFactory(),
+        ),
         agent_factory=RecordingFactory(agent),  # type: ignore[arg-type]
         model_config=ModelConfig(provider="openai", model_name="test", api_key="key"),
     )
@@ -133,9 +174,10 @@ def test_plan_interrupt_then_approval_resumes_execute_and_accumulates_messages()
     candidate = _candidate()
     plan_messages = _messages("plan", "candidate")
     execute_messages = _messages("execute", "complete")
+    final_messages = _messages("review", "final")
     agent = RecordingAgent(
-        [candidate, PlannerResult(response="Execution complete.")],
-        [plan_messages, execute_messages],
+        [candidate, "execution phase complete", PlannerResult(response="Execution complete.")],
+        [plan_messages, execute_messages, final_messages],
     )
     planner = _planner(agent)
 
@@ -145,23 +187,31 @@ def test_plan_interrupt_then_approval_resumes_execute_and_accumulates_messages()
             PlanReviewDecision(
                 action=PlanReviewAction.APPROVE,
                 plan_id=candidate.plan.plan_id,  # type: ignore[union-attr]
-            )
+            ),
+            context=PlannerContext(
+                active_plan=candidate.plan,
+                objective=candidate.plan.objective,  # type: ignore[union-attr]
+                tasks=candidate.tasks,
+            ),
         )
     )
 
     assert pending.result == candidate
     assert pending.messages == plan_messages
     assert completed.result.response == "Execution complete."
-    assert completed.messages == (*plan_messages, *execute_messages)
-    assert len(agent.calls) == 2
+    assert completed.messages[: len(plan_messages)] == plan_messages
+    assert "Human Plan review: APPROVE" in str(completed.messages[len(plan_messages)])
+    assert completed.messages[-len(final_messages) :] == final_messages
+    assert len(agent.calls) == 3
     assert agent.calls[0]["output_type"] is PlannerResult
-    assert agent.calls[1]["output_type"] is PlannerResult
+    assert agent.calls[1]["output_type"] is str
+    assert agent.calls[2]["output_type"] is PlannerResult
     plan_deps = agent.calls[0]["deps"]
     execute_deps = agent.calls[1]["deps"]
     assert isinstance(plan_deps, PlannerDeps) and not plan_deps.executor_tools_enabled
-    assert plan_deps.approved_plan is None
+    assert plan_deps.execution_session is None
     assert isinstance(execute_deps, PlannerDeps) and execute_deps.executor_tools_enabled
-    assert execute_deps.approved_plan == candidate.plan
+    assert execute_deps.execution_session is not None
 
 
 def test_rejection_feedback_routes_to_new_plan_and_requires_another_interrupt() -> None:
@@ -177,7 +227,8 @@ def test_rejection_feedback_routes_to_new_plan_and_requires_another_interrupt() 
                 action=PlanReviewAction.REVISE,
                 plan_id=original.plan.plan_id,  # type: ignore[union-attr]
                 feedback="Narrow the population to active customers.",
-            )
+            ),
+            context=PlannerContext(),
         )
     )
 
@@ -185,6 +236,35 @@ def test_rejection_feedback_routes_to_new_plan_and_requires_another_interrupt() 
     assert "Narrow the population" in str(agent.calls[1]["prompt"])
     assert replacement.plan is not None
     assert replacement.plan.plan_id in planner._pending_threads
+
+
+def test_continue_existing_plan_routes_directly_to_execute_without_review() -> None:
+    candidate = _candidate("active")
+    assert candidate.plan is not None
+    agent = RecordingAgent(
+        [
+            PlannerResult(continue_execution=True),
+            "execution phase complete",
+            PlannerResult(response="Enough admitted Evidence is now available."),
+        ]
+    )
+    planner = _planner(agent)
+
+    output = asyncio.run(
+        planner.run(
+            "Continue the investigation",
+            context=PlannerContext(
+                active_plan=candidate.plan,
+                objective=candidate.plan.objective,
+                tasks=candidate.tasks,
+            ),
+        )
+    )
+
+    assert output.result.response == "Enough admitted Evidence is now available."
+    assert len(agent.calls) == 3
+    assert agent.calls[1]["output_type"] is str
+    assert not any("Human Plan review" in str(message) for message in output.messages)
 
 
 def test_instruction_reload_preserves_agent_unless_recreation_requested() -> None:

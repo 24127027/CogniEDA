@@ -12,11 +12,13 @@ from cognieda.schemas.artifacts import (
     Task,
 )
 from cognieda.schemas.common import ImmutableCogniEDABaseModel
+from cognieda.schemas.plan import Plan
 
 
 class PlannerContext(ImmutableCogniEDABaseModel):
     """Readable Planner input; conversation history inside it is non-authoritative."""
 
+    active_plan: Plan | None = None
     objective: Objective | None = None
     assumptions: tuple[Assumption, ...] = ()
     tasks: tuple[Task, ...] = ()

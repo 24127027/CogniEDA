@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from cognieda.schemas.plan import Plan
+
 from .contracts import PlannerControlledError, PlannerErrorCode, PlannerResult
 from .state import PlannerState
 
@@ -16,10 +18,28 @@ def fail_state(
     return state
 
 
+def block_execution(
+    state: PlannerState,
+    code: PlannerErrorCode,
+    message: str,
+) -> PlannerState:
+    """Return execute control to reasoning without fabricating a PlannerResult."""
+
+    state.result = None
+    state.execution_blocker = message
+    state.error = PlannerControlledError(code=code, message=message)
+    return state
+
+
 def plan_or_answer_prompt(state: PlannerState) -> str:
+    feedback_items = tuple(
+        item
+        for item in (state.human_feedback, state.execution_blocker)
+        if item is not None
+    )
     feedback = (
-        f"\n\nExplicit Human or execution feedback:\n{state.human_feedback}"
-        if state.human_feedback is not None
+        "\n\nExplicit Human or execution feedback:\n" + "\n".join(feedback_items)
+        if feedback_items
         else ""
     )
     return (
@@ -32,15 +52,15 @@ def plan_or_answer_prompt(state: PlannerState) -> str:
 
 def execute_prompt(
     state: PlannerState,
-    approved: PlannerResult,
+    active_plan: Plan,
 ) -> str:
     return (
-        "Execute only this exact Human-approved Plan bundle:\n"
-        f"{approved.model_dump_json()}\n\n"
+        "Execute only the active Human-approved Plan:\n"
+        f"{active_plan.model_dump_json()}\n\n"
         "Readable Planner context (only admitted Evidence and governed Discovery may "
         "support empirical claims):\n"
         f"{state.context.model_dump_json()}"
     )
 
 
-__all__ = ("execute_prompt", "fail_state", "plan_or_answer_prompt")
+__all__ = ("block_execution", "execute_prompt", "fail_state", "plan_or_answer_prompt")

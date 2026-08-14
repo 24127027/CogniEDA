@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command, interrupt
 from pydantic_ai import Agent
+from pydantic_ai.messages import ModelRequest, UserPromptPart
 
 from cognieda.agents.utilities import instruction
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
@@ -21,7 +22,7 @@ from .contracts import (
 )
 from .dependencies import PlannerDeps
 from .graph import build_graph
-from .nodes import execute_prompt, fail_state, plan_or_answer_prompt
+from .nodes import block_execution, execute_prompt, fail_state, plan_or_answer_prompt
 from .state import PlannerState
 from .tools import RUN_DATA_WORK_TOOL
 
@@ -44,6 +45,7 @@ class Planner:
         self._model_config = model_config
         self._workspace_instruction = agent_instruction
         self._pending_threads: dict[UUID, str] = {}
+        self._last_context: PlannerContext | None = None
         self._assemble_instructions()
         self._recreate_agent()
         self.graph = build_graph(self._plan_or_answer_node, self._execute_node)
@@ -117,12 +119,15 @@ class Planner:
             config=self._graph_config(thread_id),
         )
         state = self._state_from_result(result)
+        self._last_context = state.context
         self._record_pending_thread(state, thread_id)
         return self._output_from_state(state)
 
     async def resume(
         self,
         decision: PlanReviewDecision,
+        *,
+        context: PlannerContext,
     ) -> PlannerOutput:
         """Resume the exact interrupted lifecycle after Application authority acts."""
 
@@ -138,10 +143,14 @@ class Planner:
             )
 
         result = await self.graph.ainvoke(
-            Command(resume=decision.model_dump(mode="json")),
+            Command(
+                update={"context": context},
+                resume=decision.model_dump(mode="json"),
+            ),
             config=self._graph_config(thread_id),
         )
         state = self._state_from_result(result)
+        self._last_context = state.context
         self._record_pending_thread(state, thread_id)
         return self._output_from_state(state)
 
@@ -165,19 +174,34 @@ class Planner:
                 deps=replace(
                     self._deps,
                     executor_tools_enabled=False,
-                    approved_plan=None,
-                    approved_tasks=(),
-                    eligible_task_ids=frozenset(),
-                    data_profile=None,
+                    execution_session=None,
                 ),
             )
             planner_result = PlannerResult.model_validate(result.output)
+            if planner_result.continue_execution:
+                if state.context.active_plan is None:
+                    raise ValueError(
+                        "continue_execution requires an approved active Plan."
+                    )
+                if state.execution_blocker is not None:
+                    raise ValueError(
+                        "Execution cannot continue without resolving the prior blocker."
+                    )
+            if planner_result.plan is not None:
+                admitted_assumptions = {
+                    assumption.assumption_id: assumption
+                    for assumption in state.context.assumptions
+                }
+                for assumption in planner_result.plan.assumptions:
+                    if admitted_assumptions.get(assumption.assumption_id) != assumption:
+                        raise ValueError(
+                            "Candidate Plan Assumptions must exactly match admitted state."
+                        )
             state.result = planner_result
             state.messages = (
                 *state.messages,
                 *result.all_messages()[len(message_history) :],
             )
-            state.approved_plan_id = None
             state.human_feedback = None
             state.error = None
         except Exception as exc:
@@ -189,91 +213,108 @@ class Planner:
         return state
 
     async def _execute_node(self, state: PlannerState) -> PlannerState:
-        approved = state.result
-        if approved is None or approved.plan is None:
-            return fail_state(
+        planner_result = state.result
+        if planner_result is None:
+            return block_execution(
                 state,
                 PlannerErrorCode.INVALID_SUCCESSOR_STATE,
-                "Execute requires one exact candidate Plan bundle.",
+                "Execute requires an explicit Planner result.",
             )
 
-        review = PlanReviewDecision.model_validate(
-            interrupt(
-                {
-                    "plan_id": str(approved.plan.plan_id),
-                    "plan": approved.plan.model_dump(mode="json"),
-                    "tasks": [task.model_dump(mode="json") for task in approved.tasks],
-                }
+        candidate = planner_result.plan
+        if candidate is not None:
+            review = PlanReviewDecision.model_validate(
+                interrupt(
+                    {
+                        "plan_id": str(candidate.plan_id),
+                        "plan": candidate.model_dump(mode="json"),
+                        "tasks": [
+                            task.model_dump(mode="json") for task in planner_result.tasks
+                        ],
+                    }
+                )
             )
-        )
-        if review.plan_id != approved.plan.plan_id:
-            return fail_state(
+            if review.plan_id != candidate.plan_id:
+                return block_execution(
+                    state,
+                    PlannerErrorCode.INVALID_SUCCESSOR_STATE,
+                    "Human review identity does not match the interrupted Plan.",
+                )
+            state.messages = (*state.messages, self._human_review_message(review))
+            if review.action is not PlanReviewAction.APPROVE:
+                state.result = None
+                state.human_feedback = review.feedback
+                state.execution_blocker = None
+                state.error = None
+                return state
+            if state.context.active_plan != candidate:
+                return block_execution(
+                    state,
+                    PlannerErrorCode.INVALID_SUCCESSOR_STATE,
+                    "Execute requires the exact approved Plan in current authoritative context.",
+                )
+        elif not planner_result.continue_execution:
+            return block_execution(
                 state,
                 PlannerErrorCode.INVALID_SUCCESSOR_STATE,
-                "Human review identity does not match the interrupted Plan.",
+                "Execute requires a candidate Plan or continue_execution.",
             )
-        if review.action is not PlanReviewAction.APPROVE:
-            state.result = None
-            state.approved_plan_id = None
-            state.human_feedback = review.feedback
-            state.error = None
-            return state
 
-        state.approved_plan_id = approved.plan.plan_id
+        active_plan = state.context.active_plan
+        if active_plan is None:
+            return block_execution(
+                state,
+                PlannerErrorCode.INVALID_SUCCESSOR_STATE,
+                "Execute requires an approved active Plan.",
+            )
+        state.result = None
         state.human_feedback = None
         try:
             if self._agent is None:
-                return fail_state(
+                return block_execution(
                     state,
                     PlannerErrorCode.MODEL_UNAVAILABLE,
                     "Planner model configuration is unavailable.",
                 )
+            if self._deps.execution_session_factory is None:
+                state.execution_blocker = (
+                    "Approved execution is unavailable because no Application execution "
+                    "authority is configured."
+                )
+                state.error = None
+                return state
+            execution_session = self._deps.execution_session_factory.create(
+                context=state.context,
+                active_plan=active_plan,
+            )
             message_history = [
                 *state.context.conversation_history.model_messages(),
                 *state.messages,
             ]
             result = await self._agent.run(
-                execute_prompt(state, approved),
-                output_type=PlannerResult,
+                execute_prompt(state, active_plan),
+                output_type=str,
                 message_history=message_history,
                 instructions=self._execute_instructions,
                 deps=replace(
                     self._deps,
                     executor_tools_enabled=True,
-                    approved_plan=approved.plan,
-                    approved_tasks=approved.tasks,
-                    eligible_task_ids=frozenset(
-                        approved.plan.eligible_task_ids(
-                            completed_task_ids={
-                                task.task_id
-                                for task in approved.tasks
-                                if task.status.value == "completed"
-                            }
-                        )
-                    ),
-                    execution_context=self._deps.execution_context.model_copy(
-                        update={
-                            "data_profile_id": (
-                                state.context.data_profile.data_profile_id
-                                if state.context.data_profile is not None
-                                else None
-                            )
-                        }
-                    ),
-                    data_profile=state.context.data_profile,
+                    execution_session=execution_session,
                 ),
             )
-            planner_result = PlannerResult.model_validate(result.output)
-            if planner_result.plan is not None:
-                raise ValueError("The execute phase cannot author a Plan.")
-            state.result = planner_result
             state.messages = (
                 *state.messages,
                 *result.all_messages()[len(message_history) :],
             )
+            state.context = execution_session.context
+            state.execution_blocker = (
+                None
+                if execution_session.progress_count > 0
+                else "Execute completed without an authoritative tool result or state change."
+            )
             state.error = None
         except Exception as exc:
-            fail_state(
+            block_execution(
                 state,
                 PlannerErrorCode.RESPONSE_FAILED,
                 f"Planner could not produce a valid execute-phase result: {exc}",
@@ -293,8 +334,28 @@ class Planner:
 
     def _record_pending_thread(self, state: PlannerState, thread_id: str) -> None:
         result = state.result
-        if result is not None and result.plan is not None and state.approved_plan_id is None:
+        if result is not None and result.plan is not None:
             self._pending_threads[result.plan.plan_id] = thread_id
+
+    @staticmethod
+    def _human_review_message(decision: PlanReviewDecision) -> ModelRequest:
+        feedback = f" Feedback: {decision.feedback}" if decision.feedback else ""
+        return ModelRequest(
+            parts=[
+                UserPromptPart(
+                    content=(
+                        f"Human Plan review: {decision.action.value.upper()} "
+                        f"Plan {decision.plan_id}.{feedback}"
+                    )
+                )
+            ]
+        )
+
+    @property
+    def last_context(self) -> PlannerContext | None:
+        """Return the successor readable context from the latest lifecycle snapshot."""
+
+        return self._last_context
 
     @staticmethod
     def _output_from_state(state: PlannerState) -> PlannerOutput:

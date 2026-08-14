@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from uuid import UUID
-
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_ai.messages import ModelMessage
 
@@ -18,8 +16,8 @@ class PlannerState(BaseModel):
     context: PlannerContext
     result: PlannerResult | None = None
     messages: tuple[ModelMessage, ...] = ()
-    approved_plan_id: UUID | None = None
     human_feedback: str | None = None
+    execution_blocker: str | None = None
     error: PlannerControlledError | None = None
 
     @field_validator("result", mode="before")

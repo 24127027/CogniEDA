@@ -88,6 +88,7 @@ def test_builder_exactly_materializes_every_retained_session_frame_member() -> N
 
 def test_planner_context_has_exact_readable_membership() -> None:
     assert set(PlannerContext.model_fields) == {
+        "active_plan",
         "objective",
         "assumptions",
         "tasks",
@@ -99,5 +100,6 @@ def test_planner_context_has_exact_readable_membership() -> None:
     assert set(inspect.signature(build_planner_context).parameters) == {
         "session_frame",
         "conversation_history",
+        "active_plan",
     }
 

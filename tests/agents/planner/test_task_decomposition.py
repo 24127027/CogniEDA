@@ -131,7 +131,7 @@ def test_application_pauses_before_persistence_and_exact_approval_commits(
     assert application.session_frame.objective == plan.objective
     assert application.session_frame.tasks == candidate.tasks
     assert len(application.conversation_history.turns) == 1
-    assert len(application.conversation_history.turns[0].messages) == 2
+    assert len(application.conversation_history.turns[0].messages) == 3
     assert agent.call_count == 2
 
 
@@ -160,7 +160,7 @@ def test_rejection_persists_nothing_and_revised_plan_requires_new_review(
     assert application.conversation_history.turns == ()
 
 
-def test_execute_replan_routes_to_plan_and_interrupts_again(
+def test_plan_or_answer_may_propose_a_new_plan_after_execution_blocker(
     tmp_path: Path,
     db_session: Session,
 ) -> None:
@@ -171,7 +171,6 @@ def test_execute_replan_routes_to_plan_and_interrupts_again(
         db_session,
         [
             original,
-            PlannerResult(continue_execution=True),
             replacement,
         ],
     )

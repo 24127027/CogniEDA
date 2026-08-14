@@ -89,6 +89,7 @@ def test_public_planner_input_is_request_and_readable_context() -> None:
 
     assert tuple(parameters) == ("self", "request", "context")
     assert set(PlannerContext.model_fields) == {
+        "active_plan",
         "objective",
         "assumptions",
         "tasks",
