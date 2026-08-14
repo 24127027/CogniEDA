@@ -23,12 +23,13 @@ from .dependencies import PlannerDeps
 from .graph import build_graph
 from .nodes import execute_prompt, fail_state, plan_prompt
 from .state import PlannerState
+from .tools import RUN_DATA_WORK_TOOL
 
 
 class Planner:
     """Human-facing two-phase coordinator over typed research state."""
 
-    builtin_tools: tuple[()] = ()
+    builtin_tools = (RUN_DATA_WORK_TOOL,)
 
     def __init__(
         self,
@@ -166,6 +167,7 @@ class Planner:
                     approved_plan=None,
                     approved_tasks=(),
                     eligible_task_ids=frozenset(),
+                    data_profile=None,
                 ),
             )
             cognitive_result = PlannerCognitiveResult.model_validate(result.output)
@@ -246,6 +248,16 @@ class Planner:
                             }
                         )
                     ),
+                    execution_context=self._deps.execution_context.model_copy(
+                        update={
+                            "data_profile_id": (
+                                state.context.data_profile.data_profile_id
+                                if state.context.data_profile is not None
+                                else None
+                            )
+                        }
+                    ),
+                    data_profile=state.context.data_profile,
                 ),
             )
             cognitive_result = PlannerCognitiveResult.model_validate(result.output)

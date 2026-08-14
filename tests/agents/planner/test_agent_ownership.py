@@ -20,6 +20,7 @@ from cognieda.agents.planner.contracts import (
     PlanReviewDecision,
 )
 from cognieda.agents.planner.dependencies import PlannerDeps
+from cognieda.agents.planner.tools import RUN_DATA_WORK_TOOL
 from cognieda.application.ports import ModelConfig
 from cognieda.execution import ExecutorDispatcher, ExecutorRegistry
 from cognieda.schemas import Objective, Plan, PlanTaskBinding, Task, TaskKind
@@ -107,7 +108,7 @@ def test_planner_owns_one_agent_and_exact_dependency_instance() -> None:
             "worker": "planner",
             "config": config,
             "deps_type": PlannerDeps,
-            "builtin_tools": (),
+            "builtin_tools": (RUN_DATA_WORK_TOOL,),
         }
     ]
     assert inspect.signature(Planner).parameters["deps"].default is inspect.Parameter.empty
@@ -150,6 +151,12 @@ def test_plan_interrupt_then_approval_resumes_execute_and_accumulates_messages()
     assert len(agent.calls) == 2
     assert agent.calls[0]["output_type"] is PlannerCognitiveResult
     assert agent.calls[1]["output_type"] is PlannerCognitiveResult
+    plan_deps = agent.calls[0]["deps"]
+    execute_deps = agent.calls[1]["deps"]
+    assert isinstance(plan_deps, PlannerDeps) and not plan_deps.executor_tools_enabled
+    assert plan_deps.approved_plan is None
+    assert isinstance(execute_deps, PlannerDeps) and execute_deps.executor_tools_enabled
+    assert execute_deps.approved_plan == candidate.plan
 
 
 def test_rejection_feedback_routes_to_new_plan_and_requires_another_interrupt() -> None:

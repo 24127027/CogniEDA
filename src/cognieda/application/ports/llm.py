@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any, Protocol, Literal
 from pathlib import Path
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel
-from pydantic_ai import Agent
+from pydantic_ai import Agent, Tool
 
-AgentTool = Callable[..., Any]
+AgentTool = Tool[Any] | Callable[..., Any]
 
 ProviderType = Literal["openai", "google", "anthropic"]
 
@@ -36,7 +36,7 @@ class AgentFactoryPort(Protocol):
 # This port is still a questionable design choice
 # whether the AgentFactory should consume a ToolingConfig 
 # or just the paths to the tooling configuration files. 
-# These configuration files are not changed at runtime, so it may be simpler to just pass the paths directly.
+# These configuration files are not changed at runtime, so direct paths may be simpler.
 class ToolingConfig(Protocol):
     @property
     def agents_config_path(self) -> Path: ...

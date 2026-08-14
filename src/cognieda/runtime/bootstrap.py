@@ -39,7 +39,10 @@ def bootstrap_application(workspace_path: Path) -> Application:
 
     registry = ExecutorRegistry()
     registry.register_provider(
-        lambda: DataExplorer(config=model_config, agent_factory=agent_factory),
+        lambda: DataExplorer(
+            config=model_config,
+            agent_factory=agent_factory if model_config is not None else None,
+        ),
         capabilities=(
             Capability.DATA_ANALYSIS,
             Capability.DATA_PROFILING,
