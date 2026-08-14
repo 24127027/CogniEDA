@@ -75,10 +75,10 @@ from cognieda.schemas.enums import (
     UserDecisionType,
     VariableType,
 )
-from cognieda.schemas.plan_revision import (
-    PLAN_REVISION_CONTRACT_VERSION,
+from cognieda.schemas.plan import (
+    PLAN_CONTRACT_VERSION,
+    Plan,
     PlanDependency,
-    PlanRevision,
     PlanTaskBinding,
 )
 from cognieda.schemas.planner_operations import PlannerCommitResult, PlannerOperation
@@ -148,9 +148,9 @@ __all__ = [
     "PlannerOperationType",
     "PlanDependency",
     "PlanPriority",
-    "PlanRevision",
+    "Plan",
     "PlanTaskBinding",
-    "PLAN_REVISION_CONTRACT_VERSION",
+    "PLAN_CONTRACT_VERSION",
     "QualityFlag",
     "QualityFlagSeverity",
     "SchemaSummary",
