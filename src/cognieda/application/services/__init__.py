@@ -7,6 +7,11 @@ from .mvp_data_admission import (
     MvpDataProfileAdmissionService,
     MvpEvidenceAdmissionService,
 )
+from .plan_admission import (
+    PlanAdmissionService,
+    PlanReviewAction,
+    PlanReviewDecision,
+)
 from .plan_validation import (
     PlanValidationError,
     PlanValidationErrorCode,
@@ -26,6 +31,9 @@ __all__ = (
     "PlanValidationError",
     "PlanValidationErrorCode",
     "PlanValidator",
+    "PlanAdmissionService",
+    "PlanReviewAction",
+    "PlanReviewDecision",
     "build_execution_admission_operations",
     "commit_planner_operations",
 )
