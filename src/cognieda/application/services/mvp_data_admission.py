@@ -18,7 +18,7 @@ from cognieda.agents.data_explorer import (
     DataExplorerResult,
     DataProfileCandidate,
 )
-from cognieda.execution import (
+from cognieda.delegation import (
     Capability,
     ExecutionRequest,
     ExecutionStatus,

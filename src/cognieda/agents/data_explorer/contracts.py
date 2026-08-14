@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
-from cognieda.execution import Capability, ExecutionResult, ExecutionStatus, ExecutorInput
+from cognieda.delegation import Capability, ExecutionResult, ExecutionStatus, ExecutorInput
 from cognieda.schemas.artifacts import DataProfile
 
 

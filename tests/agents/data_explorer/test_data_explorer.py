@@ -12,7 +12,7 @@ from cognieda.agents.data_explorer import (
     DataExplorerInput,
     DataExplorerResult,
 )
-from cognieda.execution import (
+from cognieda.delegation import (
     Capability,
     ExecutionRequest,
     ExecutionStatus,

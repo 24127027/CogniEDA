@@ -9,7 +9,7 @@ from uuid import uuid4
 from pydantic_ai import Agent
 
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
-from cognieda.execution import Capability, ExecutionFailure, ExecutionRequest, ExecutionStatus
+from cognieda.delegation import Capability, ExecutionFailure, ExecutionRequest, ExecutionStatus
 from cognieda.infrastructure.datasets import load_dataset
 from cognieda.schemas.enums import TaskKind
 

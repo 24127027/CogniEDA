@@ -19,7 +19,7 @@ from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.types import PlannerOutput, PlannerResult
 from cognieda.application.ports import AgentFactoryPort
-from cognieda.execution import ExecutorDispatcher
+from cognieda.delegation import ExecutorDispatcher
 from cognieda.runtime.application import Application
 from cognieda.runtime.conversation import ConversationHistory, ConversationTurn
 from cognieda.runtime.workspace import Workspace

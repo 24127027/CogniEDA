@@ -21,7 +21,7 @@ from cognieda.application.services import (
     MvpDataProfileAdmissionService,
     MvpEvidenceAdmissionService,
 )
-from cognieda.execution import (
+from cognieda.delegation import (
     Capability,
     ExecutionRequest,
     ExecutorContext,

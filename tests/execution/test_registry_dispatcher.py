@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from cognieda.execution import (
+from cognieda.delegation import (
     Capability,
     CapabilityNotRegisteredError,
     ExecutionRequest,
@@ -20,7 +20,7 @@ from cognieda.execution import (
     ExecutorRegistry,
     normalize_for_planner,
 )
-from cognieda.execution.capabilities import Capability as CapabilityFromOwner
+from cognieda.delegation.capabilities import Capability as CapabilityFromOwner
 from cognieda.runtime.bootstrap import bootstrap_application
 from cognieda.schemas.artifacts import Task
 from cognieda.schemas.enums import TaskKind

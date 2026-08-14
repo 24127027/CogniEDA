@@ -8,7 +8,7 @@ from cognieda.infrastructure.llm import AgentFactory
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
-from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
+from cognieda.delegation import Capability, ExecutorDispatcher, ExecutorRegistry
 
 from .application import Application
 from .workspace import MissingModelCredentialError

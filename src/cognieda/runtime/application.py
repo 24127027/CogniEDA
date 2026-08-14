@@ -3,7 +3,7 @@ from __future__ import annotations
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.types import PlannerResult
 from cognieda.application.ports import AgentFactoryPort
-from cognieda.execution import ExecutorDispatcher
+from cognieda.delegation import ExecutorDispatcher
 from cognieda.schemas.artifacts import SessionFrame
 
 from .conversation import ConversationHistory
