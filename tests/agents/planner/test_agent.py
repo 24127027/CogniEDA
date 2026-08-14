@@ -141,6 +141,8 @@ def test_planner_directly_owns_one_agent_and_invokes_it_once_with_exact_deps() -
     assert kwargs["output_type"] is PlannerResult
     assert kwargs["deps"] is deps
     assert kwargs["message_history"] == list(prior_messages)
+    assert any("plan_or_answer" in part for part in kwargs["instructions"])
+    assert any("Assumptions guide planning only" in part for part in kwargs["instructions"])
     assert output.result.response == "The answer follows from admitted evidence."
     assert output.messages == current_messages
     assert all(type(message) in {ModelRequest, ModelResponse} for message in output.messages)

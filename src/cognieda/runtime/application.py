@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from cognieda.agents.planner.agent import Planner
+from cognieda.agents.planner.types import PlannerResult
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.execution import ExecutorDispatcher
 from cognieda.schemas.artifacts import SessionFrame
 
 from .conversation import ConversationHistory
 from .messages import Message, MessageRole, MessageType
-from .planner_context import apply_planner_output, build_planning_context
-from .workspace import Workspace, MissingModelCredentialError
+from .planner_context import build_planner_context
+from .workspace import MissingModelCredentialError, Workspace
 
 
 class Application:
@@ -30,14 +31,14 @@ class Application:
         if message.startswith("/"):
             return await self._handle_command(message)
 
-        planning_context = build_planning_context(
+        planner_context = build_planner_context(
             self.session_frame,
             self.conversation_history,
         )
         try:
             planner_output = await self.planner_agent.run(
                 message,
-                planning_context=planning_context,
+                context=planner_context,
             )
         except MissingModelCredentialError as e:
             return self._text(
@@ -45,17 +46,28 @@ class Application:
                 "Run '/provider key <provider>' to configure an API key."
             )
 
-        self.session_frame = apply_planner_output(self.session_frame, planner_output)
-        if planner_output.new_messages:
+        if planner_output.messages:
             self.conversation_history = self.conversation_history.add_turn(
-                planner_output.new_messages
+                planner_output.messages
             )
 
         return Message(
             type=MessageType.TEXT,
             role=MessageRole.ASSISTANT,
-            content=planner_output.response,
+            content=self._present_planner_result(planner_output.result),
         )
+
+    @staticmethod
+    def _present_planner_result(result: PlannerResult) -> str:
+        if result.response is not None:
+            return result.response
+        if result.human_input_request is not None:
+            return result.human_input_request
+        if result.plan is not None:
+            return f"Planner proposed a candidate Plan with {len(result.tasks)} Task(s)."
+        if result.continue_execution:
+            return "The active Plan should continue execution."
+        raise ValueError("PlannerResult has no presentable conclusion.")
 
     # TODO: Move command handling to a separate class or module for better separation of concerns
     async def _handle_command(self, command: str) -> Message:

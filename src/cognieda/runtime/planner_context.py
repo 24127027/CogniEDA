@@ -1,45 +1,26 @@
 from __future__ import annotations
 
-from cognieda.agents.planner.context import PlanningContext
-from cognieda.agents.planner.types import PlannerOutput
+from cognieda.agents.planner.context import PlannerContext
+from cognieda.runtime.conversation import ConversationHistory
 from cognieda.schemas.artifacts import SessionFrame
 
-from .conversation import ConversationHistory
 
-
-def build_planning_context(
+def build_planner_context(
     session_frame: SessionFrame,
     conversation_history: ConversationHistory,
-) -> PlanningContext:
-    """Materialize every retained frame member without filtering or ranking."""
+) -> PlannerContext:
+    """Materialize retained readable state without filtering or authority changes."""
 
-    return PlanningContext(
+    return PlannerContext(
+        active_plan=None,
         objective=session_frame.objective,
         assumptions=session_frame.assumptions,
         tasks=session_frame.tasks,
         evidences=session_frame.evidences,
+        discoveries=session_frame.discoveries,
         data_profile=session_frame.data_profile,
         conversation_history=conversation_history,
     )
 
 
-def apply_planner_output(
-    current_frame: SessionFrame,
-    planner_output: PlannerOutput,
-) -> SessionFrame:
-    """Apply the bounded typed results from one Planner turn to a successor frame."""
-
-    successor = current_frame
-    if planner_output.created_objective is not None:
-        successor = successor.set_objective(planner_output.created_objective)
-    if planner_output.created_assumption is not None:
-        successor = successor.add_assumption(planner_output.created_assumption)
-    if planner_output.created_task is not None:
-        objective = successor.objective
-        if (
-            objective is None
-            or planner_output.created_task.objective_id != objective.objective_id
-        ):
-            raise ValueError("Planner Task result must match the active Objective identity.")
-        successor = successor.add_task(planner_output.created_task)
-    return successor
+__all__ = ("build_planner_context",)

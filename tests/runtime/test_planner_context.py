@@ -5,19 +5,21 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from cognieda.agents.planner.types import PlannerOutput
 from cognieda.runtime.conversation import ConversationHistory
-from cognieda.runtime.planner_context import apply_planner_output, build_planning_context
-from cognieda.schemas.artifacts import (
+from cognieda.runtime.planner_context import build_planner_context
+from cognieda.schemas import (
     Assumption,
     DataProfile,
+    Discovery,
+    DiscoveryClaim,
     Evidence,
+    EvidenceProvenance,
     Objective,
     SessionFrame,
     Task,
+    ValidityBasis,
 )
-from cognieda.schemas.common import EvidenceProvenance
-from cognieda.schemas.enums import TaskKind, TaskStatus
+from cognieda.schemas.enums import DiscoveryEpistemicStatus, TaskKind, TaskStatus
 
 
 def _full_frame() -> SessionFrame:
@@ -41,92 +43,61 @@ def _full_frame() -> SessionFrame:
             data_profile_id=profile.data_profile_id,
         ),
     )
+    hypothesis_id = uuid4()
+    discovery = Discovery(
+        hypothesis_id=hypothesis_id,
+        evidence_ids=[evidence.evidence_id],
+        claim=DiscoveryClaim(
+            statement="The admitted dataset contains 42 rows.",
+            scope="dataset:v1",
+        ),
+        epistemic_status=DiscoveryEpistemicStatus.SUPPORTED,
+        scope="dataset:v1",
+        validity_basis=ValidityBasis(
+            data_profile_id=profile.data_profile_id,
+            analysis_frame_refs=["analysis:row-count"],
+            hypothesis_id=hypothesis_id,
+            evidence_ids=[evidence.evidence_id],
+            method="row count",
+            decision_rule="Support when the admitted count is 42.",
+        ),
+    )
     return SessionFrame(
         objective=objective,
         assumptions=(assumption,),
         tasks=(task,),
         evidences=(evidence,),
+        discoveries=(discovery,),
         data_profile=profile,
     )
 
 
-def test_builder_exactly_materializes_every_retained_session_frame_member() -> None:
+def test_builder_exactly_materializes_every_readable_session_frame_member() -> None:
     frame = _full_frame()
     history = ConversationHistory()
 
-    context = build_planning_context(frame, history)
+    context = build_planner_context(frame, history)
 
+    assert context.active_plan is None
     assert context.objective == frame.objective
     assert context.assumptions == frame.assumptions
     assert context.tasks == frame.tasks
     assert context.evidences == frame.evidences
+    assert context.discoveries == frame.discoveries
     assert context.data_profile == frame.data_profile
     assert context.conversation_history == history
     with pytest.raises(ValidationError, match="frozen"):
         context.tasks = ()
 
 
-def test_application_boundary_applies_objective_and_assumption_results() -> None:
-    original = Objective(text="Understand retention.")
-    refined = Objective(text="Understand retention drivers.")
-    assumption = Assumption(text="Rows represent customers.")
-    current = SessionFrame(objective=original)
+def test_session_frame_retains_discovery_membership_immutably() -> None:
+    frame = _full_frame()
+    discovery = frame.discoveries[0]
+    empty = SessionFrame()
 
-    successor = apply_planner_output(
-        current,
-        PlannerOutput(
-            response="Updated planning state.",
-            created_objective=refined,
-            created_assumption=assumption,
-        ),
-    )
+    successor = empty.add_discovery(discovery)
 
-    assert current.objective == original
-    assert current.assumptions == ()
-    assert successor.objective == refined
-    assert successor.assumptions == (assumption,)
-
-
-def test_application_boundary_applies_terminal_task_with_exact_semantic_identity() -> None:
-    objective = Objective(text="Understand missingness.")
-    task = Task(
-        objective_id=objective.objective_id,
-        kind=TaskKind.DATA,
-        instruction="Summarize missingness by column.",
-        status=TaskStatus.COMPLETED,
-    )
-
-    successor = apply_planner_output(
-        SessionFrame(objective=objective),
-        PlannerOutput(response="Work completed.", created_task=task),
-    )
-
-    applied = successor.tasks[0]
-    assert applied.status is TaskStatus.COMPLETED
-    assert (
-        applied.task_id,
-        applied.objective_id,
-        applied.kind,
-        applied.instruction,
-    ) == (
-        task.task_id,
-        task.objective_id,
-        task.kind,
-        task.instruction,
-    )
-
-
-def test_application_boundary_rejects_task_for_another_objective() -> None:
-    objective = Objective(text="Understand missingness.")
-    mismatched_task = Task(
-        objective_id=uuid4(),
-        kind=TaskKind.DATA,
-        instruction="Summarize missingness by column.",
-        status=TaskStatus.FAILED,
-    )
-
-    with pytest.raises(ValueError, match="active Objective identity"):
-        apply_planner_output(
-            SessionFrame(objective=objective),
-            PlannerOutput(response="Work failed.", created_task=mismatched_task),
-        )
+    assert empty.discoveries == ()
+    assert successor.discoveries == (discovery,)
+    with pytest.raises(ValidationError, match="duplicate Discovery"):
+        SessionFrame(discoveries=(discovery, discovery))

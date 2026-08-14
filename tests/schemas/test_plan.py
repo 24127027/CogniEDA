@@ -12,8 +12,8 @@ from pydantic import ValidationError
 
 import cognieda.schemas as schemas
 import cognieda.schemas.plan as plan_module
-from cognieda.agents.planner.context import PlanningContext
-from cognieda.agents.planner.types import PlannerOutput, State
+from cognieda.agents.planner.context import PlannerContext
+from cognieda.agents.planner.types import PlannerOutput, PlannerResult
 from cognieda.schemas import (
     Assumption,
     FirstClassObjectType,
@@ -336,16 +336,16 @@ def test_plan_contract_excludes_routing_data_and_lifecycle_fields() -> None:
     assert prohibited.isdisjoint(PlanDependency.model_fields)
 
 
-def test_plan_is_immutable_non_fco_and_planner_contracts_are_untouched() -> None:
+def test_plan_is_immutable_non_fco_and_has_explicit_planner_surfaces() -> None:
     task = _task()
     plan = _plan([task])
 
     with pytest.raises(ValidationError, match="frozen"):
         plan.task_ids = ()
     assert "PLAN" not in FirstClassObjectType.__members__
-    assert "plan" not in PlanningContext.model_fields
+    assert "active_plan" in PlannerContext.model_fields
+    assert "plan" in PlannerResult.model_fields
     assert "plan" not in PlannerOutput.model_fields
-    assert "plan" not in State.model_fields
 
 
 def test_plan_revision_production_type_remains_removed() -> None:
