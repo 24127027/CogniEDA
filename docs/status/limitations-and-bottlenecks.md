@@ -7,14 +7,12 @@ These are verified constraints of the bounded current implementation.
 
 - The active typed research-state foundation is transitional and does not
   implement the minimum complete scientific loop defined by MVP-v2.
-- Active bounded Task has no runtime-selected Plan membership,
-  dependency eligibility, approval, activation, or parent/leaf execution
-  semantics. Immutable Plan candidates can represent direct Task membership,
-  exact Objective and admitted Assumption basis, and structural dependencies
-  and can be validated without persistence.
-  The append-only repository is an isolated
-  infrastructure foundation; only `DATA` is executable and no Plan
-  drives execution.
+- Active bounded Task has no Plan-driven dependency eligibility or parent/leaf
+  execution semantics. Immutable Plan candidates represent direct Task
+  membership, exact Objective and admitted Assumption basis, and grouped
+  structural dependencies. Exact Human approval can atomically persist and
+  select a Plan active by Objective, but only `DATA` is separately executable
+  and no Plan drives execution.
 - The current materialized SessionFrame can hold one Objective and one
   DataProfile but is not the canonical reference-based session-membership FCO
   and does not implement Objective-bound multi-session isolation. It now
@@ -29,17 +27,18 @@ These are verified constraints of the bounded current implementation.
 - The Phase 2 Planner cognitive core, append-only native model conversation
   history, and deterministic Data Explorer-to-Evidence admission are
   **Implemented** at separate bounded library surfaces. Planner performs one
-  direct `plan_or_answer` invocation with no tools, persistence, approval, or
-  dispatch. The in-process Application retains its materialized SessionFrame
-  and model-backed conversation turns, but does not admit candidate Plan state;
-  durable restart/recovery and complete-loop composition are **Deferred**.
+  direct `plan_or_answer` invocation with no tools or dispatch. The in-process
+  Application retains its materialized SessionFrame, exact transient Plan
+  candidate, and model-backed conversation turns. Typed approval delegates
+  atomic admission to application authority; durable pending-review recovery,
+  restart/recovery, and complete-loop composition are **Deferred**.
 - The Phase 1 Plan domain and side-effect-free candidate validation are
   **Implemented**, and append-only repository behavior is **Verified on
   SQLite** with exact Objective and Assumption snapshots for historical
   reconstruction. Planner can author a transient structurally validated
-  candidate, but no application path persists one. Human approval,
-  commit-boundary validation and persistence, activation, active selection,
-  and Task DAG runtime are **Deferred**.
+  candidate. Typed Human review, commit-boundary validation and persistence,
+  and objective-scoped active selection are **Verified on SQLite**. Task DAG
+  runtime is **Deferred**.
   `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
@@ -48,9 +47,11 @@ These are verified constraints of the bounded current implementation.
   and Hypothesis remain canonical FCO names but have no active bounded runtime.
 - Planner may propose a new Objective only inside a transient candidate Plan.
   It cannot create or mutate Assumptions; a candidate may retain only exact
-  already-admitted Assumptions. Application does not apply candidate Objective,
-  Task, or Plan state in Phase 2. Human review and durable candidate admission
-  remain **Deferred**. Task persistence supports status change only. Active Task
+  already-admitted Assumptions. Exact approval may atomically admit that new
+  Objective, its exact Tasks, and Plan. If an existing SessionFrame already has
+  a different Objective, Application does not switch it because retained
+  cross-Objective membership succession is undefined. Task persistence supports
+  status change only. Active Task
   values are immutable; changing Task meaning requires a new identity, while
   status change produces a replacement with the same identity and instruction.
 - Application-authority Evidence admission is **Implemented** for the direct
@@ -91,9 +92,11 @@ These are verified constraints of the bounded current implementation.
 - Bootstrap composes the in-process S0 dispatcher and bounded Data Explorer.
   The installable `cognieda [PATH]` command reaches the development Planner
   REPL and is **Partially implemented**. Its Application owns materialized
-  SessionFrame state, exact `PlannerContext` materialization, and complete
+  SessionFrame state, typed Plan review, exact active-Plan `PlannerContext`
+  materialization, and complete
   native-message model turns only for the
-  current process; no durable recovery, supported end-to-end application
+  current process. The REPL does not expose typed Plan review; no durable
+  recovery, supported end-to-end application
   runtime, worker, service API, or product CLI exists.
 - The local Data Explorer path executes only finite validated deterministic
   operations from an explicit absolute CSV or Parquet path. General-purpose

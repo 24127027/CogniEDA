@@ -3,16 +3,21 @@ from __future__ import annotations
 from cognieda.agents.planner.context import PlannerContext
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.schemas.artifacts import SessionFrame
+from cognieda.schemas.plan import Plan
 
 
 def build_planner_context(
     session_frame: SessionFrame,
     conversation_history: ConversationHistory,
+    *,
+    active_plan: Plan | None = None,
 ) -> PlannerContext:
     """Materialize retained readable state without filtering or authority changes."""
 
+    if active_plan is not None and active_plan.objective != session_frame.objective:
+        raise ValueError("Active Plan must match the exact SessionFrame Objective.")
     return PlannerContext(
-        active_plan=None,
+        active_plan=active_plan,
         objective=session_frame.objective,
         assumptions=session_frame.assumptions,
         tasks=session_frame.tasks,

@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+from sqlmodel import Session
+
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.types import PlannerResult
 from cognieda.application.ports import AgentFactoryPort
+from cognieda.application.services import (
+    PlanAdmissionService,
+    PlanReviewAction,
+    PlanReviewDecision,
+)
 from cognieda.execution import ExecutorDispatcher
-from cognieda.schemas.artifacts import SessionFrame
+from cognieda.infrastructure.persistence.repositories import ActivePlanRepository
+from cognieda.schemas.artifacts import SessionFrame, Task
+from cognieda.schemas.plan import Plan
 
 from .conversation import ConversationHistory
 from .messages import Message, MessageRole, MessageType
@@ -19,13 +28,18 @@ class Application:
         planner_agent: Planner,
         dispatcher: ExecutorDispatcher,
         agent_factory: AgentFactoryPort,
+        session: Session,
     ) -> None:
         self.workspace = workspace
         self.agent_factory = agent_factory
         self.planner_agent = planner_agent
         self.dispatcher = dispatcher
+        self._plan_admission = PlanAdmissionService(session)
+        self._active_plans = ActivePlanRepository(session)
         self.session_frame = SessionFrame()
         self.conversation_history = ConversationHistory()
+        self._pending_plan: Plan | None = None
+        self._pending_tasks: tuple[Task, ...] = ()
 
     async def submit_message(self, message: str) -> Message:
         if message.startswith("/"):
@@ -34,6 +48,7 @@ class Application:
         planner_context = build_planner_context(
             self.session_frame,
             self.conversation_history,
+            active_plan=self._resolve_active_plan(),
         )
         try:
             planner_output = await self.planner_agent.run(
@@ -51,11 +66,55 @@ class Application:
                 planner_output.messages
             )
 
+        if planner_output.result.plan is not None:
+            self._pending_plan = planner_output.result.plan
+            self._pending_tasks = planner_output.result.tasks
+
         return Message(
             type=MessageType.TEXT,
             role=MessageRole.ASSISTANT,
             content=self._present_planner_result(planner_output.result),
         )
+
+    def review_plan(self, decision: PlanReviewDecision) -> PlanReviewDecision:
+        """Apply typed Human authority to the exact retained transient candidate."""
+
+        plan = self._pending_plan
+        if plan is None:
+            raise ValueError("No transient candidate Plan is awaiting Human review.")
+        tasks = self._pending_tasks
+        reviewed = self._plan_admission.admit(
+            decision,
+            plan=plan,
+            tasks=tasks,
+        )
+        if decision.action is PlanReviewAction.APPROVE:
+            self._initialize_empty_session_frame(plan)
+        self._pending_plan = None
+        self._pending_tasks = ()
+        return reviewed
+
+    def _resolve_active_plan(self) -> Plan | None:
+        objective = self.session_frame.objective
+        if objective is None:
+            return None
+        return self._active_plans.get_by_objective_id(objective.objective_id)
+
+    def _initialize_empty_session_frame(self, plan: Plan) -> None:
+        frame = self.session_frame
+        if (
+            frame.objective is None
+            and not frame.assumptions
+            and not frame.tasks
+            and not frame.evidences
+            and not frame.discoveries
+        ):
+            self.session_frame = SessionFrame(
+                objective=plan.objective,
+                assumptions=plan.assumptions,
+                tasks=self._pending_tasks,
+                data_profile=frame.data_profile,
+            )
 
     @staticmethod
     def _present_planner_result(result: PlannerResult) -> str:

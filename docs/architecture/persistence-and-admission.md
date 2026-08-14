@@ -243,6 +243,9 @@ Immutable Plan repository infrastructure is **Verified on SQLite**.
 Normalized `plans`, `plan_assumptions`, `plan_tasks`, and
 `plan_dependencies` rows preserve exact Plan content and fingerprint in one
 caller-owned transaction. `plan_tasks` contains only `plan_id` and `task_id`.
+The domain groups all outgoing dependents under one prerequisite; repository
+writes flatten those groups to atomic edge rows and loads regroup them
+canonically.
 The Plan header snapshots exact Objective content;
 each assumption link snapshots exact admitted Assumption content. Reload still
 requires the referenced Objective, Assumptions, and Tasks to exist, but it
@@ -254,15 +257,16 @@ overwrite the existing snapshot, while different IDs with the same content
 fingerprint remain distinct. The repository is append-only and exposes no
 update or delete surface.
 
-No application path currently persists a Plan candidate. Human review
-precedes the intended application commit boundary; no mandatory separate
-application preflight is required before review. Commit-boundary validation and
-atomic persistence, adoption, and activation of the exact approved objects are
-**Deferred**; repository existence alone does not make pending Planner objects
-authoritative.
+Application retains the exact Planner candidate in-process without writing it.
+Frozen `PlanReviewDecision` is the Human authority value; conversation text is
+not sufficient. Reject/revise write nothing. Approval requires the exact
+candidate ID and atomically validates existing Assumptions, resolves or admits
+the exact Objective and Tasks, persists the immutable Plan, and writes one
+objective-scoped active pointer. Any failure rolls the complete transaction
+back. Pending candidates and review decisions are not durable or recoverable.
 
-The complete target boundary is not implemented. Canonical Plan approval,
-activation, active selection, durable role-native result inbox processing,
+The complete target boundary is not implemented. Canonical Task DAG execution,
+durable pending-review recovery, role-native result inbox processing,
 complete replay coordination, scientific Evidence admission from
 `EvidenceRequest`, governance
 workflow, Discovery admission from exact governed proposals, and end-to-end

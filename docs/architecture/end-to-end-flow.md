@@ -253,9 +253,11 @@ agent's retained transcript or hidden memory.
 
 **Unsupported** end to end. The Phase 2 Planner cognitive core can answer,
 request clarification, or produce a transient validated Plan and Task bundle
-through one direct PydanticAI invocation. It performs no Human review,
-approval, commit, activation, or execution. Generic capability dispatch
-foundations and several durable execution-safety transitions exist separately.
+through one direct PydanticAI invocation. A bounded typed Human-review and
+SQLite admission surface atomically admits and activates an exact approved
+bundle, while rejection/revision write nothing. It performs no Plan execution.
+Generic capability dispatch foundations and several durable execution-safety
+transitions exist separately.
 
 The S0 infrastructure boundary is **Implemented**: bootstrap composes an
 explicit registry, dispatcher, Data Explorer provider factory, and Planner
@@ -263,7 +265,7 @@ dependency. Capability dispatch is not model-visible Planner cognition, and
 Phase 2 exposes no Planner tool. These separate foundations do not establish
 the end-to-end research-state flow.
 
-Human Plan review and activation, role-native contracts, full specialist
+Durable review recovery, Plan execution, role-native contracts, full specialist
 implementations, EvidenceRequest-to-Evidence admission, protected evaluation,
 governance, Discovery admission, full PlannerWorkOutcome consumption, and
 validity-aware presentation sequence remain incomplete or absent. Data

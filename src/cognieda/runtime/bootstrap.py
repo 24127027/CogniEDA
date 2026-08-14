@@ -4,15 +4,15 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from cognieda.infrastructure.llm import AgentFactory
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
+from cognieda.infrastructure.llm import AgentFactory
+from cognieda.infrastructure.persistence import get_session, init_db
 
 from .application import Application
-from .workspace import MissingModelCredentialError
-from .workspace import Workspace
+from .workspace import MissingModelCredentialError, Workspace
 
 
 def _load_workspace_environment(workspace_path: Path) -> None:
@@ -50,10 +50,13 @@ def bootstrap_application(workspace_path: Path) -> Application:
         agent_instruction=workspace.load_agent_instruction(),
     )
 
+    database_url = init_db()
+
     return Application(
         agent_factory=agent_factory,
         workspace=workspace,
         planner_agent=planner,
         dispatcher=dispatcher,
+        session=get_session(database_url),
     )
 

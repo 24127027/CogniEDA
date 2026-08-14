@@ -14,12 +14,18 @@ from pydantic_ai.messages import (
     TextPart,
     UserPromptPart,
 )
+from sqlmodel import Session
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.types import PlannerOutput, PlannerResult
 from cognieda.application.ports import AgentFactoryPort
+from cognieda.application.services import PlanReviewAction, PlanReviewDecision
 from cognieda.execution import ExecutorDispatcher
+from cognieda.infrastructure.persistence.repositories import (
+    ActivePlanRepository,
+    PlanRepository,
+)
 from cognieda.runtime.application import Application
 from cognieda.runtime.conversation import ConversationHistory, ConversationTurn
 from cognieda.runtime.workspace import Workspace
@@ -82,12 +88,16 @@ def test_conversation_history_appends_complete_native_message_turns() -> None:
         ConversationTurn(messages=())
 
 
-def test_application_retains_messages_but_does_not_admit_candidate_plan() -> None:
+def test_application_retains_messages_but_does_not_admit_candidate_plan(
+    db_session: Session,
+) -> None:
     first_messages = _messages("Investigate churn.", "Proposed a plan.")
     second_messages = _messages("Summarize.", "No plan has been admitted.")
+    candidate = _candidate_result()
+    assert candidate.plan is not None
     planner = SequencePlanner(
         (
-            PlannerOutput(result=_candidate_result(), messages=first_messages),
+            PlannerOutput(result=candidate, messages=first_messages),
             PlannerOutput(
                 result=PlannerResult(response="No plan has been admitted."),
                 messages=second_messages,
@@ -99,6 +109,7 @@ def test_application_retains_messages_but_does_not_admit_candidate_plan() -> Non
         planner_agent=cast(Planner, planner),
         dispatcher=cast(ExecutorDispatcher, object()),
         agent_factory=cast(AgentFactoryPort, object()),
+        session=db_session,
     )
 
     first = asyncio.run(application.submit_message("Investigate churn."))
@@ -111,9 +122,79 @@ def test_application_retains_messages_but_does_not_admit_candidate_plan() -> Non
     assert len(application.conversation_history.turns) == 2
     assert planner.contexts[0].conversation_history.turns == ()
     assert planner.contexts[1].conversation_history.turns[0].messages == first_messages
+    assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) is None
 
 
-def test_skill_assignment_reloads_tooling_and_planner_without_state_mutation() -> None:
+def test_typed_approval_admits_candidate_and_materializes_exact_active_plan(
+    db_session: Session,
+) -> None:
+    candidate = _candidate_result()
+    assert candidate.plan is not None
+    planner = SequencePlanner(
+        (
+            PlannerOutput(result=candidate),
+            PlannerOutput(result=PlannerResult(continue_execution=True)),
+        )
+    )
+    application = Application(
+        workspace=cast(Workspace, object()),
+        planner_agent=cast(Planner, planner),
+        dispatcher=cast(ExecutorDispatcher, object()),
+        agent_factory=cast(AgentFactoryPort, object()),
+        session=db_session,
+    )
+
+    asyncio.run(application.submit_message("Investigate churn."))
+    decision = PlanReviewDecision(
+        action=PlanReviewAction.APPROVE,
+        plan_id=candidate.plan.plan_id,
+    )
+    assert application.review_plan(decision) is decision
+    continued = asyncio.run(application.submit_message("Continue."))
+
+    assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) == candidate.plan
+    assert ActivePlanRepository(db_session).get_by_objective_id(
+        candidate.plan.objective.objective_id
+    ) == candidate.plan
+    assert application.session_frame.objective == candidate.plan.objective
+    assert application.session_frame.tasks == candidate.tasks
+    assert planner.contexts[1].active_plan == candidate.plan
+    assert continued.content == "The active Plan should continue execution."
+
+
+def test_approved_different_objective_does_not_switch_existing_session_frame(
+    db_session: Session,
+) -> None:
+    candidate = _candidate_result()
+    assert candidate.plan is not None
+    planner = SequencePlanner((PlannerOutput(result=candidate),))
+    application = Application(
+        workspace=cast(Workspace, object()),
+        planner_agent=cast(Planner, planner),
+        dispatcher=cast(ExecutorDispatcher, object()),
+        agent_factory=cast(AgentFactoryPort, object()),
+        session=db_session,
+    )
+    existing = Objective(text="Existing Objective.")
+    application.session_frame = application.session_frame.set_objective(existing)
+
+    asyncio.run(application.submit_message("Propose a different scope."))
+    application.review_plan(
+        PlanReviewDecision(
+            action=PlanReviewAction.APPROVE,
+            plan_id=candidate.plan.plan_id,
+        )
+    )
+
+    assert application.session_frame.objective == existing
+    assert ActivePlanRepository(db_session).get_by_objective_id(
+        candidate.plan.objective.objective_id
+    ) == candidate.plan
+
+
+def test_skill_assignment_reloads_tooling_and_planner_without_state_mutation(
+    db_session: Session,
+) -> None:
     workspace = Mock(spec=Workspace)
     workspace.project_config = Mock()
     workspace.project_config.try_resolve_model.return_value = None
@@ -125,6 +206,7 @@ def test_skill_assignment_reloads_tooling_and_planner_without_state_mutation() -
         planner_agent=planner,
         dispatcher=cast(ExecutorDispatcher, object()),
         agent_factory=cast(AgentFactoryPort, agent_factory),
+        session=db_session,
     )
     original_frame = application.session_frame
 

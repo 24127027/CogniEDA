@@ -15,6 +15,7 @@ from cognieda.schemas import (
     Evidence,
     EvidenceProvenance,
     Objective,
+    Plan,
     SessionFrame,
     Task,
     ValidityBasis,
@@ -101,3 +102,35 @@ def test_session_frame_retains_discovery_membership_immutably() -> None:
     assert successor.discoveries == (discovery,)
     with pytest.raises(ValidationError, match="duplicate Discovery"):
         SessionFrame(discoveries=(discovery, discovery))
+
+
+def test_builder_materializes_exact_active_plan_for_current_objective() -> None:
+    frame = _full_frame()
+    assert frame.objective is not None
+    plan = Plan.create(
+        objective=frame.objective,
+        assumptions=frame.assumptions,
+        task_ids=(task.task_id for task in frame.tasks),
+        tasks=frame.tasks,
+    )
+
+    context = build_planner_context(
+        frame,
+        ConversationHistory(),
+        active_plan=plan,
+    )
+
+    assert context.active_plan is plan
+
+
+def test_builder_rejects_active_plan_for_different_objective() -> None:
+    frame = _full_frame()
+    other = Objective(text="Different Objective.")
+    plan = Plan.create(objective=other, task_ids=(), tasks=())
+
+    with pytest.raises(ValueError, match="exact SessionFrame Objective"):
+        build_planner_context(
+            frame,
+            ConversationHistory(),
+            active_plan=plan,
+        )

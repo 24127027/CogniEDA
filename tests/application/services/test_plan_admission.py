@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any, Literal, cast
 from uuid import uuid4
 
@@ -83,6 +84,15 @@ def test_reject_and_revise_require_exact_feedback(action: PlanReviewAction) -> N
         PlanReviewDecision(action=action, plan_id=uuid4())
     with pytest.raises(ValidationError, match="requires exact Human feedback"):
         PlanReviewDecision(action=action, plan_id=uuid4(), feedback="   ")
+
+
+def test_review_and_admission_contracts_preserve_authority_boundaries() -> None:
+    assert set(PlanReviewDecision.model_fields) == {"action", "plan_id", "feedback"}
+    source = inspect.getsource(PlanAdmissionService)
+    assert "pydantic_ai" not in source
+    assert "Capability" not in source
+    assert "Executor" not in source
+    assert "DataProfile" not in source
 
 
 def test_candidate_is_transient_until_exact_approval(db_session: Session) -> None:

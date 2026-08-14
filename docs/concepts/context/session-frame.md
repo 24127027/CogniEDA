@@ -149,7 +149,9 @@ The in-process application exact-copies all six current materialized member
 categories into immutable `PlannerContext`. Planner receives that context and
 returns a response, Human clarification request, transient Plan plus exact Task
 bundle, or continuation signal; it never receives, mutates, or returns
-SessionFrame. Application does not admit candidate state in Phase 2.
+SessionFrame. Application may atomically admit an exact Human-approved bundle
+and materializes the exact active Plan for the frame's current Objective into
+`PlannerContext`.
 Conversation history remains an explicit non-authoritative context field and
 native message-history input.
 
@@ -158,7 +160,11 @@ no frame identity, Objective-bound session identity, reference manifest,
 active Objective/DataProfile selectors distinct from materialized objects,
 successor lineage, or runtime reload authority. The in-process application
 retains it only for the current process. Canonical durable session continuity
-and restart reconstruction remain **Deferred**.
+and restart reconstruction remain **Deferred**. Current source does not define
+how an existing Objective-scoped frame succeeds to a newly approved different
+Objective while preserving or dropping prior Tasks, Evidence, and Discoveries;
+Application therefore admits that new Objective and Plan without silently
+switching the existing frame.
 
 Continue with [Context type safety](context-type-safety.md) for the rules that
 govern operation-specific selection and [Continuity and resume](continuity-and-resume.md)
