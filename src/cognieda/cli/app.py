@@ -8,7 +8,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .mock_application import run_mock_repl
 from .main import repl
 from .renderer import Renderer
 
@@ -48,12 +47,13 @@ def parse_args(argv: Sequence[str] | None = None) -> Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    """Open the selected workspace and run the Planner REPL."""
     args = parse_args(argv)
 
     if args.mode == "mock":
-        asyncio.run(run_mock_repl(workspace_root=args.path))
-        return
+        from .mock_application import MockApplication
 
-    app = bootstrap_application(args.path)
-    asyncio.run(repl(app, Renderer()))
+        app = MockApplication(workspace_root=args.path)
+    else:
+        app = bootstrap_application(args.path)
+
+    asyncio.run(repl(app, Renderer())) #type: ignore
