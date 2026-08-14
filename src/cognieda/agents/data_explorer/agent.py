@@ -53,6 +53,12 @@ class DataExplorer:
 
     builtin_tools: tuple[()] = ()
 
+    CAPABILITIES: tuple[Capability, ...] = (
+        Capability.DATA_ANALYSIS,
+        Capability.DATA_PROFILING,
+        Capability.DATA_TRANSFORMATION,
+    )
+
     def __init__(
         self,
         *,
