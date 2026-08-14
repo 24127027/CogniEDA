@@ -5,7 +5,7 @@ from collections.abc import Callable, Iterable
 from .capabilities import Capability
 from .contracts import ExecutorProvider
 
-ProviderFactory = Callable[[], ExecutorProvider]
+ExecutorFactory = Callable[[], ExecutorProvider]
 
 
 class CapabilityNotRegisteredError(LookupError):
@@ -13,15 +13,15 @@ class CapabilityNotRegisteredError(LookupError):
 
 
 class ExecutorRegistry:
-    """Explicit Capability -> ProviderFactory registry with lazy provider reuse."""
+    """Explicit Capability -> ExecutorFactory registry with lazy provider reuse."""
 
     def __init__(self) -> None:
-        self._providers: dict[Capability, ProviderFactory] = {}
-        self._instances: dict[ProviderFactory, ExecutorProvider] = {}
+        self._providers: dict[Capability, ExecutorFactory] = {}
+        self._instances: dict[ExecutorFactory, ExecutorProvider] = {}
 
     def register_provider(
         self,
-        provider_factory: ProviderFactory,
+        provider_factory: ExecutorFactory,
         *,
         capabilities: Iterable[Capability],
     ) -> None:
