@@ -155,13 +155,6 @@ class AssumptionSource(StrEnum):
     SYSTEM_SUGGESTED = "system_suggested"
 
 
-class AssumptionTestability(StrEnum):
-    """Admission categories for claims proposed as assumptions."""
-
-    UNTESTABLE_IN_PROJECT = "untestable_in_project"
-    TESTABLE_CLAIM_REJECTED_AS_ASSUMPTION = "testable_claim_rejected_as_assumption"
-
-
 class TaskStatus(StrEnum):
     """Finite execution lifecycle for an MVP Task."""
 

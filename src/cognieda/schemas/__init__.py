@@ -46,7 +46,6 @@ from cognieda.schemas.common import (
 from cognieda.schemas.enums import (
     AssumptionSource,
     AssumptionStatus,
-    AssumptionTestability,
     ConfidenceLevel,
     DataProfileLifecycleState,
     DataProfileMethod,
@@ -95,7 +94,6 @@ __all__ = [
     "AssumptionContextSummary",
     "AssumptionSource",
     "AssumptionStatus",
-    "AssumptionTestability",
     "BaselineSummary",
     "CategoricalColumnSummary",
     "ColumnProfile",

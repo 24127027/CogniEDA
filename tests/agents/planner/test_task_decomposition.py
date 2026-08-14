@@ -4,6 +4,7 @@ import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 
+import pytest
 from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
 from sqlmodel import Session
 
@@ -16,7 +17,7 @@ from cognieda.infrastructure.persistence.models import ActivePlanRecord
 from cognieda.infrastructure.persistence.repositories import PlanRepository
 from cognieda.runtime.application import Application
 from cognieda.runtime.workspace import Workspace
-from cognieda.schemas import Objective, Plan, PlanTaskBinding, Task, TaskKind
+from cognieda.schemas import Objective, Plan, PlanTaskBinding, SessionFrame, Task, TaskKind
 
 
 @dataclass
@@ -204,3 +205,41 @@ def test_wrong_plan_identity_fails_closed_without_resuming(
 
     assert "No pending candidate matches" in response.content
     assert agent.call_count == 1
+
+
+def test_approved_new_objective_replaces_only_an_empty_old_objective_scope(
+    tmp_path: Path,
+    db_session: Session,
+) -> None:
+    candidate = _candidate("new")
+    application, _ = _application(tmp_path, db_session, [candidate])
+    old_objective = Objective(text="Old framing without retained scoped work")
+    application.session_frame = SessionFrame(objective=old_objective)
+    assert candidate.plan is not None
+
+    successor = application._successor_for_approved_plan(candidate.plan, candidate.tasks)
+
+    assert successor.objective == candidate.plan.objective
+    assert successor.tasks == candidate.tasks
+
+
+def test_approved_new_objective_fails_closed_when_old_scoped_work_is_retained(
+    tmp_path: Path,
+    db_session: Session,
+) -> None:
+    candidate = _candidate("new")
+    application, _ = _application(tmp_path, db_session, [candidate])
+    old_objective = Objective(text="Old framing with retained work")
+    old_task = Task(
+        objective_id=old_objective.objective_id,
+        kind=TaskKind.DATA,
+        instruction="Retained old-Objective work",
+    )
+    application.session_frame = SessionFrame(
+        objective=old_objective,
+        tasks=(old_task,),
+    )
+    assert candidate.plan is not None
+
+    with pytest.raises(ValueError, match="canonical successor contract"):
+        application._successor_for_approved_plan(candidate.plan, candidate.tasks)

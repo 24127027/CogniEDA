@@ -6,17 +6,16 @@ import pytest
 from pydantic import ValidationError
 
 import cognieda.agents.planner.contracts as contracts
+import cognieda.schemas as schemas
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.contracts import (
-    AssumptionAssessment,
-    PlannerResult,
     PlannerOutput,
+    PlannerResult,
 )
 from cognieda.runtime.conversation import ConversationHistory
-from cognieda.runtime.planner_context import apply_planner_output, build_planner_context
+from cognieda.runtime.planner_context import build_planner_context
 from cognieda.schemas import (
-    AssumptionTestability,
     Objective,
     Plan,
     PlanTaskBinding,
@@ -42,7 +41,7 @@ def _candidate() -> tuple[Plan, tuple[Task, ...]]:
     return plan, tasks
 
 
-def test_one_cognitive_result_model_carries_candidate_plan_bundle() -> None:
+def test_planner_result_model_carries_candidate_plan_bundle() -> None:
     plan, tasks = _candidate()
 
     result = PlannerResult(
@@ -59,7 +58,7 @@ def test_one_cognitive_result_model_carries_candidate_plan_bundle() -> None:
     assert not hasattr(contracts, "AuthoritativeAnswerRequest")
 
 
-def test_cognitive_result_rejects_contradictory_or_incomplete_shapes() -> None:
+def test_planner_result_rejects_contradictory_or_incomplete_shapes() -> None:
     plan, tasks = _candidate()
 
     with pytest.raises(ValidationError, match="Tasks require"):
@@ -111,21 +110,7 @@ def test_context_contains_non_authoritative_conversation_history() -> None:
     assert "non-authoritative" in PlannerContext.__doc__
 
 
-def test_application_admits_only_exact_untestable_human_assumption() -> None:
-    source = "The project cannot observe competitor intent."
-    output = PlannerOutput(
-        result=PlannerResult(
-            response="This may be retained for planning only.",
-            assumption_assessment=AssumptionAssessment(
-                source_text=source,
-                testability=AssumptionTestability.UNTESTABLE_IN_PROJECT,
-            ),
-        )
-    )
-
-    accepted = apply_planner_output(SessionFrame(), output, request=source)
-
-    assert len(accepted.assumptions) == 1
-    assert accepted.assumptions[0].text == source
-    with pytest.raises(ValueError, match="exact Human text"):
-        apply_planner_output(SessionFrame(), output, request="Paraphrased request")
+def test_planner_result_has_no_assumption_admission_surface() -> None:
+    assert not hasattr(contracts, "AssumptionAssessment")
+    assert "assumption_assessment" not in PlannerResult.model_fields
+    assert not hasattr(schemas, "AssumptionTestability")

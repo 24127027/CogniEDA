@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
 
 from cognieda.schemas.artifacts import Task
-from cognieda.schemas.enums import AssumptionTestability
 from cognieda.schemas.plan import Plan
 
 
@@ -29,15 +28,6 @@ class PlannerControlledError(BaseModel):
     message: str = Field(min_length=1)
 
 
-class AssumptionAssessment(BaseModel):
-    """Planner assessment of exact Human text; never an Assumption FCO."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    source_text: str = Field(min_length=1)
-    testability: AssumptionTestability
-
-
 class PlannerResult(BaseModel):
     """Typed reasoning result produced only by ``plan_or_answer``."""
 
@@ -48,7 +38,6 @@ class PlannerResult(BaseModel):
     response: str | None = Field(default=None, min_length=1)
     human_input_request: str | None = Field(default=None, min_length=1)
     continue_execution: bool = False
-    assumption_assessment: AssumptionAssessment | None = None
 
     @model_validator(mode="after")
     def _coherent_result(self) -> Self:
@@ -60,10 +49,6 @@ class PlannerResult(BaseModel):
                 raise ValueError("A complete Plan cannot also request clarification.")
             if self.continue_execution:
                 raise ValueError("A candidate Plan cannot also continue an active Plan.")
-            if self.assumption_assessment is not None:
-                raise ValueError(
-                    "A candidate Assumption assessment must be admitted before planning."
-                )
         if self.continue_execution and self.human_input_request is not None:
             raise ValueError("Execution cannot be requested with Human clarification.")
         if not any(
@@ -72,7 +57,6 @@ class PlannerResult(BaseModel):
                 self.response is not None,
                 self.human_input_request is not None,
                 self.continue_execution,
-                self.assumption_assessment is not None,
             )
         ):
             raise ValueError("PlannerResult requires one meaningful result field.")
@@ -129,7 +113,6 @@ class PlannerOutput(BaseModel):
 
 
 __all__ = (
-    "AssumptionAssessment",
     "PlannerResult",
     "PlannerControlledError",
     "PlannerErrorCode",

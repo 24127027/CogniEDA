@@ -18,7 +18,7 @@ from cognieda.schemas.plan import Plan
 
 from .conversation import ConversationHistory
 from .messages import Message, MessageRole, MessageType
-from .planner_context import apply_planner_output, build_planner_context
+from .planner_context import build_planner_context
 from .workspace import MissingModelCredentialError, Workspace
 
 
@@ -322,11 +322,6 @@ class Application:
         *,
         request: str,
     ) -> Message:
-        self.session_frame = apply_planner_output(
-            self.session_frame,
-            planner_output,
-            request=request,
-        )
         result = planner_output.result
         if result.plan is not None:
             if self._pending_plan is not None:
@@ -354,19 +349,31 @@ class Application:
         tasks: tuple[Task, ...],
     ) -> SessionFrame:
         current = self.session_frame
-        if current.objective is not None and current.objective != plan.objective:
+        replacing_objective = (
+            current.objective is not None and current.objective != plan.objective
+        )
+        if replacing_objective and (
+            current.tasks or current.evidences or current.discoveries
+        ):
             raise ValueError(
-                "Replacing an active Objective without an exact successor contract is unsupported."
+                "A different approved Objective cannot replace retained old-Objective "
+                "Task, Evidence, or Discovery membership without a canonical successor contract."
             )
 
         assumptions_by_id = {item.assumption_id: item for item in current.assumptions}
         for assumption in plan.assumptions:
             assumption_existing = assumptions_by_id.get(assumption.assumption_id)
-            if assumption_existing is not None and assumption_existing != assumption:
+            if assumption_existing is None:
+                raise ValueError(
+                    "Approved Plan references an Assumption absent from admitted "
+                    "SessionFrame state."
+                )
+            if assumption_existing != assumption:
                 raise ValueError("Approved Assumption identity conflicts with retained content.")
-            assumptions_by_id[assumption.assumption_id] = assumption
 
-        tasks_by_id = {item.task_id: item for item in current.tasks}
+        tasks_by_id = (
+            {} if replacing_objective else {item.task_id: item for item in current.tasks}
+        )
         for task in tasks:
             task_existing = tasks_by_id.get(task.task_id)
             if task_existing is not None and task_existing != task:

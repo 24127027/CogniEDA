@@ -11,7 +11,6 @@ from sqlmodel import Session
 from cognieda.application.services.plan_validation import PlanValidator
 from cognieda.infrastructure.persistence.models import (
     ActivePlanRecord,
-    AssumptionRecord,
     ObjectiveRecord,
     TaskRecord,
 )
@@ -20,7 +19,7 @@ from cognieda.infrastructure.persistence.repositories.common import (
     record_to_schema,
     schema_to_record_payload,
 )
-from cognieda.schemas.artifacts import Assumption, Objective, Task
+from cognieda.schemas.artifacts import Objective, Task
 from cognieda.schemas.plan import Plan
 
 
@@ -40,13 +39,6 @@ class PlanAdmissionService:
                 plan.objective,
                 Objective,
             )
-            for assumption in plan.assumptions:
-                self._stage_exact(
-                    AssumptionRecord,
-                    assumption.assumption_id,
-                    assumption,
-                    Assumption,
-                )
             for task in member_tasks:
                 self._stage_exact(TaskRecord, task.task_id, task, Task)
             self._session.flush()

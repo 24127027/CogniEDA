@@ -7,10 +7,8 @@ import pytest
 from pydantic import ValidationError
 
 from cognieda.agents.planner.context import PlannerContext
-from cognieda.agents.planner.contracts import PlannerOutput, PlannerResult
 from cognieda.runtime.conversation import ConversationHistory
-from cognieda.runtime.planner_context import apply_planner_output, build_planner_context
-from cognieda.schemas import Plan, PlanTaskBinding
+from cognieda.runtime.planner_context import build_planner_context
 from cognieda.schemas.artifacts import (
     Assumption,
     DataProfile,
@@ -103,34 +101,3 @@ def test_planner_context_has_exact_readable_membership() -> None:
         "conversation_history",
     }
 
-
-def test_candidate_plan_does_not_mutate_session_frame_before_approval() -> None:
-    original = Objective(text="Understand retention.")
-    refined = Objective(text="Understand retention drivers.")
-    current = SessionFrame(objective=original)
-    task = Task(
-        objective_id=refined.objective_id,
-        kind=TaskKind.DATA,
-        instruction="Profile retention data.",
-    )
-    plan = Plan.create(
-        objective=refined,
-        task_bindings=(PlanTaskBinding(task_id=task.task_id, order_rank=0),),
-        tasks=(task,),
-    )
-
-    successor = apply_planner_output(
-        current,
-        PlannerOutput(
-            result=PlannerResult(
-                plan=plan,
-                tasks=(task,),
-                response="Review the candidate Plan.",
-            )
-        ),
-        request="Refine the objective.",
-    )
-
-    assert current.objective is original
-    assert successor is current
-    assert successor.objective is original

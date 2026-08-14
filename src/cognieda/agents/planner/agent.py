@@ -264,8 +264,8 @@ class Planner:
                 ),
             )
             planner_result = PlannerResult.model_validate(result.output)
-            if planner_result.plan is not None or planner_result.assumption_assessment:
-                raise ValueError("The execute phase cannot author a Plan or Assumption assessment.")
+            if planner_result.plan is not None:
+                raise ValueError("The execute phase cannot author a Plan.")
             state.result = planner_result
             state.messages = (
                 *state.messages,

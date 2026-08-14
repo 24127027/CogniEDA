@@ -10,10 +10,12 @@ import pytest
 from sqlmodel import Session
 
 from cognieda.application.services import (
+    PlanAdmissionService,
     PlanValidationError,
     PlanValidationErrorCode,
     PlanValidator,
 )
+from cognieda.infrastructure.persistence.models import ActivePlanRecord
 from cognieda.infrastructure.persistence.repositories import (
     AssumptionRepository,
     ObjectiveRepository,
@@ -422,3 +424,57 @@ def test_all_task_kinds_validate_without_provider_or_capability_lookup(
     assert validated == candidate
     assert "capability" not in validated.model_dump_json()
     assert PlanRepository(db_session).get_by_id(candidate.plan_id) is None
+
+
+def test_plan_admission_accepts_a_new_objective_but_not_a_new_assumption(
+    db_session: Session,
+) -> None:
+    objective = Objective(text="Human-approved new Objective")
+    task = _task(objective.objective_id)
+    fabricated = Assumption(text="Model-fabricated premise")
+    candidate = _plan(objective, [task], assumptions=(fabricated,))
+
+    with pytest.raises(PlanValidationError) as exc_info:
+        PlanAdmissionService(db_session).admit(candidate, (task,))
+
+    assert exc_info.value.code is PlanValidationErrorCode.ASSUMPTION_NOT_FOUND
+    assert AssumptionRepository(db_session).get_by_id(fabricated.assumption_id) is None
+    assert ObjectiveRepository(db_session).get_by_id(objective.objective_id) is None
+    assert TaskRepository(db_session).get_by_id(task.task_id) is None
+
+
+def test_plan_admission_uses_only_exact_previously_admitted_assumptions(
+    db_session: Session,
+) -> None:
+    assumption = AssumptionRepository(db_session).create(
+        Assumption(text="Exact Human-authored planning premise")
+    )
+    objective = Objective(text="Approved new Objective")
+    task = _task(objective.objective_id)
+    candidate = _plan(objective, [task], assumptions=(assumption,))
+
+    admitted = PlanAdmissionService(db_session).admit(candidate, (task,))
+
+    assert admitted == candidate
+    assert ObjectiveRepository(db_session).get_by_id(objective.objective_id) == objective
+    assert TaskRepository(db_session).get_by_id(task.task_id) == task
+    active = db_session.get(ActivePlanRecord, objective.objective_id)
+    assert active is not None and active.plan_id == candidate.plan_id
+
+
+def test_plan_admission_rejects_same_assumption_identity_with_different_content(
+    db_session: Session,
+) -> None:
+    persisted = AssumptionRepository(db_session).create(
+        Assumption(text="Exact Human text")
+    )
+    conflicting = persisted.model_copy(update={"text": "Changed model text"})
+    objective = Objective(text="Approved Objective")
+    task = _task(objective.objective_id)
+    candidate = _plan(objective, [task], assumptions=(conflicting,))
+
+    with pytest.raises(PlanValidationError) as exc_info:
+        PlanAdmissionService(db_session).admit(candidate, (task,))
+
+    assert exc_info.value.code is PlanValidationErrorCode.ASSUMPTION_CONTENT_MISMATCH
+    assert AssumptionRepository(db_session).get_by_id(persisted.assumption_id) == persisted
