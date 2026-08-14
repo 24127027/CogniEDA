@@ -18,7 +18,7 @@ boundaries.
 
 ```text
 Research scope and planning
-  Objective, Assumption, Task, PlanRevision
+  Objective, Assumption, Task, Plan
                  |
                  v
 Scientific commitments and epistemic objects
@@ -75,7 +75,7 @@ or a scientific claim.
 ## How layers interact
 
 Planning starts within an `Objective`. It may use `Assumption` objects to decide
-what to investigate and uses `PlanRevision` records to express an approved or
+what to investigate and uses `Plan` records to express an approved or
 proposed Task graph. Those planning materials cannot silently become support
 for a claim.
 

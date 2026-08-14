@@ -33,7 +33,7 @@ prose.
 
 | Mode | May include | Must preserve or exclude |
 | --- | --- | --- |
-| planning | every resolved SessionFrame member; approved or proposed PlanRevision state; authorized Graph Miner findings; Data Explorer consultation results; limitations and blockers | retained history remains visible, while type, validity, lifecycle, scope, lineage, and authority constrain its use; planning materials remain non-scientific |
+| planning | every resolved SessionFrame member; approved or proposed Plan state; authorized Graph Miner findings; Data Explorer consultation results; limitations and blockers | retained history remains visible, while type, validity, lifecycle, scope, lineage, and authority constrain its use; planning materials remain non-scientific |
 | planning consultation | exact consultation request, admitted DataProfile references where applicable, eligible planning context, limitations, blockers | consultation is bounded; output is not automatically a Task, Evidence, or Discovery |
 | scientific investigation control | eligible leaf SCIENTIFIC Task; ScientificInvestigationRun; Hypothesis; active protocol revision; Evidence obligations and requests; admitted Evidence and provenance needed to decide next scientific action | Planner and Assumption content cannot operationalize science; Hypothesis Analyst receives no dataset access |
 | protected evaluation | exact Hypothesis; admitted DataProfile; active protocol revision; Evidence obligations; AnalysisFrame provenance; admitted eligible Evidence; method, parameters, decision rule, uncertainty, limitations, claim scope, validity basis, necessary provenance | closed bundle only; all protected exclusions below apply |

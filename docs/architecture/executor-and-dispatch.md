@@ -42,7 +42,7 @@ protected evaluation cross Hypothesis Analyst, and graph inquiry remains
 read-only. It is not a compile-time `TaskKind -> Capability -> Provider`
 routing table.
 
-PlanRevision and `PlanTaskBinding` contain no capability, provider, specialist,
+Plan contains no capability, provider, specialist,
 worker, or tool selection. Application authority determines eligibility and
 which governed role-level tools are available; Planner reasons over the
 interactions needed to pursue the eligible Task. One Task may require zero,
@@ -55,7 +55,7 @@ allowed role-level interaction cannot be fulfilled. They must not fall back to
 a legacy executor, reinterpret Task meaning, or expose internal provider
 routing as approved plan content.
 
-Neither PlanRevision nor `PlanTaskBinding` selects a concrete DataProfile.
+Plan does not select a concrete DataProfile.
 Specialists receive the complete authoritative DataProfile context available
 for their work, then select the applicable profile and concrete scope within
 their role-native authority. Receiving metadata does not grant Graph Miner or
@@ -90,7 +90,7 @@ artifacts, and stopping conditions. `DataExplorerResult` returns observations,
 bounded completion status.
 
 Those stopping conditions bound one Data Explorer execution. They are not
-PlanRevision completion policy, replan triggers, or scientific investigation
+Plan completion policy, replan triggers, or scientific investigation
 stopping conditions.
 
 This direct path is not a scientific `EvidenceRequest`. It may produce useful
@@ -157,12 +157,12 @@ human.
 
 The capability registry is the authoritative runtime mapping from stable
 capability identity to a provider factory. Provider registration, instance
-reuse, availability, and implementation identity remain outside PlanRevision
+reuse, availability, and implementation identity remain outside Plan
 content and its fingerprint.
 
 The dispatcher accepts an admitted work identity and an execution-internal
 capability selected behind a governed role-level tool boundary. It does not
-derive that value from PlanRevision or infer scientific intent from Task kind.
+derive that value from Plan or infer scientific intent from Task kind.
 It verifies capability availability, contract compatibility, attempt identity,
 and policy before invoking a worker.
 
@@ -215,7 +215,7 @@ role-native fields. A minimal `PlannerWorkOutcome` projection seam consumes
 only shared metadata; full Planner consumption remains **Deferred**.
 
 At the bounded M3-A direct-DATA library surface, an execution-internal
-`DATA_ANALYSIS` request reaches Data Explorer outside PlanRevision. This
+`DATA_ANALYSIS` request reaches Data Explorer outside Plan. This
 transitional plumbing is not a canonical Task-kind route. Data Explorer owns
 the typed `Task.instruction -> DataAnalysisPlan` translation through its
 `DataAnalysisPlannerPort`, using the application-supplied authoritative

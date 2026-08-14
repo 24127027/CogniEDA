@@ -13,7 +13,7 @@ authorship.
 | Authority | Canonical holder | May decide or perform | Cannot acquire by implication |
 | --- | --- | --- | --- |
 | human authority | Human through the Planner boundary | intent, approval policy, consequential plan approval, clarification, rejection, and requested revision | executor access, scientific authorship, or admission mechanics |
-| planning authority | Planner | Objective coordination, consultation, PlanRevision and Task DAG proposals, routing, replanning, SessionFrame and GeneratedView coordination | scientific operationalization or Evidence creation |
+| planning authority | Planner | Objective coordination, consultation, Plan and Task DAG proposals, routing, replanning, SessionFrame and GeneratedView coordination | scientific operationalization or Evidence creation |
 | execution authority | bounded specialist under an admitted work contract | perform the exact role-specific operation and return a bounded result | admission, governance, or permission to expand scope |
 | scientific authority | Hypothesis Analyst or the scientific investigation controller | feasibility, Hypothesis and protocol content, Evidence obligations, protected evaluation, and exact scientific proposal content | dataset access, governance self-approval, or persistence authority |
 | governance authority | authorized human or policy-governed review boundary | approve, reject, hold, or request correction, more Evidence, or conflict review | rewriting scientific content or making a proposal durable |
@@ -44,7 +44,7 @@ governance requirements, or admission authority.
 ## Planning authority
 
 The Planner is the control plane. It owns Objective coordination, planning
-consultations, `PlanRevision` and Task DAG proposals, routing, replanning,
+consultations, `Plan` and Task DAG proposals, routing, replanning,
 approval coordination, SessionFrame and GeneratedView coordination, restart
 and resume orchestration, and high-level work synthesis.
 

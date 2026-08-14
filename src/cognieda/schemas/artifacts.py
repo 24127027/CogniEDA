@@ -68,7 +68,7 @@ class _FrozenJsonList(list[Any]):
     sort = _immutable
 
 
-class Objective(CogniEDABaseModel):
+class Objective(ImmutableCogniEDABaseModel):
     """Minimum executable research intent for the active MVP session."""
 
     objective_id: UUID = Field(default_factory=uuid4)
@@ -90,7 +90,7 @@ class DataProfile(ImmutableCogniEDABaseModel):
         return self
 
 
-class Assumption(CogniEDABaseModel):
+class Assumption(ImmutableCogniEDABaseModel):
     """Planning-only statement; an Assumption is never empirical Evidence."""
 
     assumption_id: UUID = Field(default_factory=uuid4)

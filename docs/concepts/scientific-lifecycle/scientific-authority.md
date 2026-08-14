@@ -61,7 +61,7 @@ role, not a failure of it.
 `ScientificInvestigationRun` is a durable non-FCO lifecycle record for one
 governed scientific investigation. Conceptually, it binds:
 
-- Objective and PlanRevision scope;
+- Objective and Plan scope;
 - the source Task and its feasibility state;
 - the Hypothesis when admitted;
 - the InvestigationPlan and active protocol revision;
@@ -99,8 +99,8 @@ Planner must not define or revise these scientific fields. Application
 authority validates and admits the exact candidate under the applicable
 approval and lineage rules.
 
-These scientific stopping conditions are not PlanRevision completion policy or
-replanning triggers. PlanRevision contains high-level plan content; the
+These scientific stopping conditions are not Plan completion policy or
+replanning triggers. Plan contains high-level plan content; the
 Hypothesis Analyst retains exclusive authority over investigation stopping
 semantics.
 

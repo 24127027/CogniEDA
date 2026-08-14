@@ -33,7 +33,7 @@ tested, Planner should propose a `SCIENTIFIC` Task.
 After Discovery admission, comparison may flag an Assumption for review. The
 flag is not an automatic rewrite or deletion of either object.
 
-## Task is work; PlanRevision is a plan
+## Task is work; Plan is a plan
 
 A `Task` is a durable semantic work unit of exactly one canonical kind:
 
@@ -56,22 +56,25 @@ lifecycle. A direct question that needs no project work, or that can already be
 answered from retained authoritative state, does not become a Task. Planner
 response synthesis is Planner behavior, not executable Task work.
 
-`PlanRevision` is the non-FCO version of an entire proposed or approved Task
-DAG. Exactly one immutable `PlanTaskBinding` represents each member Task and
-owns non-negative `order_rank` and finite `LOW`, `NORMAL`, or `HIGH` priority.
-Membership is derived from binding Task identities, while dependencies remain
-explicit edges. Those coordination concerns do not define Task identity.
+`Plan` is the non-FCO immutable aggregate for an entire proposed or approved
+research plan. It contains its exact Objective, the exact admitted Human
+Assumptions that materially influenced planning, canonical Task IDs as its
+direct and only membership representation, and explicit dependency edges.
+Those Plan semantics do not define Task identity.
 
-The dependency DAG determines eligibility. `order_rank` expresses preference
-among otherwise compatible work, permits ties, and never overrides a
-dependency. Priority defaults to `NORMAL` and is scheduling metadata only; it
-does not establish epistemic importance, authority, or Task meaning. Execution
-route, rank, priority, dependencies, parentage,
-PlanRevision identity, approval, and activation are absent from Task semantic
-identity.
+Duplicate Assumption identities are invalid. Assumption content contributes to
+Plan fingerprint identity because it records the exact planning basis, but it
+remains excluded from protected evaluation and is neither an execution
+parameter nor scientific support.
+
+The dependency DAG determines structural eligibility. Independent Tasks are
+intentionally unordered; execution order among eligible Tasks is a later
+Planner reasoning concern. Execution route, scheduling strategy, dependencies,
+parentage, Plan identity, approval, and activation are absent from Task
+semantic identity.
 
 Capability is execution-internal runtime plumbing, not approved plan content.
-PlanRevision contains no provider, specialist, worker, tool, or routing hint.
+Plan contains no provider, specialist, worker, tool, or routing hint.
 Application authority determines eligibility and the governed action space;
 Planner reasons about specialist interactions within that allowed space.
 Provider or worker changes therefore do not change plan content or its
@@ -79,35 +82,35 @@ fingerprint. Planner coordinates but is not a Task executor.
 There is no Planner or synthesis capability, provider, role, or compatibility
 branch.
 
-PlanRevision and its bindings contain no exact DataProfile identity or concrete
+Plan contains no exact DataProfile identity or concrete
 data selection. Planner describes intended data scope only in the Task
 instruction. The responsible specialist or controller receives all
 authoritative DataProfile context available for the work and selects the
 applicable profile and concrete scope within its role-native authority. Exact
 profiles actually used remain mandatory downstream execution or scientific
-provenance and do not enter the PlanRevision fingerprint.
+provenance and do not enter the Plan fingerprint.
 
 Its immutable plan content contains neither configurable stopping conditions
 nor replan-trigger policy. Plan completion, interruption, approval and
-activation state, and replanning belong to workflow lifecycle around the
-revision. An actual cause that later requires reconsideration is a workflow
-fact associated with the affected revision, not content that mutates the
+activation state, and replanning belong to workflow lifecycle around the Plan.
+An actual cause that later requires reconsideration is a workflow fact
+associated with the affected Plan, not content that mutates the
 historical plan. Scientific stopping remains `InvestigationProtocol`-owned;
 bounded execution stopping remains work-order-owned.
 
 A change to Task meaning requires a successor Task. A change to the approved
-plan creates an authorized successor PlanRevision or returns to grounded
+plan creates an authorized successor Plan or returns to grounded
 planning; it does not silently edit the active plan.
 
 ## Planner coordinates but does not operationalize science
 
-Planner owns Objective and PlanRevision coordination, Task proposals, routing,
+Planner owns Objective and Plan coordination, Task proposals, routing,
 replanning, approval interaction, SessionFrame coordination, and GeneratedView
 coordination. It does not author the scientific Hypothesis, InvestigationPlan,
 InvestigationProtocol, Evidence obligations, decision rule, or protected final
 evaluation.
 
-The Planner constructs transient canonical Objective, Task, and PlanRevision
+The Planner constructs transient canonical Objective, Task, and Plan
 objects and presents those exact pending objects to the Human. Domain
 construction performs structural validation, but there is no mandatory
 application preflight or admission stage before review. Human approval
@@ -148,13 +151,14 @@ Evidence loops, typed non-completion, and authoritative admission are owned by
 ## Implementation status
 
 **Partially implemented.** The active Task semantic core is Objective-scoped
-and uses the canonical three-kind taxonomy. The immutable PlanRevision V1
+and uses the canonical three-kind taxonomy. The immutable Phase 1 Plan
 domain and side-effect-free application validator are **Implemented** with
-binding membership, DAG validation, structural fingerprinting, and persisted
-Objective/Task checks. The append-only
-repository foundation is **Verified on SQLite**, but has no application caller
-for PlanRevision. Planner authoring, human approval, exact
+exact Objective and Assumption content, direct Task-ID membership, DAG validation,
+deterministic fingerprinting, and persisted Objective/Assumption/Task checks.
+The append-only repository foundation snapshots exact Objective and Assumption
+content and is **Verified on SQLite**, but has no application caller
+for Plan. Planner authoring, human approval, exact
 revalidation, persistence at the approval boundary, activation, active
 selection, replanning, canonical scientific execution, and the complete
 lifecycle linked above remain **Deferred**; only bounded `DATA` execution is
-supported, and PlanRevision state does not drive it.
+supported, and Plan state does not drive it.
