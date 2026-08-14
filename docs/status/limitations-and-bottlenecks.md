@@ -16,6 +16,10 @@ These are verified constraints of the bounded current implementation.
   implement Objective-bound multi-session isolation. Retained Discovery
   membership is context membership, not ownership of its complete provenance
   graph.
+- A Human-approved different Objective can replace an empty materialized
+  Objective scope. If old-Objective Tasks, Evidence, or Discoveries are retained,
+  replacement fails closed because canonical successor membership and
+  cross-Objective reuse rules are not implemented.
 - Direct Task-to-Evidence linkage is a bounded transitional capability. Canonical
   Hypothesis, EvidenceRequest, ExecutionRun, AnalysisFrame, evaluation, and
   admission lineage remain **Deferred** and are required by MVP-v2.
@@ -37,16 +41,17 @@ These are verified constraints of the bounded current implementation.
   and `GovernanceDecision` have no supported implementation.
 - Hypothesis Analyst and Graph Miner remain unregistered scaffolds. Discovery
   and Hypothesis remain canonical FCO names but have no active bounded runtime.
-- Plan-owned Objective proposal and exact-Human-text Assumption testability
-  assessment are **Implemented**. Planner-authored and reasonably testable
-  Assumptions fail closed. Planner proposes DATA Tasks only as part of the exact
-  review bundle; internal Capability dispatch is hidden behind the approved
-  semantic tool. Task persistence supports status change only. Active Task
+- Plan-owned Objective proposal is **Implemented**. Plan approval may approve a
+  new Objective but may reference only exact already-admitted Assumptions;
+  Planner-side Assumption assessment/admission is **Deferred**. Planner proposes
+  DATA Tasks only as part of the exact review bundle; internal Capability
+  dispatch is hidden behind the approved semantic tool. Task persistence
+  supports status change only. Active Task
   values are immutable; changing Task meaning requires a new identity, while
   status change produces a replacement with the same identity and instruction.
-- Planner's `PlannerDeps` contains the dispatcher and exact model-hidden
-  execution scope. `run_data_work` is the only active semantic tool and is
-  omitted from PLAN before approval. Scientific-investigation and graph-query
+- Planner's `PlannerDeps` contains the dispatcher and model-hidden application
+  execution-session service. `run_data_work` is the only active semantic tool
+  and is omitted from `plan_or_answer`. Scientific-investigation and graph-query
   tools are **Deferred** because their executors are not runnable.
 - Application-authority Evidence admission is **Implemented** for the direct
   bounded Task-to-Evidence contract and **Verified on SQLite**. It is not the
@@ -103,12 +108,14 @@ These are verified constraints of the bounded current implementation.
   blocked until successor dataset and DataProfile semantics exist.
 - `DATA_TRANSFORMATION` remains blocked until immutable successor dataset state
   and successor DataProfile handling exist.
-- Planner tests use a deterministic fake Agent supplied by a fake
+- Planner graph tests use a deterministic fake Agent supplied by a fake
   `AgentFactoryPort`; they prove independent typed result contracts, exact
   `PlannerDeps` injection, minimal lifecycle/epistemic graph state, native-
   message delta propagation, separated conversation, Evidence/Discovery answer
   support, Assumption quarantine without command bypass, and fail-closed
-  behavior without claiming real Data Explorer filesystem execution.
+  behavior. Separate execution-session tests use a real temporary CSV, the real
+  dispatcher and Data Explorer, SQLite Task transition and Evidence admission,
+  and successor-context propagation.
 - Workspace path selection and initialization are **Implemented**, but
   automatic dataset discovery or admission is **Unsupported**. The
   conventional `data/` directory does not itself establish a DataProfile.
@@ -137,10 +144,11 @@ These are verified constraints of the bounded current implementation.
 - Full pytest collection includes the rewritten M1-B Planner tests. The three
   former donor import blockers were removed rather than restored as
   compatibility APIs.
-- A bounded harness proves real dispatcher-compatible Data Explorer execution
-  and application Evidence admission. No composed user-to-Planner-to-real-Data
-  Explorer-to-Evidence-to-SessionFrame-to-response test exists; bounded
-  library completion does not establish MVP-v2.
+- A bounded harness proves real dispatcher-compatible Data Explorer execution,
+  application Evidence admission, dynamic Plan eligibility, and successor
+  PlannerContext propagation. No supported user dataset-adoption and
+  user-to-response test exists; bounded in-process composition does not
+  establish MVP-v2.
 - No production performance envelope, non-SQLite validation, or external
   integration test exists. The first-party documentation regression is
   intentionally limited to internal Markdown links, relative anchors, and

@@ -173,7 +173,8 @@ flowchart LR
     D -->|available and eligible| E[Role-native specialist]
     D -->|absent or ineligible| B[Typed blocked outcome]
     E --> N[Validated native result]
-    N --> O[PlannerWorkOutcome normalization]
+    N --> A[Application admission or bounded normalization]
+    A --> O[Planner-visible semantic result]
 ```
 
 Unknown capability, missing registration, incompatible contract, or stale
@@ -213,13 +214,19 @@ plumbing. Scientific and graph semantic tools remain **Deferred**.
 
 `ExecutionResult` now contains only shared transport metadata.
 `DataExplorerResult` and the deferred `HypothesisAnalystResult` own their
-role-native fields. The semantic Planner tool returns the minimal
-`PlannerWorkOutcome` projection to the Agent without admitting Evidence.
+role-native fields. For the active direct DATA path, the semantic Planner tool
+returns admitted `Evidence`, not `PlannerWorkOutcome`. Application execution
+authority re-resolves active Plan membership and current DAG eligibility at
+each call, performs the Task transition, validates Data Explorer provenance,
+and commits Task completion plus Evidence atomically before returning.
+Internal `PlannerWorkOutcome` normalization remains available at lower library
+seams but is not the Planner-visible successful DATA artifact.
 
 At the bounded M3-A direct-DATA library surface, an execution-internal
-`DATA_ANALYSIS` request reaches Data Explorer outside Plan. This
+`DATA_ANALYSIS` request reaches Data Explorer behind the semantic Planner tool.
+This
 transitional plumbing is not a canonical Task-kind route. Data Explorer owns
-the typed `Task.instruction -> DataAnalysisPlan` translation through its
+the typed `requested_work -> DataAnalysisPlan` translation through its
 `DataAnalysisPlannerPort`, using the application-supplied authoritative
 DataProfile projection from `DataExplorerInput` and the finite
 supported-operation set. Deterministic code

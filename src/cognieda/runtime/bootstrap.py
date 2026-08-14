@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
+from cognieda.application.services import PlannerExecutionSessionFactory
 from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
 from cognieda.infrastructure.llm import AgentFactory
 from cognieda.infrastructure.persistence.init_db import init_db
@@ -51,7 +52,10 @@ def bootstrap_application(workspace_path: Path) -> Application:
     )
     dispatcher = ExecutorDispatcher(registry)
     planner = Planner(
-        deps=PlannerDeps(dispatcher=dispatcher),
+        deps=PlannerDeps(
+            dispatcher=dispatcher,
+            execution_session_factory=PlannerExecutionSessionFactory(session),
+        ),
         agent_factory=agent_factory,
         model_config=model_config,
         agent_instruction=workspace.load_planner_agent_instruction(),

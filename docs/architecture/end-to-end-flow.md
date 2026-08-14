@@ -65,7 +65,8 @@ observation is not automatically Evidence.
 2. Domain construction enforces structural validity without making the pending
    objects authoritative or durable.
 3. The Planner presents those exact pending canonical objects to the Human.
-4. Human approval authorizes only those exact objects.
+4. Human approval authorizes the exact Plan, including its Objective and Task
+   coordination; every referenced Assumption must already be admitted exactly.
 5. Application authority performs commit-boundary validation and atomically
    persists, adopts, and activates the exact approved objects.
 
@@ -131,14 +132,17 @@ used to downstream execution or scientific provenance.
 3. Data Explorer performs only the admitted dataset operations.
 4. It returns `DataExplorerResult` with observations, AnalysisFrame material,
    diagnostics, artifacts, limitations, blockers, and status.
-5. Application coordination validates and normalizes the result into a
-   `PlannerWorkOutcome`.
-6. Application authority admits only the permitted provenance, workflow, or
-   artifact transitions.
-7. The Planner presents the result, proposes follow-up work, or replans.
+5. Application authority validates current Plan eligibility, Task identity,
+   DataProfile binding, execution provenance, and the role-native result.
+6. The bounded current path atomically completes the Task and admits Evidence,
+   then returns that Evidence at the Planner-visible tool boundary.
+7. `execute` returns to `plan_or_answer`, which sees the successor Task and
+   Evidence state and may answer, continue the active Plan, request Human input,
+   or propose a new Plan for review.
 
-This path does not require a Hypothesis and does not automatically create
-Evidence or Discovery.
+This bounded direct path does not require a Hypothesis and cannot create a
+Discovery. It is transitional direct Task-to-Evidence behavior rather than the
+canonical scientific EvidenceRequest lineage.
 
 ## SCIENTIFIC path
 
@@ -266,10 +270,10 @@ DATA eligibility and `run_data_work` are implemented; scientific and graph
 tools remain **Deferred**, so these execution seams do not establish the
 end-to-end research-state flow.
 
-The canonical Plan, role-native contracts, full specialist
+The canonical scientific role-native contracts, full specialist
 implementations, EvidenceRequest-to-Evidence admission, protected evaluation,
-governance, Discovery admission, full PlannerWorkOutcome consumption, and
-validity-aware presentation sequence remain incomplete or absent. Data
+governance, Discovery admission, and validity-aware presentation sequence
+remain incomplete or absent. Data
 Explorer's current local donor paths are not the canonical DATA workflow;
 SCIENTIFIC and GRAPH providers are not registered as runnable.
 

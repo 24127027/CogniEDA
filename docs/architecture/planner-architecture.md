@@ -54,17 +54,21 @@ revise decisions; broader policy modes remain **Deferred**.
 
 ## Grounded planning loop
 
-The current PLAN phase reasons only from the Human request and `PlannerContext`:
+The current `plan_or_answer` phase reasons from the Human request and complete
+readable `PlannerContext`:
 
 ```text
 human intent + PlannerContext
-  -> Planner forms Objective, Assumption basis, Tasks, and DAG
-  -> complete Plan proposal or Human clarification request
+  -> answer from admitted Evidence or Discovery when sufficient
+  -> propose an exact Objective, admitted Assumption basis, Tasks, and DAG
+  -> continue the current approved Plan when it remains appropriate
+  -> request Human clarification when direction is underdetermined
 ```
 
-Executor tools are structurally omitted from the PLAN model definition. If the
-readable context is insufficient, Planner requests Human clarification instead
-of dispatching a specialist before approval.
+Executor tools are structurally omitted from `plan_or_answer`. Internal
+candidate directions remain model reasoning rather than new domain objects or
+Assumptions. If new work changes Plan semantics, the new immutable Plan returns
+to Human review; continuing an unchanged active Plan does not.
 
 The Planner must use only planning-eligible context. An `Assumption` may guide
 this loop, but it remains a planning constraint and cannot be smuggled into
@@ -144,10 +148,10 @@ The planning sequence is:
    objects.
 
 There is no mandatory separate application preflight or admission stage before
-Human review. The implemented `PlanValidator` is a side-effect-free
-foundation for resolving persisted references and verifying an exact canonical
-candidate at an application boundary; approval and the commit transaction are
-**Deferred**.
+Human review. The implemented `PlanValidator` and `PlanAdmissionService`
+resolve exact persisted references and commit the approved Objective, Tasks,
+Plan, and active selection on SQLite. Every Plan Assumption must already be
+admitted with the same identity and content; Plan approval never admits one.
 
 Approval is not activation. The plan visible to a user must be the same plan
 fingerprint or exact version that application authority activates. A changed
@@ -156,13 +160,14 @@ specific change.
 
 ## Governed execution and replanning
 
-Application authority selects an eligible Task from the active approved DAG
-and exposes only the role-level specialist tools allowed for the execution
-context. The Planner receives that Task as its current goal and reasons about
-whether to call zero, one, or multiple allowed tools, whether more work is
-needed, and when to stop or report a blocker. The application owns Task
-lifecycle transitions and validates identity, provenance, and authority at
-every boundary.
+Application authority exposes only the role-level specialist tools allowed for
+the current active approved DAG. `execute` may call zero, one, or multiple
+semantic tools, but must make authoritative progress or expose a controlled
+blocker. It never answers or produces a `PlannerResult`; its fixed successor is
+`plan_or_answer`, which sees authoritative Task and Evidence deltas and decides
+whether to answer, continue, ask the Human, or propose a new Plan. Application
+owns Task lifecycle transitions and validates identity, provenance, and
+authority at every tool call.
 
 Plan does not contain capability, role, provider, specialist, worker,
 process, model, tool, or routing-hint identity. Execution internals may retain
@@ -233,33 +238,32 @@ scientific proposal.
 ## Implementation status
 
 **Partially implemented.** Application exact-materializes the current
-SessionFrame and non-authoritative `ConversationHistory` into one immutable
-`PlannerContext`; Planner never receives or returns SessionFrame. Candidate
-Plan content owns the exact Objective and Human-authored Assumption basis.
-Tasks remain separate FCO values carried beside the Plan in the Human-review
-bundle.
+SessionFrame, active approved Plan, and non-authoritative ConversationHistory
+into one immutable `PlannerContext`; Planner never receives or returns
+SessionFrame. Candidate Plan content owns the exact Objective and a subset of
+exact already-admitted Assumptions. Tasks remain separate FCO values in the
+Human-review bundle.
 
 Planner directly owns one PydanticAI `Agent` created through the inward-facing
-`AgentFactoryPort`. `PlannerDeps` contains `ExecutorDispatcherPort` plus the
-smallest model-hidden approved Plan, Task, eligibility, DataProfile, and
-execution context needed for tools to fail closed. The model sees semantic
-tool arguments only; `Capability`, provider, registry, dispatcher, and physical
-route never enter Planner-visible schemas.
+`AgentFactoryPort`. `PlannerDeps` contains `ExecutorDispatcherPort` and an
+Application-owned execution-session service. The model sees only semantic tool
+arguments; `Capability`, provider, registry, dispatcher, and physical route do
+not enter Planner-visible schemas.
 
-For each invocation Planner supplies its Agent, immutable `PlannerContext`,
-phase-specific `PlannerDeps`, and assembled instructions directly to exactly
-two LangGraph cognitive nodes: `plan` and `execute`. There is no
-extra graph-context wrapper or global action/decision classifier.
-One optional-field `PlannerCognitiveResult` represents phase results, and one
-`PlannerOutput` envelope exposes the lifecycle snapshot.
+Exactly two LangGraph cognitive nodes are active: `plan_or_answer` and
+`execute`. The graph starts at `plan_or_answer`; final answers and clarification
+requests return to the Human, candidate Plans interrupt for exact Human review,
+and `continue_execution=True` enters `execute` without another approval.
+`execute` always returns to `plan_or_answer` and never produces a
+`PlannerResult`. One optional-field `PlannerResult` is used only for
+`plan_or_answer`; `PlannerOutput(result, messages, error)` is the
+Application-facing lifecycle snapshot.
 
-LangGraph owns lifecycle transitions; PydanticAI owns reasoning and its normal
-zero/one/many tool-call loop; Application owns authoritative transitions. The
-current graph is `START -> plan -> execute -> END`, with a LangGraph
-`interrupt` at the beginning of `execute`. Rejection or revision returns to
-PLAN without persistence. Approval atomically validates, persists, adopts, and
-activates the exact bundle before resume. An execute-phase `replan_reason`
-returns to PLAN and every replacement Plan is interrupted for Human review.
+Rejection or revision adds an explicit native Human message and returns to
+`plan_or_answer` without persistence. Approval atomically validates, persists,
+adopts, and activates the exact bundle before resume, and the same message
+sequence records that Human decision without treating message text as
+authority.
 
 The built-in Planner role and authority instruction remains source-owned.
 Optional project guidance is loaded only from `.cognieda/planner.md` and is
@@ -268,17 +272,18 @@ The instruction utility resolves the direct caller module's sibling
 `instruction/` directory through the source layout convention. Repository-root
 `AGENTS.md` content is not a Planner runtime instruction.
 
-Current bounded Planner behavior returns one typed cognitive result and may
-propose a complete Plan/Task bundle, request clarification, assess exact Human
-Assumption text, respond, or request replanning. Application owns
+Current bounded Planner behavior may answer from admitted state, propose a
+complete Plan/Task bundle, request clarification, or continue an existing
+approved Plan. Assumption assessment and admission commands are **Deferred**;
+model-generated possibilities never create Assumptions. Application owns
 administrative and Plan-review commands. Planner may propose Tasks but cannot
-make them authoritative; it never admits Evidence or creates or re-evaluates
-Discovery.
+make them authoritative or independently create Evidence or Discovery.
 
 `PlannerOutput.messages` means every native PydanticAI message generated by the
-current lifecycle across PLAN and EXECUTE, including tool-call and tool-return
-messages. Application appends that complete set as one `ConversationTurn` only
-after completion; an interrupt does not create a partial turn. History remains
+current lifecycle across `plan_or_answer` and `execute`, including tool-call,
+tool-return, and explicit Human approval/rejection/revision messages.
+Application appends that complete set as one `ConversationTurn` only after
+completion; an interrupt does not create a partial turn. History remains
 non-authoritative and excluded from empirical support. Neither conversation nor
 the current SessionFrame is durably restored after restart.
 
@@ -288,12 +293,16 @@ exact persisted Objective, Assumption, and Task checks, structural
 canonicalization, DAG guards, and deterministic routing-free fingerprinting.
 Append-only snapshot persistence and active-plan selection are **Verified on
 SQLite**. Application calls this boundary only after exact Human approval and
-commits the approved Objective, Assumptions, Tasks, Plan, and active pointer
-atomically. Active Task exposes all three canonical kinds, while only approved
-eligible `DATA` Tasks have a real semantic tool. `run_data_work` invokes the
-registered Data Explorer through model-hidden dispatcher plumbing; Hypothesis
-Analyst and Graph Miner tools remain absent because those runtimes are not
-executable. Full scientific and graph Task DAG behavior,
+commits the approved Objective, Tasks, Plan, and active pointer atomically;
+referenced Assumptions must already exist exactly. Active Task exposes all
+three canonical kinds, while only approved eligible `DATA` Tasks have a real
+semantic tool. At every call, `run_data_work` re-resolves the persisted active
+Plan and current DAG eligibility, invokes Data Explorer through model-hidden
+dispatcher plumbing, completes the Task and admits Evidence atomically on
+SQLite, and returns that admitted Evidence. The successor `PlannerContext` is
+updated directly; no mandatory full context reload occurs. Hypothesis Analyst
+and Graph Miner tools remain absent because those runtimes are not executable.
+Full scientific and graph Task DAG behavior,
 GeneratedView coordination, durable SessionFrame composition, and the
 end-to-end recovery model remain **Deferred** target design. The
 [MVP-v2 definition](mvp-runtime-subset.md) explains the minimum complete

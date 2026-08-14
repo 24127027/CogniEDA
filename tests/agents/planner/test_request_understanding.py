@@ -71,6 +71,24 @@ def test_planner_result_rejects_contradictory_or_incomplete_shapes() -> None:
         )
     with pytest.raises(ValidationError, match="meaningful result"):
         PlannerResult()
+    with pytest.raises(ValidationError, match="cannot also continue"):
+        PlannerResult(plan=plan, tasks=tasks, continue_execution=True)
+    with pytest.raises(ValidationError, match="Human clarification"):
+        PlannerResult(
+            human_input_request="Clarify the population.",
+            continue_execution=True,
+        )
+
+    assert PlannerResult(response="Final grounded answer.").response
+    assert set(PlannerResult.model_fields) == {
+        "plan",
+        "tasks",
+        "response",
+        "human_input_request",
+        "continue_execution",
+    }
+    assert not hasattr(contracts, "PlannerCognitiveResult")
+    assert "replan_reason" not in PlannerResult.model_fields
 
 
 def test_planner_output_is_one_nonduplicating_envelope() -> None:

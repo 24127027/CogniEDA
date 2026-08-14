@@ -24,7 +24,17 @@ from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.tools import RUN_DATA_WORK_TOOL
 from cognieda.application.ports import ExecutorDispatcherPort, ModelConfig
 from cognieda.execution import ExecutorDispatcher, ExecutorRegistry
-from cognieda.schemas import Evidence, Objective, Plan, PlanTaskBinding, Task, TaskKind
+from cognieda.schemas import (
+    DataProfile,
+    Evidence,
+    EvidenceProvenance,
+    Objective,
+    Plan,
+    PlanTaskBinding,
+    Task,
+    TaskKind,
+    TaskStatus,
+)
 
 
 @dataclass
@@ -104,8 +114,14 @@ class FakeExecutionSession:
 
 
 class FakeExecutionSessionFactory:
-    def __init__(self, progress_count: int = 1) -> None:
+    def __init__(
+        self,
+        progress_count: int = 1,
+        *,
+        successor_context: PlannerContext | None = None,
+    ) -> None:
         self.progress_count = progress_count
+        self.successor_context = successor_context
         self.sessions: list[FakeExecutionSession] = []
 
     def create(
@@ -115,7 +131,10 @@ class FakeExecutionSessionFactory:
         active_plan: Plan,
     ) -> FakeExecutionSession:
         assert context.active_plan == active_plan
-        session = FakeExecutionSession(context, self.progress_count)
+        session = FakeExecutionSession(
+            self.successor_context or context,
+            self.progress_count,
+        )
         self.sessions.append(session)
         return session
 
@@ -265,6 +284,86 @@ def test_continue_existing_plan_routes_directly_to_execute_without_review() -> N
     assert len(agent.calls) == 3
     assert agent.calls[1]["output_type"] is str
     assert not any("Human Plan review" in str(message) for message in output.messages)
+
+
+def test_authoritative_execute_delta_is_visible_to_next_plan_or_answer() -> None:
+    candidate = _candidate("delta")
+    assert candidate.plan is not None
+    profile = DataProfile(row_count=3, column_count=0, columns=())
+    completed_task = candidate.tasks[0].model_copy(update={"status": TaskStatus.COMPLETED})
+    evidence = Evidence(
+        task_id=completed_task.task_id,
+        data_profile_id=profile.data_profile_id,
+        content={"row_count": 3},
+        provenance=EvidenceProvenance(
+            producer_role="data_explorer",
+            work_reference="work:delta",
+            dataset_reference="dataset:v1",
+            data_profile_id=profile.data_profile_id,
+        ),
+    )
+    initial_context = PlannerContext(
+        active_plan=candidate.plan,
+        objective=candidate.plan.objective,
+        tasks=candidate.tasks,
+        data_profile=profile,
+    )
+    successor_context = initial_context.model_copy(
+        update={"tasks": (completed_task,), "evidences": (evidence,)}
+    )
+    agent = RecordingAgent(
+        [
+            PlannerResult(continue_execution=True),
+            "execution phase complete",
+            PlannerResult(response="The admitted row count is available."),
+        ]
+    )
+    planner = _planner(
+        agent,
+        execution_factory=FakeExecutionSessionFactory(
+            successor_context=successor_context
+        ),
+    )
+
+    output = asyncio.run(
+        planner.run("Continue the active Plan", context=initial_context)
+    )
+
+    assert str(evidence.evidence_id) in str(agent.calls[2]["prompt"])
+    assert "completed" in str(agent.calls[2]["prompt"])
+    assert planner.last_context == successor_context
+    assert output.result.response == "The admitted row count is available."
+
+
+def test_continue_execution_without_progress_fails_closed_before_another_execute() -> None:
+    candidate = _candidate("blocked")
+    assert candidate.plan is not None
+    agent = RecordingAgent(
+        [
+            PlannerResult(continue_execution=True),
+            "no tool work",
+            PlannerResult(continue_execution=True),
+        ]
+    )
+    planner = _planner(
+        agent,
+        execution_factory=FakeExecutionSessionFactory(progress_count=0),
+    )
+
+    output = asyncio.run(
+        planner.run(
+            "Continue",
+            context=PlannerContext(
+                active_plan=candidate.plan,
+                objective=candidate.plan.objective,
+                tasks=candidate.tasks,
+            ),
+        )
+    )
+
+    assert output.error is not None
+    assert "prior blocker" in output.error.message
+    assert len(agent.calls) == 3
 
 
 def test_instruction_reload_preserves_agent_unless_recreation_requested() -> None:

@@ -146,25 +146,22 @@ def test_planner_cognitive_contracts_exclude_legacy_routing_and_adapter_state() 
     assert (planner_root / "dependencies.py").exists()
     assert set(PlannerDeps.__dataclass_fields__) == {
         "dispatcher",
+        "execution_session_factory",
         "executor_tools_enabled",
-        "approved_plan",
-        "approved_tasks",
-        "eligible_task_ids",
-        "execution_context",
-        "data_profile",
+        "execution_session",
     }
     assert violations == []
     assert set(PlannerState.model_fields) == {
         "request",
         "context",
-        "cognitive_result",
+        "result",
         "messages",
-        "approved_plan_id",
         "human_feedback",
+        "execution_blocker",
         "error",
     }
     assert set(PlannerOutput.model_fields) == {
-        "cognitive_result",
+        "result",
         "messages",
         "error",
     }
@@ -231,7 +228,7 @@ def test_specialist_roles_are_peer_packages() -> None:
 def test_production_source_contains_only_python_and_known_instruction_assets() -> None:
     allowed = {
         Path("src/cognieda/agents/planner/instruction/agents.md"),
-        Path("src/cognieda/agents/planner/instruction/plan.txt"),
+        Path("src/cognieda/agents/planner/instruction/plan_or_answer.txt"),
         Path("src/cognieda/agents/planner/instruction/execute.txt"),
     }
     non_python = [

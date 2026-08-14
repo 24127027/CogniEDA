@@ -14,6 +14,7 @@ from .plan_validation import (
     PlanValidator,
 )
 from .planner_commit import commit_planner_operations
+from .planner_execution import PlannerExecutionSession, PlannerExecutionSessionFactory
 from .transition_service import ExecutionAttemptTransitionService
 
 __all__ = (
@@ -28,6 +29,8 @@ __all__ = (
     "PlanValidationError",
     "PlanValidationErrorCode",
     "PlanValidator",
+    "PlannerExecutionSession",
+    "PlannerExecutionSessionFactory",
     "build_execution_admission_operations",
     "commit_planner_operations",
 )

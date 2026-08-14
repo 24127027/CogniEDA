@@ -99,11 +99,12 @@ at a time; this is not a one-session-per-Workspace rule.
 **Partially implemented.** Current source has a bounded materialized
 `SessionFrame` with one optional Objective, ordered Assumptions, Tasks,
 Evidence, and Discovery, and one optional DataProfile. The in-process
-application passes those objects without filtering, together with native
-non-authoritative conversation history, into an immutable `PlannerContext`.
-Planner returns a bounded candidate Plan/Task bundle or exact-text Assumption
-assessment; Application alone applies exact approved results to its successor
-SessionFrame.
+application passes those objects without filtering, together with the active
+Plan and native non-authoritative conversation history, into an immutable
+`PlannerContext`. Planner returns an answer, bounded candidate Plan/Task bundle,
+Human clarification request, or request to continue the active Plan;
+Application alone applies exact approved or admitted results to its successor
+materialized state.
 
 The current frame is not the canonical typed-reference membership model and is
 not durably restored by the runtime. Mode-specific context eligibility, exact

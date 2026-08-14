@@ -379,6 +379,8 @@ class MvpEvidenceAdmissionService:
         self,
         request: ExecutionRequest,
         result: DataExplorerResult,
+        *,
+        commit: bool = True,
     ) -> EvidenceAdmissionResult:
         content, provenance = self._validate(request, result)
         try:
@@ -417,9 +419,14 @@ class MvpEvidenceAdmissionService:
 
         try:
             self._evidence.add(evidence)
-            self._session.commit()
+            if commit:
+                self._session.commit()
+            else:
+                self._session.flush()
         except IntegrityError:
             self._session.rollback()
+            if not commit:
+                raise
             existing = self._evidence.get_by_id(evidence.evidence_id)
             if existing == evidence:
                 return self._result(result, evidence, created=False)
@@ -431,6 +438,8 @@ class MvpEvidenceAdmissionService:
             self._session.rollback()
             raise
 
+        if not commit:
+            return self._result(result, evidence, created=True)
         admitted = self._evidence.get_by_id(evidence.evidence_id)
         if admitted is None:
             raise RuntimeError("Committed Evidence could not be reloaded.")

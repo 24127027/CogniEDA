@@ -257,10 +257,12 @@ transitions, validity propagation, replay safety, and fail-closed enforcement.
 
 ## Assumption quarantine and protected evaluation
 
-An Assumption is planning state or a planning constraint. It is not Evidence
-and cannot enter protected evaluation or Discovery support as an inference
-premise. If a user-provided Assumption is reasonably testable, Planner warns
-and proposes a `SCIENTIFIC` Task. Otherwise it remains planning state.
+An Assumption is admitted Human planning state or a planning constraint. It is
+not Evidence and cannot enter protected evaluation or Discovery support as an
+inference premise. A Plan may select only exact already-admitted Assumptions.
+A model-generated testable possibility may motivate a Task; a premise that
+requires Human commitment may motivate clarification; neither path silently
+creates an Assumption.
 
 Protected evaluation belongs to Hypothesis Analyst and consumes only a closed,
 validated `EvaluationBundle` containing the applicable Hypothesis, locked

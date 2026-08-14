@@ -248,10 +248,12 @@ different IDs with the same content fingerprint remain distinct. The
 repository is append-only and exposes no update or delete surface.
 
 The bounded Application path persists a Plan candidate only after exact Human
-approval. `PlanAdmissionService` stages the exact Objective, Assumptions, Tasks,
-Plan, and `active_plans` pointer, then commits once. Rejection and requested
-revision create none of those authoritative objects. Repository existence alone
-does not make a pending Planner object authoritative.
+approval. `PlanAdmissionService` requires every Plan Assumption to exist with
+exact authoritative content, stages the approved Objective and Tasks plus the
+Plan and `active_plans` pointer, then commits once. It never inserts a missing
+Assumption. Rejection and requested revision create none of those authoritative
+objects. Repository existence alone does not make a pending Planner object
+authoritative.
 
 The complete target boundary is not implemented. Canonical Plan
 activation, durable role-native result inbox processing, complete replay
