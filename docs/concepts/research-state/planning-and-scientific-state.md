@@ -58,24 +58,20 @@ response synthesis is Planner behavior, not executable Task work.
 
 `Plan` is the non-FCO immutable aggregate for an entire proposed or approved
 research plan. It contains its exact Objective, the exact admitted Human
-Assumptions that materially influenced planning, and one Task DAG. Exactly one
-immutable `PlanTaskBinding` represents each member Task and
-owns non-negative `order_rank` and finite `LOW`, `NORMAL`, or `HIGH` priority.
-Membership is derived from binding Task identities, while dependencies remain
-explicit edges. Those coordination concerns do not define Task identity.
+Assumptions that materially influenced planning, canonical Task IDs as its
+direct and only membership representation, and explicit dependency edges.
+Those Plan semantics do not define Task identity.
 
 Duplicate Assumption identities are invalid. Assumption content contributes to
 Plan fingerprint identity because it records the exact planning basis, but it
 remains excluded from protected evaluation and is neither an execution
 parameter nor scientific support.
 
-The dependency DAG determines eligibility. `order_rank` expresses preference
-among otherwise compatible work, permits ties, and never overrides a
-dependency. Priority defaults to `NORMAL` and is scheduling metadata only; it
-does not establish epistemic importance, authority, or Task meaning. Execution
-route, rank, priority, dependencies, parentage,
-Plan identity, approval, and activation are absent from Task semantic
-identity.
+The dependency DAG determines structural eligibility. Independent Tasks are
+intentionally unordered; execution order among eligible Tasks is a later
+Planner reasoning concern. Execution route, scheduling strategy, dependencies,
+parentage, Plan identity, approval, and activation are absent from Task
+semantic identity.
 
 Capability is execution-internal runtime plumbing, not approved plan content.
 Plan contains no provider, specialist, worker, tool, or routing hint.
@@ -86,7 +82,7 @@ fingerprint. Planner coordinates but is not a Task executor.
 There is no Planner or synthesis capability, provider, role, or compatibility
 branch.
 
-Plan and its bindings contain no exact DataProfile identity or concrete
+Plan contains no exact DataProfile identity or concrete
 data selection. Planner describes intended data scope only in the Task
 instruction. The responsible specialist or controller receives all
 authoritative DataProfile context available for the work and selects the
@@ -155,9 +151,9 @@ Evidence loops, typed non-completion, and authoritative admission are owned by
 ## Implementation status
 
 **Partially implemented.** The active Task semantic core is Objective-scoped
-and uses the canonical three-kind taxonomy. The immutable Plan V1
+and uses the canonical three-kind taxonomy. The immutable Phase 1 Plan
 domain and side-effect-free application validator are **Implemented** with
-exact Objective and Assumption content, binding membership, DAG validation,
+exact Objective and Assumption content, direct Task-ID membership, DAG validation,
 deterministic fingerprinting, and persisted Objective/Assumption/Task checks.
 The append-only repository foundation snapshots exact Objective and Assumption
 content and is **Verified on SQLite**, but has no application caller

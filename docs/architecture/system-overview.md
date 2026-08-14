@@ -171,7 +171,7 @@ foundations demonstrate important authority and traceability rules, but the
 direct Evidence path is transitional.
 
 The complete target architecture is not yet a supported end-to-end runtime.
-The immutable Plan V1 domain contract and side-effect-free candidate
+The immutable Phase 1 Plan domain contract and side-effect-free candidate
 validation are **Implemented**, and its append-only repository foundation is
 **Verified on SQLite** with exact historical Objective and Assumption content
 snapshots. No application path currently persists a Plan.

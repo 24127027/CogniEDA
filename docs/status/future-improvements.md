@@ -12,7 +12,7 @@ These are established architecture, not speculative enhancements:
   keeping Planner response synthesis outside Task execution and keeping Task
   identity separate from Plan dependency and coordination
   metadata;
-- integrate the implemented Plan V1 domain and pure validator plus the
+- integrate the implemented Phase 1 Plan domain and pure validator plus the
   SQLite repository foundation with Planner authoring, human approval,
   exact-object commit-boundary validation and persistence, active Plan
   selection, activation, and Task DAG runtime;

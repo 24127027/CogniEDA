@@ -161,9 +161,7 @@ user request
 
 Planning-support observations are not Evidence. `Plan` represents the
 full approved Task DAG. A Task is an independently governed semantic work
-unit. Exactly one immutable `PlanTaskBinding` represents each member Task and
-owns non-negative `order_rank` and finite `LOW`, `NORMAL`, or `HIGH` priority.
-Membership is derived from the bindings;
+unit. Canonical `task_ids` directly and exclusively represent membership;
 dependencies remain explicit DAG edges. Related workflow-lifecycle state owns
 approval and activation metadata. Capability, provider, specialist, tool, and
 other execution-routing choices are not Plan content.
@@ -174,11 +172,11 @@ pending objects are not durable authoritative state; commit-boundary validation,
 persistence, adoption, and activation belong to the later exact-approval
 transition.
 
-The DAG alone determines eligibility. Rank ties are valid for concurrent or
-independent Tasks, canonical Task-ID ordering is only a deterministic
-serialization tie-breaker, and neither rank nor priority overrides a
-dependency. A binding coordination change changes Plan content and its
-fingerprint without, by itself, creating a successor Task.
+The DAG alone determines structural eligibility. Independent Tasks are
+intentionally unordered; canonical Task-ID ordering is only a deterministic
+serialization tie-breaker. Execution order among eligible Tasks is a later
+Planner reasoning concern. A membership or dependency change changes Plan
+content and its fingerprint without, by itself, creating a successor Task.
 
 Capability remains execution-internal plumbing where current providers require
 it. Plan states no capability requirement or provider route. Role,
@@ -189,7 +187,7 @@ that allowed set but is not a Task executor. When retained authoritative state
 already answers a request, Planner synthesizes the response without creating a
 Task, capability, or provider path.
 
-Plan and its bindings contain no concrete DataProfile identity or data
+Plan contains no concrete DataProfile identity or data
 selection. Planner describes intended data scope only through Task semantics.
 Each specialist or controller receives complete authoritative DataProfile
 context and chooses the concrete applicable profile and scope within its own

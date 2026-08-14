@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from pydantic import ValidationError
 from sqlalchemy import event
 from sqlmodel import Session, select
 
@@ -16,7 +16,7 @@ from cognieda.infrastructure.persistence.models import (
     PlanAssumptionRecord,
     PlanDependencyRecord,
     PlanRecord,
-    PlanTaskBindingRecord,
+    PlanTaskRecord,
     TaskRecord,
 )
 from cognieda.infrastructure.persistence.repositories import (
@@ -30,8 +30,6 @@ from cognieda.schemas import (
     Objective,
     Plan,
     PlanDependency,
-    PlanPriority,
-    PlanTaskBinding,
     Task,
     TaskKind,
 )
@@ -76,14 +74,7 @@ def _plan(
         plan_id=plan_id,
         objective=objective,
         assumptions=assumptions,
-        task_bindings=(
-            PlanTaskBinding(
-                task_id=task.task_id,
-                order_rank=index,
-                priority=PlanPriority.HIGH if index == 0 else PlanPriority.NORMAL,
-            )
-            for index, task in enumerate(task_tuple)
-        ),
+        task_ids=(task.task_id for task in task_tuple),
         dependencies=(
             (
                 PlanDependency(
@@ -116,7 +107,7 @@ def test_exact_plan_round_trip_includes_normalized_content(db_session: Session) 
     assert loaded.fingerprint == plan.fingerprint
     assert db_session.get(PlanRecord, plan.plan_id) is not None
     assert len(db_session.exec(select(PlanAssumptionRecord)).all()) == 2
-    assert len(db_session.exec(select(PlanTaskBindingRecord)).all()) == 2
+    assert len(db_session.exec(select(PlanTaskRecord)).all()) == 2
     assert len(db_session.exec(select(PlanDependencyRecord)).all()) == 1
 
 
@@ -181,7 +172,7 @@ def test_reload_fails_closed_when_referenced_fco_is_missing(
     _persist(db_session, plan)
     session_get = db_session.get
 
-    def get_with_missing(entity, ident):
+    def get_with_missing(entity: Any, ident: Any) -> Any:
         if entity is missing_type:
             return None
         return session_get(entity, ident)
@@ -219,9 +210,7 @@ def test_historical_reconstruction_uses_exact_objective_and_assumption_snapshots
     assert loaded_assumption.text == "Dates are reliable."
 
 
-@pytest.mark.parametrize(
-    "failed_table", ["plan_assumptions", "plan_task_bindings", "plan_dependencies"]
-)
+@pytest.mark.parametrize("failed_table", ["plan_assumptions", "plan_tasks", "plan_dependencies"])
 def test_child_write_failure_rolls_back_complete_plan(
     db_session: Session,
     failed_table: str,
@@ -230,7 +219,14 @@ def test_child_write_failure_rolls_back_complete_plan(
     plan = _plan(objective, assumptions, tasks)
     engine = db_session.get_bind()
 
-    def fail_target_insert(_conn, _cursor, statement, _parameters, _context, _many):
+    def fail_target_insert(
+        _conn: Any,
+        _cursor: Any,
+        statement: str,
+        _parameters: Any,
+        _context: Any,
+        _many: Any,
+    ) -> None:
         if f"INSERT INTO {failed_table}" in statement:
             raise RuntimeError(f"forced {failed_table} failure")
 
@@ -245,7 +241,7 @@ def test_child_write_failure_rolls_back_complete_plan(
 
     assert db_session.get(PlanRecord, plan.plan_id) is None
     assert db_session.exec(select(PlanAssumptionRecord)).all() == []
-    assert db_session.exec(select(PlanTaskBindingRecord)).all() == []
+    assert db_session.exec(select(PlanTaskRecord)).all() == []
     assert db_session.exec(select(PlanDependencyRecord)).all() == []
 
 
@@ -277,7 +273,7 @@ def test_distinct_plan_ids_may_share_one_semantic_fingerprint(db_session: Sessio
     _persist(db_session, second)
 
 
-def test_corrupt_fingerprint_and_contract_fail_closed(db_session: Session) -> None:
+def test_corrupt_fingerprint_fails_closed(db_session: Session) -> None:
     objective, assumptions, tasks = _persisted_bundle(db_session)
     plan = _plan(objective, assumptions, tasks)
     _persist(db_session, plan)
@@ -287,12 +283,6 @@ def test_corrupt_fingerprint_and_contract_fail_closed(db_session: Session) -> No
     db_session.add(row)
     db_session.commit()
     with pytest.raises(ValueError, match="fingerprint does not match"):
-        PlanRepository(db_session).get_by_id(plan.plan_id)
-
-    row.contract_version = "plan/v2"
-    db_session.add(row)
-    db_session.commit()
-    with pytest.raises(ValidationError, match="plan/v1"):
         PlanRepository(db_session).get_by_id(plan.plan_id)
 
 
@@ -320,8 +310,18 @@ def test_unknown_plan_returns_none_and_repository_has_no_crud_mutation(
 def test_plan_storage_schema_uses_only_plan_identity_and_snapshot_content() -> None:
     assert PlanRecord.__tablename__ == "plans"
     assert PlanAssumptionRecord.__tablename__ == "plan_assumptions"
-    assert "plan_id" in PlanTaskBindingRecord.model_fields
+    assert PlanTaskRecord.__tablename__ == "plan_tasks"
+    assert set(PlanTaskRecord.model_fields) == {"plan_id", "task_id"}
     assert "plan_id" in PlanDependencyRecord.model_fields
-    prohibited = {"approval_status", "activation_status", "provider", "capability", "tool"}
-    for record in (PlanRecord, PlanAssumptionRecord, PlanTaskBindingRecord, PlanDependencyRecord):
+    prohibited = {
+        "approval_status",
+        "activation_status",
+        "provider",
+        "capability",
+        "tool",
+        "contract_version",
+        "priority",
+        "order_rank",
+    }
+    for record in (PlanRecord, PlanAssumptionRecord, PlanTaskRecord, PlanDependencyRecord):
         assert prohibited.isdisjoint(record.model_fields)

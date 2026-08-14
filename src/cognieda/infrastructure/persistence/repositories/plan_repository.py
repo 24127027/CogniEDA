@@ -12,7 +12,7 @@ from cognieda.infrastructure.persistence.models import (
     PlanAssumptionRecord,
     PlanDependencyRecord,
     PlanRecord,
-    PlanTaskBindingRecord,
+    PlanTaskRecord,
     TaskRecord,
 )
 from cognieda.infrastructure.persistence.repositories.common import record_to_schema
@@ -46,8 +46,8 @@ class PlanRepository:
                 raise ValueError("Plan Assumption differs from the admitted Assumption.")
 
         tasks: list[Task] = []
-        for binding in plan.task_bindings:
-            task_row = self._session.get(TaskRecord, binding.task_id)
+        for task_id in plan.task_ids:
+            task_row = self._session.get(TaskRecord, task_id)
             if task_row is None:
                 raise ValueError("Plan references a missing Task.")
             tasks.append(record_to_schema(Task, task_row))
@@ -58,7 +58,6 @@ class PlanRepository:
                 plan_id=plan.plan_id,
                 objective_id=plan.objective.objective_id,
                 objective_snapshot=plan.objective.model_dump(mode="json"),
-                contract_version=plan.contract_version,
                 fingerprint=plan.fingerprint,
             )
         )
@@ -75,13 +74,11 @@ class PlanRepository:
         )
         self._session.add_all(
             [
-                PlanTaskBindingRecord(
+                PlanTaskRecord(
                     plan_id=plan.plan_id,
-                    task_id=binding.task_id,
-                    order_rank=binding.order_rank,
-                    priority=binding.priority,
+                    task_id=task_id,
                 )
-                for binding in plan.task_bindings
+                for task_id in plan.task_ids
             ]
         )
         self._session.flush()
@@ -121,12 +118,12 @@ class PlanRepository:
                 raise ValueError("Persisted Plan Assumption snapshot identity is inconsistent.")
             assumptions.append(assumption)
 
-        binding_rows = self._session.exec(
-            select(PlanTaskBindingRecord).where(PlanTaskBindingRecord.plan_id == plan_id)
+        task_rows = self._session.exec(
+            select(PlanTaskRecord).where(PlanTaskRecord.plan_id == plan_id)
         ).all()
         tasks: list[Task] = []
-        for binding in binding_rows:
-            task_row = self._session.get(TaskRecord, binding.task_id)
+        for membership in task_rows:
+            task_row = self._session.get(TaskRecord, membership.task_id)
             if task_row is None:
                 raise ValueError("Persisted Plan references a missing Task.")
             tasks.append(record_to_schema(Task, task_row))
@@ -139,14 +136,7 @@ class PlanRepository:
                 "plan_id": header.plan_id,
                 "objective": objective,
                 "assumptions": assumptions,
-                "task_bindings": [
-                    {
-                        "task_id": binding.task_id,
-                        "order_rank": binding.order_rank,
-                        "priority": binding.priority,
-                    }
-                    for binding in binding_rows
-                ],
+                "task_ids": [membership.task_id for membership in task_rows],
                 "dependencies": [
                     {
                         "prerequisite_task_id": dependency.prerequisite_task_id,
@@ -154,7 +144,6 @@ class PlanRepository:
                     }
                     for dependency in dependency_rows
                 ],
-                "contract_version": header.contract_version,
             }
         )
         plan.validate_tasks(tasks)

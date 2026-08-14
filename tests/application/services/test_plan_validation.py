@@ -25,7 +25,6 @@ from cognieda.schemas import (
     Assumption,
     Objective,
     Plan,
-    PlanTaskBinding,
     Task,
     TaskKind,
     TaskStatus,
@@ -51,7 +50,7 @@ def _candidate(objective: Objective, assumption: Assumption, task: Task) -> Plan
     return Plan.create(
         objective=objective,
         assumptions=(assumption,),
-        task_bindings=(PlanTaskBinding(task_id=task.task_id, order_rank=0),),
+        task_ids=(task.task_id,),
         tasks=(task,),
     )
 
@@ -162,6 +161,7 @@ def test_supplied_task_bundle_is_exact(db_session: Session, case: str) -> None:
         kind=TaskKind.DATA,
         instruction="Extra.",
     )
+    tasks: tuple[Task, ...]
     if case == "missing":
         tasks = ()
     elif case == "extra":
@@ -191,23 +191,14 @@ def test_task_runtime_status_is_not_plan_content(db_session: Session) -> None:
     assert PlanValidator(db_session).validate(candidate, tasks=(pending,)) == candidate
 
 
-def test_unsupported_contract_and_invalid_identity_are_rejected(db_session: Session) -> None:
+def test_invalid_identity_is_rejected(db_session: Session) -> None:
     objective, assumption, task = _persisted_bundle(db_session)
     valid = _candidate(objective, assumption, task)
-    unsupported = Plan.model_construct(
-        **valid.model_dump(exclude={"fingerprint", "contract_version"}),
-        contract_version="plan/v2",
-    )
     invalid_id = Plan.model_construct(
         **valid.model_dump(exclude={"fingerprint", "plan_id"}),
         plan_id="not-a-uuid",
     )
 
-    _assert_code(
-        PlanValidator(db_session),
-        unsupported,
-        PlanValidationErrorCode.UNSUPPORTED_CONTRACT_VERSION,
-    )
     _assert_code(PlanValidator(db_session), invalid_id, PlanValidationErrorCode.INVALID_IDENTITY)
 
 

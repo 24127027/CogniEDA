@@ -42,7 +42,7 @@ protected evaluation cross Hypothesis Analyst, and graph inquiry remains
 read-only. It is not a compile-time `TaskKind -> Capability -> Provider`
 routing table.
 
-Plan and `PlanTaskBinding` contain no capability, provider, specialist,
+Plan contains no capability, provider, specialist,
 worker, or tool selection. Application authority determines eligibility and
 which governed role-level tools are available; Planner reasons over the
 interactions needed to pursue the eligible Task. One Task may require zero,
@@ -55,7 +55,7 @@ allowed role-level interaction cannot be fulfilled. They must not fall back to
 a legacy executor, reinterpret Task meaning, or expose internal provider
 routing as approved plan content.
 
-Neither Plan nor `PlanTaskBinding` selects a concrete DataProfile.
+Plan does not select a concrete DataProfile.
 Specialists receive the complete authoritative DataProfile context available
 for their work, then select the applicable profile and concrete scope within
 their role-native authority. Receiving metadata does not grant Graph Miner or

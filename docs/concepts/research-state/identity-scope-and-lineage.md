@@ -8,9 +8,9 @@ coordination metadata and separates historical truth from current authority.
 ## Stable identity and mutable metadata
 
 An object's identifier is not permission to change its meaning. Changes to
-priority, ordering, dependencies, scheduling,
-or presentation do not redefine a `Task`; those properties belong to
-`Plan`, `PlanTaskBinding`, and related records.
+Plan membership or dependencies, workflow scheduling, or presentation do not
+redefine a `Task`; those properties belong to `Plan` or their separate owning
+records.
 
 A substantive change to the semantic work unit creates a successor Task rather
 than mutating the existing identity in place. The old Task remains part of the

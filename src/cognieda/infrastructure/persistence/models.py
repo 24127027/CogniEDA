@@ -18,7 +18,6 @@ from cognieda.schemas.enums import (
     PlannerNodeName,
     PlannerOperationApprovalState,
     PlannerOperationType,
-    PlanPriority,
     TaskKind,
     TaskStatus,
     UserDecisionStatus,
@@ -147,7 +146,6 @@ class PlanRecord(SQLModel, table=True):
         index=True,
     )
     objective_snapshot: dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
-    contract_version: str = Field(nullable=False)
     fingerprint: str = Field(nullable=False, index=True)
 
 
@@ -164,18 +162,16 @@ class PlanAssumptionRecord(SQLModel, table=True):
     assumption_snapshot: dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
 
 
-class PlanTaskBindingRecord(SQLModel, table=True):
-    """One immutable Task binding belonging to one Plan."""
+class PlanTaskRecord(SQLModel, table=True):
+    """Direct immutable Task membership belonging to one Plan."""
 
-    __tablename__ = "plan_task_bindings"
+    __tablename__ = "plan_tasks"
 
     plan_id: UUID = Field(
         foreign_key="plans.plan_id",
         primary_key=True,
     )
     task_id: UUID = Field(foreign_key="tasks.task_id", primary_key=True)
-    order_rank: int = Field(ge=0, nullable=False)
-    priority: PlanPriority = Field(nullable=False)
 
 
 class PlanDependencyRecord(SQLModel, table=True):

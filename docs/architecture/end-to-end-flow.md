@@ -57,9 +57,8 @@ observation is not automatically Evidence.
 ## Plan proposal, approval, and activation
 
 1. The Planner constructs transient canonical Objective, Task, and Plan
-   objects, with exactly one immutable binding per member Task and explicit
-   dependency edges. Each binding owns non-negative `order_rank` and `LOW`,
-   `NORMAL`, or `HIGH` priority. The Plan contains no capability, provider,
+   objects, with direct canonical Task-ID membership and explicit dependency
+   edges. The Plan contains no ordering, priority, capability, provider,
    specialist, tool, exact DataProfile identity, or configurable stopping-
    condition or replan-trigger policy.
 2. Domain construction enforces structural validity without making the pending
@@ -115,9 +114,9 @@ tool boundary, but capability and provider selection are not Plan
 content. Planner response synthesis is not a Task kind, capability, provider,
 or dispatch path.
 
-The dependency DAG determines eligibility; binding `order_rank` only expresses
-a scheduling preference and may tie, while priority is coordination metadata.
-Neither can override a prerequisite. Planner describes intended data scope in
+The dependency DAG determines structural eligibility. Independent Tasks are
+intentionally unordered; execution order among eligible Tasks is a later
+Planner reasoning concern. Planner describes intended data scope in
 the Task instruction but does not bind an exact DataProfile. The responsible
 specialist or controller receives complete authoritative DataProfile context,
 selects the applicable profile and concrete scope, and leaves the exact profile

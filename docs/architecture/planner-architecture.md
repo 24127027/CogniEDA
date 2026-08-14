@@ -81,27 +81,23 @@ protected scientific evaluation.
 A `Plan` is a non-FCO immutable aggregate containing the exact Objective under
 which one complete research plan was constructed, the exact admitted Human
 Assumptions that materially influenced planning, and one Task DAG. Its content
-owns coordination concerns such as:
+owns only:
 
-- exactly one immutable `PlanTaskBinding` for each member Task;
+- canonical Task IDs as the direct and only membership representation;
 - explicit dependency edges between member Tasks;
-- binding-owned non-negative `order_rank` and finite `LOW`, `NORMAL`, or `HIGH`
-  priority;
 - a deterministic plan-content fingerprint.
 
-The fingerprint covers the version-bound Objective and Assumption
-representations, Task membership, rank, priority, and dependency edges. It
+The fingerprint covers exact Objective and Assumption representations,
+canonical Task IDs, and canonical dependency edges. It
 excludes Task runtime status and all execution-routing, approval, activation,
 timestamp, conversation, model, and DataProfile-selection state. Assumptions
 remain planning basis only and cannot support protected evaluation.
 
-Membership is derived from the binding Task identities; a parallel `task_ids`
-collection is not a second source of truth. Order rank and priority are
-coordination semantics. Changing either one
-changes Plan content and its fingerprint without, by itself, creating a
-successor Task.
+`task_ids` is the single membership source of truth. Changing membership or a
+dependency changes Plan content and its fingerprint without, by itself,
+creating a successor Task.
 
-Plan and `PlanTaskBinding` contain no exact DataProfile identity,
+Plan contains no exact DataProfile identity,
 dataset reference, column binding, row filter, cohort, population, or variable
 binding. Planner describes intended data scope only in the Task instruction.
 Each responsible specialist or controller receives the complete authoritative
@@ -124,10 +120,10 @@ the applicable role-native work order, including `DataWorkOrder`.
 
 A `Task` is the durable semantic work unit. Its canonical kinds are `DATA`,
 `SCIENTIFIC`, and `GRAPH`; these are semantic and epistemic classes, not
-provider routes. Execution strategy, assignment, dependencies, parentage,
-order, priority, Plan identity, approval, and activation are not part
-of Task identity. Changing binding coordination does not change what the Task
-means; changing semantic work requires a successor Task.
+provider routes. Execution strategy, assignment, dependencies, parentage, Plan
+identity, approval, and activation are not part of Task identity. Changing
+Plan coordination does not change what the Task means; changing semantic work
+requires a successor Task.
 
 Not every user prompt becomes a Task. The Planner may answer a general/direct
 question with no project work, or synthesize an answer from retained
@@ -135,14 +131,11 @@ authoritative project state, without creating executable work.
 
 The Planner constructs a DAG rather than a bag of instructions. It must expose
 dependencies, blocked prerequisites, and terminal leaves before activation.
-The dependency DAG determines eligibility.
-`order_rank` is only a scheduling preference among otherwise compatible work,
-permits ties for concurrent or independent Tasks, and never overrides a
-dependency. Equal-rank bindings use canonical Task-ID ordering only as a
-deterministic serialization tie-breaker; that tie-breaker creates no dependency
-or execution-order meaning. Priority is coordination metadata only, defaults to
-`NORMAL`, and never overrides dependencies, validity, authority, or Task
-meaning. Proposed Tasks cannot execute.
+The dependency DAG determines structural eligibility. Independent Tasks are
+intentionally unordered; canonical Task-ID sorting makes serialization and
+helper output deterministic but creates no dependency or execution-order
+meaning. Execution order among eligible Tasks is a later Planner reasoning
+concern. Proposed Tasks cannot execute.
 
 ## Proposal, approval, and activation
 
@@ -267,7 +260,7 @@ That history remains separate from the materialized research state and is
 excluded from empirical answer support. Neither conversation nor the current
 SessionFrame is durably restored after restart.
 
-The immutable `Plan`, `PlanTaskBinding`, and `PlanDependency` V1 domain
+The immutable Phase 1 `Plan` and `PlanDependency` domain
 contracts and side-effect-free application validation are **Implemented** with
 exact persisted Objective and Assumption content checks, persisted Task
 resolution, structural canonicalization, DAG guards, and deterministic

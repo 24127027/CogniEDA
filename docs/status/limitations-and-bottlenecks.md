@@ -9,9 +9,9 @@ These are verified constraints of the bounded current implementation.
   implement the minimum complete scientific loop defined by MVP-v2.
 - Active bounded Task has no runtime-selected Plan membership,
   dependency eligibility, approval, activation, or parent/leaf execution
-  semantics. Immutable Plan candidates can represent membership,
-  exact Objective and admitted Assumption basis, dependencies, rank, and
-  priority and can be validated without persistence.
+  semantics. Immutable Plan candidates can represent direct Task membership,
+  exact Objective and admitted Assumption basis, and structural dependencies
+  and can be validated without persistence.
   The append-only repository is an isolated
   infrastructure foundation; only `DATA` is executable and no Plan
   drives execution.
@@ -29,7 +29,7 @@ These are verified constraints of the bounded current implementation.
   at bounded library surfaces. The in-process Application retains its current
   successor SessionFrame and model-backed conversation turns, but durable
   restart/recovery and complete-loop composition are **Deferred**.
-- Plan V1 domain and side-effect-free candidate validation are
+- The Phase 1 Plan domain and side-effect-free candidate validation are
   **Implemented**, and append-only repository behavior is **Verified on
   SQLite** with exact Objective and Assumption snapshots for historical
   reconstruction. No application path currently persists a Plan. Planner

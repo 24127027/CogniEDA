@@ -15,14 +15,13 @@ from cognieda.infrastructure.persistence.repositories import (
     TaskRepository,
 )
 from cognieda.schemas.artifacts import Task
-from cognieda.schemas.plan import PLAN_CONTRACT_VERSION, Plan
+from cognieda.schemas.plan import Plan
 
 
 class PlanValidationErrorCode(StrEnum):
     """Finite fail-closed candidate rejection categories."""
 
     INVALID_IDENTITY = "invalid_identity"
-    UNSUPPORTED_CONTRACT_VERSION = "unsupported_contract_version"
     OBJECTIVE_NOT_FOUND = "objective_not_found"
     OBJECTIVE_CONTENT_MISMATCH = "objective_content_mismatch"
     ASSUMPTION_NOT_FOUND = "assumption_not_found"
@@ -60,12 +59,6 @@ class PlanValidator:
                 PlanValidationErrorCode.INVALID_IDENTITY,
                 "Plan candidate requires an exact UUID identity.",
             )
-        if candidate.contract_version != PLAN_CONTRACT_VERSION:
-            raise PlanValidationError(
-                PlanValidationErrorCode.UNSUPPORTED_CONTRACT_VERSION,
-                "Plan candidate uses an unsupported contract version.",
-            )
-
         objective = self._objectives.get_by_id(candidate.objective.objective_id)
         if objective is None:
             raise PlanValidationError(
@@ -104,8 +97,8 @@ class PlanValidator:
                 ) from exc
 
         persisted_tasks: list[Task] = []
-        for binding in candidate.task_bindings:
-            task = self._tasks.get_by_id(binding.task_id)
+        for task_id in candidate.task_ids:
+            task = self._tasks.get_by_id(task_id)
             if task is None:
                 raise PlanValidationError(
                     PlanValidationErrorCode.TASK_NOT_FOUND,
@@ -124,14 +117,7 @@ class PlanValidator:
                     "plan_id": candidate.plan_id,
                     "objective": objective,
                     "assumptions": assumptions,
-                    "task_bindings": [
-                        {
-                            "task_id": binding.task_id,
-                            "order_rank": binding.order_rank,
-                            "priority": binding.priority,
-                        }
-                        for binding in candidate.task_bindings
-                    ],
+                    "task_ids": candidate.task_ids,
                     "dependencies": [
                         {
                             "prerequisite_task_id": dependency.prerequisite_task_id,
@@ -139,7 +125,6 @@ class PlanValidator:
                         }
                         for dependency in candidate.dependencies
                     ],
-                    "contract_version": candidate.contract_version,
                 }
             )
             canonical.validate_tasks(persisted_tasks)

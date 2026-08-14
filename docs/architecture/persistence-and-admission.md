@@ -55,7 +55,7 @@ able to preserve:
 | --- | --- | --- |
 | semantic research state | Objective, Hypothesis, Evidence, Discovery | typed, lineage-bound, lifecycle- and validity-governed |
 | data and workflow state | DataProfile, Assumption, Task, SessionFrame | type-specific lifecycle and immutability rules |
-| plan and investigation state | Plan, plan bindings, scientific investigation, protocol, and EvidenceRequest records | versioned or append-oriented; exact authority required |
+| plan and investigation state | Plan, PlanDependency, scientific investigation, protocol, and EvidenceRequest records | append-oriented or lifecycle-governed; exact authority required |
 | provenance | ExecutionRun, AnalysisFrame, method, parameters, code and environment identity | append-oriented and bound to work identity |
 | governance and validity | decisions, holds, correction requests, admission records, validity events | exact proposal identity and authorized transition |
 | operational recovery | outbox, inbox, leases, fencing tokens, idempotency keys, replay and retry records | transactional and restart-safe |
@@ -88,7 +88,7 @@ checks, as applicable:
 - schema and contract version;
 - Objective scope;
 - predecessor or successor identity;
-- exact plan and work binding;
+- exact Plan membership and work binding;
 - approval or governance identity;
 - lifecycle eligibility;
 - scientific lineage and cardinality;
@@ -106,7 +106,7 @@ compatibility.
 ## Atomic plan and execution transitions
 
 An approved `Plan` becomes active only through an atomic application
-transition. Plan identity, Task membership, dependencies, plan bindings, and
+transition. Plan identity, Task membership, dependencies, workflow state, and
 eligible lifecycle changes must agree. Partial activation is invalid.
 
 Execution admission similarly binds one authorized work identity to one
@@ -234,15 +234,16 @@ non-FCO provenance/authority record and does not expand the semantic graph.
 
 Side-effect-free Plan candidate validation is **Implemented**.
 Application requires exact persisted Objective and Assumption content, resolves
-every bound Task from persistence, revalidates exact membership and DAG
+every member Task from persistence, revalidates exact membership and DAG
 structure, verifies canonical representation, and recomputes the fingerprint
 without writing or committing. It does not consult provider or capability
 availability.
 
 Immutable Plan repository infrastructure is **Verified on SQLite**.
-Normalized `plans`, `plan_assumptions`, `plan_task_bindings`, and
-`plan_dependencies` rows preserve exact V1 content and fingerprint in one
-caller-owned transaction. The Plan header snapshots exact Objective content;
+Normalized `plans`, `plan_assumptions`, `plan_tasks`, and
+`plan_dependencies` rows preserve exact Plan content and fingerprint in one
+caller-owned transaction. `plan_tasks` contains only `plan_id` and `task_id`.
+The Plan header snapshots exact Objective content;
 each assumption link snapshots exact admitted Assumption content. Reload still
 requires the referenced Objective, Assumptions, and Tasks to exist, but it
 reconstructs historical Objective and Assumption semantics from the immutable

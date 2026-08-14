@@ -62,8 +62,9 @@ other workflow/provenance/cache/presentation state into an FCO.
   provider, or executor path. Not every user prompt becomes a Task.
 - Do not add compatibility fallback from legacy `ANALYTICAL`, `ORGANIZING`, or
   `REVIEW` to canonical new-write paths.
-- Task owns semantic work identity. Plan owns membership, dependency, ordering,
-  and priority; workflow state outside Plan owns approval and activation.
+- Task owns semantic work identity. Plan owns direct Task membership and
+  structural dependency; workflow state outside Plan owns approval and
+  activation. Independent Tasks are intentionally unordered.
 - Semantic Task change creates a successor; coordination-only change creates a
   successor Plan without changing Task identity.
 - Proposed Tasks cannot execute.
