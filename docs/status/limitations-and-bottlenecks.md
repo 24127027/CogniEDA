@@ -7,13 +7,9 @@ These are verified constraints of the bounded current implementation.
 
 - The active typed research-state foundation is transitional and does not
   implement the minimum complete scientific loop defined by MVP-v2.
-- Active bounded Task has no runtime-selected PlanRevision membership,
-  dependency eligibility, approval, activation, or parent/leaf execution
-  semantics. Immutable PlanRevision candidates can represent membership,
-  dependencies, rank, and priority and can be validated without persistence.
-  The append-only repository is an isolated
-  infrastructure foundation; only `DATA` is executable and no PlanRevision
-  drives execution.
+- The bounded runtime approves and activates exact Plan/Task bundles and
+  enforces dependency eligibility for semantic DATA tool calls. Only `DATA` is
+  executable; scientific parent/leaf feasibility and graph work remain absent.
 - The current materialized SessionFrame can hold one Objective and one
   DataProfile plus ordered Assumption, Task, Evidence, and Discovery values,
   but is not the canonical reference-based session-membership FCO and does not
@@ -31,31 +27,27 @@ These are verified constraints of the bounded current implementation.
   at bounded library surfaces. The in-process Application retains its current
   successor SessionFrame and model-backed conversation turns, but durable
   restart/recovery and complete-loop composition are **Deferred**.
-- PlanRevision V1 domain and side-effect-free candidate validation are
-  **Implemented**, and append-only repository behavior is **Verified on
-  SQLite**. No application path currently persists a PlanRevision. Planner
-  authoring, human approval, commit-boundary validation and persistence,
-  activation, active selection, and Task DAG runtime are **Deferred**.
+- Plan V1 domain and side-effect-free candidate validation are
+  **Implemented**, and append-only repository plus exact approval/activation
+  behavior is **Verified on SQLite**. Durable recovery, successor lineage, and
+  non-DATA Task DAG runtime are **Deferred**.
   `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
   and `GovernanceDecision` have no supported implementation.
 - Hypothesis Analyst and Graph Miner remain unregistered scaffolds. Discovery
   and Hypothesis remain canonical FCO names but have no active bounded runtime.
-- Planner typed Objective proposal and exact-Human-text Assumption testability
-  assessment are **Implemented**. Application alone applies an Objective result
-  or constructs a genuinely project-untestable Assumption in its in-memory
-  successor SessionFrame. Planner-authored and reasonably testable Assumptions
-  fail closed. Direct Planner DATA Task creation and Capability dispatch are
-  removed; correct approved-plan and semantic specialist-tool execution remain
-  **Deferred**. Durable Objective and Assumption persistence updates remain
-  **Deferred**. Task persistence supports status change only. Active Task
+- Plan-owned Objective proposal and exact-Human-text Assumption testability
+  assessment are **Implemented**. Planner-authored and reasonably testable
+  Assumptions fail closed. Planner proposes DATA Tasks only as part of the exact
+  review bundle; internal Capability dispatch is hidden behind the approved
+  semantic tool. Task persistence supports status change only. Active Task
   values are immutable; changing Task meaning requires a new identity, while
   status change produces a replacement with the same identity and instruction.
-- Planner's `PlannerDeps` boundary is intentionally empty. No governed DATA,
-  scientific-investigation, or graph-query tool is active, so the model cannot
-  reach the retained execution registry through this seam. Those semantic
-  specialist tools are **Deferred**.
+- Planner's `PlannerDeps` contains the dispatcher and exact model-hidden
+  execution scope. `run_data_work` is the only active semantic tool and is
+  omitted from PLAN before approval. Scientific-investigation and graph-query
+  tools are **Deferred** because their executors are not runnable.
 - Application-authority Evidence admission is **Implemented** for the direct
   bounded Task-to-Evidence contract and **Verified on SQLite**. It is not the
   canonical scientific admission contract and does not fabricate

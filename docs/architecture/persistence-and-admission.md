@@ -29,7 +29,7 @@ Application authority owns:
 - Objective-scoped admission checks;
 - persistence and transaction boundaries;
 - lifecycle-transition guards;
-- `PlanRevision` activation;
+- `Plan` activation;
 - execution-attempt admission;
 - Evidence admission;
 - governance-decision application;
@@ -55,7 +55,7 @@ able to preserve:
 | --- | --- | --- |
 | semantic research state | Objective, Hypothesis, Evidence, Discovery | typed, lineage-bound, lifecycle- and validity-governed |
 | data and workflow state | DataProfile, Assumption, Task, SessionFrame | type-specific lifecycle and immutability rules |
-| plan and investigation state | PlanRevision, plan bindings, scientific investigation, protocol, and EvidenceRequest records | versioned or append-oriented; exact authority required |
+| plan and investigation state | Plan, plan bindings, scientific investigation, protocol, and EvidenceRequest records | versioned or append-oriented; exact authority required |
 | provenance | ExecutionRun, AnalysisFrame, method, parameters, code and environment identity | append-oriented and bound to work identity |
 | governance and validity | decisions, holds, correction requests, admission records, validity events | exact proposal identity and authorized transition |
 | operational recovery | outbox, inbox, leases, fencing tokens, idempotency keys, replay and retry records | transactional and restart-safe |
@@ -105,7 +105,7 @@ compatibility.
 
 ## Atomic plan and execution transitions
 
-An approved `PlanRevision` becomes active only through an atomic application
+An approved `Plan` becomes active only through an atomic application
 transition. Plan identity, Task membership, dependencies, plan bindings, and
 eligible lifecycle changes must agree. Partial activation is invalid.
 
@@ -232,28 +232,28 @@ closed unless request path, observed execution path, observed digest, and
 provenance profile identity all match that authoritative binding. This is a
 non-FCO provenance/authority record and does not expand the semantic graph.
 
-Side-effect-free PlanRevision candidate validation is **Implemented**.
-Application resolves the Objective and every bound Task from persistence,
-revalidates exact membership and DAG structure, verifies canonical
+Side-effect-free Plan candidate validation is **Implemented**.
+Application resolves the exact Objective, every retained Assumption, and every
+bound Task from persistence, revalidates exact content, membership, Objective
+scope, and DAG structure, verifies canonical
 representation, and recomputes the structural fingerprint without writing or
 committing. It does not consult provider or capability availability.
 
-Immutable PlanRevision repository infrastructure is **Verified on SQLite**.
-Normalized revision, binding, and dependency rows preserve exact V1 content
+Immutable Plan repository infrastructure is **Verified on SQLite**.
+Normalized Plan, Assumption-membership, binding, and dependency rows preserve exact V1 content
 and fingerprint in one caller-owned transaction. Child-write failure rolls the
 complete snapshot back; loading fails closed on a stored fingerprint mismatch;
 same-ID replay or collision cannot overwrite the existing snapshot; and
 different IDs with the same content fingerprint remain distinct. The
 repository is append-only and exposes no update or delete surface.
 
-No application path currently persists a PlanRevision candidate. Human review
-precedes the intended application commit boundary; no mandatory separate
-application preflight is required before review. Commit-boundary validation and
-atomic persistence, adoption, and activation of the exact approved objects are
-**Deferred**; repository existence alone does not make pending Planner objects
-authoritative.
+The bounded Application path persists a Plan candidate only after exact Human
+approval. `PlanAdmissionService` stages the exact Objective, Assumptions, Tasks,
+Plan, and `active_plans` pointer, then commits once. Rejection and requested
+revision create none of those authoritative objects. Repository existence alone
+does not make a pending Planner object authoritative.
 
-The complete target boundary is not implemented. Canonical PlanRevision
+The complete target boundary is not implemented. Canonical Plan
 activation, durable role-native result inbox processing, complete replay
 coordination, scientific Evidence admission from `EvidenceRequest`, governance
 workflow, Discovery admission from exact governed proposals, and end-to-end

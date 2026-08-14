@@ -10,15 +10,15 @@ coordination metadata and separates historical truth from current authority.
 An object's identifier is not permission to change its meaning. Changes to
 priority, ordering, dependencies, scheduling,
 or presentation do not redefine a `Task`; those properties belong to
-`PlanRevision`, `PlanTaskBinding`, and related records.
+`Plan`, `PlanTaskBinding`, and related records.
 
 A substantive change to the semantic work unit creates a successor Task rather
 than mutating the existing identity in place. The old Task remains part of the
 record. The successor makes the change explicit and allows downstream lineage
 to keep referring to the meaning that was actually approved.
 
-PlanRevision follows a similar version boundary. A bounded semantic amendment
-creates a successor PlanRevision. A sufficiently large change starts a new
+Plan follows a similar version boundary. A bounded semantic amendment
+creates a successor Plan. A sufficiently large change starts a new
 grounded planning loop rather than disguising a new plan as an edit to the old
 one.
 
@@ -33,12 +33,12 @@ Scientific lineage and Evidence refer to the applicable DataProfile. This
 allows a later validity review to determine which observations and claims
 depend on a changed or invalidated data state.
 
-PlanRevision does not pre-bind that DataProfile. Planner expresses intended
+Plan does not pre-bind that DataProfile. Planner expresses intended
 data scope in Task semantics, and the responsible specialist or controller
 selects concrete applicable profiles from the complete authoritative context
 within its own authority. Actual execution and scientific provenance then bind
 the exact profiles used. Concrete profile selection is therefore not existing
-PlanRevision content and does not, by itself, change its fingerprint.
+Plan content and does not, by itself, change its fingerprint.
 
 Physical location does not establish dataset identity or admission. A
 Workspace conventionally owns user-visible datasets under `data/`, but a
@@ -112,7 +112,7 @@ record. The scientific content of admitted Evidence is not manually edited.
 There is no generic cross-Objective relation admission in the canonical
 architecture. Related prior work may motivate an inert proposal for a new
 Objective, but it does not automatically aggregate or transfer Tasks,
-Hypotheses, Evidence, Discoveries, or PlanRevisions.
+Hypotheses, Evidence, Discoveries, or Plans.
 
 Cross-Objective Evidence reuse requires explicit admission and exact equality
 over the relevant versioned canonical typed obligations. Fuzzy similarity,

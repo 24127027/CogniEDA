@@ -1,3 +1,4 @@
+from typing import cast
 from unittest.mock import Mock
 
 import pytest
@@ -7,7 +8,8 @@ from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.graph_miner import GraphMiner
 from cognieda.agents.hypothesis_analyst import HypothesisAnalyst
 from cognieda.agents.planner.agent import Planner
-from cognieda.application.ports import ModelConfig
+from cognieda.agents.planner.tools import RUN_DATA_WORK_TOOL
+from cognieda.application.ports import ModelConfig, ToolingConfig
 from cognieda.infrastructure.llm import factory as llm_factory
 
 
@@ -29,41 +31,37 @@ def test_create_agent_selects_canonical_provider_and_forwards_builtin_tools(
     provider_attribute: str,
     model_attribute: str,
 ) -> None:
+    del provider_attribute, model_attribute
     tooling = Mock()
     tooling.toolsets_for.return_value = []
     tooling.skills_for.return_value = []
 
-    provider = object()
     model = object()
     agent = object()
-    provider_factory = Mock(return_value=provider)
     model_factory = Mock(return_value=model)
     agent_factory = Mock(return_value=agent)
-    monkeypatch.setattr(llm_factory, provider_attribute, provider_factory)
-    monkeypatch.setattr(llm_factory, model_attribute, model_factory)
+    monkeypatch.setattr(llm_factory.AgentTooling, "load", Mock(return_value=tooling))
+    monkeypatch.setattr(llm_factory, "_choose_model", model_factory)
     monkeypatch.setattr(llm_factory, "Agent", agent_factory)
 
     builtin_tools = (_builtin_tool,)
     deps_type = object
 
-    result = llm_factory.AgentFactory(tooling).create_agent(
+    config = ModelConfig(
+        provider=provider_name,
+        model_name="test-model",
+        base_url="https://models.example/v1",
+        api_key="test-key",
+    )
+    result = llm_factory.AgentFactory(cast(ToolingConfig, object())).create_agent(
         worker="planner",
-        config=ModelConfig(
-            provider=provider_name,
-            model_name="test-model",
-            base_url="https://models.example/v1",
-            api_key="test-key",
-        ),
+        config=config,
         deps_type=deps_type,
         builtin_tools=builtin_tools,
     )
 
     assert result is agent
-    provider_factory.assert_called_once_with(
-        api_key="test-key",
-        base_url="https://models.example/v1",
-    )
-    model_factory.assert_called_once_with(model_name="test-model", provider=provider)
+    model_factory.assert_called_once_with(config)
     tooling.toolsets_for.assert_called_once_with("planner", builtin_tools)
     tooling.skills_for.assert_called_once_with("planner")
     agent_factory.assert_called_once_with(
@@ -82,14 +80,19 @@ def test_create_agent_selects_canonical_provider_and_forwards_builtin_tools(
     ],
 )
 def test_create_agent_rejects_missing_required_configuration(
+    monkeypatch,
     model_name: str,
     api_key: str,
     message: str,
 ) -> None:
     tooling = Mock()
+    tooling_config = cast(ToolingConfig, object())
+    monkeypatch.setattr(llm_factory.AgentTooling, "load", Mock(return_value=tooling))
 
     with pytest.raises(ValueError, match=message):
-        llm_factory.AgentFactory(tooling).create_agent(
+        factory = llm_factory.AgentFactory(tooling_config)
+        factory._tooling = tooling
+        factory.create_agent(
             worker="planner",
             config=ModelConfig(
                 provider="openai",
@@ -118,7 +121,7 @@ def test_data_explorer_requires_model_config_only_for_model_backed_planning() ->
 
 
 def test_concrete_agent_classes_own_their_builtin_tool_selections() -> None:
-    assert Planner.builtin_tools == ()
+    assert Planner.builtin_tools == (RUN_DATA_WORK_TOOL,)
     assert DataExplorer.builtin_tools == ()
     assert GraphMiner.builtin_tools == ()
     assert HypothesisAnalyst.builtin_tools == ()

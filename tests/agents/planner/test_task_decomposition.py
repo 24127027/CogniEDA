@@ -24,7 +24,7 @@ class FakeRunResult:
     output: object
     messages: tuple[ModelMessage, ...]
 
-    def new_messages(self) -> list[ModelMessage]:
+    def all_messages(self) -> list[ModelMessage]:
         return list(self.messages)
 
 
@@ -33,11 +33,12 @@ class QueueAgent:
         self.outputs = iter(outputs)
         self.call_count = 0
 
-    async def run(self, _prompt: str, **_kwargs: object) -> FakeRunResult:
+    async def run(self, _prompt: str, **kwargs: object) -> FakeRunResult:
         self.call_count += 1
+        history = tuple(kwargs.get("message_history", ()))
         return FakeRunResult(
             next(self.outputs),
-            (
+            (*history,
                 ModelRequest(
                     parts=[UserPromptPart(content=f"planner call {self.call_count}")]
                 ),

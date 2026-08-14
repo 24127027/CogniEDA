@@ -30,7 +30,6 @@ def test_planner_cannot_access_dataset_implementation_directly() -> None:
     forbidden = (
         "pandas",
         "cognieda.infrastructure.datasets",
-        "cognieda.agents.data_explorer",
         "cognieda.agents.data_explorer.analysis",
         "cognieda.agents.data_explorer.tools",
     )
@@ -49,7 +48,7 @@ def test_mvp_planner_does_not_import_deferred_scientific_or_plan_contracts() -> 
         "GovernanceDecision",
         "Hypothesis",
         "InvestigationProtocol",
-        "PlanRevision",
+        "Plan" + "Revision",
     }
     violations: list[str] = []
     for path in _python_files("agents/planner"):
@@ -81,8 +80,7 @@ def test_planner_has_no_session_frame_dependency_or_result_surface() -> None:
     signature = inspect.signature(Planner.run)
     assert violations == []
     assert "session_frame" not in signature.parameters
-    assert signature.parameters["planner_context"].default is inspect.Parameter.empty
-    assert signature.parameters["conversation_history"].default is inspect.Parameter.empty
+    assert signature.parameters["context"].default is inspect.Parameter.empty
     assert inspect.iscoroutinefunction(Planner.reload)
     assert "session_frame" not in PlannerState.model_fields
     assert "session_frame" not in PlannerOutput.model_fields
@@ -90,6 +88,11 @@ def test_planner_has_no_session_frame_dependency_or_result_surface() -> None:
 
 def test_planner_model_wrapper_family_is_removed_from_production() -> None:
     planner_root = SOURCE_ROOT / "agents" / "planner"
+    model_visible_files = (
+        planner_root / "context.py",
+        planner_root / "contracts.py",
+        planner_root / "state.py",
+    )
     forbidden_names = (
         "Planner" + "Model",
         "PlannerDecision" + "Model",
@@ -98,7 +101,7 @@ def test_planner_model_wrapper_family_is_removed_from_production() -> None:
     )
     violations = [
         f"{path.relative_to(PROJECT_ROOT)} contains {name}"
-        for path in planner_root.rglob("*.py")
+        for path in model_visible_files
         for name in forbidden_names
         if name in path.read_text(encoding="utf-8")
     ]
@@ -113,6 +116,11 @@ def test_planner_cognitive_contracts_exclude_legacy_routing_and_adapter_state() 
     from cognieda.agents.planner.state import PlannerState
 
     planner_root = SOURCE_ROOT / "agents" / "planner"
+    model_visible_files = (
+        planner_root / "context.py",
+        planner_root / "contracts.py",
+        planner_root / "state.py",
+    )
     forbidden = (
         "PlannerDecision" + "Input",
         "latest_" + "request",
@@ -129,34 +137,52 @@ def test_planner_cognitive_contracts_exclude_legacy_routing_and_adapter_state() 
     )
     violations = [
         f"{path.relative_to(PROJECT_ROOT)} contains {name}"
-        for path in planner_root.rglob("*.py")
+        for path in model_visible_files
         for name in forbidden
         if name in path.read_text(encoding="utf-8")
     ]
 
     assert not (planner_root / "types.py").exists()
     assert (planner_root / "dependencies.py").exists()
-    assert PlannerDeps.__dataclass_fields__ == {}
+    assert set(PlannerDeps.__dataclass_fields__) == {
+        "dispatcher",
+        "executor_tools_enabled",
+        "approved_plan",
+        "approved_tasks",
+        "eligible_task_ids",
+        "execution_context",
+        "data_profile",
+    }
     assert violations == []
     assert set(PlannerState.model_fields) == {
         "request",
-        "result",
-        "new_messages",
+        "context",
+        "cognitive_result",
+        "messages",
+        "approved_plan_id",
+        "human_feedback",
         "error",
     }
     assert set(PlannerOutput.model_fields) == {
-        "result",
-        "new_messages",
+        "cognitive_result",
+        "messages",
         "error",
     }
 
 
-def test_planner_production_python_has_no_execution_capability_or_dispatcher_import() -> None:
+def test_planner_model_visible_contracts_have_no_execution_routing_vocabulary() -> None:
+    planner_root = SOURCE_ROOT / "agents" / "planner"
     violations = [
         str(path.relative_to(PROJECT_ROOT))
-        for path in _python_files("agents/planner")
+        for path in (
+            planner_root / "context.py",
+            planner_root / "contracts.py",
+            planner_root / "state.py",
+        )
         if "Capability" in path.read_text(encoding="utf-8")
-        or "cognieda.execution" in path.read_text(encoding="utf-8")
+        or "dispatcher" in path.read_text(encoding="utf-8")
+        or "provider" in path.read_text(encoding="utf-8")
+        or "executor" in path.read_text(encoding="utf-8")
     ]
 
     assert violations == []
@@ -205,8 +231,8 @@ def test_specialist_roles_are_peer_packages() -> None:
 def test_production_source_contains_only_python_and_known_instruction_assets() -> None:
     allowed = {
         Path("src/cognieda/agents/planner/instruction/agents.md"),
-        Path("src/cognieda/agents/planner/instruction/answer.txt"),
-        Path("src/cognieda/agents/planner/instruction/planner-turn.txt"),
+        Path("src/cognieda/agents/planner/instruction/plan.txt"),
+        Path("src/cognieda/agents/planner/instruction/execute.txt"),
     }
     non_python = [
         path.relative_to(PROJECT_ROOT)

@@ -16,18 +16,13 @@ from pydantic_ai.messages import (
 )
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.contracts import (
-    DirectResponse,
-    ObjectiveProposal,
-    PlannerCognitiveResult,
-)
+from cognieda.agents.planner.contracts import PlannerCognitiveResult
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
-from cognieda.execution import ExecutorDispatcher
+from cognieda.execution import ExecutorDispatcher, ExecutorRegistry
 from cognieda.runtime.application import Application
 from cognieda.runtime.conversation import ConversationHistory, ConversationTurn
 from cognieda.runtime.workspace import Workspace
-from cognieda.schemas.artifacts import Objective
 
 
 def _messages(request: str, response: str) -> tuple[ModelMessage, ...]:
@@ -42,7 +37,7 @@ class FakeRunResult:
     output: object
     messages: tuple[ModelMessage, ...]
 
-    def new_messages(self) -> list[ModelMessage]:
+    def all_messages(self) -> list[ModelMessage]:
         return list(self.messages)
 
 
@@ -58,7 +53,7 @@ class SequencePlannerAgent:
         self.message_histories.append(tuple(history))  # type: ignore[arg-type]
         return FakeRunResult(
             output=next(self._results),
-            messages=_messages(request, "typed result"),
+            messages=(*history, *_messages(request, "typed result")),
         )
 
 
@@ -88,23 +83,21 @@ def test_conversation_history_appends_complete_native_message_turns() -> None:
         ConversationTurn(messages=())
 
 
-def test_application_retains_original_history_alongside_current_session_frame() -> None:
+def test_application_retains_complete_history_alongside_current_session_frame() -> None:
     model = SequencePlannerAgent(
-        ObjectiveProposal(
-            objective=Objective(text="Understand customer churn."),
-            response="Objective proposed.",
-        ),
-        DirectResponse(text="State summarized."),
+        PlannerCognitiveResult(response="First response."),
+        PlannerCognitiveResult(response="State summarized."),
     )
+    dispatcher = ExecutorDispatcher(ExecutorRegistry())
     planner = Planner(
-        PlannerDeps(),
+        PlannerDeps(dispatcher),
         agent_factory=FakeAgentFactory(model),  # type: ignore[arg-type]
         model_config=ModelConfig(provider="openai", model_name="test", api_key="test"),
     )
     application = Application(
         workspace=cast(Workspace, object()),
         planner_agent=planner,
-        dispatcher=cast(ExecutorDispatcher, object()),
+        dispatcher=dispatcher,
         agent_factory=cast(AgentFactoryPort, object()),
     )
 
@@ -112,14 +105,14 @@ def test_application_retains_original_history_alongside_current_session_frame() 
     first_turn = application.conversation_history.turns[0]
     asyncio.run(application.submit_message("Summarize what we established."))
 
-    assert application.session_frame.objective is not None
-    assert application.session_frame.objective.text == "Understand customer churn."
+    assert application.session_frame.objective is None
     assert model.message_histories == [(), first_turn.messages]
     assert len(application.conversation_history.turns) == 2
 
 
 def test_skill_assignment_preserves_runtime_reload_path_without_planner_state_access() -> None:
-    workspace = Mock(spec=Workspace)
+    workspace = Mock()
+    workspace.project_config.try_resolve_model.return_value = None
     planner = Mock(spec=Planner)
     planner.reload = AsyncMock()
     agent_factory = Mock()
@@ -131,14 +124,18 @@ def test_skill_assignment_preserves_runtime_reload_path_without_planner_state_ac
     )
     original_frame = application.session_frame
 
-    response = asyncio.run(application.submit_message("/skill assign planner review"))
+    response = asyncio.run(application.submit_message("/skill use planner review"))
 
     workspace.add_worker_skill.assert_called_once_with("planner", "review")
     agent_factory.reload_tooling.assert_called_once_with()
-    planner.reload.assert_awaited_once_with(recreate_agent=True)
+    planner.reload.assert_awaited_once_with(
+        model_config=None,
+        agent_instruction=None,
+        recreate_agent=True,
+    )
     planner.run.assert_not_called()
     assert application.session_frame is original_frame
-    assert response.content == "Assigned skill 'review' to 'planner'."
+    assert response.content == "Assigned 'review' to 'planner'."
 
 
 def test_assumption_slash_syntax_cannot_bypass_planner_assessment() -> None:
@@ -164,7 +161,8 @@ def test_assumption_slash_syntax_cannot_bypass_planner_assessment() -> None:
 
 
 def test_skill_unassignment_reloads_tooling_and_recreates_planner_agent() -> None:
-    workspace = Mock(spec=Workspace)
+    workspace = Mock()
+    workspace.project_config.try_resolve_model.return_value = None
     planner = Mock(spec=Planner)
     planner.reload = AsyncMock()
     agent_factory = Mock()
@@ -175,12 +173,16 @@ def test_skill_unassignment_reloads_tooling_and_recreates_planner_agent() -> Non
         agent_factory=cast(AgentFactoryPort, agent_factory),
     )
 
-    response = asyncio.run(application.submit_message("/skill unassign planner review"))
+    response = asyncio.run(application.submit_message("/skill drop planner review"))
 
     workspace.remove_worker_skill.assert_called_once_with("planner", "review")
     agent_factory.reload_tooling.assert_called_once_with()
-    planner.reload.assert_awaited_once_with(recreate_agent=True)
-    assert response.content == "Removed skill 'review' from 'planner'."
+    planner.reload.assert_awaited_once_with(
+        model_config=None,
+        agent_instruction=None,
+        recreate_agent=True,
+    )
+    assert response.content == "Removed 'review' from 'planner'."
 
 
 def test_reload_instructions_reads_current_workspace_planner_instruction() -> None:
@@ -195,10 +197,12 @@ def test_reload_instructions_reads_current_workspace_planner_instruction() -> No
         agent_factory=cast(AgentFactoryPort, object()),
     )
 
-    response = asyncio.run(application.submit_message("/reload instructions"))
+    response = asyncio.run(application.submit_message("/reload"))
 
     workspace.load_planner_agent_instruction.assert_called_once_with()
     planner.reload.assert_awaited_once_with(
-        agent_instruction="current workspace guidance"
+        model_config=None,
+        agent_instruction="current workspace guidance",
+        recreate_agent=False,
     )
     assert response.content == "Planner instructions reloaded."

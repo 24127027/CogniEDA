@@ -10,7 +10,7 @@ All entries describe **target design** unless explicitly labeled current.
 
 ```text
 Objective
-  -> PlanRevision
+  -> Plan
   -> Task
   -> ScientificInvestigationRun
   -> Hypothesis
@@ -35,7 +35,7 @@ investigation to reach every stage.
 | Stage | Class | Created or controlled by | May terminate or branch before next stage? |
 | --- | --- | --- | ---: |
 | `Objective` | FCO; semantic graph | Planner coordinates; application authority admits | yes |
-| `PlanRevision` | non-FCO plan version | Planner proposes; human or policy approves; application authority activates | yes |
+| `Plan` | non-FCO plan version | Planner proposes; human or policy approves; application authority activates | yes |
 | `Task` | FCO workflow state | Planner proposes; application authority admits | yes |
 | `ScientificInvestigationRun` | durable non-FCO lifecycle | scientific authority proposes transitions; application authority records | yes |
 | `Hypothesis` | FCO; semantic graph | Hypothesis Analyst proposes; application authority admits | yes |

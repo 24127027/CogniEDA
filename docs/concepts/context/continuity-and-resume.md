@@ -13,7 +13,7 @@ prescribe a database or message transport.
 Resume recovers, as applicable:
 
 - Objective;
-- active PlanRevision;
+- active Plan;
 - Task lifecycle and dependency state;
 - ScientificInvestigationRun;
 - active protocol revision;
@@ -156,7 +156,7 @@ operational records expose some attempt, outbox, lease, fencing, retry, and
 idempotency fields. Those uncomposed seams do not establish supported restart
 or recovery behavior.
 
-Canonical SessionFrame membership, PlanRevision,
+Canonical SessionFrame membership, Plan,
 ScientificInvestigationRun, protocol and EvidenceRequest recovery, complete
 result replay, Objective-bound session ownership, governance and validity
 reconstruction, and permitted-next-action projection remain **Deferred**. The

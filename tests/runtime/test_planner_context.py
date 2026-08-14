@@ -7,8 +7,10 @@ import pytest
 from pydantic import ValidationError
 
 from cognieda.agents.planner.context import PlannerContext
-from cognieda.agents.planner.contracts import ObjectiveProposal, PlannerOutput
+from cognieda.agents.planner.contracts import PlannerCognitiveResult, PlannerOutput
+from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.planner_context import apply_planner_output, build_planner_context
+from cognieda.schemas import Plan, PlanTaskBinding
 from cognieda.schemas.artifacts import (
     Assumption,
     DataProfile,
@@ -72,7 +74,8 @@ def _full_frame() -> SessionFrame:
 def test_builder_exactly_materializes_every_retained_session_frame_member() -> None:
     frame = _full_frame()
 
-    context = build_planner_context(frame)
+    history = ConversationHistory()
+    context = build_planner_context(frame, history)
 
     assert context.objective == frame.objective
     assert context.assumptions == frame.assumptions
@@ -80,11 +83,12 @@ def test_builder_exactly_materializes_every_retained_session_frame_member() -> N
     assert context.evidences == frame.evidences
     assert context.discoveries == frame.discoveries
     assert context.data_profile == frame.data_profile
+    assert context.conversation_history == history
     with pytest.raises(ValidationError, match="frozen"):
         context.tasks = ()
 
 
-def test_planner_context_has_exact_research_membership_without_conversation() -> None:
+def test_planner_context_has_exact_readable_membership() -> None:
     assert set(PlannerContext.model_fields) == {
         "objective",
         "assumptions",
@@ -92,26 +96,41 @@ def test_planner_context_has_exact_research_membership_without_conversation() ->
         "evidences",
         "discoveries",
         "data_profile",
+        "conversation_history",
     }
-    assert "conversation_history" not in PlannerContext.model_fields
-    assert set(inspect.signature(build_planner_context).parameters) == {"session_frame"}
+    assert set(inspect.signature(build_planner_context).parameters) == {
+        "session_frame",
+        "conversation_history",
+    }
 
 
-def test_application_boundary_applies_objective_proposal_immutably() -> None:
+def test_candidate_plan_does_not_mutate_session_frame_before_approval() -> None:
     original = Objective(text="Understand retention.")
     refined = Objective(text="Understand retention drivers.")
     current = SessionFrame(objective=original)
+    task = Task(
+        objective_id=refined.objective_id,
+        kind=TaskKind.DATA,
+        instruction="Profile retention data.",
+    )
+    plan = Plan.create(
+        objective=refined,
+        task_bindings=(PlanTaskBinding(task_id=task.task_id, order_rank=0),),
+        tasks=(task,),
+    )
 
     successor = apply_planner_output(
         current,
         PlannerOutput(
-            result=ObjectiveProposal(
-                objective=refined,
-                response="Updated planning state.",
+            cognitive_result=PlannerCognitiveResult(
+                plan=plan,
+                tasks=(task,),
+                response="Review the candidate Plan.",
             )
         ),
         request="Refine the objective.",
     )
 
     assert current.objective is original
-    assert successor.objective is refined
+    assert successor is current
+    assert successor.objective is original

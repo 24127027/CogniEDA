@@ -2,176 +2,57 @@ from __future__ import annotations
 
 import pytest
 
-from cognieda.runtime.bootstrap import resolve_model_config
-from cognieda.runtime.workspace import ProjectConfig, Workspace
-
-_MODEL_ENVIRONMENT_NAMES = (
-    "COGNIEDA_MODEL_PROVIDER",
-    "COGNIEDA_MODEL_NAME",
-    "MODEL_BASE_URL",
-    "MODEL_API_KEY",
-    "COGNIEDA_OPENAI_BASE_URL",
-    "COGNIEDA_OPENAI_API_KEY",
-)
+from cognieda.runtime.workspace import MissingModelCredentialError, Workspace
 
 
 @pytest.fixture(autouse=True)
-def _clear_model_environment(monkeypatch) -> None:
-    for name in _MODEL_ENVIRONMENT_NAMES:
+def _clear_provider_keys(monkeypatch) -> None:
+    for name in ("GOOGLE_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(name, raising=False)
 
 
-def _workspace(tmp_path, values: dict[str, object]) -> Workspace:
-    return Workspace(tmp_path, ProjectConfig(values=values))
+def test_default_workspace_uses_canonical_google_profile(tmp_path) -> None:
+    workspace = Workspace.open(tmp_path)
+
+    assert workspace.project_config.default_provider == "google"
+    assert workspace.project_config.providers["google"].type == "google"
 
 
 @pytest.mark.parametrize(
-    ("configured_provider", "canonical_provider"),
+    ("profile", "provider_type", "environment_name"),
     [
-        ("openai", "openai"),
-        ("google", "google"),
-        ("gemini", "google"),
-        ("anthropic", "anthropic"),
+        ("google", "google", "GOOGLE_API_KEY"),
+        ("openai", "openai", "OPENAI_API_KEY"),
+        ("anthropic", "anthropic", "ANTHROPIC_API_KEY"),
     ],
 )
-def test_provider_input_resolves_to_canonical_identity(
-    tmp_path,
-    configured_provider: str,
-    canonical_provider: str,
-) -> None:
-    workspace = _workspace(
-        tmp_path,
-        {
-            "model": {
-                "provider": configured_provider,
-                "name": "workspace-model",
-                "api_key": "workspace-key",
-            }
-        },
-    )
-
-    config = resolve_model_config(workspace)
-
-    assert config.provider == canonical_provider
-
-
-def test_workspace_model_configuration_takes_precedence_over_environment(
+def test_selected_profile_resolves_model_from_its_exact_environment_key(
     monkeypatch,
     tmp_path,
+    profile: str,
+    provider_type: str,
+    environment_name: str,
 ) -> None:
-    monkeypatch.setenv("COGNIEDA_MODEL_PROVIDER", "openai")
-    monkeypatch.setenv("COGNIEDA_MODEL_NAME", "environment-model")
-    monkeypatch.setenv("MODEL_BASE_URL", "https://generic.example/v1")
-    monkeypatch.setenv("MODEL_API_KEY", "generic-key")
-    monkeypatch.setenv("COGNIEDA_OPENAI_BASE_URL", "https://legacy.example/v1")
-    monkeypatch.setenv("COGNIEDA_OPENAI_API_KEY", "legacy-key")
-    workspace = _workspace(
-        tmp_path,
-        {
-            "model": {
-                "provider": "anthropic",
-                "name": "workspace-model",
-                "base_url": "https://workspace.example/v1",
-                "api_key": "workspace-key",
-            }
-        },
-    )
+    workspace = Workspace.open(tmp_path)
+    workspace.use_provider(profile)
+    monkeypatch.setenv(environment_name, "provider-key")
 
-    config = resolve_model_config(workspace)
+    config = workspace.project_config.resolve_model()
 
-    assert config.provider == "anthropic"
-    assert config.model_name == "workspace-model"
-    assert config.base_url == "https://workspace.example/v1"
-    assert config.api_key == "workspace-key"
+    assert config.provider == provider_type
+    assert config.api_key == "provider-key"
 
 
-def test_generic_environment_fills_missing_model_configuration(
-    monkeypatch,
-    tmp_path,
-) -> None:
-    monkeypatch.setenv("COGNIEDA_MODEL_PROVIDER", "google")
-    monkeypatch.setenv("COGNIEDA_MODEL_NAME", "environment-model")
-    monkeypatch.setenv("MODEL_BASE_URL", "https://generic.example/v1")
-    monkeypatch.setenv("MODEL_API_KEY", "generic-key")
+def test_missing_selected_provider_key_fails_closed(tmp_path) -> None:
+    workspace = Workspace.open(tmp_path)
 
-    config = resolve_model_config(_workspace(tmp_path, {}))
-
-    assert config.provider == "google"
-    assert config.model_name == "environment-model"
-    assert config.base_url == "https://generic.example/v1"
-    assert config.api_key == "generic-key"
+    with pytest.raises(MissingModelCredentialError, match="GOOGLE_API_KEY"):
+        workspace.project_config.resolve_model()
 
 
-def test_legacy_openai_environment_remains_a_fallback(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("COGNIEDA_MODEL_PROVIDER", "openai")
-    monkeypatch.setenv("COGNIEDA_MODEL_NAME", "environment-model")
-    monkeypatch.setenv("COGNIEDA_OPENAI_BASE_URL", "https://legacy.example/v1")
-    monkeypatch.setenv("COGNIEDA_OPENAI_API_KEY", "legacy-key")
+def test_unknown_selected_profile_fails_closed(tmp_path) -> None:
+    workspace = Workspace.open(tmp_path)
+    workspace.project_config.default_provider = "unsupported"
 
-    config = resolve_model_config(_workspace(tmp_path, {}))
-
-    assert config.base_url == "https://legacy.example/v1"
-    assert config.api_key == "legacy-key"
-
-
-def test_generic_environment_takes_precedence_over_legacy_fallback(
-    monkeypatch,
-    tmp_path,
-) -> None:
-    monkeypatch.setenv("COGNIEDA_MODEL_PROVIDER", "openai")
-    monkeypatch.setenv("COGNIEDA_MODEL_NAME", "environment-model")
-    monkeypatch.setenv("MODEL_BASE_URL", "https://generic.example/v1")
-    monkeypatch.setenv("MODEL_API_KEY", "generic-key")
-    monkeypatch.setenv("COGNIEDA_OPENAI_BASE_URL", "https://legacy.example/v1")
-    monkeypatch.setenv("COGNIEDA_OPENAI_API_KEY", "legacy-key")
-
-    config = resolve_model_config(_workspace(tmp_path, {}))
-
-    assert config.base_url == "https://generic.example/v1"
-    assert config.api_key == "generic-key"
-
-
-def test_missing_provider_fails_closed(tmp_path) -> None:
-    workspace = _workspace(
-        tmp_path,
-        {"model": {"name": "workspace-model", "api_key": "workspace-key"}},
-    )
-
-    with pytest.raises(ValueError, match="Model provider is required"):
-        resolve_model_config(workspace)
-
-
-def test_unsupported_provider_fails_closed(tmp_path) -> None:
-    workspace = _workspace(
-        tmp_path,
-        {
-            "model": {
-                "provider": "unsupported",
-                "name": "workspace-model",
-                "api_key": "workspace-key",
-            }
-        },
-    )
-
-    with pytest.raises(ValueError, match="Unsupported model provider: unsupported"):
-        resolve_model_config(workspace)
-
-
-def test_missing_model_name_fails_closed(tmp_path) -> None:
-    workspace = _workspace(
-        tmp_path,
-        {"model": {"provider": "openai", "api_key": "workspace-key"}},
-    )
-
-    with pytest.raises(ValueError, match="Model name is required"):
-        resolve_model_config(workspace)
-
-
-def test_missing_api_key_fails_closed(tmp_path) -> None:
-    workspace = _workspace(
-        tmp_path,
-        {"model": {"provider": "openai", "name": "workspace-model"}},
-    )
-
-    with pytest.raises(ValueError, match="Model API key is required"):
-        resolve_model_config(workspace)
+    with pytest.raises(ValueError, match="Unknown provider 'unsupported'"):
+        workspace.project_config.resolve_model()

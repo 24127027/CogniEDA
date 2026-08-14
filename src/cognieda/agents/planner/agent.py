@@ -153,13 +153,14 @@ class Planner:
                     PlannerErrorCode.MODEL_UNAVAILABLE,
                     "Planner model configuration is unavailable.",
                 )
+            message_history = [
+                *state.context.conversation_history.model_messages(),
+                *state.messages,
+            ]
             result = await self._agent.run(
                 plan_prompt(state),
                 output_type=PlannerCognitiveResult,
-                message_history=[
-                    *state.context.conversation_history.model_messages(),
-                    *state.messages,
-                ],
+                message_history=message_history,
                 instructions=self._plan_instructions,
                 deps=replace(
                     self._deps,
@@ -174,7 +175,10 @@ class Planner:
             if cognitive_result.replan_reason is not None:
                 raise ValueError("The plan phase cannot emit a replan request.")
             state.cognitive_result = cognitive_result
-            state.messages = (*state.messages, *result.new_messages())
+            state.messages = (
+                *state.messages,
+                *result.all_messages()[len(message_history) :],
+            )
             state.approved_plan_id = None
             state.human_feedback = None
             state.error = None
@@ -226,13 +230,14 @@ class Planner:
                     PlannerErrorCode.MODEL_UNAVAILABLE,
                     "Planner model configuration is unavailable.",
                 )
+            message_history = [
+                *state.context.conversation_history.model_messages(),
+                *state.messages,
+            ]
             result = await self._agent.run(
                 execute_prompt(state, approved),
                 output_type=PlannerCognitiveResult,
-                message_history=[
-                    *state.context.conversation_history.model_messages(),
-                    *state.messages,
-                ],
+                message_history=message_history,
                 instructions=self._execute_instructions,
                 deps=replace(
                     self._deps,
@@ -264,7 +269,10 @@ class Planner:
             if cognitive_result.plan is not None or cognitive_result.assumption_assessment:
                 raise ValueError("The execute phase cannot author a Plan or Assumption assessment.")
             state.cognitive_result = cognitive_result
-            state.messages = (*state.messages, *result.new_messages())
+            state.messages = (
+                *state.messages,
+                *result.all_messages()[len(message_history) :],
+            )
             state.error = None
             if cognitive_result.replan_reason is not None:
                 state.approved_plan_id = None

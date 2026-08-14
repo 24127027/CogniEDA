@@ -148,12 +148,12 @@ membership does not require co-retaining its full provenance graph. SQLite can
 round-trip bounded frame snapshots including Discovery exactly.
 
 The in-process application exact-copies all six current materialized member
-categories into an immutable `PlannerContext`. Planner receives that context,
-may return an Objective proposal or exact-text Assumption assessment, and never
-receives, mutates, or returns SessionFrame. Application alone applies allowed
-results through the existing copy-returning frame seams. Conversation history
-remains a separate non-authoritative input to request understanding and is
-excluded from protected answer support.
+categories and non-authoritative conversation history into an immutable
+`PlannerContext`. Planner may return a complete candidate Plan/Task bundle or
+an exact-text Assumption assessment and never receives, mutates, or returns
+SessionFrame. Application alone applies exact approved results through the
+existing copy-returning frame seams. Conversation remains excluded from
+empirical support.
 
 The current value is not the canonical typed-reference membership FCO. It has
 no frame identity, Objective-bound session identity, reference manifest,

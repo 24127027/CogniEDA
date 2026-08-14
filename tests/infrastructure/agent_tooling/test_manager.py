@@ -45,11 +45,12 @@ def test_unknown_worker_is_rejected() -> None:
 
 
 def test_missing_development_config_uses_bounded_planner_defaults(tmp_path) -> None:
-    manager = AgentTooling.from_config_path(
-        path=tmp_path / "missing-agents.toml",
-        mcp_path=tmp_path / "missing-mcp.toml",
-        skills_path=tmp_path / "missing-skills.toml",
-    )
+    class MissingConfig:
+        agents_config_path = tmp_path / "missing-agents.toml"
+        mcp_config_path = tmp_path / "missing-mcp.toml"
+        skills_config_path = tmp_path / "missing-skills.toml"
+
+    manager = AgentTooling.load(MissingConfig())
 
     assert manager.toolsets_for("planner", ()) == []
     assert manager.skills_for("planner") == []

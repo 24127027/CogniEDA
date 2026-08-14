@@ -31,7 +31,7 @@ class FakeRunResult:
     output: object
     messages: tuple[ModelMessage, ...]
 
-    def new_messages(self) -> list[ModelMessage]:
+    def all_messages(self) -> list[ModelMessage]:
         return list(self.messages)
 
 
@@ -47,7 +47,8 @@ class RecordingAgent:
 
     async def run(self, prompt: str, **kwargs: object) -> FakeRunResult:
         self.calls.append({"prompt": prompt, **kwargs})
-        return FakeRunResult(next(self._outputs), next(self._messages))
+        history = tuple(kwargs.get("message_history", ()))
+        return FakeRunResult(next(self._outputs), (*history, *next(self._messages)))
 
 
 class RecordingFactory:
