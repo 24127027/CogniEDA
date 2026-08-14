@@ -53,7 +53,7 @@ def _task(
 def _edge(prerequisite: Task, dependent: Task) -> PlanDependency:
     return PlanDependency(
         prerequisite_task_id=prerequisite.task_id,
-        dependent_task_id=dependent.task_id,
+        dependent_task_ids=(dependent.task_id,),
     )
 
 
@@ -94,7 +94,7 @@ def test_plan_has_only_minimal_semantic_fields() -> None:
     assert plan.task_ids == (task.task_id,)
     assert set(PlanDependency.model_fields) == {
         "prerequisite_task_id",
-        "dependent_task_id",
+        "dependent_task_ids",
     }
 
 
@@ -151,22 +151,55 @@ def test_dependency_endpoint_outside_membership_fails() -> None:
         )
 
 
+def test_dependency_requires_dependents_and_rejects_duplicates() -> None:
+    prerequisite, dependent = _task(), _task()
+
+    with pytest.raises(ValidationError, match="at least 1 item"):
+        PlanDependency(
+            prerequisite_task_id=prerequisite.task_id,
+            dependent_task_ids=(),
+        )
+    with pytest.raises(ValidationError, match="duplicate dependent"):
+        PlanDependency(
+            prerequisite_task_id=prerequisite.task_id,
+            dependent_task_ids=(dependent.task_id, dependent.task_id),
+        )
+
+
 def test_dependency_rejects_self_edge() -> None:
     task = _task()
 
     with pytest.raises(ValidationError, match="self dependency"):
         PlanDependency(
             prerequisite_task_id=task.task_id,
-            dependent_task_id=task.task_id,
+            dependent_task_ids=(task.task_id,),
         )
 
 
-def test_plan_rejects_duplicate_dependency_edge() -> None:
-    first, second = _task(), _task()
-    edge = _edge(first, second)
+def test_one_prerequisite_groups_many_canonical_dependents() -> None:
+    prerequisite = _task(task_id=FIRST_TASK_ID)
+    first_dependent = _task(task_id=SECOND_TASK_ID)
+    second_dependent = _task(task_id=THIRD_TASK_ID)
 
-    with pytest.raises(ValidationError, match="duplicate dependency"):
-        _plan([first, second], dependencies=(edge, edge))
+    dependency = PlanDependency(
+        prerequisite_task_id=prerequisite.task_id,
+        dependent_task_ids=(second_dependent.task_id, first_dependent.task_id),
+    )
+
+    assert dependency.dependent_task_ids == (
+        first_dependent.task_id,
+        second_dependent.task_id,
+    )
+
+
+def test_plan_rejects_duplicate_prerequisite_groups() -> None:
+    first, second, third = _task(), _task(), _task()
+
+    with pytest.raises(ValidationError, match="duplicate prerequisite"):
+        _plan(
+            [first, second, third],
+            dependencies=(_edge(first, second), _edge(first, third)),
+        )
 
 
 def test_plan_rejects_dependency_cycle() -> None:
@@ -176,7 +209,10 @@ def test_plan_rejects_dependency_cycle() -> None:
         _plan(
             [first, second, third],
             dependencies=(
-                _edge(first, second),
+                PlanDependency(
+                    prerequisite_task_id=first.task_id,
+                    dependent_task_ids=(second.task_id, third.task_id),
+                ),
                 _edge(second, third),
                 _edge(third, first),
             ),
@@ -206,6 +242,54 @@ def test_dependency_controls_structural_eligibility() -> None:
     assert plan.eligible_task_ids(completed_task_ids={prerequisite.task_id}) == (dependent.task_id,)
     with pytest.raises(ValueError, match="outside Plan membership"):
         plan.eligible_task_ids(completed_task_ids={uuid4()})
+
+
+def test_many_to_one_dependency_requires_all_incoming_prerequisites() -> None:
+    first = _task(task_id=FIRST_TASK_ID)
+    second = _task(task_id=SECOND_TASK_ID)
+    dependent = _task(task_id=THIRD_TASK_ID)
+    plan = _plan(
+        [first, second, dependent],
+        dependencies=(_edge(first, dependent), _edge(second, dependent)),
+    )
+
+    assert plan.eligible_task_ids() == (first.task_id, second.task_id)
+    assert plan.eligible_task_ids(completed_task_ids={first.task_id}) == (second.task_id,)
+    assert plan.eligible_task_ids(
+        completed_task_ids={first.task_id, second.task_id}
+    ) == (dependent.task_id,)
+
+
+def test_dependent_input_order_does_not_change_fingerprint() -> None:
+    prerequisite = _task(task_id=FIRST_TASK_ID)
+    first_dependent = _task(task_id=SECOND_TASK_ID)
+    second_dependent = _task(task_id=THIRD_TASK_ID)
+    tasks = (prerequisite, first_dependent, second_dependent)
+    plan_id = uuid4()
+
+    forward = _plan(
+        tasks,
+        plan_id=plan_id,
+        dependencies=(
+            PlanDependency(
+                prerequisite_task_id=prerequisite.task_id,
+                dependent_task_ids=(first_dependent.task_id, second_dependent.task_id),
+            ),
+        ),
+    )
+    reverse = _plan(
+        tasks,
+        plan_id=plan_id,
+        dependencies=(
+            PlanDependency(
+                prerequisite_task_id=prerequisite.task_id,
+                dependent_task_ids=(second_dependent.task_id, first_dependent.task_id),
+            ),
+        ),
+    )
+
+    assert forward.dependencies == reverse.dependencies
+    assert forward.fingerprint == reverse.fingerprint
 
 
 def test_canonical_input_order_does_not_change_serialization_or_fingerprint() -> None:

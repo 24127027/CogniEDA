@@ -15,14 +15,24 @@ from cognieda.schemas.common import ImmutableCogniEDABaseModel
 
 
 class PlanDependency(ImmutableCogniEDABaseModel):
-    """Directed structural prerequisite edge between two Tasks in one Plan."""
+    """All direct outgoing dependency edges from one prerequisite Task."""
 
     prerequisite_task_id: UUID
-    dependent_task_id: UUID
+    dependent_task_ids: tuple[UUID, ...] = Field(min_length=1)
+
+    @field_validator("dependent_task_ids", mode="after")
+    @classmethod
+    def _canonicalize_dependent_task_ids(
+        cls,
+        dependent_task_ids: tuple[UUID, ...],
+    ) -> tuple[UUID, ...]:
+        if len(dependent_task_ids) != len(set(dependent_task_ids)):
+            raise ValueError("PlanDependency rejects duplicate dependent Task IDs.")
+        return tuple(sorted(dependent_task_ids, key=str))
 
     @model_validator(mode="after")
     def _reject_self_dependency(self) -> PlanDependency:
-        if self.prerequisite_task_id == self.dependent_task_id:
+        if self.prerequisite_task_id in self.dependent_task_ids:
             raise ValueError("PlanDependency rejects a self dependency.")
         return self
 
@@ -60,19 +70,15 @@ class Plan(ImmutableCogniEDABaseModel):
         cls,
         dependencies: tuple[PlanDependency, ...],
     ) -> tuple[PlanDependency, ...]:
-        edges = [
-            (dependency.prerequisite_task_id, dependency.dependent_task_id)
-            for dependency in dependencies
+        prerequisite_ids = [
+            dependency.prerequisite_task_id for dependency in dependencies
         ]
-        if len(edges) != len(set(edges)):
-            raise ValueError("Plan rejects duplicate dependency edges.")
+        if len(prerequisite_ids) != len(set(prerequisite_ids)):
+            raise ValueError("Plan rejects duplicate prerequisite dependency groups.")
         return tuple(
             sorted(
                 dependencies,
-                key=lambda item: (
-                    str(item.prerequisite_task_id),
-                    str(item.dependent_task_id),
-                ),
+                key=lambda item: str(item.prerequisite_task_id),
             )
         )
 
@@ -101,13 +107,14 @@ class Plan(ImmutableCogniEDABaseModel):
         in_degree = dict.fromkeys(member_ids, 0)
         dependents = {task_id: set[UUID]() for task_id in member_ids}
         for dependency in self.dependencies:
-            if (
-                dependency.prerequisite_task_id not in member_ids
-                or dependency.dependent_task_id not in member_ids
+            if dependency.prerequisite_task_id not in member_ids or any(
+                dependent_id not in member_ids
+                for dependent_id in dependency.dependent_task_ids
             ):
                 raise ValueError("Plan rejects a dependency endpoint outside membership.")
-            dependents[dependency.prerequisite_task_id].add(dependency.dependent_task_id)
-            in_degree[dependency.dependent_task_id] += 1
+            for dependent_id in dependency.dependent_task_ids:
+                dependents[dependency.prerequisite_task_id].add(dependent_id)
+                in_degree[dependent_id] += 1
 
         ready = [task_id for task_id, degree in in_degree.items() if degree == 0]
         visited = 0
@@ -158,7 +165,8 @@ class Plan(ImmutableCogniEDABaseModel):
             raise ValueError("Completed Task identity is outside Plan membership.")
         prerequisites = {task_id: set[UUID]() for task_id in self.task_ids}
         for dependency in self.dependencies:
-            prerequisites[dependency.dependent_task_id].add(dependency.prerequisite_task_id)
+            for dependent_id in dependency.dependent_task_ids:
+                prerequisites[dependent_id].add(dependency.prerequisite_task_id)
         return tuple(
             task_id
             for task_id in self.task_ids
@@ -173,7 +181,10 @@ class Plan(ImmutableCogniEDABaseModel):
             "dependencies": [
                 {
                     "prerequisite_task_id": str(dependency.prerequisite_task_id),
-                    "dependent_task_id": str(dependency.dependent_task_id),
+                    "dependent_task_ids": [
+                        str(dependent_id)
+                        for dependent_id in dependency.dependent_task_ids
+                    ],
                 }
                 for dependency in self.dependencies
             ],

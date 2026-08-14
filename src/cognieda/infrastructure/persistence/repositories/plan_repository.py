@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from uuid import UUID
 
 from sqlmodel import Session, select
@@ -87,9 +88,10 @@ class PlanRepository:
                 PlanDependencyRecord(
                     plan_id=plan.plan_id,
                     prerequisite_task_id=dependency.prerequisite_task_id,
-                    dependent_task_id=dependency.dependent_task_id,
+                    dependent_task_id=dependent_task_id,
                 )
                 for dependency in plan.dependencies
+                for dependent_task_id in dependency.dependent_task_ids
             ]
         )
 
@@ -131,6 +133,11 @@ class PlanRepository:
         dependency_rows = self._session.exec(
             select(PlanDependencyRecord).where(PlanDependencyRecord.plan_id == plan_id)
         ).all()
+        dependent_ids_by_prerequisite: defaultdict[UUID, list[UUID]] = defaultdict(list)
+        for dependency in dependency_rows:
+            dependent_ids_by_prerequisite[dependency.prerequisite_task_id].append(
+                dependency.dependent_task_id
+            )
         plan = Plan.model_validate(
             {
                 "plan_id": header.plan_id,
@@ -139,10 +146,12 @@ class PlanRepository:
                 "task_ids": [membership.task_id for membership in task_rows],
                 "dependencies": [
                     {
-                        "prerequisite_task_id": dependency.prerequisite_task_id,
-                        "dependent_task_id": dependency.dependent_task_id,
+                        "prerequisite_task_id": prerequisite_task_id,
+                        "dependent_task_ids": dependent_task_ids,
                     }
-                    for dependency in dependency_rows
+                    for prerequisite_task_id, dependent_task_ids in (
+                        dependent_ids_by_prerequisite.items()
+                    )
                 ],
             }
         )
