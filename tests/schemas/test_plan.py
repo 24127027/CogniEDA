@@ -293,6 +293,8 @@ def test_plan_is_immutable_non_fco_and_outside_semantic_graph() -> None:
     plan = _plan([_task()])
     with pytest.raises(ValidationError, match="frozen"):
         plan.dependencies = ()
+    with pytest.raises(ValidationError, match="frozen"):
+        plan.objective.text = "Mutated Objective."
 
     assert "PLAN" not in FirstClassObjectType.__members__
     semantic_members = {
@@ -302,6 +304,17 @@ def test_plan_is_immutable_non_fco_and_outside_semantic_graph() -> None:
         FirstClassObjectType.DISCOVERY,
     }
     assert all(member.value != "plan" for member in semantic_members)
+
+
+def test_plan_assumption_basis_cannot_change_after_fingerprinting() -> None:
+    assumption = Assumption(text="Renewal dates are reliable.")
+    plan = _plan([_task()], assumptions=[assumption])
+    fingerprint = plan.fingerprint
+
+    with pytest.raises(ValidationError, match="frozen"):
+        plan.assumptions[0].text = "Mutated Assumption."
+
+    assert plan.fingerprint == fingerprint
 
 
 def test_plan_revision_production_type_is_removed() -> None:
