@@ -26,6 +26,12 @@ def build_parser() -> ArgumentParser:
     """Build the CLI parser without initializing application services."""
     parser = ArgumentParser(description="CogniEDA CLI")
     parser.add_argument(
+        "--mode",
+        choices=("real", "mock"),
+        default="real",
+        help="Run the real planner runtime or the mock UI playground",
+    )
+    parser.add_argument(
         "path",
         nargs="?",
         default=Path.cwd(),
@@ -41,7 +47,13 @@ def parse_args(argv: Sequence[str] | None = None) -> Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    """Open the selected workspace and run the Planner REPL."""
     args = parse_args(argv)
-    app = bootstrap_application(args.path)
-    asyncio.run(repl(app, Renderer()))
+
+    if args.mode == "mock":
+        from .mock_application import MockApplication
+
+        app = MockApplication(workspace_root=args.path)
+    else:
+        app = bootstrap_application(args.path)
+
+    asyncio.run(repl(app, Renderer())) #type: ignore
