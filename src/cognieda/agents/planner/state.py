@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_ai.messages import ModelMessage
 
 from .context import PlannerContext
-from .contracts import PlannerCognitiveResult, PlannerControlledError
+from .contracts import PlannerControlledError, PlannerResult
 
 
 class PlannerState(BaseModel):
@@ -16,19 +16,19 @@ class PlannerState(BaseModel):
 
     request: str = Field(min_length=1)
     context: PlannerContext
-    cognitive_result: PlannerCognitiveResult | None = None
+    result: PlannerResult | None = None
     messages: tuple[ModelMessage, ...] = ()
     approved_plan_id: UUID | None = None
     human_feedback: str | None = None
     error: PlannerControlledError | None = None
 
-    @field_validator("cognitive_result", mode="before")
+    @field_validator("result", mode="before")
     @classmethod
     def _revalidate_checkpointed_result(
         cls,
         value: object,
     ) -> object:
-        if isinstance(value, PlannerCognitiveResult):
+        if isinstance(value, PlannerResult):
             payload = value.model_dump(exclude_computed_fields=True, warnings=False)
             plan = payload.get("plan")
             if isinstance(plan, dict):

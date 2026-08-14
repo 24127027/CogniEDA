@@ -8,7 +8,7 @@ from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
 from sqlmodel import Session
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.contracts import PlannerCognitiveResult
+from cognieda.agents.planner.contracts import PlannerResult
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.application.ports import ModelConfig
 from cognieda.execution import ExecutorDispatcher, ExecutorRegistry
@@ -29,7 +29,7 @@ class FakeRunResult:
 
 
 class QueueAgent:
-    def __init__(self, outputs: list[PlannerCognitiveResult]) -> None:
+    def __init__(self, outputs: list[PlannerResult]) -> None:
         self.outputs = iter(outputs)
         self.call_count = 0
 
@@ -57,7 +57,7 @@ class QueueFactory:
         pass
 
 
-def _candidate(label: str) -> PlannerCognitiveResult:
+def _candidate(label: str) -> PlannerResult:
     objective = Objective(text=f"Investigate {label} retention.")
     task = Task(
         objective_id=objective.objective_id,
@@ -69,7 +69,7 @@ def _candidate(label: str) -> PlannerCognitiveResult:
         task_bindings=(PlanTaskBinding(task_id=task.task_id, order_rank=0),),
         tasks=(task,),
     )
-    return PlannerCognitiveResult(
+    return PlannerResult(
         plan=plan,
         tasks=(task,),
         response=f"Review the {label} Plan.",
@@ -79,7 +79,7 @@ def _candidate(label: str) -> PlannerCognitiveResult:
 def _application(
     tmp_path: Path,
     db_session: Session,
-    outputs: list[PlannerCognitiveResult],
+    outputs: list[PlannerResult],
 ) -> tuple[Application, QueueAgent]:
     agent = QueueAgent(outputs)
     factory = QueueFactory(agent)
@@ -109,7 +109,7 @@ def test_application_pauses_before_persistence_and_exact_approval_commits(
     application, agent = _application(
         tmp_path,
         db_session,
-        [candidate, PlannerCognitiveResult(response="Execution complete.")],
+        [candidate, PlannerResult(response="Execution complete.")],
     )
     plan = candidate.plan
     assert plan is not None
@@ -170,7 +170,7 @@ def test_execute_replan_routes_to_plan_and_interrupts_again(
         db_session,
         [
             original,
-            PlannerCognitiveResult(replan_reason="Dataset scope changed."),
+            PlannerResult(continue_execution=True),
             replacement,
         ],
     )

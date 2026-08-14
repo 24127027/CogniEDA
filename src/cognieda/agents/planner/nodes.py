@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .contracts import PlannerCognitiveResult, PlannerControlledError, PlannerErrorCode
+from .contracts import PlannerControlledError, PlannerErrorCode, PlannerResult
 from .state import PlannerState
 
 
@@ -12,11 +12,11 @@ def fail_state(
     """Return one controlled Human-facing failure without arbitrary exception detail."""
 
     state.error = PlannerControlledError(code=code, message=message)
-    state.cognitive_result = PlannerCognitiveResult(response=message)
+    state.result = PlannerResult(response=message)
     return state
 
 
-def plan_prompt(state: PlannerState) -> str:
+def plan_or_answer_prompt(state: PlannerState) -> str:
     feedback = (
         f"\n\nExplicit Human or execution feedback:\n{state.human_feedback}"
         if state.human_feedback is not None
@@ -32,7 +32,7 @@ def plan_prompt(state: PlannerState) -> str:
 
 def execute_prompt(
     state: PlannerState,
-    approved: PlannerCognitiveResult,
+    approved: PlannerResult,
 ) -> str:
     return (
         "Execute only this exact Human-approved Plan bundle:\n"
@@ -43,4 +43,4 @@ def execute_prompt(
     )
 
 
-__all__ = ("execute_prompt", "fail_state", "plan_prompt")
+__all__ = ("execute_prompt", "fail_state", "plan_or_answer_prompt")

@@ -38,8 +38,8 @@ class AssumptionAssessment(BaseModel):
     testability: AssumptionTestability
 
 
-class PlannerCognitiveResult(BaseModel):
-    """One typed cognitive result shared by the plan and execute phases."""
+class PlannerResult(BaseModel):
+    """Typed reasoning result produced only by ``plan_or_answer``."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -47,7 +47,7 @@ class PlannerCognitiveResult(BaseModel):
     tasks: tuple[Task, ...] = ()
     response: str | None = Field(default=None, min_length=1)
     human_input_request: str | None = Field(default=None, min_length=1)
-    replan_reason: str | None = Field(default=None, min_length=1)
+    continue_execution: bool = False
     assumption_assessment: AssumptionAssessment | None = None
 
     @model_validator(mode="after")
@@ -58,24 +58,24 @@ class PlannerCognitiveResult(BaseModel):
             self.plan.validate_tasks(self.tasks)
             if self.human_input_request is not None:
                 raise ValueError("A complete Plan cannot also request clarification.")
-            if self.replan_reason is not None:
-                raise ValueError("A candidate Plan cannot also request replanning.")
+            if self.continue_execution:
+                raise ValueError("A candidate Plan cannot also continue an active Plan.")
             if self.assumption_assessment is not None:
                 raise ValueError(
                     "A candidate Assumption assessment must be admitted before planning."
                 )
-        if self.replan_reason is not None and self.human_input_request is not None:
-            raise ValueError("A result cannot request replanning and Human clarification.")
+        if self.continue_execution and self.human_input_request is not None:
+            raise ValueError("Execution cannot be requested with Human clarification.")
         if not any(
             (
                 self.plan is not None,
                 self.response is not None,
                 self.human_input_request is not None,
-                self.replan_reason is not None,
+                self.continue_execution,
                 self.assumption_assessment is not None,
             )
         ):
-            raise ValueError("PlannerCognitiveResult requires one meaningful result field.")
+            raise ValueError("PlannerResult requires one meaningful result field.")
         return self
 
 
@@ -108,21 +108,21 @@ class PlannerOutput(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid", frozen=True)
 
-    cognitive_result: PlannerCognitiveResult
+    result: PlannerResult
     messages: tuple[ModelMessage, ...] = ()
     error: PlannerControlledError | None = None
 
     @property
     def response(self) -> str:
-        result = self.cognitive_result
+        result = self.result
         if result.response is not None:
             return result.response
         if result.human_input_request is not None:
             return result.human_input_request
         if result.plan is not None:
             return "A candidate Plan is ready for Human review."
-        if result.replan_reason is not None:
-            return result.replan_reason
+        if result.continue_execution:
+            return "Continuing the active approved Plan."
         if self.error is not None:
             return self.error.message
         return "Planner completed without a Human-facing response."
@@ -130,7 +130,7 @@ class PlannerOutput(BaseModel):
 
 __all__ = (
     "AssumptionAssessment",
-    "PlannerCognitiveResult",
+    "PlannerResult",
     "PlannerControlledError",
     "PlannerErrorCode",
     "PlannerOutput",

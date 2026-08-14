@@ -15,7 +15,7 @@ from pydantic_ai.messages import (
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.contracts import (
-    PlannerCognitiveResult,
+    PlannerResult,
     PlanReviewAction,
     PlanReviewDecision,
 )
@@ -38,7 +38,7 @@ class FakeRunResult:
 class RecordingAgent:
     def __init__(
         self,
-        outputs: list[PlannerCognitiveResult],
+        outputs: list[PlannerResult],
         messages: list[tuple[ModelMessage, ...]] | None = None,
     ) -> None:
         self._outputs = iter(outputs)
@@ -71,7 +71,7 @@ def _messages(request: str, response: str) -> tuple[ModelMessage, ...]:
     )
 
 
-def _candidate(label: str = "original") -> PlannerCognitiveResult:
+def _candidate(label: str = "original") -> PlannerResult:
     objective = Objective(text=f"Investigate {label} retention.")
     task = Task(
         objective_id=objective.objective_id,
@@ -83,7 +83,7 @@ def _candidate(label: str = "original") -> PlannerCognitiveResult:
         task_bindings=(PlanTaskBinding(task_id=task.task_id, order_rank=0),),
         tasks=(task,),
     )
-    return PlannerCognitiveResult(plan=plan, tasks=(task,), response="Review the Plan.")
+    return PlannerResult(plan=plan, tasks=(task,), response="Review the Plan.")
 
 
 def _planner(agent: RecordingAgent) -> Planner:
@@ -95,7 +95,7 @@ def _planner(agent: RecordingAgent) -> Planner:
 
 
 def test_planner_owns_one_agent_and_exact_dependency_instance() -> None:
-    agent = RecordingAgent([PlannerCognitiveResult(response="Done.")])
+    agent = RecordingAgent([PlannerResult(response="Done.")])
     factory = RecordingFactory(agent)
     deps = PlannerDeps(ExecutorDispatcher(ExecutorRegistry()))
     config = ModelConfig(provider="openai", model_name="test", api_key="key")
@@ -116,10 +116,14 @@ def test_planner_owns_one_agent_and_exact_dependency_instance() -> None:
 
 
 def test_langgraph_has_exactly_two_cognitive_node_names() -> None:
-    planner = _planner(RecordingAgent([PlannerCognitiveResult(response="Done.")]))
+    planner = _planner(RecordingAgent([PlannerResult(response="Done.")]))
     graph = planner.graph.get_graph()
 
-    assert set(graph.nodes) == {"__start__", "plan", "execute", "__end__"}
+    assert set(graph.nodes) == {"__start__", "plan_or_answer", "execute", "__end__"}
+    edges = {(edge.source, edge.target) for edge in graph.edges}
+    assert ("__start__", "plan_or_answer") in edges
+    assert ("execute", "plan_or_answer") in edges
+    assert ("execute", "__end__") not in edges
     assert "human_check" not in graph.nodes
     assert "run_planner" not in graph.nodes
     assert "compose_authoritative_answer" not in graph.nodes
@@ -130,7 +134,7 @@ def test_plan_interrupt_then_approval_resumes_execute_and_accumulates_messages()
     plan_messages = _messages("plan", "candidate")
     execute_messages = _messages("execute", "complete")
     agent = RecordingAgent(
-        [candidate, PlannerCognitiveResult(response="Execution complete.")],
+        [candidate, PlannerResult(response="Execution complete.")],
         [plan_messages, execute_messages],
     )
     planner = _planner(agent)
@@ -145,13 +149,13 @@ def test_plan_interrupt_then_approval_resumes_execute_and_accumulates_messages()
         )
     )
 
-    assert pending.cognitive_result == candidate
+    assert pending.result == candidate
     assert pending.messages == plan_messages
-    assert completed.cognitive_result.response == "Execution complete."
+    assert completed.result.response == "Execution complete."
     assert completed.messages == (*plan_messages, *execute_messages)
     assert len(agent.calls) == 2
-    assert agent.calls[0]["output_type"] is PlannerCognitiveResult
-    assert agent.calls[1]["output_type"] is PlannerCognitiveResult
+    assert agent.calls[0]["output_type"] is PlannerResult
+    assert agent.calls[1]["output_type"] is PlannerResult
     plan_deps = agent.calls[0]["deps"]
     execute_deps = agent.calls[1]["deps"]
     assert isinstance(plan_deps, PlannerDeps) and not plan_deps.executor_tools_enabled
@@ -177,15 +181,15 @@ def test_rejection_feedback_routes_to_new_plan_and_requires_another_interrupt() 
         )
     )
 
-    assert pending_replacement.cognitive_result == replacement
+    assert pending_replacement.result == replacement
     assert "Narrow the population" in str(agent.calls[1]["prompt"])
     assert replacement.plan is not None
     assert replacement.plan.plan_id in planner._pending_threads
 
 
 def test_instruction_reload_preserves_agent_unless_recreation_requested() -> None:
-    first = RecordingAgent([PlannerCognitiveResult(response="first")])
-    second = RecordingAgent([PlannerCognitiveResult(response="second")])
+    first = RecordingAgent([PlannerResult(response="first")])
+    second = RecordingAgent([PlannerResult(response="second")])
 
     class Factory(RecordingFactory):
         def __init__(self) -> None:
@@ -205,7 +209,7 @@ def test_instruction_reload_preserves_agent_unless_recreation_requested() -> Non
 
     asyncio.run(planner.reload(agent_instruction="workspace guidance"))
     assert planner._agent is first
-    assert planner._plan_instructions[1] == "workspace guidance"
+    assert planner._plan_or_answer_instructions[1] == "workspace guidance"
     assert planner._execute_instructions[1] == "workspace guidance"
 
     asyncio.run(planner.reload(recreate_agent=True))

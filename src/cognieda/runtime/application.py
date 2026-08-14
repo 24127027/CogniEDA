@@ -327,7 +327,7 @@ class Application:
             planner_output,
             request=request,
         )
-        result = planner_output.cognitive_result
+        result = planner_output.result
         if result.plan is not None:
             if self._pending_plan is not None:
                 raise ValueError("A pending Plan cannot be replaced without Human review.")

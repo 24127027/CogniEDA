@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from cognieda.agents.planner.context import PlannerContext
-from cognieda.agents.planner.contracts import PlannerCognitiveResult, PlannerOutput
+from cognieda.agents.planner.contracts import PlannerOutput, PlannerResult
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.planner_context import apply_planner_output, build_planner_context
 from cognieda.schemas import Plan, PlanTaskBinding
@@ -122,7 +122,7 @@ def test_candidate_plan_does_not_mutate_session_frame_before_approval() -> None:
     successor = apply_planner_output(
         current,
         PlannerOutput(
-            cognitive_result=PlannerCognitiveResult(
+            result=PlannerResult(
                 plan=plan,
                 tasks=(task,),
                 response="Review the candidate Plan.",

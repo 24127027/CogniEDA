@@ -16,7 +16,7 @@ from pydantic_ai.messages import (
 )
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.contracts import PlannerCognitiveResult
+from cognieda.agents.planner.contracts import PlannerResult
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.execution import ExecutorDispatcher, ExecutorRegistry
@@ -42,12 +42,12 @@ class FakeRunResult:
 
 
 class SequencePlannerAgent:
-    def __init__(self, *results: PlannerCognitiveResult) -> None:
+    def __init__(self, *results: PlannerResult) -> None:
         self._results = iter(results)
         self.message_histories: list[tuple[ModelMessage, ...]] = []
 
     async def run(self, prompt: str, **kwargs: object) -> FakeRunResult:
-        assert kwargs["output_type"] == PlannerCognitiveResult
+        assert kwargs["output_type"] == PlannerResult
         request = prompt.split("\n", 1)[1].split("\n\n", 1)[0]
         history = kwargs.get("message_history", ())
         self.message_histories.append(tuple(history))  # type: ignore[arg-type]
@@ -85,8 +85,8 @@ def test_conversation_history_appends_complete_native_message_turns() -> None:
 
 def test_application_retains_complete_history_alongside_current_session_frame() -> None:
     model = SequencePlannerAgent(
-        PlannerCognitiveResult(response="First response."),
-        PlannerCognitiveResult(response="State summarized."),
+        PlannerResult(response="First response."),
+        PlannerResult(response="State summarized."),
     )
     dispatcher = ExecutorDispatcher(ExecutorRegistry())
     planner = Planner(

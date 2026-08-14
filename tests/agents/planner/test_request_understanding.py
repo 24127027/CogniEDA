@@ -10,7 +10,7 @@ from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.contracts import (
     AssumptionAssessment,
-    PlannerCognitiveResult,
+    PlannerResult,
     PlannerOutput,
 )
 from cognieda.runtime.conversation import ConversationHistory
@@ -45,7 +45,7 @@ def _candidate() -> tuple[Plan, tuple[Task, ...]]:
 def test_one_cognitive_result_model_carries_candidate_plan_bundle() -> None:
     plan, tasks = _candidate()
 
-    result = PlannerCognitiveResult(
+    result = PlannerResult(
         plan=plan,
         tasks=tasks,
         response="Review this complete candidate Plan.",
@@ -63,23 +63,23 @@ def test_cognitive_result_rejects_contradictory_or_incomplete_shapes() -> None:
     plan, tasks = _candidate()
 
     with pytest.raises(ValidationError, match="Tasks require"):
-        PlannerCognitiveResult(tasks=tasks, response="Invalid")
+        PlannerResult(tasks=tasks, response="Invalid")
     with pytest.raises(ValidationError, match="cannot also request clarification"):
-        PlannerCognitiveResult(
+        PlannerResult(
             plan=plan,
             tasks=tasks,
             human_input_request="Clarify scope.",
         )
     with pytest.raises(ValidationError, match="meaningful result"):
-        PlannerCognitiveResult()
+        PlannerResult()
 
 
 def test_planner_output_is_one_nonduplicating_envelope() -> None:
     plan, tasks = _candidate()
-    result = PlannerCognitiveResult(plan=plan, tasks=tasks)
-    output = PlannerOutput(cognitive_result=result)
+    result = PlannerResult(plan=plan, tasks=tasks)
+    output = PlannerOutput(result=result)
 
-    assert set(PlannerOutput.model_fields) == {"cognitive_result", "messages", "error"}
+    assert set(PlannerOutput.model_fields) == {"result", "messages", "error"}
     assert "plan" not in PlannerOutput.model_fields
     assert "tasks" not in PlannerOutput.model_fields
     assert output.response == "A candidate Plan is ready for Human review."
@@ -114,7 +114,7 @@ def test_context_contains_non_authoritative_conversation_history() -> None:
 def test_application_admits_only_exact_untestable_human_assumption() -> None:
     source = "The project cannot observe competitor intent."
     output = PlannerOutput(
-        cognitive_result=PlannerCognitiveResult(
+        result=PlannerResult(
             response="This may be retained for planning only.",
             assumption_assessment=AssumptionAssessment(
                 source_text=source,

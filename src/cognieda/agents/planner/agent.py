@@ -12,16 +12,16 @@ from cognieda.application.ports import AgentFactoryPort, ModelConfig
 
 from .context import PlannerContext
 from .contracts import (
-    PlannerCognitiveResult,
     PlannerControlledError,
     PlannerErrorCode,
     PlannerOutput,
+    PlannerResult,
     PlanReviewAction,
     PlanReviewDecision,
 )
 from .dependencies import PlannerDeps
 from .graph import build_graph
-from .nodes import execute_prompt, fail_state, plan_prompt
+from .nodes import execute_prompt, fail_state, plan_or_answer_prompt
 from .state import PlannerState
 from .tools import RUN_DATA_WORK_TOOL
 
@@ -46,12 +46,12 @@ class Planner:
         self._pending_threads: dict[UUID, str] = {}
         self._assemble_instructions()
         self._recreate_agent()
-        self.graph = build_graph(self._plan_node, self._execute_node)
+        self.graph = build_graph(self._plan_or_answer_node, self._execute_node)
 
     def _assemble_instructions(self) -> None:
-        self._plan_instructions = tuple(
+        self._plan_or_answer_instructions = tuple(
             instruction.assemble(
-                "plan.txt",
+                "plan_or_answer.txt",
                 workspace_instruction=self._workspace_instruction,
             )
         )
@@ -107,7 +107,7 @@ class Planner:
                 message="Planner requests cannot be empty.",
             )
             return PlannerOutput(
-                cognitive_result=PlannerCognitiveResult(response=error.message),
+                result=PlannerResult(response=error.message),
                 error=error,
             )
 
@@ -133,7 +133,7 @@ class Planner:
                 message="No pending Planner lifecycle matches the reviewed Plan.",
             )
             return PlannerOutput(
-                cognitive_result=PlannerCognitiveResult(response=error.message),
+                result=PlannerResult(response=error.message),
                 error=error,
             )
 
@@ -145,7 +145,7 @@ class Planner:
         self._record_pending_thread(state, thread_id)
         return self._output_from_state(state)
 
-    async def _plan_node(self, state: PlannerState) -> PlannerState:
+    async def _plan_or_answer_node(self, state: PlannerState) -> PlannerState:
         try:
             if self._agent is None:
                 return fail_state(
@@ -158,10 +158,10 @@ class Planner:
                 *state.messages,
             ]
             result = await self._agent.run(
-                plan_prompt(state),
-                output_type=PlannerCognitiveResult,
+                plan_or_answer_prompt(state),
+                output_type=PlannerResult,
                 message_history=message_history,
-                instructions=self._plan_instructions,
+                instructions=self._plan_or_answer_instructions,
                 deps=replace(
                     self._deps,
                     executor_tools_enabled=False,
@@ -171,10 +171,8 @@ class Planner:
                     data_profile=None,
                 ),
             )
-            cognitive_result = PlannerCognitiveResult.model_validate(result.output)
-            if cognitive_result.replan_reason is not None:
-                raise ValueError("The plan phase cannot emit a replan request.")
-            state.cognitive_result = cognitive_result
+            planner_result = PlannerResult.model_validate(result.output)
+            state.result = planner_result
             state.messages = (
                 *state.messages,
                 *result.all_messages()[len(message_history) :],
@@ -191,7 +189,7 @@ class Planner:
         return state
 
     async def _execute_node(self, state: PlannerState) -> PlannerState:
-        approved = state.cognitive_result
+        approved = state.result
         if approved is None or approved.plan is None:
             return fail_state(
                 state,
@@ -215,7 +213,7 @@ class Planner:
                 "Human review identity does not match the interrupted Plan.",
             )
         if review.action is not PlanReviewAction.APPROVE:
-            state.cognitive_result = None
+            state.result = None
             state.approved_plan_id = None
             state.human_feedback = review.feedback
             state.error = None
@@ -236,7 +234,7 @@ class Planner:
             ]
             result = await self._agent.run(
                 execute_prompt(state, approved),
-                output_type=PlannerCognitiveResult,
+                output_type=PlannerResult,
                 message_history=message_history,
                 instructions=self._execute_instructions,
                 deps=replace(
@@ -265,18 +263,15 @@ class Planner:
                     data_profile=state.context.data_profile,
                 ),
             )
-            cognitive_result = PlannerCognitiveResult.model_validate(result.output)
-            if cognitive_result.plan is not None or cognitive_result.assumption_assessment:
+            planner_result = PlannerResult.model_validate(result.output)
+            if planner_result.plan is not None or planner_result.assumption_assessment:
                 raise ValueError("The execute phase cannot author a Plan or Assumption assessment.")
-            state.cognitive_result = cognitive_result
+            state.result = planner_result
             state.messages = (
                 *state.messages,
                 *result.all_messages()[len(message_history) :],
             )
             state.error = None
-            if cognitive_result.replan_reason is not None:
-                state.approved_plan_id = None
-                state.human_feedback = cognitive_result.replan_reason
         except Exception as exc:
             fail_state(
                 state,
@@ -297,24 +292,24 @@ class Planner:
         return PlannerState.model_validate(values)
 
     def _record_pending_thread(self, state: PlannerState, thread_id: str) -> None:
-        result = state.cognitive_result
+        result = state.result
         if result is not None and result.plan is not None and state.approved_plan_id is None:
             self._pending_threads[result.plan.plan_id] = thread_id
 
     @staticmethod
     def _output_from_state(state: PlannerState) -> PlannerOutput:
-        if state.cognitive_result is None:
+        if state.result is None:
             error = PlannerControlledError(
                 code=PlannerErrorCode.RESPONSE_FAILED,
                 message="Planner graph completed without a cognitive result.",
             )
             return PlannerOutput(
-                cognitive_result=PlannerCognitiveResult(response=error.message),
+                result=PlannerResult(response=error.message),
                 messages=state.messages,
                 error=error,
             )
         return PlannerOutput(
-            cognitive_result=state.cognitive_result,
+            result=state.result,
             messages=state.messages,
             error=state.error,
         )

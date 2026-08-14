@@ -9,50 +9,35 @@ from langgraph.graph.state import CompiledStateGraph, StateGraph
 from .state import PlannerState
 
 
-def route_after_plan(state: PlannerState) -> Literal["execute", "__end__"]:
-    """Pause at execute only for a complete candidate Plan bundle."""
+def route_after_plan_or_answer(state: PlannerState) -> Literal["execute", "__end__"]:
+    """Execute new or continuing approved work; otherwise return to the Human."""
 
-    if state.cognitive_result is not None and state.cognitive_result.plan is not None:
+    if state.result is not None and (
+        state.result.plan is not None or state.result.continue_execution
+    ):
         return "execute"
     return "__end__"
 
 
-def route_after_execute(state: PlannerState) -> Literal["plan", "__end__"]:
-    """Return to planning after explicit rejection/revision or an execution replan."""
-
-    if state.approved_plan_id is None and state.human_feedback is not None:
-        return "plan"
-    if (
-        state.cognitive_result is not None
-        and state.cognitive_result.replan_reason is not None
-    ):
-        return "plan"
-    return "__end__"
-
-
 def build_graph(
-    plan_node: Any,
+    plan_or_answer_node: Any,
     execute_node: Any,
 ) -> CompiledStateGraph[PlannerState, None, PlannerState, PlannerState]:
     """Compile the two cognitive Planner nodes with a resumable Human boundary."""
 
     builder = StateGraph(PlannerState)
-    builder.add_node("plan", plan_node)
+    builder.add_node("plan_or_answer", plan_or_answer_node)
     builder.add_node("execute", execute_node)
 
-    builder.add_edge(START, "plan")
+    builder.add_edge(START, "plan_or_answer")
     builder.add_conditional_edges(
-        "plan",
-        route_after_plan,
+        "plan_or_answer",
+        route_after_plan_or_answer,
         {"execute": "execute", END: END},
     )
-    builder.add_conditional_edges(
-        "execute",
-        route_after_execute,
-        {"plan": "plan", END: END},
-    )
+    builder.add_edge("execute", "plan_or_answer")
 
     return builder.compile(checkpointer=InMemorySaver())
 
 
-__all__ = ("build_graph", "route_after_execute", "route_after_plan")
+__all__ = ("build_graph", "route_after_plan_or_answer")

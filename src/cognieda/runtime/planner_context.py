@@ -33,7 +33,7 @@ def apply_planner_output(
     """Apply the bounded typed results from one Planner turn to a successor frame."""
 
     successor = current_frame
-    result = planner_output.cognitive_result
+    result = planner_output.result
     assessment = result.assumption_assessment
     if isinstance(assessment, AssumptionAssessment):
         if assessment.source_text != request:
