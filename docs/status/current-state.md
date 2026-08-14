@@ -3,7 +3,7 @@
 This page answers one question: **what is supported by the current
 implementation?** It describes source and tests inspected on 2026-08-14 on an
 implementation branch based on fetched `origin/main`
-`e3e07fd1ab1f8725d456934e8ceb7fddd4119fdf`. A
+`24f34245b6eebe77f31e20b72d110a6d1022466f`. A
 schema, table, interface, stub, fixture, configuration entry, or directory is
 not a supported workflow by itself.
 
