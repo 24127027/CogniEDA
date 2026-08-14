@@ -250,7 +250,7 @@ def test_candidate_plan_accepts_only_exact_admitted_assumptions() -> None:
     assert mismatch.error.code is PlannerErrorCode.INVALID_MODEL_RESULT
 
 
-def test_continue_execution_requires_supplied_active_plan_and_never_executes() -> None:
+def test_continue_execution_requires_supplied_pending_or_active_plan() -> None:
     objective = Objective(text="Understand retention.")
     candidate = _candidate(objective)
     assert candidate.plan is not None
@@ -261,6 +261,20 @@ def test_continue_execution_requires_supplied_active_plan_and_never_executes() -
     )
     assert rejected.error is not None
     assert rejected.error.code is PlannerErrorCode.INVALID_MODEL_RESULT
+
+    planner_with_pending, _, _, _ = _planner(PlannerResult(continue_execution=True))
+    accepted_pending = asyncio.run(
+        planner_with_pending.run(
+            "Proceed.",
+            context=PlannerContext(
+                objective=objective,
+                pending_plan=candidate.plan,
+                pending_tasks=candidate.tasks,
+            ),
+        )
+    )
+    assert accepted_pending.error is None
+    assert accepted_pending.result.continue_execution is True
 
     planner_with_active, _, _, _ = _planner(PlannerResult(continue_execution=True))
     accepted = asyncio.run(

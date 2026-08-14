@@ -141,8 +141,12 @@ class Planner:
         result: PlannerResult,
         context: PlannerContext,
     ) -> None:
-        if result.continue_execution and context.active_plan is None:
-            raise ValueError("continue_execution requires an active Plan.")
+        if (
+            result.continue_execution
+            and context.pending_plan is None
+            and context.active_plan is None
+        ):
+            raise ValueError("continue_execution requires a pending or active Plan.")
 
         if result.plan is None:
             return
@@ -155,9 +159,7 @@ class Planner:
             if admitted is None:
                 raise ValueError("Candidate Plan references an unknown Assumption.")
             if admitted != assumption:
-                raise ValueError(
-                    "Candidate Plan changes the content of an admitted Assumption."
-                )
+                raise ValueError("Candidate Plan changes the content of an admitted Assumption.")
 
     @staticmethod
     def _controlled_output(

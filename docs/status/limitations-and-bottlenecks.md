@@ -29,15 +29,17 @@ These are verified constraints of the bounded current implementation.
   **Implemented** at separate bounded library surfaces. Planner performs one
   direct `plan_or_answer` invocation with no tools or dispatch. The in-process
   Application retains its materialized SessionFrame, exact transient Plan
-  candidate, and model-backed conversation turns. Typed approval delegates
-  atomic admission to application authority; durable pending-review recovery,
-  restart/recovery, and complete-loop composition are **Deferred**.
+  candidate, and model-backed conversation turns. Planner-interpreted Human
+  authorization delegates atomic exact-bundle admission to application
+  authority; durable pending-candidate recovery, restart/recovery, and
+  complete-loop composition are **Deferred**.
 - The Phase 1 Plan domain and side-effect-free candidate validation are
   **Implemented**, and append-only repository behavior is **Verified on
   SQLite** with exact Objective and Assumption snapshots for historical
   reconstruction. Planner can author a transient structurally validated
-  candidate. Typed Human review, commit-boundary validation and persistence,
-  and objective-scoped active selection are **Verified on SQLite**. Task DAG
+  candidate. Conversational authorization, commit-boundary validation and
+  persistence, and objective-scoped active selection are **Verified on
+  SQLite**. Task DAG
   runtime is **Deferred**.
   `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,

@@ -427,6 +427,8 @@ def test_plan_is_immutable_non_fco_and_has_explicit_planner_surfaces() -> None:
     with pytest.raises(ValidationError, match="frozen"):
         plan.task_ids = ()
     assert "PLAN" not in FirstClassObjectType.__members__
+    assert "pending_plan" in PlannerContext.model_fields
+    assert "pending_tasks" in PlannerContext.model_fields
     assert "active_plan" in PlannerContext.model_fields
     assert "plan" in PlannerResult.model_fields
     assert "plan" not in PlannerOutput.model_fields

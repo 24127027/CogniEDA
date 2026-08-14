@@ -257,16 +257,20 @@ overwrite the existing snapshot, while different IDs with the same content
 fingerprint remain distinct. The repository is append-only and exposes no
 update or delete surface.
 
-Application retains the exact Planner candidate in-process without writing it.
-Frozen `PlanReviewDecision` is the Human authority value; conversation text is
-not sufficient. Reject/revise write nothing. Approval requires the exact
-candidate ID and atomically validates existing Assumptions, resolves or admits
-the exact Objective and Tasks, persists the immutable Plan, and writes one
-objective-scoped active pointer. Any failure rolls the complete transaction
-back. Pending candidates and review decisions are not durable or recoverable.
+Application retains the exact Planner candidate in-process without writing it
+and exposes it to the next Planner invocation separately from authoritative
+state. Planner interprets the latest Human prompt; conversation text is not
+direct Application authority. Clear authorization produces
+`continue_execution`, after which Application atomically validates the exact
+pre-invocation pending bundle, resolves or admits its Objective and Tasks,
+persists the immutable Plan, and writes one objective-scoped active pointer.
+Returning the same candidate preserves it, a new candidate replaces it, and a
+response without a candidate clears it. Any admission failure rolls the
+complete transaction back. Pending candidates and conversation history are not
+durable or recoverable.
 
 The complete target boundary is not implemented. Canonical Task DAG execution,
-durable pending-review recovery, role-native result inbox processing,
+durable pending-candidate recovery, role-native result inbox processing,
 complete replay coordination, scientific Evidence admission from
 `EvidenceRequest`, governance
 workflow, Discovery admission from exact governed proposals, and end-to-end

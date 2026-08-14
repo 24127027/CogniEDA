@@ -78,6 +78,8 @@ def _evidence_and_discovery(
 
 def test_planner_context_and_result_have_exact_canonical_fields() -> None:
     assert tuple(PlannerContext.model_fields) == (
+        "pending_plan",
+        "pending_tasks",
         "active_plan",
         "objective",
         "assumptions",
@@ -107,6 +109,8 @@ def test_planner_context_retains_all_typed_readable_state() -> None:
     history = ConversationHistory()
 
     context = PlannerContext(
+        pending_plan=active_plan,
+        pending_tasks=(task,),
         active_plan=active_plan,
         objective=objective,
         assumptions=(assumption,),
@@ -117,6 +121,8 @@ def test_planner_context_retains_all_typed_readable_state() -> None:
         conversation_history=history,
     )
 
+    assert context.pending_plan is active_plan
+    assert context.pending_tasks == (task,)
     assert context.active_plan is active_plan
     assert context.objective is objective
     assert context.assumptions == (assumption,)
@@ -150,6 +156,13 @@ def test_tasks_without_plan_are_rejected() -> None:
         PlannerResult(tasks=(_task(objective),))
 
 
+def test_pending_tasks_without_pending_plan_are_rejected() -> None:
+    objective = Objective(text="Understand customer retention.")
+
+    with pytest.raises(ValidationError, match="Pending Tasks require"):
+        PlannerContext(pending_tasks=(_task(objective),))
+
+
 def test_plan_must_validate_the_exact_task_bundle() -> None:
     objective = Objective(text="Understand customer retention.")
     expected = _task(objective, "Expected task")
@@ -160,7 +173,7 @@ def test_plan_must_validate_the_exact_task_bundle() -> None:
         PlannerResult(plan=plan, tasks=(unexpected,))
 
 
-def test_continue_execution_rejects_candidate_plan_or_human_input_request() -> None:
+def test_candidate_cannot_be_generated_and_authorized_in_same_result() -> None:
     objective = Objective(text="Understand customer retention.")
     task = _task(objective)
 

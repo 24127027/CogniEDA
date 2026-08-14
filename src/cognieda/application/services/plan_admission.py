@@ -1,11 +1,7 @@
-"""Human-authorized atomic admission and activation of exact Plan bundles."""
+"""Atomic admission and activation of an exact authorized Plan bundle."""
 
 from __future__ import annotations
 
-from enum import StrEnum
-from uuid import UUID
-
-from pydantic import BaseModel, ConfigDict, model_validator
 from sqlmodel import Session
 
 from cognieda.application.services.plan_validation import PlanValidator
@@ -27,58 +23,24 @@ from cognieda.schemas.artifacts import Assumption, Objective, Task
 from cognieda.schemas.plan import Plan
 
 
-class PlanReviewAction(StrEnum):
-    """Finite Human authority over one exact transient Plan candidate."""
-
-    APPROVE = "approve"
-    REJECT = "reject"
-    REVISE = "revise"
-
-
-class PlanReviewDecision(BaseModel):
-    """Human review value bound to one exact candidate Plan identity."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    action: PlanReviewAction
-    plan_id: UUID
-    feedback: str | None = None
-
-    @model_validator(mode="after")
-    def _require_feedback_for_nonapproval(self) -> PlanReviewDecision:
-        if self.action in {PlanReviewAction.REJECT, PlanReviewAction.REVISE} and (
-            self.feedback is None or not self.feedback.strip()
-        ):
-            raise ValueError(f"{self.action.value} requires exact Human feedback.")
-        return self
-
-
 class PlanAdmissionService:
-    """Apply one typed Human review decision at the application authority boundary."""
+    """Admit one exact bundle after Planner-interpreted Human authorization."""
 
     def __init__(self, session: Session) -> None:
         self._session = session
 
     def admit(
         self,
-        decision: PlanReviewDecision,
-        *,
         plan: Plan,
+        *,
         tasks: tuple[Task, ...],
-    ) -> PlanReviewDecision:
-        """Admit an approved exact bundle, or preserve a non-authoritative rejection."""
-
-        if decision.plan_id != plan.plan_id:
-            raise ValueError("Plan review decision does not identify the exact candidate Plan.")
-        if decision.action is not PlanReviewAction.APPROVE:
-            return decision
+    ) -> Plan:
+        """Validate, persist, and activate one exact authorized bundle atomically."""
 
         try:
             new_objective, new_tasks = self._validate_authoritative_bundle(plan, tasks)
             if new_objective:
-                self._session.add(
-                    ObjectiveRecord(**schema_to_record_payload(plan.objective))
-                )
+                self._session.add(ObjectiveRecord(**schema_to_record_payload(plan.objective)))
             self._session.add_all(
                 TaskRecord(**schema_to_record_payload(task)) for task in new_tasks
             )
@@ -92,7 +54,7 @@ class PlanAdmissionService:
         except Exception:
             self._session.rollback()
             raise
-        return decision
+        return canonical
 
     def _validate_authoritative_bundle(
         self,
@@ -102,15 +64,15 @@ class PlanAdmissionService:
         plan.validate_tasks(tasks)
 
         if self._session.get(PlanRecord, plan.plan_id) is not None:
-            raise ValueError("Plan identity already exists; approval cannot overwrite it.")
+            raise ValueError("Plan identity already exists; admission cannot overwrite it.")
 
         for assumption in plan.assumptions:
             row = self._session.get(AssumptionRecord, assumption.assumption_id)
             if row is None:
-                raise ValueError("Plan approval requires every Assumption to be admitted.")
+                raise ValueError("Plan admission requires every Assumption to be admitted.")
             if record_to_schema(Assumption, row) != assumption:
                 raise ValueError(
-                    "Plan approval rejects changed content for an admitted Assumption."
+                    "Plan admission rejects changed content for an admitted Assumption."
                 )
 
         objective_row = self._session.get(
@@ -121,7 +83,7 @@ class PlanAdmissionService:
         if objective_row is not None and (
             record_to_schema(Objective, objective_row) != plan.objective
         ):
-            raise ValueError("Plan approval rejects an Objective identity collision.")
+            raise ValueError("Plan admission rejects an Objective identity collision.")
 
         new_tasks: list[Task] = []
         for task in tasks:
@@ -131,7 +93,7 @@ class PlanAdmissionService:
                 continue
             persisted = record_to_schema(Task, task_row)
             if self._task_semantics(persisted) != self._task_semantics(task):
-                raise ValueError("Plan approval rejects a Task identity collision.")
+                raise ValueError("Plan admission rejects a Task identity collision.")
         return new_objective, tuple(new_tasks)
 
     @staticmethod
@@ -144,8 +106,4 @@ class PlanAdmissionService:
         )
 
 
-__all__ = (
-    "PlanAdmissionService",
-    "PlanReviewAction",
-    "PlanReviewDecision",
-)
+__all__ = ("PlanAdmissionService",)

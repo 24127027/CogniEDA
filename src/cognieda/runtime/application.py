@@ -5,11 +5,7 @@ from sqlmodel import Session
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.types import PlannerResult
 from cognieda.application.ports import AgentFactoryPort
-from cognieda.application.services import (
-    PlanAdmissionService,
-    PlanReviewAction,
-    PlanReviewDecision,
-)
+from cognieda.application.services import PlanAdmissionService
 from cognieda.execution import ExecutorDispatcher
 from cognieda.infrastructure.persistence.repositories import ActivePlanRepository
 from cognieda.schemas.artifacts import SessionFrame, Task
@@ -45,10 +41,15 @@ class Application:
         if message.startswith("/"):
             return await self._handle_command(message)
 
+        prior_pending_plan = self._pending_plan
+        prior_pending_tasks = self._pending_tasks
+        active_plan = self._resolve_active_plan()
         planner_context = build_planner_context(
             self.session_frame,
             self.conversation_history,
-            active_plan=self._resolve_active_plan(),
+            pending_plan=prior_pending_plan,
+            pending_tasks=prior_pending_tasks,
+            active_plan=active_plan,
         )
         try:
             planner_output = await self.planner_agent.run(
@@ -66,9 +67,12 @@ class Application:
                 planner_output.messages
             )
 
-        if planner_output.result.plan is not None:
-            self._pending_plan = planner_output.result.plan
-            self._pending_tasks = planner_output.result.tasks
+        self._apply_planner_result(
+            planner_output.result,
+            prior_pending_plan=prior_pending_plan,
+            prior_pending_tasks=prior_pending_tasks,
+            active_plan=active_plan,
+        )
 
         return Message(
             type=MessageType.TEXT,
@@ -76,23 +80,37 @@ class Application:
             content=self._present_planner_result(planner_output.result),
         )
 
-    def review_plan(self, decision: PlanReviewDecision) -> PlanReviewDecision:
-        """Apply typed Human authority to the exact retained transient candidate."""
+    def _apply_planner_result(
+        self,
+        result: PlannerResult,
+        *,
+        prior_pending_plan: Plan | None,
+        prior_pending_tasks: tuple[Task, ...],
+        active_plan: Plan | None,
+    ) -> None:
+        """Apply only deterministic lifecycle effects of one Planner conclusion."""
 
-        plan = self._pending_plan
-        if plan is None:
-            raise ValueError("No transient candidate Plan is awaiting Human review.")
-        tasks = self._pending_tasks
-        reviewed = self._plan_admission.admit(
-            decision,
-            plan=plan,
-            tasks=tasks,
-        )
-        if decision.action is PlanReviewAction.APPROVE:
-            self._initialize_empty_session_frame(plan)
+        if result.plan is not None:
+            self._pending_plan = result.plan
+            self._pending_tasks = result.tasks
+            return
+
+        if result.continue_execution:
+            if prior_pending_plan is not None:
+                admitted = self._plan_admission.admit(
+                    prior_pending_plan,
+                    tasks=prior_pending_tasks,
+                )
+                self._initialize_empty_session_frame(admitted, prior_pending_tasks)
+                self._pending_plan = None
+                self._pending_tasks = ()
+                return
+            if active_plan is not None:
+                return
+            raise ValueError("continue_execution requires a pending or active Plan.")
+
         self._pending_plan = None
         self._pending_tasks = ()
-        return reviewed
 
     def _resolve_active_plan(self) -> Plan | None:
         objective = self.session_frame.objective
@@ -100,7 +118,11 @@ class Application:
             return None
         return self._active_plans.get_by_objective_id(objective.objective_id)
 
-    def _initialize_empty_session_frame(self, plan: Plan) -> None:
+    def _initialize_empty_session_frame(
+        self,
+        plan: Plan,
+        tasks: tuple[Task, ...],
+    ) -> None:
         frame = self.session_frame
         if (
             frame.objective is None
@@ -112,7 +134,7 @@ class Application:
             self.session_frame = SessionFrame(
                 objective=plan.objective,
                 assumptions=plan.assumptions,
-                tasks=self._pending_tasks,
+                tasks=tasks,
                 data_profile=frame.data_profile,
             )
 
@@ -125,7 +147,7 @@ class Application:
         if result.plan is not None:
             return f"Planner proposed a candidate Plan with {len(result.tasks)} Task(s)."
         if result.continue_execution:
-            return "The active Plan should continue execution."
+            return "The current Plan should continue execution."
         raise ValueError("PlannerResult has no presentable conclusion.")
 
     # TODO: Move command handling to a separate class or module for better separation of concerns
@@ -293,7 +315,7 @@ class Application:
             role=MessageRole.ASSISTANT,
             content=content,
         )
-    
+
     async def _reload_runtime(
         self,
         *,

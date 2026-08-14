@@ -79,6 +79,8 @@ def test_builder_exactly_materializes_every_readable_session_frame_member() -> N
 
     context = build_planner_context(frame, history)
 
+    assert context.pending_plan is None
+    assert context.pending_tasks == ()
     assert context.active_plan is None
     assert context.objective == frame.objective
     assert context.assumptions == frame.assumptions
@@ -121,6 +123,32 @@ def test_builder_materializes_exact_active_plan_for_current_objective() -> None:
     )
 
     assert context.active_plan is plan
+
+
+def test_builder_keeps_pending_tasks_separate_from_authoritative_tasks() -> None:
+    frame = _full_frame()
+    assert frame.objective is not None
+    pending_task = Task(
+        objective_id=frame.objective.objective_id,
+        kind=TaskKind.DATA,
+        instruction="Inspect a proposed cohort.",
+    )
+    pending_plan = Plan.create(
+        objective=frame.objective,
+        task_ids=(pending_task.task_id,),
+        tasks=(pending_task,),
+    )
+
+    context = build_planner_context(
+        frame,
+        ConversationHistory(),
+        pending_plan=pending_plan,
+        pending_tasks=(pending_task,),
+    )
+
+    assert context.pending_plan is pending_plan
+    assert context.pending_tasks == (pending_task,)
+    assert context.tasks == frame.tasks
 
 
 def test_builder_rejects_active_plan_for_different_objective() -> None:

@@ -1,20 +1,15 @@
-"""Human Plan authority, atomic admission, and active selection invariants."""
+"""Atomic Plan admission and active selection invariants."""
 
 from __future__ import annotations
 
 import inspect
 from typing import Any, Literal, cast
-from uuid import uuid4
 
 import pytest
-from pydantic import ValidationError
 from sqlmodel import Session, select
 
-from cognieda.application.services import (
-    PlanAdmissionService,
-    PlanReviewAction,
-    PlanReviewDecision,
-)
+import cognieda.application.services as application_services
+from cognieda.application.services import PlanAdmissionService
 from cognieda.infrastructure.persistence.models import (
     ActivePlanRecord,
     AssumptionRecord,
@@ -54,40 +49,13 @@ def _plan(
     )
 
 
-def _decision(
-    plan: Plan,
-    action: PlanReviewAction = PlanReviewAction.APPROVE,
-) -> PlanReviewDecision:
-    return PlanReviewDecision(
-        action=action,
-        plan_id=plan.plan_id,
-        feedback=(
-            "Keep the exact scope narrower."
-            if action is not PlanReviewAction.APPROVE
-            else None
-        ),
-    )
+def _admit(session: Session, plan: Plan, tasks: tuple[Task, ...]) -> None:
+    assert PlanAdmissionService(session).admit(plan, tasks=tasks) == plan
 
 
-def _approve(session: Session, plan: Plan, tasks: tuple[Task, ...]) -> None:
-    decision = _decision(plan)
-    assert PlanAdmissionService(session).admit(
-        decision,
-        plan=plan,
-        tasks=tasks,
-    ) is decision
-
-
-@pytest.mark.parametrize("action", [PlanReviewAction.REJECT, PlanReviewAction.REVISE])
-def test_reject_and_revise_require_exact_feedback(action: PlanReviewAction) -> None:
-    with pytest.raises(ValidationError, match="requires exact Human feedback"):
-        PlanReviewDecision(action=action, plan_id=uuid4())
-    with pytest.raises(ValidationError, match="requires exact Human feedback"):
-        PlanReviewDecision(action=action, plan_id=uuid4(), feedback="   ")
-
-
-def test_review_and_admission_contracts_preserve_authority_boundaries() -> None:
-    assert set(PlanReviewDecision.model_fields) == {"action", "plan_id", "feedback"}
+def test_review_contracts_are_deleted_and_admission_preserves_authority_boundaries() -> None:
+    assert not hasattr(application_services, "PlanReviewAction")
+    assert not hasattr(application_services, "PlanReviewDecision")
     source = inspect.getsource(PlanAdmissionService)
     assert "pydantic_ai" not in source
     assert "Capability" not in source
@@ -106,48 +74,7 @@ def test_candidate_is_transient_until_exact_approval(db_session: Session) -> Non
     assert db_session.exec(select(ActivePlanRecord)).all() == []
 
 
-@pytest.mark.parametrize("action", [PlanReviewAction.REJECT, PlanReviewAction.REVISE])
-def test_reject_and_revise_preserve_feedback_and_create_zero_writes(
-    db_session: Session,
-    action: PlanReviewAction,
-) -> None:
-    objective = Objective(text="Understand retention.")
-    task = _task(objective)
-    plan = _plan(objective, (task,))
-    decision = PlanReviewDecision(
-        action=action,
-        plan_id=plan.plan_id,
-        feedback="  Preserve this exact Human feedback.  ",
-    )
-
-    returned = PlanAdmissionService(db_session).admit(
-        decision,
-        plan=plan,
-        tasks=(task,),
-    )
-
-    assert returned is decision
-    assert returned.feedback == "  Preserve this exact Human feedback.  "
-    assert db_session.exec(select(ObjectiveRecord)).all() == []
-    assert db_session.exec(select(TaskRecord)).all() == []
-    assert db_session.exec(select(PlanRecord)).all() == []
-    assert db_session.exec(select(ActivePlanRecord)).all() == []
-
-
-def test_review_decision_must_match_exact_candidate_identity(db_session: Session) -> None:
-    objective = Objective(text="Understand retention.")
-    task = _task(objective)
-    plan = _plan(objective, (task,))
-
-    with pytest.raises(ValueError, match="exact candidate Plan"):
-        PlanAdmissionService(db_session).admit(
-            PlanReviewDecision(action=PlanReviewAction.APPROVE, plan_id=uuid4()),
-            plan=plan,
-            tasks=(task,),
-        )
-
-
-def test_approve_atomically_admits_exact_new_bundle_and_active_selection(
+def test_admission_atomically_persists_exact_new_bundle_and_active_selection(
     db_session: Session,
 ) -> None:
     assumption = AssumptionRepository(db_session).create(
@@ -157,7 +84,7 @@ def test_approve_atomically_admits_exact_new_bundle_and_active_selection(
     tasks = (_task(objective), _task(objective, instruction="Count renewal events."))
     plan = _plan(objective, tasks, assumptions=(assumption,))
 
-    _approve(db_session, plan, tasks)
+    _admit(db_session, plan, tasks)
 
     assert ObjectiveRepository(db_session).get_by_id(objective.objective_id) == objective
     assert tuple(TaskRepository(db_session).get_by_id(task.task_id) for task in tasks) == tasks
@@ -173,7 +100,7 @@ def test_existing_exact_objective_and_task_are_reused_without_status_replacement
     candidate_task = persisted_task.model_copy(update={"status": TaskStatus.COMPLETED})
     plan = _plan(objective, (candidate_task,))
 
-    _approve(db_session, plan, (candidate_task,))
+    _admit(db_session, plan, (candidate_task,))
 
     assert len(db_session.exec(select(ObjectiveRecord)).all()) == 1
     assert len(db_session.exec(select(TaskRecord)).all()) == 1
@@ -192,7 +119,7 @@ def test_objective_identity_collision_fails_without_plan_or_task_writes(
     plan = _plan(counterfeit, (task,))
 
     with pytest.raises(ValueError, match="Objective identity collision"):
-        _approve(db_session, plan, (task,))
+        _admit(db_session, plan, (task,))
 
     assert TaskRepository(db_session).get_by_id(task.task_id) is None
     assert PlanRepository(db_session).get_by_id(plan.plan_id) is None
@@ -218,7 +145,7 @@ def test_assumption_must_already_exist_with_exact_content(
     plan = _plan(objective, (task,), assumptions=(candidate,))
 
     with pytest.raises(ValueError, match="Assumption"):
-        _approve(db_session, plan, (task,))
+        _admit(db_session, plan, (task,))
 
     persisted_assumption = db_session.get(AssumptionRecord, candidate.assumption_id)
     if case == "missing":
@@ -237,7 +164,7 @@ def test_task_identity_collision_fails_without_plan_write(db_session: Session) -
     plan = _plan(objective, (counterfeit,))
 
     with pytest.raises(ValueError, match="Task identity collision"):
-        _approve(db_session, plan, (counterfeit,))
+        _admit(db_session, plan, (counterfeit,))
 
     assert TaskRepository(db_session).get_by_id(persisted.task_id) == persisted
     assert PlanRepository(db_session).get_by_id(plan.plan_id) is None
@@ -273,7 +200,7 @@ def test_fingerprint_failure_rolls_back_new_objective_and_task(
     counterfeit = cast(Plan, _FingerprintMismatchCandidate(valid))
 
     with pytest.raises(ValueError, match="fingerprint"):
-        _approve(db_session, counterfeit, (task,))
+        _admit(db_session, counterfeit, (task,))
 
     assert ObjectiveRepository(db_session).get_by_id(objective.objective_id) is None
     assert TaskRepository(db_session).get_by_id(task.task_id) is None
@@ -287,7 +214,7 @@ def test_failed_successor_leaves_existing_active_plan_unchanged(
     objective = Objective(text="Understand retention.")
     first_task = _task(objective)
     active = _plan(objective, (first_task,))
-    _approve(db_session, active, (first_task,))
+    _admit(db_session, active, (first_task,))
 
     successor_task = _task(objective, instruction="Inspect a successor scope.")
     missing_assumption = Assumption(text="This premise is not admitted.")
@@ -298,7 +225,7 @@ def test_failed_successor_leaves_existing_active_plan_unchanged(
     )
 
     with pytest.raises(ValueError, match="Assumption"):
-        _approve(db_session, successor, (successor_task,))
+        _admit(db_session, successor, (successor_task,))
 
     assert PlanRepository(db_session).get_by_id(successor.plan_id) is None
     assert TaskRepository(db_session).get_by_id(successor_task.task_id) is None
@@ -322,7 +249,7 @@ def test_failure_after_staging_rolls_back_entire_bundle(
     monkeypatch.setattr(ActivePlanRepository, "activate", fail_activation)
 
     with pytest.raises(RuntimeError, match="injected activation failure"):
-        _approve(db_session, plan, (task,))
+        _admit(db_session, plan, (task,))
 
     assert ObjectiveRepository(db_session).get_by_id(objective.objective_id) is None
     assert TaskRepository(db_session).get_by_id(task.task_id) is None
@@ -336,15 +263,15 @@ def test_successor_activation_is_objective_scoped_and_preserves_old_plan(
     first_objective = Objective(text="Understand retention.")
     first_task = _task(first_objective)
     first_plan = _plan(first_objective, (first_task,))
-    _approve(db_session, first_plan, (first_task,))
+    _admit(db_session, first_plan, (first_task,))
 
     successor = _plan(first_objective, (first_task,))
-    _approve(db_session, successor, (first_task,))
+    _admit(db_session, successor, (first_task,))
 
     second_objective = Objective(text="Understand acquisition.")
     second_task = _task(second_objective)
     second_plan = _plan(second_objective, (second_task,))
-    _approve(db_session, second_plan, (second_task,))
+    _admit(db_session, second_plan, (second_task,))
 
     assert PlanRepository(db_session).get_by_id(first_plan.plan_id) == first_plan
     assert ActivePlanRepository(db_session).get_by_objective_id(
@@ -361,10 +288,10 @@ def test_plan_identity_can_be_persisted_only_once(db_session: Session) -> None:
     objective = Objective(text="Understand retention.")
     task = _task(objective)
     plan = _plan(objective, (task,))
-    _approve(db_session, plan, (task,))
+    _admit(db_session, plan, (task,))
 
     with pytest.raises(ValueError, match="Plan identity already exists"):
-        _approve(db_session, plan, (task,))
+        _admit(db_session, plan, (task,))
 
     assert PlanRepository(db_session).get_by_id(plan.plan_id) == plan
     assert ActivePlanRepository(db_session).get_by_objective_id(objective.objective_id) == plan
