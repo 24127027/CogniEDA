@@ -11,7 +11,7 @@ from .contracts import (
     PlannerWorkOutcome,
     normalize_for_planner,
 )
-from .dispatcher import ExecutorDispatcher, ExecutorProviderError
+from .dispatcher import ExecutorDispatcher, ExecutorError
 from .registry import CapabilityNotRegisteredError, ExecutorRegistry
 
 __all__ = (
@@ -24,7 +24,7 @@ __all__ = (
     "ExecutorContext",
     "ExecutorDispatcher",
     "ExecutorInput",
-    "ExecutorProviderError",
+    "ExecutorError",
     "ExecutorRegistry",
     "PlannerWorkOutcome",
     "normalize_for_planner",

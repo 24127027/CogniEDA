@@ -16,7 +16,7 @@ from cognieda.delegation import (
     ExecutorContext,
     ExecutorDispatcher,
     ExecutorInput,
-    ExecutorProviderError,
+    ExecutorError,
     ExecutorRegistry,
     normalize_for_planner,
 )
@@ -159,7 +159,7 @@ def test_dispatcher_preserves_controlled_provider_failure() -> None:
     registry.register_provider(FailingProvider, capabilities=(Capability.DATA_ANALYSIS,))
     dispatcher = ExecutorDispatcher(registry)
 
-    with pytest.raises(ExecutorProviderError, match="provider exploded") as error:
+    with pytest.raises(ExecutorError, match="provider exploded") as error:
         asyncio.run(dispatcher.dispatch(_request()))
 
     assert isinstance(error.value.__cause__, RuntimeError)
@@ -172,7 +172,7 @@ def test_dispatcher_rejects_incompatible_provider_result() -> None:
         capabilities=(Capability.DATA_ANALYSIS,),
     )
 
-    with pytest.raises(ExecutorProviderError, match="incompatible result"):
+    with pytest.raises(ExecutorError, match="incompatible result"):
         asyncio.run(ExecutorDispatcher(registry).dispatch(_request()))
 
 

@@ -3,9 +3,9 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 
 from .capabilities import Capability
-from .contracts import ExecutorProvider
+from .contracts import Executor
 
-ExecutorFactory = Callable[[], ExecutorProvider]
+ExecutorFactory = Callable[[], Executor]
 
 
 class CapabilityNotRegisteredError(LookupError):
@@ -17,7 +17,7 @@ class ExecutorRegistry:
 
     def __init__(self) -> None:
         self._providers: dict[Capability, ExecutorFactory] = {}
-        self._instances: dict[ExecutorFactory, ExecutorProvider] = {}
+        self._instances: dict[ExecutorFactory, Executor] = {}
 
     def register_provider(
         self,
@@ -45,7 +45,7 @@ class ExecutorRegistry:
         for capability in registered:
             self._providers[capability] = provider_factory
 
-    def resolve(self, capability: Capability) -> ExecutorProvider:
+    def resolve(self, capability: Capability) -> Executor:
         if not isinstance(capability, Capability):
             raise TypeError("Resolved capability must be a Capability value.")
 
@@ -58,7 +58,7 @@ class ExecutorRegistry:
 
         if factory not in self._instances:
             provider = factory()
-            if not isinstance(provider, ExecutorProvider):
+            if not isinstance(provider, Executor):
                 raise TypeError("Provider factory returned an incompatible provider.")
             self._instances[factory] = provider
         return self._instances[factory]
