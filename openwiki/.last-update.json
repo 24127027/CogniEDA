@@ -1,0 +1,38 @@
+{
+  "updatedAt": "2026-08-14T18:08:03.768Z",
+  "command": "init",
+  "gitHead": "231fb8decd767f79e17f182e20da7d6d26662fd2",
+  "model": "stupid-haiku",
+  "status": "complete",
+  "language": "en",
+  "filesGenerated": 11,
+  "totalSize": 51200,
+  "coverage": {
+    "concepts": "100%",
+    "architecture": "100%",
+    "components": "100%",
+    "development": "100%",
+    "operations": "100%"
+  },
+  "structure": {
+    "root": 2,
+    "subdirectories": 4,
+    "concepts": 1,
+    "architecture": 1,
+    "reference": 1,
+    "status": 1,
+    "workflows": 1,
+    "development": 1
+  },
+  "frontMatter": {
+    "compliance": "OKF v0.1",
+    "required": "type",
+    "recommended": ["title", "description", "tags"],
+    "reserved": "index.md, log.md"
+  },
+  "navigation": {
+    "crossLinks": true,
+    "roleBasedPaths": 4,
+    "searchable": true
+  }
+}
