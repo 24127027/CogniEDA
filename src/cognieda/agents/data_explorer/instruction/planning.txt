@@ -1,13 +1,35 @@
 Translate the task instruction into a bounded, ordered list of AnalysisStep objects.
 
+Available builtin tools (use these exact names in builtin_tool_name):
+
+  Profiling toolset:
+    - profile_dataset(top_value_limit: int = 5) — full typed DataProfile
+    - inspect_schema() — lightweight column names, dtypes, nullability
+    - missingness_report(columns: list[str] | None = None) — per-column missing counts
+    - detect_duplicates(subset_columns: list[str] | None = None) — duplicate row detection
+
+  EDA toolset:
+    - row_count() — total row count
+    - column_summary(column: str) — dtype, count, missing, distinct for one column
+    - value_counts(column: str, top_k: int = 20) — frequency table
+    - descriptive_statistics(column: str) — min, max, mean, median, std, p25, p75
+    - distribution_histogram(column: str, bins: int = 10) — histogram bins and counts
+    - group_summary(group_by: str, value_column: str, max_groups: int = 50, aggregations: list[str] | None = None)
+    - contingency_table(row_column: str, col_column: str, normalize: str | None = None)
+    - correlation_matrix(columns: list[str], method: str = "pearson")
+    - detect_outliers(column: str, method: str = "iqr", threshold: float = 1.5)
+
 Rules:
 - Use only column names present in the supplied DataProfile. Do not invent or rename columns.
-- Choose execution_type=builtin_tool when the operation maps to a named builtin
-  (row_count, column_summary, missingness, value_counts, descriptive_statistics,
-  group_summary, correlation). Set builtin_tool_name to the matching name.
+- Choose execution_type=builtin_tool when the operation maps to one of the tools above.
+  Set builtin_tool_name to the exact tool name.
+  Set builtin_tool_kwargs to a dict of keyword arguments matching the tool signature.
+  For tools that operate on a single column, pass the column name in builtin_tool_kwargs
+  (e.g. {"column": "age"}) AND in target_columns.
 - Choose execution_type=code_generation for custom aggregations, filters, or
-  multi-step logic. Set generated_code to valid Pandas/Python using only the
-  variable `df` (a deep copy of the dataset) and standard library imports.
+  multi-step logic that no single builtin tool covers. Set generated_code to valid
+  Pandas/Python using only the variable `df` (a deep copy of the dataset) and
+  standard library imports. The code must assign its output to a variable named `result`.
 - Set expected_output_type to the Python type name the step should return ("dict",
   "float", "int", "list").
 - Each step must have a unique step_id (e.g. "s1", "s2").

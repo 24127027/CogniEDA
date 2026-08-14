@@ -38,6 +38,8 @@ class AnalysisStep(BaseModel):
     execution_type: ExecutionType
     # Populated only when execution_type is BUILTIN_TOOL
     builtin_tool_name: str | None = None
+    # Keyword arguments to pass to the builtin tool (e.g. {"bins": 20, "method": "iqr"})
+    builtin_tool_kwargs: dict[str, Any] = Field(default_factory=dict)
     # Populated only when execution_type is CODE_GENERATION
     generated_code: str | None = None
     # The Python type name the executor should validate against, e.g. "dict", "float"

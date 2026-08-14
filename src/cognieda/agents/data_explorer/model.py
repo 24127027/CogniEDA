@@ -1,12 +1,27 @@
-"""Pydantic AI model adapter for the Data Explorer workflow."""
+"""Pydantic AI model adapter for the Data Explorer workflow.
+
+The agent is created once at construction time without a bound DataFrame.
+At each node invocation the caller supplies a live DataFrame via the
+``toolsets`` parameter of ``agent.run()``, which injects the three
+FunctionToolsets:
+    - profiling_toolset(df) — schema inspection & profiling
+    - eda_toolset(df)       — descriptive / exploratory analysis
+    - sandbox_toolset(df)   — custom sandboxed Python/Pandas code
+
+All three toolsets are visible to every node call; the per-call instruction
+controls which tools each node is expected to invoke.
+"""
 
 from __future__ import annotations
 
 from typing import Protocol
 
+import pandas as pd
+
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.agents.utilities import instruction
 
+from .tools import eda_toolset, profiling_toolset, sandbox_toolset
 from .types import EvaluationOutput, PlanningOutput
 
 
@@ -18,9 +33,9 @@ from .types import EvaluationOutput, PlanningOutput
 class DataExplorerDecisionModel(Protocol):
     """Typed model boundary used by the deterministic DE graph nodes."""
 
-    async def plan(self, prompt: str) -> PlanningOutput: ...
+    async def plan(self, prompt: str, df: pd.DataFrame) -> PlanningOutput: ...
 
-    async def evaluate(self, prompt: str) -> EvaluationOutput: ...
+    async def evaluate(self, prompt: str, df: pd.DataFrame | None) -> EvaluationOutput: ...
 
 
 # ---------------------------------------------------------------------------
@@ -29,7 +44,12 @@ class DataExplorerDecisionModel(Protocol):
 
 
 class DataExplorerModel:
-    """Pydantic AI adapter that drives DE planning and evaluation via one agent."""
+    """Pydantic AI adapter that drives DE planning and evaluation.
+
+    The underlying agent is constructed once.  At each call, live toolsets
+    are built around a DataFrame copy and injected into the agent run so
+    that the model can call them during its reasoning turn.
+    """
 
     def __init__(
         self,
@@ -51,6 +71,7 @@ class DataExplorerModel:
         self._reload_agent()
 
     def _reload_agent(self) -> None:
+        # Agent is built without tools; toolsets are injected per call.
         self._agent = self._agent_factory.create_agent(
             worker="data_explorer",
             config=self._model_config,
@@ -81,19 +102,49 @@ class DataExplorerModel:
         if recreate_agent:
             self._reload_agent()
 
-    async def plan(self, prompt: str) -> PlanningOutput:
+    def _build_toolsets(self, df: pd.DataFrame | None) -> list:
+        """Build bound toolsets around the supplied DataFrame.
+
+        When ``df`` is None (e.g. pure evaluation on already-collected results),
+        an empty DataFrame is used so the toolset factories succeed but the
+        model is not expected to call them.
+        """
+        frame = df if df is not None else pd.DataFrame()
+        return [
+            profiling_toolset(frame),
+            eda_toolset(frame),
+            sandbox_toolset(frame),
+        ]
+
+    async def plan(self, prompt: str, df: pd.DataFrame) -> PlanningOutput:
+        """Invoke the planning agent with all toolsets visible.
+
+        The planning instruction tells the model to select tools for each step
+        rather than calling them directly — the execute node does the actual
+        dispatch.  Tools are still visible so the model can reason about what
+        is available.
+        """
         result = await self._agent.run(
             prompt,
             output_type=PlanningOutput,
             instructions=self._planning_instruction,
+            toolsets=self._build_toolsets(df),
         )
         return PlanningOutput.model_validate(result.output)
 
-    async def evaluate(self, prompt: str) -> EvaluationOutput:
+    async def evaluate(self, prompt: str, df: pd.DataFrame | None = None) -> EvaluationOutput:
+        """Invoke the evaluation agent with all toolsets visible.
+
+        Evaluation primarily inspects accumulated execution results from the
+        state.  Tools are available in case the model needs to re-examine the
+        data, but the evaluation instruction focuses the model on judging
+        completeness rather than generating new analysis.
+        """
         result = await self._agent.run(
             prompt,
             output_type=EvaluationOutput,
             instructions=self._evaluate_instruction,
+            toolsets=self._build_toolsets(df),
         )
         return EvaluationOutput.model_validate(result.output)
 
