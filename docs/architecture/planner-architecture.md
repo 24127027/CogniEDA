@@ -139,7 +139,7 @@ concern. Proposed Tasks cannot execute.
 
 ## Proposal, approval, and activation
 
-The planning sequence is:
+The **Design target** planning sequence is:
 
 1. The Planner constructs transient canonical Objective, Task, and
    `Plan` objects, including the complete Task DAG. Domain construction
@@ -156,11 +156,11 @@ There is no mandatory separate application preflight or admission stage before
 Human review. The implemented `PlanValidator` is a side-effect-free
 boundary for requiring exact persisted Objective and Assumption content,
 resolving exact Task membership, and verifying a canonical candidate without
-side effects. Conversational authorization and the commit transaction are
-implemented at the bounded SQLite application surface. The Human prompt is
-retained in native conversation history, Planner produces the semantic
-`continue_execution` conclusion, and conversation text alone is not direct
-Application authority.
+side effects. The atomic commit transaction and objective-scoped active Plan
+selection are **Verified on SQLite** as an independently callable
+application-authority surface. Conversational authorization and the transient
+candidate lifecycle are deferred to the Planner LangGraph phase; the current
+runtime does not connect a later Human prompt to Plan admission.
 
 Authorization is not activation. The Plan visible to a user must be the same
 exact Plan that application authority activates. A changed proposal remains a
@@ -256,10 +256,9 @@ Planner-side tool is active in this phase.
 Application exact-materializes the current SessionFrame Objective,
 Assumptions, Tasks, Evidence, Discoveries, and DataProfile into immutable
 `PlannerContext`. It resolves the objective-scoped active Plan for the frame's
-exact current Objective and materializes that Plan without model inference. It
-also exposes the exact prior pending Plan and Task bundle in separate fields;
-those pending Tasks never enter the authoritative `tasks` field.
-Native conversation history is supplied as model history but is
+exact current Objective and materializes that Plan without model inference.
+`PlannerContext` contains neither candidate Plan/Task state nor conversation
+history. Native conversation history is supplied separately as model history but is
 non-authoritative and is not duplicated into current-run `PlannerOutput.messages`.
 Evidence and Discovery may support an answer. Assumptions may guide planning
 but cannot support an empirical answer or be created by Planner.
@@ -267,17 +266,13 @@ but cannot support an empirical answer or be created by Planner.
 Candidate validation rejects Tasks without a Plan, any Task bundle that does
 not exactly match Plan membership and Objective scope, unknown Assumption IDs,
 or changed content under an admitted Assumption ID. A candidate may reuse the
-current Objective or contain a newly proposed Objective, but Application does
-retain that exact bundle transiently. Typed approval atomically admits its
-exact Objective and Tasks when needed, persists the Plan, and selects it active
-for that Objective only after Planner interprets a later Human prompt as clear
-authorization. Returning the same candidate preserves it, returning a new
-candidate replaces it, and returning no candidate without continuation clears
-it. The `continue_execution` signal requires a supplied pending or active Plan
-and performs no execution. A pending Plan present before the invocation takes
-precedence and is admitted exactly; a candidate returned by the same invocation
-cannot be admitted. Capability, provider, executor, worker, and execution
-routing are absent from the model-visible Planner contracts.
+current Objective or contain a newly proposed Objective, but it remains output
+of that invocation only. Application does not retain, replace, clear, or admit
+the candidate. The `continue_execution` signal requires a supplied active Plan
+and performs no execution. Candidate retention, conversational Human
+authorization, and interrupt/resume are **Deferred** to the Planner LangGraph
+phase. Capability, provider, executor, worker, and execution routing are absent
+from the model-visible Planner contracts.
 
 The immutable Phase 1 `Plan` and `PlanDependency` domain
 contracts and side-effect-free application validation are **Implemented** with
@@ -288,10 +283,11 @@ identity/fingerprint reconstruction are **Verified on SQLite** as
 infrastructure for the approval boundary. `PlanDependency` is one canonical
 outgoing-adjacency group per prerequisite, while SQLite persistence remains
 normalized as atomic edges. Validation alone does not persist a candidate.
-Planner-interpreted Human authorization, atomic exact-bundle admission, and
-objective-scoped active selection are **Verified on SQLite**. Pending candidate
-and conversation recovery, Task DAG execution, and replanning runtime are
-**Deferred**. Active
+Atomic exact-bundle admission and objective-scoped active selection are
+**Verified on SQLite** as independent application-authority services. No
+current runtime path invokes admission from a Planner candidate. Candidate
+lifecycle, conversational Human authorization, LangGraph interrupt/resume,
+Task DAG execution, and replanning runtime are **Deferred**. Active
 Task exposes all three canonical kinds, but only the
 separate bounded `DATA` execution subsystem is executable; Planner does not
 dispatch it in Phase 2. GeneratedView coordination, durable SessionFrame

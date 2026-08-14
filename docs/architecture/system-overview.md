@@ -175,10 +175,11 @@ The immutable Phase 1 Plan domain contract and side-effect-free candidate
 validation are **Implemented**, and its append-only repository foundation is
 **Verified on SQLite** with exact historical Objective and Assumption content
 snapshots. Transient Planner candidate authoring is **Implemented** through one
-direct `plan_or_answer` invocation with no tools or execution. Conversational
-Human authorization, exact pre-existing-candidate validation, atomic
-Objective/Task/Plan persistence, and objective-scoped active selection are
-**Verified on SQLite**. Task DAG runtime, durable pending-candidate recovery,
+direct `plan_or_answer` invocation with no tools or execution. Atomic exact-
+bundle Objective/Task/Plan admission and objective-scoped active selection are
+**Verified on SQLite** as independent application-authority services.
+Conversational Human authorization, candidate retention, Planner LangGraph
+interrupt/resume, Task DAG runtime, durable candidate recovery,
 scientific
 investigation and protocol, canonical Evidence lineage, protected evaluation,
 governance, Discovery admission, semantic graph inquiry, and restart-safe

@@ -257,20 +257,20 @@ overwrite the existing snapshot, while different IDs with the same content
 fingerprint remain distinct. The repository is append-only and exposes no
 update or delete surface.
 
-Application retains the exact Planner candidate in-process without writing it
-and exposes it to the next Planner invocation separately from authoritative
-state. Planner interprets the latest Human prompt; conversation text is not
-direct Application authority. Clear authorization produces
-`continue_execution`, after which Application atomically validates the exact
-pre-invocation pending bundle, resolves or admits its Objective and Tasks,
-persists the immutable Plan, and writes one objective-scoped active pointer.
-Returning the same candidate preserves it, a new candidate replaces it, and a
-response without a candidate clears it. Any admission failure rolls the
-complete transaction back. Pending candidates and conversation history are not
-durable or recoverable.
+`PlanAdmissionService` accepts an exact candidate Plan and exact Task bundle at
+an explicit application-authority boundary. It validates membership, identity,
+Objective and Assumption exactness, persists legal new Objective and Task
+records, persists the immutable Plan, and writes one objective-scoped active
+pointer in a single transaction. Any failure rolls the complete transaction
+back. This service does not interpret Human text.
+
+The current runtime does not retain a Planner candidate or call admission from
+a later conversation turn. Candidate retention, conversational Human
+authorization, and LangGraph interrupt/resume are **Deferred**. Native model
+history remains non-authoritative interaction state outside `PlannerContext`.
 
 The complete target boundary is not implemented. Canonical Task DAG execution,
-durable pending-candidate recovery, role-native result inbox processing,
+candidate lifecycle and review recovery, role-native result inbox processing,
 complete replay coordination, scientific Evidence admission from
 `EvidenceRequest`, governance
 workflow, Discovery admission from exact governed proposals, and end-to-end

@@ -10,9 +10,9 @@ These are verified constraints of the bounded current implementation.
 - Active bounded Task has no Plan-driven dependency eligibility or parent/leaf
   execution semantics. Immutable Plan candidates represent direct Task
   membership, exact Objective and admitted Assumption basis, and grouped
-  structural dependencies. Exact Human approval can atomically persist and
-  select a Plan active by Objective, but only `DATA` is separately executable
-  and no Plan drives execution.
+  structural dependencies. An independent application service can atomically
+  persist an exact authorized bundle and select a Plan active by Objective, but
+  only `DATA` is separately executable and no Plan drives execution.
 - The current materialized SessionFrame can hold one Objective and one
   DataProfile but is not the canonical reference-based session-membership FCO
   and does not implement Objective-bound multi-session isolation. It now
@@ -28,19 +28,20 @@ These are verified constraints of the bounded current implementation.
   history, and deterministic Data Explorer-to-Evidence admission are
   **Implemented** at separate bounded library surfaces. Planner performs one
   direct `plan_or_answer` invocation with no tools or dispatch. The in-process
-  Application retains its materialized SessionFrame, exact transient Plan
-  candidate, and model-backed conversation turns. Planner-interpreted Human
-  authorization delegates atomic exact-bundle admission to application
-  authority; durable pending-candidate recovery, restart/recovery, and
-  complete-loop composition are **Deferred**.
+  Application retains its materialized SessionFrame and model-backed
+  conversation turns, while conversation history remains outside
+  `PlannerContext`. Application does not retain or admit Planner candidates.
+  Candidate lifecycle, conversational Human authorization, LangGraph
+  interrupt/resume, restart/recovery, and complete-loop composition are
+  **Deferred**.
 - The Phase 1 Plan domain and side-effect-free candidate validation are
   **Implemented**, and append-only repository behavior is **Verified on
   SQLite** with exact Objective and Assumption snapshots for historical
   reconstruction. Planner can author a transient structurally validated
-  candidate. Conversational authorization, commit-boundary validation and
-  persistence, and objective-scoped active selection are **Verified on
-  SQLite**. Task DAG
-  runtime is **Deferred**.
+  candidate for one invocation. Commit-boundary validation and persistence plus
+  objective-scoped active selection are **Verified on SQLite** through an
+  independent application service; conversational authorization is
+  **Deferred**. Task DAG runtime is **Deferred**.
   `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
@@ -49,11 +50,10 @@ These are verified constraints of the bounded current implementation.
   and Hypothesis remain canonical FCO names but have no active bounded runtime.
 - Planner may propose a new Objective only inside a transient candidate Plan.
   It cannot create or mutate Assumptions; a candidate may retain only exact
-  already-admitted Assumptions. Exact approval may atomically admit that new
-  Objective, its exact Tasks, and Plan. If an existing SessionFrame already has
-  a different Objective, Application does not switch it because retained
-  cross-Objective membership succession is undefined. Task persistence supports
-  status change only. Active Task
+  already-admitted Assumptions. The runtime does not retain that candidate or
+  connect a later Human response to admission. The independent admission
+  service may atomically admit an exact authorized Objective, Task, and Plan
+  bundle. Task persistence supports status change only. Active Task
   values are immutable; changing Task meaning requires a new identity, while
   status change produces a replacement with the same identity and instruction.
 - Application-authority Evidence admission is **Implemented** for the direct
@@ -94,11 +94,10 @@ These are verified constraints of the bounded current implementation.
 - Bootstrap composes the in-process S0 dispatcher and bounded Data Explorer.
   The installable `cognieda [PATH]` command reaches the development Planner
   REPL and is **Partially implemented**. Its Application owns materialized
-  SessionFrame state, typed Plan review, exact active-Plan `PlannerContext`
-  materialization, and complete
-  native-message model turns only for the
-  current process. The REPL does not expose typed Plan review; no durable
-  recovery, supported end-to-end application
+  SessionFrame state, exact active-Plan `PlannerContext` materialization, and
+  complete native-message model turns only for the current process. Candidate
+  review/authorization and LangGraph interrupt/resume are not implemented. No
+  durable recovery or supported end-to-end application
   runtime, worker, service API, or product CLI exists.
 - The local Data Explorer path executes only finite validated deterministic
   operations from an explicit absolute CSV or Parquet path. General-purpose

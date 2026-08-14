@@ -156,10 +156,11 @@ domain and side-effect-free application validator are **Implemented** with
 exact Objective and Assumption content, direct Task-ID membership, DAG validation,
 deterministic fingerprinting, and persisted Objective/Assumption/Task checks.
 The append-only repository foundation snapshots exact Objective and Assumption
-content and is **Verified on SQLite**, but has no application caller
-for Plan. Phase 2 transient Planner candidate authoring is **Implemented**.
-Human approval, exact revalidation, persistence at the approval boundary,
-activation, active
-selection, replanning, canonical scientific execution, and the complete
-lifecycle linked above remain **Deferred**; only bounded `DATA` execution is
-supported, and Plan state does not drive it.
+content and is **Verified on SQLite**. Exact Plan admission and objective-scoped
+active selection are **Verified on SQLite** through an independent
+application-authority service. Phase 2 transient Planner candidate authoring is
+**Implemented**, but the runtime does not retain a candidate or connect Human
+conversation to admission. Candidate lifecycle, conversational authorization,
+Planner LangGraph interrupt/resume, replanning, canonical scientific execution,
+and the complete lifecycle linked above remain **Deferred**; only bounded
+`DATA` execution is supported, and Plan state does not drive it.

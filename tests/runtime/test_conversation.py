@@ -20,6 +20,7 @@ from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.types import PlannerOutput, PlannerResult
 from cognieda.application.ports import AgentFactoryPort
+from cognieda.application.services import PlanAdmissionService
 from cognieda.execution import ExecutorDispatcher
 from cognieda.infrastructure.persistence.repositories import (
     ActivePlanRepository,
@@ -45,10 +46,18 @@ class SequencePlanner:
         self._outputs = iter(outputs)
         self.requests: list[str] = []
         self.contexts: list[PlannerContext] = []
+        self.message_histories: list[tuple[ModelMessage, ...]] = []
 
-    async def run(self, request: str, *, context: PlannerContext) -> PlannerOutput:
+    async def run(
+        self,
+        request: str,
+        *,
+        context: PlannerContext,
+        message_history: list[ModelMessage] | None = None,
+    ) -> PlannerOutput:
         self.requests.append(request)
         self.contexts.append(context)
+        self.message_histories.append(tuple(message_history or ()))
         return next(self._outputs)
 
     async def reload(self, **_: Any) -> None:
@@ -91,6 +100,7 @@ def _application(planner: SequencePlanner, db_session: Session) -> Application:
 
 def test_application_has_no_separate_plan_review_api() -> None:
     assert not hasattr(Application, "review_plan")
+    assert not hasattr(Application, "_apply_planner_result")
 
 
 def test_conversation_history_appends_complete_native_message_turns() -> None:
@@ -108,7 +118,7 @@ def test_conversation_history_appends_complete_native_message_turns() -> None:
         ConversationTurn(messages=())
 
 
-def test_candidate_becomes_pending_only_and_pending_tasks_are_not_authoritative(
+def test_candidate_is_invocation_output_only_without_authoritative_writes(
     db_session: Session,
 ) -> None:
     first_messages = _messages("Investigate churn.", "Proposed a plan.")
@@ -120,87 +130,63 @@ def test_candidate_becomes_pending_only_and_pending_tasks_are_not_authoritative(
     first = asyncio.run(application.submit_message("Investigate churn."))
 
     assert first.content == "I propose a bounded investigation."
-    assert application._pending_plan == candidate.plan
-    assert application._pending_tasks == candidate.tasks
+    assert not hasattr(application, "_pending_plan")
+    assert not hasattr(application, "_pending_tasks")
     assert application.session_frame.objective is None
     assert application.session_frame.tasks == ()
     assert len(application.conversation_history.turns) == 1
-    assert planner.contexts[0].pending_plan is None
-    assert planner.contexts[0].pending_tasks == ()
-    assert ObjectiveRepository(db_session).get_by_id(
-        candidate.plan.objective.objective_id
-    ) is None
+    assert tuple(type(planner.contexts[0]).model_fields) == (
+        "active_plan",
+        "objective",
+        "assumptions",
+        "tasks",
+        "evidences",
+        "discoveries",
+        "data_profile",
+    )
+    assert planner.message_histories == [()]
+    assert ObjectiveRepository(db_session).get_by_id(candidate.plan.objective.objective_id) is None
     assert TaskRepository(db_session).get_by_id(candidate.tasks[0].task_id) is None
     assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) is None
-    assert ActivePlanRepository(db_session).get_by_objective_id(
-        candidate.plan.objective.objective_id
-    ) is None
-
-
-def test_response_with_same_candidate_preserves_pending_bundle(
-    db_session: Session,
-) -> None:
-    candidate = _candidate_result()
-    assert candidate.plan is not None
-    explained = candidate.model_copy(
-        update={"response": "Segmentation separates materially different cohorts."}
+    assert (
+        ActivePlanRepository(db_session).get_by_objective_id(candidate.plan.objective.objective_id)
+        is None
     )
-    planner = SequencePlanner((PlannerOutput(result=candidate), PlannerOutput(result=explained)))
-    application = _application(planner, db_session)
-
-    asyncio.run(application.submit_message("Investigate churn."))
-    response = asyncio.run(application.submit_message("Why segment customers?"))
-
-    assert planner.contexts[1].pending_plan == candidate.plan
-    assert planner.contexts[1].pending_tasks == candidate.tasks
-    assert planner.contexts[1].tasks == ()
-    assert response.content == "Segmentation separates materially different cohorts."
-    assert application._pending_plan == candidate.plan
-    assert application._pending_tasks == candidate.tasks
-    assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) is None
 
 
-def test_new_candidate_replaces_pending_bundle_without_authoritative_writes(
+def test_conversation_history_is_passed_separately_from_planner_context(
     db_session: Session,
 ) -> None:
-    first = _candidate_result()
-    revised = _candidate_result(instruction="Profile enterprise churn labels.")
-    assert first.plan is not None
-    assert revised.plan is not None
-    planner = SequencePlanner((PlannerOutput(result=first), PlannerOutput(result=revised)))
-    application = _application(planner, db_session)
-
-    asyncio.run(application.submit_message("Investigate churn."))
-    asyncio.run(application.submit_message("Focus on enterprise customers."))
-
-    assert application._pending_plan == revised.plan
-    assert application._pending_tasks == revised.tasks
-    assert PlanRepository(db_session).get_by_id(first.plan.plan_id) is None
-    assert PlanRepository(db_session).get_by_id(revised.plan.plan_id) is None
-
-
-def test_response_without_candidate_clears_stale_pending_bundle(
-    db_session: Session,
-) -> None:
-    candidate = _candidate_result()
-    assert candidate.plan is not None
+    first_messages = _messages("First request", "First response")
+    second_messages = _messages("Second request", "Second response")
     planner = SequencePlanner(
         (
-            PlannerOutput(result=candidate),
-            PlannerOutput(result=PlannerResult(response="I will stop this analysis.")),
+            PlannerOutput(
+                result=PlannerResult(response="First response"),
+                messages=first_messages,
+            ),
+            PlannerOutput(
+                result=PlannerResult(response="Second response"),
+                messages=second_messages,
+            ),
         )
     )
     application = _application(planner, db_session)
 
-    asyncio.run(application.submit_message("Investigate churn."))
-    asyncio.run(application.submit_message("Stop this analysis."))
+    asyncio.run(application.submit_message("First request"))
+    asyncio.run(application.submit_message("Second request"))
 
-    assert application._pending_plan is None
-    assert application._pending_tasks == ()
-    assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) is None
+    assert planner.message_histories == [(), first_messages]
+    assert all(
+        "conversation_history" not in type(context).model_fields for context in planner.contexts
+    )
+    assert application.conversation_history.model_messages() == [
+        *first_messages,
+        *second_messages,
+    ]
 
 
-def test_conversational_acceptance_admits_exact_prior_pending_bundle(
+def test_followup_cannot_admit_an_invocation_local_candidate(
     db_session: Session,
 ) -> None:
     candidate = _candidate_result()
@@ -216,111 +202,37 @@ def test_conversational_acceptance_admits_exact_prior_pending_bundle(
     asyncio.run(application.submit_message("Investigate churn."))
     continued = asyncio.run(application.submit_message("Proceed with that plan."))
 
-    assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) == candidate.plan
+    assert continued.content == "The current Plan should continue execution."
+    assert all(context.active_plan is None for context in planner.contexts)
+    assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) is None
+    assert ObjectiveRepository(db_session).get_by_id(candidate.plan.objective.objective_id) is None
+    assert TaskRepository(db_session).get_by_id(candidate.tasks[0].task_id) is None
     assert (
         ActivePlanRepository(db_session).get_by_objective_id(candidate.plan.objective.objective_id)
-        == candidate.plan
+        is None
     )
-    assert application.session_frame.objective == candidate.plan.objective
-    assert application.session_frame.tasks == candidate.tasks
-    assert planner.contexts[1].pending_plan == candidate.plan
-    assert planner.contexts[1].active_plan is None
-    assert application._pending_plan is None
-    assert application._pending_tasks == ()
-    assert continued.content == "The current Plan should continue execution."
 
 
-def test_admitted_different_objective_does_not_switch_existing_session_frame(
+def test_active_plan_materializes_only_from_authoritative_repository_state(
     db_session: Session,
 ) -> None:
     candidate = _candidate_result()
     assert candidate.plan is not None
-    planner = SequencePlanner(
-        (
-            PlannerOutput(result=candidate),
-            PlannerOutput(result=PlannerResult(continue_execution=True)),
-        )
-    )
-    application = _application(planner, db_session)
-    existing = Objective(text="Existing Objective.")
-    application.session_frame = application.session_frame.set_objective(existing)
-
-    asyncio.run(application.submit_message("Propose a different scope."))
-    asyncio.run(application.submit_message("Proceed with that proposal."))
-
-    assert application.session_frame.objective == existing
-    assert (
-        ActivePlanRepository(db_session).get_by_objective_id(candidate.plan.objective.objective_id)
-        == candidate.plan
-    )
-
-
-def test_continuation_with_only_active_plan_remains_valid_without_execution(
-    db_session: Session,
-) -> None:
-    candidate = _candidate_result()
-    assert candidate.plan is not None
-    planner = SequencePlanner(
-        (
-            PlannerOutput(result=candidate),
-            PlannerOutput(result=PlannerResult(continue_execution=True)),
-            PlannerOutput(result=PlannerResult(continue_execution=True)),
-        )
-    )
-    application = _application(planner, db_session)
-
-    asyncio.run(application.submit_message("Investigate churn."))
-    asyncio.run(application.submit_message("Proceed."))
-    continued = asyncio.run(application.submit_message("Continue active work."))
-
-    assert planner.contexts[2].pending_plan is None
-    assert planner.contexts[2].active_plan == candidate.plan
-    assert continued.content == "The current Plan should continue execution."
-
-
-def test_pending_candidate_takes_precedence_over_existing_active_plan(
-    db_session: Session,
-) -> None:
-    objective = Objective(text="Understand customer churn.")
-    first = _candidate_result(objective=objective)
-    successor = _candidate_result(
-        objective=objective,
-        instruction="Profile enterprise churn labels.",
-    )
-    assert first.plan is not None
-    assert successor.plan is not None
-    planner = SequencePlanner(
-        (
-            PlannerOutput(result=first),
-            PlannerOutput(result=PlannerResult(continue_execution=True)),
-            PlannerOutput(result=successor),
-            PlannerOutput(result=PlannerResult(continue_execution=True)),
-        )
-    )
-    application = _application(planner, db_session)
-
-    asyncio.run(application.submit_message("Investigate churn."))
-    asyncio.run(application.submit_message("Proceed."))
-    asyncio.run(application.submit_message("Focus on enterprise customers."))
-    asyncio.run(application.submit_message("Proceed with the revised plan."))
-
-    assert planner.contexts[3].pending_plan == successor.plan
-    assert planner.contexts[3].active_plan == first.plan
-    assert PlanRepository(db_session).get_by_id(first.plan.plan_id) == first.plan
-    assert PlanRepository(db_session).get_by_id(successor.plan.plan_id) == successor.plan
-    assert ActivePlanRepository(db_session).get_by_objective_id(
-        objective.objective_id
-    ) == successor.plan
-
-
-def test_continuation_without_pending_or_active_plan_fails_closed(
-    db_session: Session,
-) -> None:
+    admitted = PlanAdmissionService(db_session).admit(candidate.plan, tasks=candidate.tasks)
     planner = SequencePlanner((PlannerOutput(result=PlannerResult(continue_execution=True)),))
     application = _application(planner, db_session)
+    application.session_frame = application.session_frame.set_objective(candidate.plan.objective)
 
-    with pytest.raises(ValueError, match="pending or active Plan"):
-        asyncio.run(application.submit_message("Continue."))
+    continued = asyncio.run(application.submit_message("Continue active work."))
+
+    assert planner.contexts[0].active_plan == admitted
+    assert planner.contexts[0].tasks == ()
+    assert PlanRepository(db_session).get_by_id(admitted.plan_id) == admitted
+    assert (
+        ActivePlanRepository(db_session).get_by_objective_id(admitted.objective.objective_id)
+        == admitted
+    )
+    assert continued.content == "The current Plan should continue execution."
 
 
 def test_skill_assignment_reloads_tooling_and_planner_without_state_mutation(

@@ -100,10 +100,10 @@ at a time; this is not a one-session-per-Workspace rule.
 `SessionFrame` with one optional Objective, ordered Assumptions, Tasks and
 Evidence and Discoveries, and one optional DataProfile. The in-process
 application passes those objects without filtering into immutable
-`PlannerContext` and retains native conversation history in its explicit
-non-authoritative field. Phase 2 Planner may answer, ask for clarification,
-return a transient Plan plus exact Tasks, or signal continuation; Application
-does not admit those candidate objects.
+`PlannerContext`. Native conversation history is supplied separately as
+non-authoritative model history. Phase 2 Planner may answer, ask for
+clarification, return a transient Plan plus exact Tasks, or signal continuation;
+Application does not retain or admit those candidate objects.
 
 The current frame is not the canonical typed-reference membership model and is
 not durably restored by the runtime. Mode-specific context eligibility, exact

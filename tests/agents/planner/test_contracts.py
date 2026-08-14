@@ -7,7 +7,6 @@ from pydantic import ValidationError
 
 from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.types import PlannerOutput, PlannerResult
-from cognieda.runtime.conversation import ConversationHistory
 from cognieda.schemas import (
     Assumption,
     DataProfile,
@@ -78,8 +77,6 @@ def _evidence_and_discovery(
 
 def test_planner_context_and_result_have_exact_canonical_fields() -> None:
     assert tuple(PlannerContext.model_fields) == (
-        "pending_plan",
-        "pending_tasks",
         "active_plan",
         "objective",
         "assumptions",
@@ -87,7 +84,6 @@ def test_planner_context_and_result_have_exact_canonical_fields() -> None:
         "evidences",
         "discoveries",
         "data_profile",
-        "conversation_history",
     )
     assert tuple(PlannerResult.model_fields) == (
         "plan",
@@ -106,11 +102,8 @@ def test_planner_context_retains_all_typed_readable_state() -> None:
     profile = DataProfile(row_count=10, column_count=0, columns=())
     evidence, discovery = _evidence_and_discovery(task, profile)
     active_plan = _plan(objective, (task,))
-    history = ConversationHistory()
 
     context = PlannerContext(
-        pending_plan=active_plan,
-        pending_tasks=(task,),
         active_plan=active_plan,
         objective=objective,
         assumptions=(assumption,),
@@ -118,11 +111,8 @@ def test_planner_context_retains_all_typed_readable_state() -> None:
         evidences=(evidence,),
         discoveries=(discovery,),
         data_profile=profile,
-        conversation_history=history,
     )
 
-    assert context.pending_plan is active_plan
-    assert context.pending_tasks == (task,)
     assert context.active_plan is active_plan
     assert context.objective is objective
     assert context.assumptions == (assumption,)
@@ -130,7 +120,6 @@ def test_planner_context_retains_all_typed_readable_state() -> None:
     assert context.evidences == (evidence,)
     assert context.discoveries == (discovery,)
     assert context.data_profile is profile
-    assert context.conversation_history is history
 
 
 def test_response_candidate_plan_and_human_input_request_are_valid() -> None:
@@ -154,13 +143,6 @@ def test_tasks_without_plan_are_rejected() -> None:
 
     with pytest.raises(ValidationError, match="tasks require"):
         PlannerResult(tasks=(_task(objective),))
-
-
-def test_pending_tasks_without_pending_plan_are_rejected() -> None:
-    objective = Objective(text="Understand customer retention.")
-
-    with pytest.raises(ValidationError, match="Pending Tasks require"):
-        PlannerContext(pending_tasks=(_task(objective),))
 
 
 def test_plan_must_validate_the_exact_task_bundle() -> None:

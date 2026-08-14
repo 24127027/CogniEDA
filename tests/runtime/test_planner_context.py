@@ -5,7 +5,6 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.planner_context import build_planner_context
 from cognieda.schemas import (
     Assumption,
@@ -75,12 +74,9 @@ def _full_frame() -> SessionFrame:
 
 def test_builder_exactly_materializes_every_readable_session_frame_member() -> None:
     frame = _full_frame()
-    history = ConversationHistory()
 
-    context = build_planner_context(frame, history)
+    context = build_planner_context(frame)
 
-    assert context.pending_plan is None
-    assert context.pending_tasks == ()
     assert context.active_plan is None
     assert context.objective == frame.objective
     assert context.assumptions == frame.assumptions
@@ -88,7 +84,6 @@ def test_builder_exactly_materializes_every_readable_session_frame_member() -> N
     assert context.evidences == frame.evidences
     assert context.discoveries == frame.discoveries
     assert context.data_profile == frame.data_profile
-    assert context.conversation_history == history
     with pytest.raises(ValidationError, match="frozen"):
         context.tasks = ()
 
@@ -118,37 +113,10 @@ def test_builder_materializes_exact_active_plan_for_current_objective() -> None:
 
     context = build_planner_context(
         frame,
-        ConversationHistory(),
         active_plan=plan,
     )
 
     assert context.active_plan is plan
-
-
-def test_builder_keeps_pending_tasks_separate_from_authoritative_tasks() -> None:
-    frame = _full_frame()
-    assert frame.objective is not None
-    pending_task = Task(
-        objective_id=frame.objective.objective_id,
-        kind=TaskKind.DATA,
-        instruction="Inspect a proposed cohort.",
-    )
-    pending_plan = Plan.create(
-        objective=frame.objective,
-        task_ids=(pending_task.task_id,),
-        tasks=(pending_task,),
-    )
-
-    context = build_planner_context(
-        frame,
-        ConversationHistory(),
-        pending_plan=pending_plan,
-        pending_tasks=(pending_task,),
-    )
-
-    assert context.pending_plan is pending_plan
-    assert context.pending_tasks == (pending_task,)
-    assert context.tasks == frame.tasks
 
 
 def test_builder_rejects_active_plan_for_different_objective() -> None:
@@ -159,6 +127,5 @@ def test_builder_rejects_active_plan_for_different_objective() -> None:
     with pytest.raises(ValueError, match="exact SessionFrame Objective"):
         build_planner_context(
             frame,
-            ConversationHistory(),
             active_plan=plan,
         )

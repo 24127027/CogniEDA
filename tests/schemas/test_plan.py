@@ -420,15 +420,16 @@ def test_plan_contract_excludes_routing_data_and_lifecycle_fields() -> None:
     assert prohibited.isdisjoint(PlanDependency.model_fields)
 
 
-def test_plan_is_immutable_non_fco_and_has_explicit_planner_surfaces() -> None:
+def test_plan_is_immutable_non_fco_and_respects_planner_ownership_surfaces() -> None:
     task = _task()
     plan = _plan([task])
 
     with pytest.raises(ValidationError, match="frozen"):
         plan.task_ids = ()
     assert "PLAN" not in FirstClassObjectType.__members__
-    assert "pending_plan" in PlannerContext.model_fields
-    assert "pending_tasks" in PlannerContext.model_fields
+    assert "pending_plan" not in PlannerContext.model_fields
+    assert "pending_tasks" not in PlannerContext.model_fields
+    assert "conversation_history" not in PlannerContext.model_fields
     assert "active_plan" in PlannerContext.model_fields
     assert "plan" in PlannerResult.model_fields
     assert "plan" not in PlannerOutput.model_fields

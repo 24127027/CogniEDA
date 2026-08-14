@@ -24,7 +24,7 @@ from cognieda.schemas.plan import Plan
 
 
 class PlanAdmissionService:
-    """Admit one exact bundle after Planner-interpreted Human authorization."""
+    """Admit one exact authorized bundle through application authority."""
 
     def __init__(self, session: Session) -> None:
         self._session = session

@@ -86,6 +86,7 @@ class Planner:
         request: str,
         *,
         context: PlannerContext,
+        message_history: list[ModelMessage] | None = None,
     ) -> PlannerOutput:
         """Invoke plan_or_answer exactly once without mutation or execution."""
 
@@ -110,7 +111,7 @@ class Planner:
                 prompt,
                 output_type=PlannerResult,
                 deps=self.deps,
-                message_history=context.conversation_history.model_messages(),
+                message_history=message_history,
                 instructions=self._instructions,
             )
             messages = tuple(run_result.new_messages())
@@ -133,7 +134,7 @@ class Planner:
 
     @staticmethod
     def _build_prompt(request: str, context: PlannerContext) -> str:
-        readable_state = context.model_dump_json(exclude={"conversation_history"})
+        readable_state = context.model_dump_json()
         return f"Human request:\n{request}\n\nTyped readable research state:\n{readable_state}"
 
     @staticmethod
@@ -141,12 +142,8 @@ class Planner:
         result: PlannerResult,
         context: PlannerContext,
     ) -> None:
-        if (
-            result.continue_execution
-            and context.pending_plan is None
-            and context.active_plan is None
-        ):
-            raise ValueError("continue_execution requires a pending or active Plan.")
+        if result.continue_execution and context.active_plan is None:
+            raise ValueError("continue_execution requires an active Plan.")
 
         if result.plan is None:
             return

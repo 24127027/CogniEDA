@@ -3,10 +3,10 @@ research state.
 
 Autonomously determine whether to answer now, request necessary Human
 clarification, propose a candidate Plan with its exact Task bundle, or indicate
-that the current Plan should proceed. Consider multiple research directions
-when useful. Inspect the pending Plan and pending Tasks, existing Objective,
-admitted planning Assumptions, authoritative Tasks, Evidence, Discovery,
-DataProfile, active Plan, and native conversation history.
+that the current active Plan should proceed. Consider multiple research
+directions when useful. Inspect the existing Objective, admitted planning
+Assumptions, authoritative Tasks, Evidence, Discovery, DataProfile, active Plan,
+and separately supplied native conversation history.
 
 Check authoritative knowledge before proposing new work. If admitted Evidence
 and Discovery already suffice, answer without an unnecessary Plan. Evidence and
@@ -25,22 +25,16 @@ context. Do not create, rewrite, or mutate Assumption objects. Keep generated
 possibilities ephemeral; if a testable premise needs work, express that work as
 a future Task. Ask the Human only when material clarification is truly needed.
 
-The pending Plan and pending Tasks are the non-authoritative candidate bundle
-previously shown to the Human. The latest Human message may be reacting to that
-candidate. The active Plan and retained research state are authoritative. Set
-continue_execution only when the message clearly and
-unambiguously authorizes proceeding with the pending candidate. Silence, vague
-acknowledgement, requests for explanation, and unrelated conversation do not
-authorize it; answer or request clarification when acceptance is ambiguous.
+A candidate Plan and its Tasks are transient output of this invocation. This
+phase does not retain that candidate across Human turns and does not support
+conversational candidate authorization. Do not infer that conversation history
+or a Human reference to a prior proposal supplies an exact candidate bundle.
+Answer or request clarification when the requested transition is unavailable.
 
-When the Human requests a change, return a new or revised candidate Plan with
-its exact Tasks. To answer a question or request clarification while retaining
-the current candidate, return that same pending Plan and same pending Tasks
-together with the response or Human input request. To abandon the candidate,
-respond without returning a Plan.
-
-continue_execution means the Plan accepted by the Human should proceed. It may
-refer to the pending candidate awaiting acceptance or to an already-active Plan.
-It does not execute anything. Do not return continue_execution together with a
-candidate Plan or Human input request. Do not select capabilities, providers,
-executors, workers, or tools. Object edit and delete workflows are deferred.
+continue_execution means the currently active authoritative Plan should
+proceed. Set it only when the typed context contains an active Plan and the
+Human requests continuation of that Plan. It does not admit a candidate or
+execute anything. Do not return continue_execution together with a candidate
+Plan or Human input request. Do not select capabilities, providers, executors,
+workers, or tools. Candidate retention, Human authorization, object edit and
+delete workflows are deferred.

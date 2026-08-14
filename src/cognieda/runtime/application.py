@@ -5,10 +5,9 @@ from sqlmodel import Session
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.types import PlannerResult
 from cognieda.application.ports import AgentFactoryPort
-from cognieda.application.services import PlanAdmissionService
 from cognieda.execution import ExecutorDispatcher
 from cognieda.infrastructure.persistence.repositories import ActivePlanRepository
-from cognieda.schemas.artifacts import SessionFrame, Task
+from cognieda.schemas.artifacts import SessionFrame
 from cognieda.schemas.plan import Plan
 
 from .conversation import ConversationHistory
@@ -30,31 +29,24 @@ class Application:
         self.agent_factory = agent_factory
         self.planner_agent = planner_agent
         self.dispatcher = dispatcher
-        self._plan_admission = PlanAdmissionService(session)
         self._active_plans = ActivePlanRepository(session)
         self.session_frame = SessionFrame()
         self.conversation_history = ConversationHistory()
-        self._pending_plan: Plan | None = None
-        self._pending_tasks: tuple[Task, ...] = ()
 
     async def submit_message(self, message: str) -> Message:
         if message.startswith("/"):
             return await self._handle_command(message)
 
-        prior_pending_plan = self._pending_plan
-        prior_pending_tasks = self._pending_tasks
         active_plan = self._resolve_active_plan()
         planner_context = build_planner_context(
             self.session_frame,
-            self.conversation_history,
-            pending_plan=prior_pending_plan,
-            pending_tasks=prior_pending_tasks,
             active_plan=active_plan,
         )
         try:
             planner_output = await self.planner_agent.run(
                 message,
                 context=planner_context,
+                message_history=self.conversation_history.model_messages(),
             )
         except MissingModelCredentialError as e:
             return self._text(
@@ -67,76 +59,17 @@ class Application:
                 planner_output.messages
             )
 
-        self._apply_planner_result(
-            planner_output.result,
-            prior_pending_plan=prior_pending_plan,
-            prior_pending_tasks=prior_pending_tasks,
-            active_plan=active_plan,
-        )
-
         return Message(
             type=MessageType.TEXT,
             role=MessageRole.ASSISTANT,
             content=self._present_planner_result(planner_output.result),
         )
 
-    def _apply_planner_result(
-        self,
-        result: PlannerResult,
-        *,
-        prior_pending_plan: Plan | None,
-        prior_pending_tasks: tuple[Task, ...],
-        active_plan: Plan | None,
-    ) -> None:
-        """Apply only deterministic lifecycle effects of one Planner conclusion."""
-
-        if result.plan is not None:
-            self._pending_plan = result.plan
-            self._pending_tasks = result.tasks
-            return
-
-        if result.continue_execution:
-            if prior_pending_plan is not None:
-                admitted = self._plan_admission.admit(
-                    prior_pending_plan,
-                    tasks=prior_pending_tasks,
-                )
-                self._initialize_empty_session_frame(admitted, prior_pending_tasks)
-                self._pending_plan = None
-                self._pending_tasks = ()
-                return
-            if active_plan is not None:
-                return
-            raise ValueError("continue_execution requires a pending or active Plan.")
-
-        self._pending_plan = None
-        self._pending_tasks = ()
-
     def _resolve_active_plan(self) -> Plan | None:
         objective = self.session_frame.objective
         if objective is None:
             return None
         return self._active_plans.get_by_objective_id(objective.objective_id)
-
-    def _initialize_empty_session_frame(
-        self,
-        plan: Plan,
-        tasks: tuple[Task, ...],
-    ) -> None:
-        frame = self.session_frame
-        if (
-            frame.objective is None
-            and not frame.assumptions
-            and not frame.tasks
-            and not frame.evidences
-            and not frame.discoveries
-        ):
-            self.session_frame = SessionFrame(
-                objective=plan.objective,
-                assumptions=plan.assumptions,
-                tasks=tasks,
-                data_profile=frame.data_profile,
-            )
 
     @staticmethod
     def _present_planner_result(result: PlannerResult) -> str:
