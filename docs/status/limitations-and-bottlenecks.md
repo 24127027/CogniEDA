@@ -17,35 +17,40 @@ These are verified constraints of the bounded current implementation.
   drives execution.
 - The current materialized SessionFrame can hold one Objective and one
   DataProfile but is not the canonical reference-based session-membership FCO
-  and does not implement Objective-bound multi-session isolation.
+  and does not implement Objective-bound multi-session isolation. It now
+  retains materialized Discovery membership for Planner readability, but that
+  does not implement validity-aware selection or the semantic graph.
 - Direct Task-to-Evidence linkage is a bounded transitional capability. Canonical
   Hypothesis, EvidenceRequest, ExecutionRun, AnalysisFrame, evaluation, and
   admission lineage remain **Deferred** and are required by MVP-v2.
 
 ## Implementation gap
 
-- Bounded Planner behavior, append-only native model conversation history, and
-  deterministic Data Explorer-to-Evidence admission are **Implemented**
-  at bounded library surfaces. The in-process Application retains its current
-  successor SessionFrame and model-backed conversation turns, but durable
-  restart/recovery and complete-loop composition are **Deferred**.
+- The Phase 2 Planner cognitive core, append-only native model conversation
+  history, and deterministic Data Explorer-to-Evidence admission are
+  **Implemented** at separate bounded library surfaces. Planner performs one
+  direct `plan_or_answer` invocation with no tools, persistence, approval, or
+  dispatch. The in-process Application retains its materialized SessionFrame
+  and model-backed conversation turns, but does not admit candidate Plan state;
+  durable restart/recovery and complete-loop composition are **Deferred**.
 - The Phase 1 Plan domain and side-effect-free candidate validation are
   **Implemented**, and append-only repository behavior is **Verified on
   SQLite** with exact Objective and Assumption snapshots for historical
-  reconstruction. No application path currently persists a Plan. Planner
-  authoring, human approval, commit-boundary validation and persistence,
-  activation, active selection, and Task DAG runtime are **Deferred**.
+  reconstruction. Planner can author a transient structurally validated
+  candidate, but no application path persists one. Human approval,
+  commit-boundary validation and persistence, activation, active selection,
+  and Task DAG runtime are **Deferred**.
   `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
   and `GovernanceDecision` have no supported implementation.
 - Hypothesis Analyst and Graph Miner remain unregistered scaffolds. Discovery
   and Hypothesis remain canonical FCO names but have no active bounded runtime.
-- Planner typed Objective creation/refinement, Assumption addition, and terminal
-  DATA Task results are **Implemented**. Application alone applies those results
-  to its in-memory successor SessionFrame. Durable Objective and Assumption
-  persistence updates remain **Deferred**. Task persistence supports status
-  change only. Active Task
+- Planner may propose a new Objective only inside a transient candidate Plan.
+  It cannot create or mutate Assumptions; a candidate may retain only exact
+  already-admitted Assumptions. Application does not apply candidate Objective,
+  Task, or Plan state in Phase 2. Human review and durable candidate admission
+  remain **Deferred**. Task persistence supports status change only. Active Task
   values are immutable; changing Task meaning requires a new identity, while
   status change produces a replacement with the same identity and instruction.
 - Application-authority Evidence admission is **Implemented** for the direct
@@ -85,9 +90,9 @@ These are verified constraints of the bounded current implementation.
 
 - Bootstrap composes the in-process S0 dispatcher and bounded Data Explorer.
   The installable `cognieda [PATH]` command reaches the development Planner
-  REPL and is **Partially implemented**. Its Application owns successor
-  materialized SessionFrame state, exact Planner-context materialization, and
-  complete native-message model turns only for the
+  REPL and is **Partially implemented**. Its Application owns materialized
+  SessionFrame state, exact `PlannerContext` materialization, and complete
+  native-message model turns only for the
   current process; no durable recovery, supported end-to-end application
   runtime, worker, service API, or product CLI exists.
 - The local Data Explorer path executes only finite validated deterministic
@@ -103,10 +108,10 @@ These are verified constraints of the bounded current implementation.
   blocked until successor dataset and DataProfile semantics exist.
 - `DATA_TRANSFORMATION` remains blocked until immutable successor dataset state
   and successor DataProfile handling exist.
-- M1-B Planner tests use deterministic fake model and dispatcher boundaries;
-  they prove typed capability selection, tracked Task lifecycle, outcome
-  consumption, and fail-closed behavior without claiming model-selected real
-  Data Explorer filesystem execution.
+- Phase 2 Planner tests use a deterministic fake Agent boundary; they prove
+  direct Agent ownership, one invocation, exact typed dependency injection,
+  context/result coherence, native message isolation, and fail-closed
+  Assumption and active-Plan validation without any executor call.
 - Workspace path selection and initialization are **Implemented**, but
   automatic dataset discovery or admission is **Unsupported**. The
   conventional `data/` directory does not itself establish a DataProfile.
@@ -130,8 +135,9 @@ These are verified constraints of the bounded current implementation.
 
 ## Verification gap
 
-- Full pytest collection includes the rewritten M1-B Planner tests. The three
-  former donor import blockers were removed rather than restored as
+- Full pytest collection includes the rewritten Phase 2 Planner tests. The old
+  Planner model wrapper, decision/action DTOs, four-node graph, nodes, and
+  Planner-side dispatcher tool were deleted rather than restored as
   compatibility APIs.
 - A bounded harness proves real dispatcher-compatible Data Explorer execution
   and application Evidence admission. No composed user-to-Planner-to-real-Data

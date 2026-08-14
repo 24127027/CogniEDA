@@ -101,6 +101,7 @@ def test_planner_production_source_has_no_obsolete_cognitive_symbols() -> None:
     for obsolete in (
         "PlannerDecision",
         "PlannerAction",
+        "PlannerModel",
         "PlannerModelInput",
         "PlannerAnswerInput",
         "PlannerResponseDraft",

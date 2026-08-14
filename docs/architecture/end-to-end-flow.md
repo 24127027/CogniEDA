@@ -251,17 +251,19 @@ agent's retained transcript or hidden memory.
 
 ## Implementation status
 
-**Unsupported end to end.** Current main contains partial Planner proposal,
-approval, and commit behavior; generic capability dispatch foundations; and
-several durable execution-safety transitions. 
+**Unsupported** end to end. The Phase 2 Planner cognitive core can answer,
+request clarification, or produce a transient validated Plan and Task bundle
+through one direct PydanticAI invocation. It performs no Human review,
+approval, commit, activation, or execution. Generic capability dispatch
+foundations and several durable execution-safety transitions exist separately.
 
 The S0 infrastructure boundary is **Implemented**: bootstrap composes an
 explicit registry, dispatcher, Data Explorer provider factory, and Planner
-dependency; a PydanticAI adapter performs typed capability dispatch; and
-focused tests exercise that adapter through a registered provider. This proves
-the invocation seam, not the end-to-end research-state flow.
+dependency. Capability dispatch is not model-visible Planner cognition, and
+Phase 2 exposes no Planner tool. These separate foundations do not establish
+the end-to-end research-state flow.
 
-The canonical Plan, role-native contracts, full specialist
+Human Plan review and activation, role-native contracts, full specialist
 implementations, EvidenceRequest-to-Evidence admission, protected evaluation,
 governance, Discovery admission, full PlannerWorkOutcome consumption, and
 validity-aware presentation sequence remain incomplete or absent. Data

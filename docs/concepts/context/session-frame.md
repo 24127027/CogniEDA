@@ -140,17 +140,18 @@ closed rather than being repaired from prose or “latest record” heuristics.
 
 **Partially implemented.** Current source has a bounded immutable M1-A
 `SessionFrame` value containing one optional materialized Objective, ordered
-materialized Assumptions, Tasks, and Evidence, and one optional materialized
-DataProfile. Validated replacement seams protect duplicate identity and direct
-Task/DataProfile/Evidence consistency, and SQLite can round-trip bounded frame
-snapshots.
+materialized Assumptions, Tasks, Evidence, and Discoveries, and one optional
+materialized DataProfile. Validated replacement seams protect duplicate
+identity and direct Task/DataProfile/Evidence consistency, and SQLite can
+round-trip bounded frame snapshots.
 
-The in-process application exact-copies all five current materialized member
-categories into an immutable `PlanningContext`. Planner receives that context,
-returns explicit Objective, Assumption, and terminal Task results, and never
-receives, mutates, or returns SessionFrame. Application applies those bounded
-results through the existing copy-returning frame seams. Conversation history
-remains a separate non-authoritative input to request understanding.
+The in-process application exact-copies all six current materialized member
+categories into immutable `PlannerContext`. Planner receives that context and
+returns a response, Human clarification request, transient Plan plus exact Task
+bundle, or continuation signal; it never receives, mutates, or returns
+SessionFrame. Application does not admit candidate state in Phase 2.
+Conversation history remains an explicit non-authoritative context field and
+native message-history input.
 
 The current value is not the canonical typed-reference membership FCO. It has
 no frame identity, Objective-bound session identity, reference manifest,

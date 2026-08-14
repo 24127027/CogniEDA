@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import ValidationError
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage
@@ -106,9 +104,9 @@ class Planner:
             )
 
         prompt = self._build_prompt(request, context)
-        messages = ()
+        messages: tuple[ModelMessage, ...] = ()
         try:
-            run_result: Any = await agent.run(
+            run_result = await agent.run(
                 prompt,
                 output_type=PlannerResult,
                 deps=self.deps,

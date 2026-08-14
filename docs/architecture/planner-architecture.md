@@ -240,25 +240,31 @@ scientific proposal.
 
 ## Implementation status
 
-**Partially implemented.** Application now exact-materializes the current
-SessionFrame into an immutable `PlanningContext`, calls Planner without passing
-the frame, and applies explicit `created_objective`, `created_assumption`, and
-terminal `created_task` results to its own successor frame. Planner graph state
-contains per-run control and typed result fields only; Planner neither mutates
-nor returns SessionFrame.
+**Partially implemented.** The Phase 2 cognitive core directly owns one typed
+PydanticAI Agent and performs one `plan_or_answer` invocation per
+`Planner.run`. The model produces one `PlannerResult`: an immediate response, a
+necessary Human clarification request, a transient candidate `Plan` with its
+exact Task bundle, or a signal that a supplied active Plan should continue.
+`PlannerOutput` is the separate runtime envelope for that result, current-run
+native model messages, and any controlled error. No LangGraph workflow or
+Planner-side tool is active in this phase.
 
-Current bounded Planner behavior can understand a
-finite set of requests, establish or refine an Objective, retain planning-only
-Assumptions, create and track bounded data Tasks, route work through the
-dispatcher, consume identity-checked outcomes, and draft empirical answers
-from admitted Evidence while excluding Assumptions. Planner does not admit
-Evidence.
+Application exact-materializes the current SessionFrame Objective,
+Assumptions, Tasks, Evidence, Discoveries, and DataProfile into immutable
+`PlannerContext`; active Plan is currently always absent because selection is
+not wired. Native conversation history is supplied as model history but is
+non-authoritative and is not duplicated into current-run `PlannerOutput.messages`.
+Evidence and Discovery may support an answer. Assumptions may guide planning
+but cannot support an empirical answer or be created by Planner.
 
-The current in-process runtime also preserves native model-message history
-across Planner runs so a follow-up can be understood in conversational context.
-That history remains separate from the materialized research state and is
-excluded from empirical answer support. Neither conversation nor the current
-SessionFrame is durably restored after restart.
+Candidate validation rejects Tasks without a Plan, any Task bundle that does
+not exactly match Plan membership and Objective scope, unknown Assumption IDs,
+or changed content under an admitted Assumption ID. A candidate may reuse the
+current Objective or contain a newly proposed Objective, but Application does
+not persist, admit, activate, or apply any candidate state. The
+`continue_execution` signal requires a supplied active Plan and performs no
+execution. Capability, provider, executor, worker, and execution routing are
+absent from the model-visible Planner contracts.
 
 The immutable Phase 1 `Plan` and `PlanDependency` domain
 contracts and side-effect-free application validation are **Implemented** with
@@ -268,12 +274,14 @@ fingerprinting. Append-only exact snapshot persistence and fail-closed
 identity/fingerprint reconstruction are **Verified on SQLite** as
 infrastructure for the later approval boundary. Validation does not persist a
 candidate, and no application caller currently persists a Plan.
-Planner does not author or consume Plan, and approval, exact
-post-approval revalidation, activation, active Plan selection, and replanning
-runtime are **Deferred**. Active Task exposes all three canonical kinds, but
-only bounded `DATA` work is executable. Full Task DAG runtime behavior,
-GeneratedView coordination, durable SessionFrame composition, and the
-end-to-end recovery model remain **Deferred** target design. The
+Planner candidate authoring is **Implemented** only at the transient cognitive
+boundary. Human review, approval, exact post-approval revalidation and commit,
+activation, active Plan selection, Task DAG execution, and replanning runtime
+are **Deferred**. Active Task exposes all three canonical kinds, but only the
+separate bounded `DATA` execution subsystem is executable; Planner does not
+dispatch it in Phase 2. GeneratedView coordination, durable SessionFrame
+composition, and the end-to-end recovery model remain **Deferred** target
+design. The
 [MVP-v2 definition](mvp-runtime-subset.md) explains the minimum complete
 product and research capability.
 

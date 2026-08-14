@@ -13,7 +13,8 @@ These are established architecture, not speculative enhancements:
   identity separate from Plan dependency and coordination
   metadata;
 - integrate the implemented Phase 1 Plan domain and pure validator plus the
-  SQLite repository foundation with Planner authoring, human approval,
+  SQLite repository foundation and Phase 2 transient Planner authoring with
+  human approval,
   exact-object commit-boundary validation and persistence, active Plan
   selection, activation, and Task DAG runtime;
 - preserve Planner-only human interaction while preventing Planner ownership

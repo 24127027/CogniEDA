@@ -98,11 +98,12 @@ at a time; this is not a one-session-per-Workspace rule.
 
 **Partially implemented.** Current source has a bounded materialized
 `SessionFrame` with one optional Objective, ordered Assumptions, Tasks and
-Evidence, and one optional DataProfile. The in-process application passes those
-objects without filtering into an immutable planning context and separately
-retains native conversation history for later request understanding. Planner
-returns explicit Objective, Assumption, and terminal Task results; Application
-alone applies them to its successor SessionFrame.
+Evidence and Discoveries, and one optional DataProfile. The in-process
+application passes those objects without filtering into immutable
+`PlannerContext` and retains native conversation history in its explicit
+non-authoritative field. Phase 2 Planner may answer, ask for clarification,
+return a transient Plan plus exact Tasks, or signal continuation; Application
+does not admit those candidate objects.
 
 The current frame is not the canonical typed-reference membership model and is
 not durably restored by the runtime. Mode-specific context eligibility, exact
