@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from cognieda.execution import ExecutionRequest
+from cognieda.delegation import ExecutionRequest
 from cognieda.schemas.artifacts import Discovery, Evidence, Hypothesis
 
 from .contracts import HypothesisAnalystResult

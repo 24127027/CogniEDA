@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from cognieda.execution import ExecutionRequest, ExecutionResult
+from cognieda.delegation import ExecutionRequest, ExecutionResult
 
 
 class ExecutorDispatcherPort(Protocol):

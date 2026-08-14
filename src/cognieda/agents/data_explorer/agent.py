@@ -9,7 +9,7 @@ from uuid import uuid4
 from pydantic_ai import Agent
 
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
-from cognieda.execution import Capability, ExecutionFailure, ExecutionRequest, ExecutionStatus
+from cognieda.delegation import Capability, ExecutionFailure, ExecutionRequest, ExecutionStatus
 from cognieda.infrastructure.datasets import load_dataset
 from cognieda.schemas.enums import TaskKind
 
@@ -52,6 +52,12 @@ class DataExplorer:
     """Provider for bounded data analysis and profiling capability requests."""
 
     builtin_tools: tuple[()] = ()
+
+    CAPABILITIES: tuple[Capability, ...] = (
+        Capability.DATA_ANALYSIS,
+        Capability.DATA_PROFILING,
+        Capability.DATA_TRANSFORMATION,
+    )
 
     def __init__(
         self,

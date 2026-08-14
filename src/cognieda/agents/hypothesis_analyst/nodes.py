@@ -6,7 +6,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
-from cognieda.execution import (
+from cognieda.delegation import (
     Capability,
     ExecutionFailure,
     ExecutionRequest,

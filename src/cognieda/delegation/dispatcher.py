@@ -4,7 +4,7 @@ from .contracts import ExecutionRequest, ExecutionResult
 from .registry import CapabilityNotRegisteredError, ExecutorRegistry
 
 
-class ExecutorProviderError(RuntimeError):
+class ExecutorError(RuntimeError):
     def __init__(self, request: ExecutionRequest, cause: Exception) -> None:
         self.capability = request.capability
         self.task_id = request.input.task.task_id
@@ -29,6 +29,6 @@ class ExecutorDispatcher:
         except CapabilityNotRegisteredError:
             raise
         except Exception as exc:
-            if isinstance(exc, ExecutorProviderError):
+            if isinstance(exc, ExecutorError):
                 raise
-            raise ExecutorProviderError(request, exc) from exc
+            raise ExecutorError(request, exc) from exc

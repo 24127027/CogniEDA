@@ -8,7 +8,7 @@ from cognieda.infrastructure.llm import AgentFactory
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
-from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
+from cognieda.delegation import Capability, ExecutorDispatcher, ExecutorRegistry
 
 from .application import Application
 from .workspace import MissingModelCredentialError
@@ -34,13 +34,8 @@ def bootstrap_application(workspace_path: Path) -> Application:
     agent_factory = AgentFactory(tooling_config=workspace)
 
     registry = ExecutorRegistry()
-    registry.register_provider(
+    registry.register(
         lambda: DataExplorer(config=model_config, agent_factory=agent_factory),
-        capabilities=(
-            Capability.DATA_ANALYSIS,
-            Capability.DATA_PROFILING,
-            Capability.DATA_TRANSFORMATION,
-        ),
     )
     dispatcher = ExecutorDispatcher(registry)
     planner = Planner(
