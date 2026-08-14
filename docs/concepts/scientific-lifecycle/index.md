@@ -11,7 +11,7 @@ that the complete lifecycle is implemented in the current runtime.
 
 ```text
 Objective
-  -> PlanRevision
+  -> Plan
   -> Task
   -> ScientificInvestigationRun
   -> Hypothesis
@@ -48,7 +48,7 @@ evaluation, governance, and authoritative Discovery admission.
 
 | Stage | Epistemic or operational role | Governing authority |
 | --- | --- | --- |
-| `Objective` and `PlanRevision` | establish scope and an approved Task DAG | Planner proposes and coordinates; application authority admits and activates |
+| `Objective` and `Plan` | establish scope and an approved Task DAG | Planner proposes and coordinates; application authority admits and activates |
 | eligible leaf `SCIENTIFIC` `Task` | identifies governed scientific work | Planner proposes work meaning; application authority enforces eligibility |
 | `ScientificInvestigationRun` | binds the durable non-FCO investigation lifecycle | scientific authority proposes scientific transitions; application authority records them |
 | `Hypothesis`, `InvestigationPlan`, `InvestigationProtocol`, and Evidence obligations | commit to what is tested and how | Hypothesis Analyst owns scientific content; application authority validates and admits |

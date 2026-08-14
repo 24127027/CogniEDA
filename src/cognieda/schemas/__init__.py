@@ -66,7 +66,6 @@ from cognieda.schemas.enums import (
     PlannerNodeName,
     PlannerOperationApprovalState,
     PlannerOperationType,
-    PlanPriority,
     QualityFlagSeverity,
     SessionFrameStatus,
     TaskKind,
@@ -75,12 +74,7 @@ from cognieda.schemas.enums import (
     UserDecisionType,
     VariableType,
 )
-from cognieda.schemas.plan_revision import (
-    PLAN_REVISION_CONTRACT_VERSION,
-    PlanDependency,
-    PlanRevision,
-    PlanTaskBinding,
-)
+from cognieda.schemas.plan import Plan, PlanDependency
 from cognieda.schemas.planner_operations import PlannerCommitResult, PlannerOperation
 from cognieda.schemas.provenance import (
     AnalysisFrame,
@@ -147,10 +141,7 @@ __all__ = [
     "PlannerOperationApprovalState",
     "PlannerOperationType",
     "PlanDependency",
-    "PlanPriority",
-    "PlanRevision",
-    "PlanTaskBinding",
-    "PLAN_REVISION_CONTRACT_VERSION",
+    "Plan",
     "QualityFlag",
     "QualityFlagSeverity",
     "SchemaSummary",

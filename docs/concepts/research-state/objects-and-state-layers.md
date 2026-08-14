@@ -21,7 +21,7 @@ There are exactly eight canonical First-Class Objects:
 | `SessionFrame` | structured research-session membership and active selectors | no | membership is not operation context, conversation memory, or scientific authority |
 
 No other record is an FCO. In particular, `Workspace`, `Question`,
-`PlanRevision`, `InvestigationProtocol`, `AnalysisFrame`, `ExecutionRun`,
+`Plan`, `InvestigationProtocol`, `AnalysisFrame`, `ExecutionRun`,
 `GovernanceDecision`, `GeneratedView`, and cache records are not FCOs.
 
 ## Semantic graph membership
@@ -68,7 +68,7 @@ eight first-class domain identities.
 
 | State family | Representative records | Responsibility |
 | --- | --- | --- |
-| planning and plan versioning | `PlanRevision`, `PlanTaskBinding`, `PlanDependency`, `TaskLifecycleRecord`, `TaskPresentationMetadata`, `PlannerConsultationRun` | binding-derived membership, explicit dependencies, ordering, priority, approval, and presentation; execution routing is excluded |
+| planning and Plan lifecycle | `Plan`, `PlanDependency`, `TaskLifecycleRecord`, `TaskPresentationMetadata`, `PlannerConsultationRun` | exact Objective and Assumption basis, direct Task-ID membership, explicit dependencies, approval, and presentation; execution strategy is excluded |
 | scientific investigation | `ScientificInvestigationRun`, feasibility record, `InvestigationPlan`, `InvestigationProtocol`, `ProtocolRevision`, `EvidenceRequest` | feasibility, operationalization, protocol evolution, and evidence obligations |
 | execution and provenance | `ExecutionRun`, `AnalysisFrame` | attempt history and exact data-view lineage |
 | evaluation and outcome | `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal` | protected inputs, typed endings, and proposed scientific content |

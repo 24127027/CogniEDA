@@ -27,7 +27,10 @@ All eight FCO names have schemas and SQLModel records. `PlannerOperation`,
 `AnalysisFrame`, `ExecutionRun`, and other provenance/operational records also
 exist. This does not establish the canonical workflow. Active Tasks have the
 minimum Objective-scoped canonical semantic core, but only bounded `DATA` work
-is executable; PlanRevision and scientific-investigation contracts are absent;
+is executable. Immutable non-FCO Plan contracts, deterministic validation, and
+append-only SQLite snapshot persistence exist, but Planner authoring, Human
+approval, activation, active Plan selection, and scientific-investigation
+contracts are absent;
 Planner execution nodes and specialist graphs are stubs; DVC and product CLI
 support are absent; database behavior is verified only on SQLite. Keep detailed
 claims in the status track.
@@ -48,7 +51,7 @@ The target FCO set is exactly:
 The semantic Knowledge Graph contains exactly `Objective`, `Hypothesis`,
 `Evidence`, and `Discovery`. `SessionFrame` is an FCO outside that graph.
 
-Do not promote `Workspace`, `Question`, `PlanRevision`, `AnalysisFrame`,
+Do not promote `Workspace`, `Question`, `Plan`, `AnalysisFrame`,
 `GeneratedView`, `PlannerOperation`, `ExecutionRun`, `EvidenceCacheEntry`, or
 other workflow/provenance/cache/presentation state into an FCO.
 
@@ -59,10 +62,11 @@ other workflow/provenance/cache/presentation state into an FCO.
   provider, or executor path. Not every user prompt becomes a Task.
 - Do not add compatibility fallback from legacy `ANALYTICAL`, `ORGANIZING`, or
   `REVIEW` to canonical new-write paths.
-- Task owns semantic work identity. PlanRevision and plan-version state own
-  membership, dependency, assignment, ordering, and approval metadata.
-- Semantic Task change creates a successor; coordination-only change belongs
-  in plan-version state.
+- Task owns semantic work identity. Plan owns direct Task membership and
+  structural dependency; workflow state outside Plan owns approval and
+  activation. Independent Tasks are intentionally unordered.
+- Semantic Task change creates a successor; coordination-only change creates a
+  successor Plan without changing Task identity.
 - Proposed Tasks cannot execute.
 - Only an eligible feasible leaf `SCIENTIFIC` Task may enter scientific
   investigation and produce at most one Hypothesis.
