@@ -1,4 +1,4 @@
-"""Immutable PlanRevision V1 domain contracts and structural validation."""
+"""Immutable Plan V1 coordination aggregate and structural validation."""
 
 from __future__ import annotations
 
@@ -17,16 +17,16 @@ from pydantic import (
     model_validator,
 )
 
-from cognieda.schemas.artifacts import Task
+from cognieda.schemas.artifacts import Assumption, Objective, Task
 from cognieda.schemas.common import ImmutableCogniEDABaseModel
 from cognieda.schemas.enums import PlanPriority
 
-PlanRevisionContractVersion = Literal["plan-revision/v1"]
-PLAN_REVISION_CONTRACT_VERSION: PlanRevisionContractVersion = "plan-revision/v1"
+PlanContractVersion = Literal["plan/v1"]
+PLAN_CONTRACT_VERSION: PlanContractVersion = "plan/v1"
 
 
 class PlanTaskBinding(ImmutableCogniEDABaseModel):
-    """Revision-specific coordination for one semantic Task."""
+    """Plan-specific coordination for one semantic Task."""
 
     task_id: UUID
     order_rank: NonNegativeInt
@@ -34,7 +34,7 @@ class PlanTaskBinding(ImmutableCogniEDABaseModel):
 
 
 class PlanDependency(ImmutableCogniEDABaseModel):
-    """Directed prerequisite edge between two Tasks in one PlanRevision."""
+    """Directed prerequisite edge between two Tasks in one Plan."""
 
     prerequisite_task_id: UUID
     dependent_task_id: UUID
@@ -46,14 +46,26 @@ class PlanDependency(ImmutableCogniEDABaseModel):
         return self
 
 
-class PlanRevision(ImmutableCogniEDABaseModel):
-    """Immutable, non-FCO V1 snapshot of one Objective-scoped Task DAG."""
+class Plan(ImmutableCogniEDABaseModel):
+    """Immutable, non-FCO coordination aggregate for one Objective-scoped Task DAG."""
 
-    plan_revision_id: UUID = Field(default_factory=uuid4)
-    objective_id: UUID
+    plan_id: UUID = Field(default_factory=uuid4)
+    objective: Objective
+    assumptions: tuple[Assumption, ...] = ()
     task_bindings: tuple[PlanTaskBinding, ...] = ()
     dependencies: tuple[PlanDependency, ...] = ()
-    contract_version: PlanRevisionContractVersion = PLAN_REVISION_CONTRACT_VERSION
+    contract_version: PlanContractVersion = PLAN_CONTRACT_VERSION
+
+    @field_validator("assumptions", mode="after")
+    @classmethod
+    def _canonicalize_assumptions(
+        cls,
+        assumptions: tuple[Assumption, ...],
+    ) -> tuple[Assumption, ...]:
+        assumption_ids = [assumption.assumption_id for assumption in assumptions]
+        if len(assumption_ids) != len(set(assumption_ids)):
+            raise ValueError("Plan rejects duplicate Assumption identities.")
+        return tuple(sorted(assumptions, key=lambda item: str(item.assumption_id)))
 
     @field_validator("task_bindings", mode="after")
     @classmethod
@@ -63,7 +75,7 @@ class PlanRevision(ImmutableCogniEDABaseModel):
     ) -> tuple[PlanTaskBinding, ...]:
         task_ids = [binding.task_id for binding in bindings]
         if len(task_ids) != len(set(task_ids)):
-            raise ValueError("PlanRevision rejects duplicate PlanTaskBinding task_id values.")
+            raise ValueError("Plan rejects duplicate PlanTaskBinding task_id values.")
         return tuple(sorted(bindings, key=lambda item: (item.order_rank, str(item.task_id))))
 
     @field_validator("dependencies", mode="after")
@@ -77,7 +89,7 @@ class PlanRevision(ImmutableCogniEDABaseModel):
             for dependency in dependencies
         ]
         if len(edges) != len(set(edges)):
-            raise ValueError("PlanRevision rejects duplicate dependency edges.")
+            raise ValueError("Plan rejects duplicate dependency edges.")
         return tuple(
             sorted(
                 dependencies,
@@ -89,22 +101,22 @@ class PlanRevision(ImmutableCogniEDABaseModel):
         )
 
     @model_validator(mode="after")
-    def _validate_against_member_tasks(self, info: ValidationInfo) -> PlanRevision:
+    def _validate_against_member_tasks(self, info: ValidationInfo) -> Plan:
         tasks = self._member_tasks(info)
         tasks_by_id: dict[UUID, Task] = {}
         for task in tasks:
             if task.task_id in tasks_by_id:
-                raise ValueError("PlanRevision rejects duplicate member Task IDs.")
+                raise ValueError("Plan rejects duplicate member Task identities.")
             tasks_by_id[task.task_id] = task
 
         member_ids = {binding.task_id for binding in self.task_bindings}
         if member_ids != set(tasks_by_id):
-            raise ValueError("PlanRevision Task inputs must exactly match binding membership.")
+            raise ValueError("Plan Task inputs must exactly match binding membership.")
 
         for binding in self.task_bindings:
             task = tasks_by_id[binding.task_id]
-            if task.objective_id != self.objective_id:
-                raise ValueError("Every bound Task must belong to the PlanRevision Objective.")
+            if task.objective_id != self.objective.objective_id:
+                raise ValueError("Every bound Task must belong to the Plan Objective.")
 
         self._validate_dependency_graph(member_ids)
         return self
@@ -113,10 +125,10 @@ class PlanRevision(ImmutableCogniEDABaseModel):
     def _member_tasks(info: ValidationInfo) -> tuple[Task, ...]:
         context = info.context
         if not isinstance(context, dict):
-            raise ValueError("PlanRevision requires Tasks through PlanRevision.create().")
+            raise ValueError("Plan requires Tasks through Plan.create().")
         tasks = context.get("tasks")
         if not isinstance(tasks, tuple) or not all(isinstance(task, Task) for task in tasks):
-            raise ValueError("PlanRevision requires Tasks through PlanRevision.create().")
+            raise ValueError("Plan requires Tasks through Plan.create().")
         return tasks
 
     def _validate_dependency_graph(self, member_ids: set[UUID]) -> None:
@@ -127,7 +139,7 @@ class PlanRevision(ImmutableCogniEDABaseModel):
                 dependency.prerequisite_task_id not in member_ids
                 or dependency.dependent_task_id not in member_ids
             ):
-                raise ValueError("PlanRevision rejects a dependency endpoint outside membership.")
+                raise ValueError("Plan rejects a dependency endpoint outside membership.")
             dependents[dependency.prerequisite_task_id].add(dependency.dependent_task_id)
             in_degree[dependency.dependent_task_id] += 1
 
@@ -141,33 +153,34 @@ class PlanRevision(ImmutableCogniEDABaseModel):
                 if in_degree[dependent_id] == 0:
                     ready.append(dependent_id)
         if visited != len(member_ids):
-            raise ValueError("PlanRevision dependencies must form an acyclic graph.")
+            raise ValueError("Plan dependencies must form an acyclic graph.")
 
     @classmethod
     def create(
         cls,
         *,
-        objective_id: UUID,
+        objective: Objective,
+        assumptions: Iterable[Assumption] = (),
         task_bindings: Iterable[PlanTaskBinding],
         dependencies: Iterable[PlanDependency] = (),
         tasks: Iterable[Task],
-        plan_revision_id: UUID | None = None,
+        plan_id: UUID | None = None,
     ) -> Self:
-        """Validate and construct a revision against exact member Task values."""
+        """Validate and construct a Plan against exact member Task values."""
 
         data: dict[str, object] = {
-            "objective_id": objective_id,
+            "objective": objective,
+            "assumptions": tuple(assumptions),
             "task_bindings": tuple(task_bindings),
             "dependencies": tuple(dependencies),
         }
-        if plan_revision_id is not None:
-            data["plan_revision_id"] = plan_revision_id
-        member_tasks = tuple(tasks)
-        return cls.model_validate(data, context={"tasks": member_tasks})
+        if plan_id is not None:
+            data["plan_id"] = plan_id
+        return cls.model_validate(data, context={"tasks": tuple(tasks)})
 
     @property
     def task_ids(self) -> frozenset[UUID]:
-        """Derive revision membership from the single binding source of truth."""
+        """Derive Plan membership from the single binding source of truth."""
 
         return frozenset(binding.task_id for binding in self.task_bindings)
 
@@ -181,7 +194,7 @@ class PlanRevision(ImmutableCogniEDABaseModel):
         completed = set(completed_task_ids)
         unknown = completed.difference(self.task_ids)
         if unknown:
-            raise ValueError("Completed Task identity is outside PlanRevision membership.")
+            raise ValueError("Completed Task identity is outside Plan membership.")
         prerequisites = {task_id: set[UUID]() for task_id in self.task_ids}
         for dependency in self.dependencies:
             prerequisites[dependency.dependent_task_id].add(dependency.prerequisite_task_id)
@@ -195,7 +208,10 @@ class PlanRevision(ImmutableCogniEDABaseModel):
     def _fingerprint_payload(self) -> dict[str, object]:
         return {
             "contract_version": self.contract_version,
-            "objective_id": str(self.objective_id),
+            "objective": self.objective.model_dump(mode="json"),
+            "assumptions": [
+                assumption.model_dump(mode="json") for assumption in self.assumptions
+            ],
             "task_bindings": [
                 {
                     "task_id": str(binding.task_id),
@@ -216,7 +232,7 @@ class PlanRevision(ImmutableCogniEDABaseModel):
     @computed_field(return_type=str)  # type: ignore[prop-decorator]
     @property
     def fingerprint(self) -> str:
-        """Return the sha256 digest of structurally canonical plan content."""
+        """Return the sha256 digest of structurally canonical Plan content."""
 
         serialized = json.dumps(
             self._fingerprint_payload(),
@@ -228,8 +244,8 @@ class PlanRevision(ImmutableCogniEDABaseModel):
 
 
 __all__ = (
-    "PLAN_REVISION_CONTRACT_VERSION",
+    "PLAN_CONTRACT_VERSION",
+    "Plan",
     "PlanDependency",
-    "PlanRevision",
     "PlanTaskBinding",
 )

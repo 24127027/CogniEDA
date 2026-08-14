@@ -35,8 +35,8 @@ from cognieda.infrastructure.persistence.repositories.objective_repository impor
 from cognieda.infrastructure.persistence.repositories.objective_revision_repository import (
     ObjectiveRevisionRepository,
 )
-from cognieda.infrastructure.persistence.repositories.plan_revision_repository import (
-    PlanRevisionRepository,
+from cognieda.infrastructure.persistence.repositories.plan_repository import (
+    PlanRepository,
 )
 from cognieda.infrastructure.persistence.repositories.planner_operation_repository import (
     PlannerOperationRepository,
@@ -70,7 +70,7 @@ __all__ = [
     "ObjectiveRepository",
     "ObjectiveUpdate",
     "PlannerOperationRepository",
-    "PlanRevisionRepository",
+    "PlanRepository",
     "SessionFrameRepository",
     "TaskRepository",
     "TaskUpdate",

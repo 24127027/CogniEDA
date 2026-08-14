@@ -1,4 +1,4 @@
-"""Exact transactional SQLite persistence for immutable PlanRevision snapshots."""
+"""Exact transactional SQLite persistence for immutable Plan snapshots."""
 
 from __future__ import annotations
 
@@ -12,21 +12,24 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from cognieda.infrastructure.persistence.models import (
+    PlanAssumptionRecord,
     PlanDependencyRecord,
-    PlanRevisionRecord,
+    PlanRecord,
     PlanTaskBindingRecord,
     TaskRecord,
 )
 from cognieda.infrastructure.persistence.repositories import (
+    AssumptionRepository,
     ObjectiveRepository,
-    PlanRevisionRepository,
+    PlanRepository,
     TaskRepository,
 )
 from cognieda.schemas import (
+    Assumption,
     Objective,
+    Plan,
     PlanDependency,
     PlanPriority,
-    PlanRevision,
     PlanTaskBinding,
     Task,
     TaskKind,
@@ -63,18 +66,20 @@ def _binding(
     )
 
 
-def _revision(
-    objective_id: UUID,
+def _plan(
+    objective: Objective,
     tasks: Iterable[Task],
     *,
     bindings: Iterable[PlanTaskBinding] | None = None,
     dependencies: Iterable[PlanDependency] = (),
-    plan_revision_id: UUID | None = None,
-) -> PlanRevision:
+    assumptions: Iterable[Assumption] = (),
+    plan_id: UUID | None = None,
+) -> Plan:
     task_tuple = tuple(tasks)
-    return PlanRevision.create(
-        plan_revision_id=plan_revision_id,
-        objective_id=objective_id,
+    return Plan.create(
+        plan_id=plan_id,
+        objective=objective,
+        assumptions=assumptions,
         task_bindings=(
             tuple(_binding(task, order_rank=index) for index, task in enumerate(task_tuple))
             if bindings is None
@@ -92,26 +97,43 @@ def _edge(prerequisite: Task, dependent: Task) -> PlanDependency:
     )
 
 
-def _persist_revision(session: Session, revision: PlanRevision) -> PlanRevision:
-    repository = PlanRevisionRepository(session)
-    repository.add(revision)
+def _persist_plan(session: Session, plan: Plan) -> Plan:
+    repository = PlanRepository(session)
+    repository.add(plan)
     session.commit()
-    loaded = repository.get_by_id(revision.plan_revision_id)
+    loaded = repository.get_by_id(plan.plan_id)
     assert loaded is not None
     return loaded
 
 
-def test_one_task_revision_round_trips_exactly(db_session: Session) -> None:
+def test_one_task_plan_round_trips_exactly(db_session: Session) -> None:
     objective = ObjectiveRepository(db_session).create(Objective(text="Plan one task"))
     task = _persisted_task(db_session, objective.objective_id)
-    revision = _revision(objective.objective_id, [task])
+    plan = _plan(objective, [task])
 
-    loaded = _persist_revision(db_session, revision)
+    loaded = _persist_plan(db_session, plan)
 
-    assert loaded == revision
-    assert loaded.model_dump(mode="json") == revision.model_dump(mode="json")
-    assert loaded.contract_version == revision.contract_version
-    assert loaded.fingerprint == revision.fingerprint
+    assert loaded == plan
+    assert loaded.model_dump(mode="json") == plan.model_dump(mode="json")
+    assert loaded.contract_version == plan.contract_version
+    assert loaded.fingerprint == plan.fingerprint
+
+
+def test_exact_planning_assumption_basis_round_trips(db_session: Session) -> None:
+    objective = ObjectiveRepository(db_session).create(Objective(text="Plan with a premise"))
+    assumption = AssumptionRepository(db_session).create(
+        Assumption(text="Exact Human-authored planning premise")
+    )
+    task = _persisted_task(db_session, objective.objective_id)
+    plan = _plan(objective, [task], assumptions=(assumption,))
+
+    loaded = _persist_plan(db_session, plan)
+
+    assert loaded.assumptions == (assumption,)
+    assert db_session.get(
+        PlanAssumptionRecord,
+        (plan.plan_id, assumption.assumption_id),
+    ) is not None
 
 
 def test_multi_root_multi_leaf_dag_round_trips_all_content(db_session: Session) -> None:
@@ -129,18 +151,18 @@ def test_multi_root_multi_leaf_dag_round_trips_all_content(db_session: Session) 
         _edge(second_root, first_leaf),
         _edge(second_root, second_leaf),
     )
-    revision = _revision(
-        objective.objective_id,
+    plan = _plan(
+        objective,
         tasks,
         bindings=bindings,
         dependencies=dependencies,
     )
 
-    loaded = _persist_revision(db_session, revision)
+    loaded = _persist_plan(db_session, plan)
 
-    assert loaded == revision
-    assert loaded.task_bindings == revision.task_bindings
-    assert loaded.dependencies == revision.dependencies
+    assert loaded == plan
+    assert loaded.task_bindings == plan.task_bindings
+    assert loaded.dependencies == plan.dependencies
     assert [binding.order_rank for binding in loaded.task_bindings].count(1) == 2
     assert {binding.priority for binding in loaded.task_bindings} == {
         PlanPriority.LOW,
@@ -162,7 +184,7 @@ def test_multi_root_multi_leaf_dag_round_trips_all_content(db_session: Session) 
         "executor_id",
         "data_profile_id",
     }
-    assert prohibited.isdisjoint(PlanRevisionRecord.model_fields)
+    assert prohibited.isdisjoint(PlanRecord.model_fields)
     assert prohibited.isdisjoint(PlanTaskBindingRecord.model_fields)
     assert prohibited.isdisjoint(PlanDependencyRecord.model_fields)
     assert all(field not in loaded.model_dump_json() for field in prohibited)
@@ -180,43 +202,43 @@ def test_storage_order_does_not_change_reconstructed_content(db_session: Session
         objective.objective_id,
         task_id=UUID("00000000-0000-0000-0000-000000000002"),
     )
-    revision = _revision(
-        objective.objective_id,
+    plan = _plan(
+        objective,
         [first, second],
         bindings=(_binding(first, order_rank=1), _binding(second, order_rank=1)),
         dependencies=(_edge(first, second),),
     )
-    _persist_revision(db_session, revision)
+    _persist_plan(db_session, plan)
     rows = db_session.exec(
         select(PlanTaskBindingRecord).where(
-            PlanTaskBindingRecord.plan_revision_id == revision.plan_revision_id
+            PlanTaskBindingRecord.plan_id == plan.plan_id
         )
     ).all()
     db_session.exec(
         delete(PlanTaskBindingRecord).where(
-            PlanTaskBindingRecord.plan_revision_id == revision.plan_revision_id
+            PlanTaskBindingRecord.plan_id == plan.plan_id
         )
     )
     for row in reversed(rows):
         db_session.add(PlanTaskBindingRecord(**row.model_dump()))
     db_session.commit()
 
-    loaded = PlanRevisionRepository(db_session).get_by_id(revision.plan_revision_id)
+    loaded = PlanRepository(db_session).get_by_id(plan.plan_id)
 
-    assert loaded == revision
-    assert loaded is not None and loaded.fingerprint == revision.fingerprint
+    assert loaded == plan
+    assert loaded is not None and loaded.fingerprint == plan.fingerprint
 
 
 @pytest.mark.parametrize("failed_table", ["plan_task_bindings", "plan_dependencies"])
-def test_child_write_failure_rolls_back_complete_revision(
+def test_child_write_failure_rolls_back_complete_plan(
     db_session: Session,
     failed_table: str,
 ) -> None:
     objective = ObjectiveRepository(db_session).create(Objective(text="Atomic plan"))
     first = _persisted_task(db_session, objective.objective_id)
     second = _persisted_task(db_session, objective.objective_id)
-    revision = _revision(
-        objective.objective_id,
+    plan = _plan(
+        objective,
         [first, second],
         dependencies=(_edge(first, second),),
     )
@@ -229,19 +251,19 @@ def test_child_write_failure_rolls_back_complete_revision(
     event.listen(engine, "before_cursor_execute", fail_target_insert)
     try:
         with pytest.raises(RuntimeError, match="forced"):
-            PlanRevisionRepository(db_session).add(revision)
+            PlanRepository(db_session).add(plan)
             db_session.commit()
         db_session.rollback()
     finally:
         event.remove(engine, "before_cursor_execute", fail_target_insert)
 
-    assert db_session.get(PlanRevisionRecord, revision.plan_revision_id) is None
+    assert db_session.get(PlanRecord, plan.plan_id) is None
     assert db_session.exec(select(PlanTaskBindingRecord)).all() == []
     assert db_session.exec(select(PlanDependencyRecord)).all() == []
 
 
-def test_unknown_revision_returns_none(db_session: Session) -> None:
-    assert PlanRevisionRepository(db_session).get_by_id(uuid4()) is None
+def test_unknown_plan_returns_none(db_session: Session) -> None:
+    assert PlanRepository(db_session).get_by_id(uuid4()) is None
 
 
 def test_missing_persisted_task_fails_closed(db_session: Session) -> None:
@@ -251,30 +273,30 @@ def test_missing_persisted_task_fails_closed(db_session: Session) -> None:
         kind=TaskKind.DATA,
         instruction="This Task was not persisted.",
     )
-    revision = _revision(objective.objective_id, [transient_task])
+    plan = _plan(objective, [transient_task])
 
     with pytest.raises(IntegrityError):
-        PlanRevisionRepository(db_session).add(revision)
+        PlanRepository(db_session).add(plan)
     db_session.rollback()
 
-    assert db_session.get(PlanRevisionRecord, revision.plan_revision_id) is None
+    assert db_session.get(PlanRecord, plan.plan_id) is None
 
 
-def test_identity_collision_never_overwrites_existing_revision(db_session: Session) -> None:
+def test_identity_collision_never_overwrites_existing_plan(db_session: Session) -> None:
     objective = ObjectiveRepository(db_session).create(Objective(text="Collision"))
     first = _persisted_task(db_session, objective.objective_id)
     second = _persisted_task(db_session, objective.objective_id)
-    revision_id = uuid4()
-    original = _revision(objective.objective_id, [first], plan_revision_id=revision_id)
-    conflicting = _revision(objective.objective_id, [second], plan_revision_id=revision_id)
-    _persist_revision(db_session, original)
+    plan_id = uuid4()
+    original = _plan(objective, [first], plan_id=plan_id)
+    conflicting = _plan(objective, [second], plan_id=plan_id)
+    _persist_plan(db_session, original)
 
     with pytest.raises(IntegrityError):
-        PlanRevisionRepository(db_session).add(conflicting)
+        PlanRepository(db_session).add(conflicting)
         db_session.commit()
     db_session.rollback()
 
-    assert PlanRevisionRepository(db_session).get_by_id(revision_id) == original
+    assert PlanRepository(db_session).get_by_id(plan_id) == original
 
 
 def test_same_identity_identical_replay_is_rejected_without_overwrite(
@@ -282,62 +304,62 @@ def test_same_identity_identical_replay_is_rejected_without_overwrite(
 ) -> None:
     objective = ObjectiveRepository(db_session).create(Objective(text="Exact replay"))
     task = _persisted_task(db_session, objective.objective_id)
-    revision = _revision(objective.objective_id, [task])
-    _persist_revision(db_session, revision)
+    plan = _plan(objective, [task])
+    _persist_plan(db_session, plan)
 
     with pytest.raises(IntegrityError):
-        PlanRevisionRepository(db_session).add(revision)
+        PlanRepository(db_session).add(plan)
         db_session.commit()
     db_session.rollback()
 
-    assert PlanRevisionRepository(db_session).get_by_id(revision.plan_revision_id) == revision
+    assert PlanRepository(db_session).get_by_id(plan.plan_id) == plan
 
 
 def test_different_identities_with_same_fingerprint_remain_distinct(
     db_session: Session,
 ) -> None:
-    objective = ObjectiveRepository(db_session).create(Objective(text="Distinct revisions"))
+    objective = ObjectiveRepository(db_session).create(Objective(text="Distinct plans"))
     task = _persisted_task(db_session, objective.objective_id)
-    first = _revision(objective.objective_id, [task])
-    second = _revision(objective.objective_id, [task])
-    assert first.plan_revision_id != second.plan_revision_id
+    first = _plan(objective, [task])
+    second = _plan(objective, [task])
+    assert first.plan_id != second.plan_id
     assert first.fingerprint == second.fingerprint
 
-    _persist_revision(db_session, first)
-    _persist_revision(db_session, second)
+    _persist_plan(db_session, first)
+    _persist_plan(db_session, second)
 
-    assert PlanRevisionRepository(db_session).get_by_id(first.plan_revision_id) == first
-    assert PlanRevisionRepository(db_session).get_by_id(second.plan_revision_id) == second
+    assert PlanRepository(db_session).get_by_id(first.plan_id) == first
+    assert PlanRepository(db_session).get_by_id(second.plan_id) == second
 
 
 def test_corrupt_stored_fingerprint_fails_closed(db_session: Session) -> None:
     objective = ObjectiveRepository(db_session).create(Objective(text="Corrupt fingerprint"))
     task = _persisted_task(db_session, objective.objective_id)
-    revision = _revision(objective.objective_id, [task])
-    _persist_revision(db_session, revision)
-    record = db_session.get(PlanRevisionRecord, revision.plan_revision_id)
+    plan = _plan(objective, [task])
+    _persist_plan(db_session, plan)
+    record = db_session.get(PlanRecord, plan.plan_id)
     assert record is not None
     record.fingerprint = "sha256:" + "0" * 64
     db_session.add(record)
     db_session.commit()
 
     with pytest.raises(ValueError, match="fingerprint does not match"):
-        PlanRevisionRepository(db_session).get_by_id(revision.plan_revision_id)
+        PlanRepository(db_session).get_by_id(plan.plan_id)
 
 
 def test_malformed_stored_contract_fails_closed(db_session: Session) -> None:
     objective = ObjectiveRepository(db_session).create(Objective(text="Malformed contract"))
     task = _persisted_task(db_session, objective.objective_id)
-    revision = _revision(objective.objective_id, [task])
-    _persist_revision(db_session, revision)
-    record = db_session.get(PlanRevisionRecord, revision.plan_revision_id)
+    plan = _plan(objective, [task])
+    _persist_plan(db_session, plan)
+    record = db_session.get(PlanRecord, plan.plan_id)
     assert record is not None
-    record.contract_version = "plan-revision/v2"
+    record.contract_version = "plan/v2"
     db_session.add(record)
     db_session.commit()
 
-    with pytest.raises(ValidationError, match="plan-revision/v1"):
-        PlanRevisionRepository(db_session).get_by_id(revision.plan_revision_id)
+    with pytest.raises(ValidationError, match="plan/v1"):
+        PlanRepository(db_session).get_by_id(plan.plan_id)
 
 
 def test_missing_task_during_reconstruction_fails_closed(
@@ -346,8 +368,8 @@ def test_missing_task_during_reconstruction_fails_closed(
 ) -> None:
     objective = ObjectiveRepository(db_session).create(Objective(text="Missing load Task"))
     task = _persisted_task(db_session, objective.objective_id)
-    revision = _revision(objective.objective_id, [task])
-    _persist_revision(db_session, revision)
+    plan = _plan(objective, [task])
+    _persist_plan(db_session, plan)
     session_get = db_session.get
 
     def get_without_tasks(entity, ident):
@@ -358,10 +380,10 @@ def test_missing_task_during_reconstruction_fails_closed(
     monkeypatch.setattr(db_session, "get", get_without_tasks)
 
     with pytest.raises(ValueError, match="missing Task"):
-        PlanRevisionRepository(db_session).get_by_id(revision.plan_revision_id)
+        PlanRepository(db_session).get_by_id(plan.plan_id)
 
 
-def test_repository_exposes_no_mutating_revision_api() -> None:
+def test_repository_exposes_no_mutating_plan_api() -> None:
     prohibited = {"create", "save", "update", "patch", "delete"}
 
-    assert prohibited.isdisjoint(vars(PlanRevisionRepository))
+    assert prohibited.isdisjoint(vars(PlanRepository))

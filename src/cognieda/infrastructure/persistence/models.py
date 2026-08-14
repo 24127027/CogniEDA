@@ -135,12 +135,12 @@ class TaskRecord(SQLModel, table=True):
     status: TaskStatus = Field(default=TaskStatus.PENDING, nullable=False, index=True)
 
 
-class PlanRevisionRecord(SQLModel, table=True):
-    """Immutable header for one exact authoritative PlanRevision snapshot."""
+class PlanRecord(SQLModel, table=True):
+    """Immutable header for one exact authoritative Plan aggregate."""
 
-    __tablename__ = "plan_revisions"
+    __tablename__ = "plans"
 
-    plan_revision_id: UUID = Field(primary_key=True)
+    plan_id: UUID = Field(primary_key=True)
     objective_id: UUID = Field(
         foreign_key="objectives.objective_id",
         nullable=False,
@@ -151,12 +151,12 @@ class PlanRevisionRecord(SQLModel, table=True):
 
 
 class PlanTaskBindingRecord(SQLModel, table=True):
-    """One immutable Task binding belonging to one PlanRevision."""
+    """One immutable Task binding belonging to one Plan."""
 
     __tablename__ = "plan_task_bindings"
 
-    plan_revision_id: UUID = Field(
-        foreign_key="plan_revisions.plan_revision_id",
+    plan_id: UUID = Field(
+        foreign_key="plans.plan_id",
         primary_key=True,
     )
     task_id: UUID = Field(foreign_key="tasks.task_id", primary_key=True)
@@ -165,16 +165,28 @@ class PlanTaskBindingRecord(SQLModel, table=True):
 
 
 class PlanDependencyRecord(SQLModel, table=True):
-    """One immutable prerequisite edge belonging to one PlanRevision."""
+    """One immutable prerequisite edge belonging to one Plan."""
 
     __tablename__ = "plan_dependencies"
 
-    plan_revision_id: UUID = Field(
-        foreign_key="plan_revisions.plan_revision_id",
+    plan_id: UUID = Field(
+        foreign_key="plans.plan_id",
         primary_key=True,
     )
     prerequisite_task_id: UUID = Field(foreign_key="tasks.task_id", primary_key=True)
     dependent_task_id: UUID = Field(foreign_key="tasks.task_id", primary_key=True)
+
+
+class PlanAssumptionRecord(SQLModel, table=True):
+    """One exact admitted planning Assumption used as a Plan basis."""
+
+    __tablename__ = "plan_assumptions"
+
+    plan_id: UUID = Field(foreign_key="plans.plan_id", primary_key=True)
+    assumption_id: UUID = Field(
+        foreign_key="assumptions.assumption_id",
+        primary_key=True,
+    )
 
 
 class HypothesisRecord(TimestampedRecord, table=True):
