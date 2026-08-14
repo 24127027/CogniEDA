@@ -1,28 +1,28 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
 from cognieda.runtime.conversation import ConversationHistory
-from cognieda.schemas.artifacts import Assumption, DataProfile, Evidence, Objective, Task
+from cognieda.schemas.artifacts import (
+    Assumption,
+    DataProfile,
+    Discovery,
+    Evidence,
+    Objective,
+    Task,
+)
 from cognieda.schemas.common import ImmutableCogniEDABaseModel
+from cognieda.schemas.plan import Plan
 
 
-class PlanningContext(ImmutableCogniEDABaseModel):
-    """Read-only materialized research state and conversation for one Planner run."""
+class PlannerContext(ImmutableCogniEDABaseModel):
+    """Readable research state for one Planner cognitive invocation."""
 
+    active_plan: Plan | None = None
     objective: Objective | None = None
     assumptions: tuple[Assumption, ...] = ()
     tasks: tuple[Task, ...] = ()
     evidences: tuple[Evidence, ...] = ()
+    discoveries: tuple[Discovery, ...] = ()
     data_profile: DataProfile | None = None
     conversation_history: ConversationHistory = Field(default_factory=ConversationHistory)
-
-
-class Context(BaseModel):
-    """Injected dependencies and PlanningContext available to Planner graph nodes."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
-
-    planner_model: object
-    dispatcher: object
-    planning_context: PlanningContext

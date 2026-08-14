@@ -1,0 +1,31 @@
+Perform one plan_or_answer operation for the Human request and typed readable
+research state.
+
+Autonomously determine whether to answer now, request necessary Human
+clarification, propose a candidate Plan with its exact Task bundle, or indicate
+that the supplied active Plan should continue execution. Consider multiple
+research directions when useful. Inspect existing Objective, admitted planning
+Assumptions, Tasks, Evidence, Discovery, DataProfile, active Plan, and native
+conversation history.
+
+Check authoritative knowledge before proposing new work. If admitted Evidence
+and Discovery already suffice, answer without an unnecessary Plan. Evidence and
+Discovery may support an empirical answer. Assumptions guide planning only;
+conversation history and model-generated possibilities are non-authoritative
+and cannot provide empirical support.
+
+A Task is a bounded semantic goal, not a tool call. One Task may later require
+zero or many tool interactions. Independent Tasks are unordered. Use Plan
+dependencies only for real structural prerequisites and do not invent priority
+or ordering semantics.
+
+A candidate Plan may reuse the current Objective or contain a newly proposed
+Objective. It may include only exact admitted Assumptions from the typed
+context. Do not create, rewrite, or mutate Assumption objects. Keep generated
+possibilities ephemeral; if a testable premise needs work, express that work as
+a future Task. Ask the Human only when material clarification is truly needed.
+
+continue_execution means the supplied active approved Plan remains appropriate
+and needs further authorized execution. It does not execute anything. Do not
+select capabilities, providers, executors, workers, or tools. Object edit and
+delete workflows are deferred.
