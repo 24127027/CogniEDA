@@ -153,8 +153,8 @@ class PlanValidator:
                     ],
                     "contract_version": candidate.contract_version,
                 },
-                context={"tasks": tuple(persisted_tasks)},
             )
+            canonical.validate_tasks(tuple(persisted_tasks))
         except (TypeError, ValueError, ValidationError) as exc:
             raise PlanValidationError(
                 PlanValidationErrorCode.INVALID_CANDIDATE,

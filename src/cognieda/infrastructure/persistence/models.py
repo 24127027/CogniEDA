@@ -189,6 +189,18 @@ class PlanAssumptionRecord(SQLModel, table=True):
     )
 
 
+class ActivePlanRecord(SQLModel, table=True):
+    """Application-owned executable selection outside immutable Plan content."""
+
+    __tablename__ = "active_plans"
+
+    objective_id: UUID = Field(
+        foreign_key="objectives.objective_id",
+        primary_key=True,
+    )
+    plan_id: UUID = Field(foreign_key="plans.plan_id", nullable=False, unique=True)
+
+
 class HypothesisRecord(TimestampedRecord, table=True):
     """Persisted Hypothesis FCO."""
 

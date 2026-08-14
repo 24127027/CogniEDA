@@ -2,232 +2,204 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from uuid import uuid4
+from pathlib import Path
 
-import pytest
-from pydantic import ValidationError
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
+from sqlmodel import Session
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.contracts import (
-    AssumptionAssessment,
-    AuthoritativeAnswerRequest,
-    DirectResponse,
-    PlannerAnswerContext,
-    PlannerCognitiveResult,
-    PlannerErrorCode,
-    PlannerOutput,
-)
+from cognieda.agents.planner.contracts import PlannerCognitiveResult
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.application.ports import ModelConfig
-from cognieda.runtime.conversation import ConversationHistory
-from cognieda.runtime.planner_context import apply_planner_output, build_planner_context
-from cognieda.schemas.artifacts import (
-    Assumption,
-    DataProfile,
-    Discovery,
-    Evidence,
-    Objective,
-    SessionFrame,
-    Task,
-)
-from cognieda.schemas.common import DiscoveryClaim, EvidenceProvenance, ValidityBasis
-from cognieda.schemas.enums import (
-    AssumptionTestability,
-    DiscoveryEpistemicStatus,
-    TaskKind,
-    TaskStatus,
-)
+from cognieda.execution import ExecutorDispatcher, ExecutorRegistry
+from cognieda.infrastructure.persistence.models import ActivePlanRecord
+from cognieda.infrastructure.persistence.repositories import PlanRepository
+from cognieda.runtime.application import Application
+from cognieda.runtime.workspace import Workspace
+from cognieda.schemas import Objective, Plan, PlanTaskBinding, Task, TaskKind
 
 
 @dataclass
 class FakeRunResult:
     output: object
+    messages: tuple[ModelMessage, ...]
 
     def new_messages(self) -> list[ModelMessage]:
-        return []
+        return list(self.messages)
 
 
-class AnswerAgent:
-    def __init__(self) -> None:
-        self.calls: list[dict[str, object]] = []
+class QueueAgent:
+    def __init__(self, outputs: list[PlannerCognitiveResult]) -> None:
+        self.outputs = iter(outputs)
+        self.call_count = 0
 
-    async def run(self, prompt: str, **kwargs: object) -> FakeRunResult:
-        self.calls.append({"prompt": prompt, **kwargs})
-        if kwargs["output_type"] == PlannerCognitiveResult:
-            return FakeRunResult(AuthoritativeAnswerRequest())
-        if kwargs["output_type"] is DirectResponse:
-            return FakeRunResult(DirectResponse(text="Grounded answer."))
-        raise AssertionError(f"Unexpected output type: {kwargs['output_type']}")
+    async def run(self, _prompt: str, **_kwargs: object) -> FakeRunResult:
+        self.call_count += 1
+        return FakeRunResult(
+            next(self.outputs),
+            (
+                ModelRequest(
+                    parts=[UserPromptPart(content=f"planner call {self.call_count}")]
+                ),
+            ),
+        )
 
 
-class FakeFactory:
-    def __init__(self, agent: AnswerAgent) -> None:
+class QueueFactory:
+    def __init__(self, agent: QueueAgent) -> None:
         self.agent = agent
 
-    def create_agent(self, **_: object) -> AnswerAgent:
+    def create_agent(self, **_kwargs: object) -> QueueAgent:
         return self.agent
 
     def reload_tooling(self) -> None:
         pass
 
 
-def _planner(agent: AnswerAgent, deps: PlannerDeps | None = None) -> Planner:
-    return Planner(
-        deps or PlannerDeps(),
-        agent_factory=FakeFactory(agent),  # type: ignore[arg-type]
-        model_config=ModelConfig(provider="openai", model_name="test", api_key="test"),
-    )
-
-
-def _research_objects() -> tuple[Objective, DataProfile, Task, Evidence, Discovery]:
-    objective = Objective(text="Understand retention.")
-    profile = DataProfile(row_count=42, column_count=0, columns=())
+def _candidate(label: str) -> PlannerCognitiveResult:
+    objective = Objective(text=f"Investigate {label} retention.")
     task = Task(
         objective_id=objective.objective_id,
         kind=TaskKind.DATA,
-        instruction="Count rows.",
-        status=TaskStatus.COMPLETED,
+        instruction=f"Profile {label} retention data.",
     )
-    evidence = Evidence(
-        task_id=task.task_id,
-        data_profile_id=profile.data_profile_id,
-        content={"row_count": 42},
-        provenance=EvidenceProvenance(
-            producer_role="data_explorer",
-            work_reference="work:count",
-            dataset_reference="dataset:v1",
-            data_profile_id=profile.data_profile_id,
-        ),
-    )
-    hypothesis_id = uuid4()
-    discovery = Discovery(
-        hypothesis_id=hypothesis_id,
-        evidence_ids=[evidence.evidence_id],
-        claim=DiscoveryClaim(
-            statement="The retained dataset contains 42 rows.",
-            scope="dataset:v1",
-        ),
-        epistemic_status=DiscoveryEpistemicStatus.SUPPORTED,
-        scope="dataset:v1",
-        validity_basis=ValidityBasis(
-            data_profile_id=profile.data_profile_id,
-            analysis_frame_refs=["analysis:count"],
-            hypothesis_id=hypothesis_id,
-            evidence_ids=[evidence.evidence_id],
-            method="row count",
-            decision_rule="Report the exact admitted count.",
-        ),
-    )
-    return objective, profile, task, evidence, discovery
-
-
-def _answer(frame: SessionFrame) -> tuple[PlannerOutput, AnswerAgent, PlannerDeps]:
-    agent = AnswerAgent()
-    deps = PlannerDeps()
-    output = asyncio.run(
-        _planner(agent, deps).run(
-            "What does retained research establish?",
-            planner_context=build_planner_context(frame),
-            conversation_history=ConversationHistory(),
-        )
-    )
-    return output, agent, deps
-
-
-@pytest.mark.parametrize("support", ["evidence", "discovery", "both"])
-def test_answer_accepts_evidence_or_discovery_authoritative_support(support: str) -> None:
-    objective, profile, task, evidence, discovery = _research_objects()
-    frame = SessionFrame(
+    plan = Plan.create(
         objective=objective,
-        tasks=(task,) if support != "discovery" else (),
-        data_profile=profile,
-        evidences=(evidence,) if support != "discovery" else (),
-        discoveries=(discovery,) if support != "evidence" else (),
+        task_bindings=(PlanTaskBinding(task_id=task.task_id, order_rank=0),),
+        tasks=(task,),
+    )
+    return PlannerCognitiveResult(
+        plan=plan,
+        tasks=(task,),
+        response=f"Review the {label} Plan.",
     )
 
-    output, agent, deps = _answer(frame)
 
-    assert output.result == DirectResponse(text="Grounded answer.")
-    assert len(agent.calls) == 2
-    answer_context = PlannerAnswerContext.model_validate_json(
-        str(agent.calls[1]["prompt"]).split("\n", 1)[1]
+def _application(
+    tmp_path: Path,
+    db_session: Session,
+    outputs: list[PlannerCognitiveResult],
+) -> tuple[Application, QueueAgent]:
+    agent = QueueAgent(outputs)
+    factory = QueueFactory(agent)
+    dispatcher = ExecutorDispatcher(ExecutorRegistry())
+    planner = Planner(
+        PlannerDeps(dispatcher),
+        agent_factory=factory,  # type: ignore[arg-type]
+        model_config=ModelConfig(provider="openai", model_name="test", api_key="key"),
     )
-    assert answer_context.request == "What does retained research establish?"
-    assert answer_context.evidences == frame.evidences
-    assert answer_context.discoveries == frame.discoveries
-    assert all(isinstance(item, Discovery) for item in answer_context.discoveries)
-    assert all(call["deps"] is deps for call in agent.calls)
+    return (
+        Application(
+            workspace=Workspace.open(tmp_path),
+            planner_agent=planner,
+            dispatcher=dispatcher,
+            agent_factory=factory,  # type: ignore[arg-type]
+            session=db_session,
+        ),
+        agent,
+    )
 
 
-def test_answer_fails_closed_without_authoritative_support() -> None:
-    output, agent, _ = _answer(
-        SessionFrame(
-            objective=Objective(text="Understand retention."),
-            assumptions=(Assumption(text="Rows are independent."),),
+def test_application_pauses_before_persistence_and_exact_approval_commits(
+    tmp_path: Path,
+    db_session: Session,
+) -> None:
+    candidate = _candidate("approved")
+    application, agent = _application(
+        tmp_path,
+        db_session,
+        [candidate, PlannerCognitiveResult(response="Execution complete.")],
+    )
+    plan = candidate.plan
+    assert plan is not None
+
+    proposed = asyncio.run(application.submit_message("Investigate retention"))
+
+    assert str(plan.plan_id) in proposed.content
+    assert application._pending_plan == plan
+    assert PlanRepository(db_session).get_by_id(plan.plan_id) is None
+    assert application.conversation_history.turns == ()
+
+    completed = asyncio.run(application.submit_message(f"/approve {plan.plan_id}"))
+
+    assert completed.content == "Execution complete."
+    assert PlanRepository(db_session).get_by_id(plan.plan_id) == plan
+    active = db_session.get(ActivePlanRecord, plan.objective.objective_id)
+    assert active is not None and active.plan_id == plan.plan_id
+    assert application.session_frame.objective == plan.objective
+    assert application.session_frame.tasks == candidate.tasks
+    assert len(application.conversation_history.turns) == 1
+    assert len(application.conversation_history.turns[0].messages) == 2
+    assert agent.call_count == 2
+
+
+def test_rejection_persists_nothing_and_revised_plan_requires_new_review(
+    tmp_path: Path,
+    db_session: Session,
+) -> None:
+    original = _candidate("original")
+    replacement = _candidate("replacement")
+    application, _ = _application(tmp_path, db_session, [original, replacement])
+    original_plan = original.plan
+    replacement_plan = replacement.plan
+    assert original_plan is not None and replacement_plan is not None
+
+    asyncio.run(application.submit_message("Investigate retention"))
+    revised = asyncio.run(
+        application.submit_message(
+            f"/revise {original_plan.plan_id} Narrow the population."
         )
     )
 
-    assert output.error is not None
-    assert output.error.code is PlannerErrorCode.NO_AUTHORITATIVE_SUPPORT
-    assert len(agent.calls) == 1
+    assert str(replacement_plan.plan_id) in revised.content
+    assert PlanRepository(db_session).get_by_id(original_plan.plan_id) is None
+    assert PlanRepository(db_session).get_by_id(replacement_plan.plan_id) is None
+    assert application._pending_plan == replacement_plan
+    assert application.conversation_history.turns == ()
 
 
-def test_protected_answer_context_excludes_planning_and_conversation_state() -> None:
-    fields = set(PlannerAnswerContext.model_fields)
-
-    assert fields == {
-        "request",
-        "objective",
-        "data_profile",
-        "evidences",
-        "discoveries",
-    }
-    assert "assumptions" not in fields
-    assert "tasks" not in fields
-    assert "conversation_history" not in fields
-    with pytest.raises(ValidationError, match="Evidence or governed Discovery"):
-        PlannerAnswerContext(request="What is supported?")
-
-
-def test_application_constructs_only_exact_untestable_human_assumption() -> None:
-    source = "The project cannot observe competitor intent."
-    accepted = apply_planner_output(
-        SessionFrame(),
-        PlannerOutput(
-            result=AssumptionAssessment(
-                source_text=source,
-                testability=AssumptionTestability.UNTESTABLE_IN_PROJECT,
-                response="Accepted for planning only.",
-            )
-        ),
-        request=source,
+def test_execute_replan_routes_to_plan_and_interrupts_again(
+    tmp_path: Path,
+    db_session: Session,
+) -> None:
+    original = _candidate("original")
+    replacement = _candidate("replacement")
+    application, _ = _application(
+        tmp_path,
+        db_session,
+        [
+            original,
+            PlannerCognitiveResult(replan_reason="Dataset scope changed."),
+            replacement,
+        ],
     )
-    rejected = apply_planner_output(
-        SessionFrame(),
-        PlannerOutput(
-            result=AssumptionAssessment(
-                source_text="Customer age predicts churn.",
-                testability=(
-                    AssumptionTestability.TESTABLE_CLAIM_REJECTED_AS_ASSUMPTION
-                ),
-                response="Rejected as a planning Assumption.",
-            )
-        ),
-        request="Customer age predicts churn.",
+    original_plan = original.plan
+    replacement_plan = replacement.plan
+    assert original_plan is not None and replacement_plan is not None
+
+    asyncio.run(application.submit_message("Investigate retention"))
+    replanned = asyncio.run(
+        application.submit_message(f"/approve {original_plan.plan_id}")
     )
 
-    assert accepted.assumptions[0].text == source
-    assert rejected.assumptions == ()
-    with pytest.raises(ValueError, match="exact Human text"):
-        apply_planner_output(
-            SessionFrame(),
-            PlannerOutput(
-                result=AssumptionAssessment(
-                    source_text="Paraphrased text.",
-                    testability=AssumptionTestability.UNTESTABLE_IN_PROJECT,
-                    response="Accepted.",
-                )
-            ),
-            request=source,
-        )
+    assert str(replacement_plan.plan_id) in replanned.content
+    assert PlanRepository(db_session).get_by_id(original_plan.plan_id) == original_plan
+    assert PlanRepository(db_session).get_by_id(replacement_plan.plan_id) is None
+    assert application._pending_plan == replacement_plan
+    assert application.conversation_history.turns == ()
+
+
+def test_wrong_plan_identity_fails_closed_without_resuming(
+    tmp_path: Path,
+    db_session: Session,
+) -> None:
+    candidate = _candidate("exact")
+    application, agent = _application(tmp_path, db_session, [candidate])
+    asyncio.run(application.submit_message("Investigate retention"))
+
+    response = asyncio.run(
+        application.submit_message("/approve 00000000-0000-0000-0000-000000000000")
+    )
+
+    assert "No pending candidate matches" in response.content
+    assert agent.call_count == 1

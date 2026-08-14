@@ -8,14 +8,7 @@ from collections.abc import Collection, Iterable
 from typing import Literal, Self
 from uuid import UUID, uuid4
 
-from pydantic import (
-    Field,
-    NonNegativeInt,
-    ValidationInfo,
-    computed_field,
-    field_validator,
-    model_validator,
-)
+from pydantic import Field, NonNegativeInt, computed_field, field_validator, model_validator
 
 from cognieda.schemas.artifacts import Assumption, Objective, Task
 from cognieda.schemas.common import ImmutableCogniEDABaseModel
@@ -101,8 +94,13 @@ class Plan(ImmutableCogniEDABaseModel):
         )
 
     @model_validator(mode="after")
-    def _validate_against_member_tasks(self, info: ValidationInfo) -> Plan:
-        tasks = self._member_tasks(info)
+    def _validate_dependencies(self) -> Plan:
+        self._validate_dependency_graph(set(self.task_ids))
+        return self
+
+    def validate_tasks(self, tasks: Iterable[Task]) -> None:
+        """Validate exact Task values supplied as the Plan's Human-review bundle."""
+
         tasks_by_id: dict[UUID, Task] = {}
         for task in tasks:
             if task.task_id in tasks_by_id:
@@ -118,18 +116,6 @@ class Plan(ImmutableCogniEDABaseModel):
             if task.objective_id != self.objective.objective_id:
                 raise ValueError("Every bound Task must belong to the Plan Objective.")
 
-        self._validate_dependency_graph(member_ids)
-        return self
-
-    @staticmethod
-    def _member_tasks(info: ValidationInfo) -> tuple[Task, ...]:
-        context = info.context
-        if not isinstance(context, dict):
-            raise ValueError("Plan requires Tasks through Plan.create().")
-        tasks = context.get("tasks")
-        if not isinstance(tasks, tuple) or not all(isinstance(task, Task) for task in tasks):
-            raise ValueError("Plan requires Tasks through Plan.create().")
-        return tasks
 
     def _validate_dependency_graph(self, member_ids: set[UUID]) -> None:
         in_degree = dict.fromkeys(member_ids, 0)
@@ -176,7 +162,9 @@ class Plan(ImmutableCogniEDABaseModel):
         }
         if plan_id is not None:
             data["plan_id"] = plan_id
-        return cls.model_validate(data, context={"tasks": tuple(tasks)})
+        plan = cls.model_validate(data)
+        plan.validate_tasks(tuple(tasks))
+        return plan
 
     @property
     def task_ids(self) -> frozenset[UUID]:

@@ -157,7 +157,7 @@ def test_duplicate_binding_is_rejected() -> None:
 def test_binding_without_member_task_is_rejected() -> None:
     task = _task()
 
-    with pytest.raises(ValidationError, match="exactly match binding membership"):
+    with pytest.raises(ValueError, match="exactly match binding membership"):
         Plan.create(
             objective=Objective(objective_id=OBJECTIVE_ID, text="Test objective"),
             task_bindings=(_binding(task),),
@@ -168,7 +168,7 @@ def test_binding_without_member_task_is_rejected() -> None:
 def test_unbound_member_task_is_rejected() -> None:
     bound, unbound = _task(), _task()
 
-    with pytest.raises(ValidationError, match="exactly match binding membership"):
+    with pytest.raises(ValueError, match="exactly match binding membership"):
         Plan.create(
             objective=Objective(objective_id=OBJECTIVE_ID, text="Test objective"),
             task_bindings=(_binding(bound),),
@@ -179,7 +179,7 @@ def test_unbound_member_task_is_rejected() -> None:
 def test_duplicate_member_task_is_rejected() -> None:
     task = _task()
 
-    with pytest.raises(ValidationError, match="duplicate member Task"):
+    with pytest.raises(ValueError, match="duplicate member Task"):
         Plan.create(
             objective=Objective(objective_id=OBJECTIVE_ID, text="Test objective"),
             task_bindings=(_binding(task),),
@@ -190,7 +190,7 @@ def test_duplicate_member_task_is_rejected() -> None:
 def test_task_from_another_objective_is_rejected() -> None:
     task = _task(objective_id=uuid4())
 
-    with pytest.raises(ValidationError, match="Plan Objective"):
+    with pytest.raises(ValueError, match="Plan Objective"):
         _plan([task])
 
 
@@ -587,14 +587,15 @@ def test_dependency_eligibility_overrides_lower_dependent_order_rank() -> None:
     )
 
 
-def test_plan_is_immutable_and_requires_member_task_construction() -> None:
+def test_plan_is_immutable_and_create_requires_exact_member_tasks() -> None:
     task = _task()
     plan = _plan([task])
 
-    with pytest.raises(ValidationError, match="requires Tasks"):
-        Plan(
+    with pytest.raises(ValueError, match="exactly match binding membership"):
+        Plan.create(
             objective=Objective(objective_id=OBJECTIVE_ID, text="Test objective"),
             task_bindings=(_binding(task),),
+            tasks=(),
         )
     with pytest.raises(ValidationError, match="frozen"):
         plan.dependencies = ()

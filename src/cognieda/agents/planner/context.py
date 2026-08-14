@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import Field
 
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.schemas.artifacts import (
@@ -13,11 +13,9 @@ from cognieda.schemas.artifacts import (
 )
 from cognieda.schemas.common import ImmutableCogniEDABaseModel
 
-from .dependencies import PlannerDeps
-
 
 class PlannerContext(ImmutableCogniEDABaseModel):
-    """Exact read-only materialization of retained authorized research state."""
+    """Readable Planner input; conversation history inside it is non-authoritative."""
 
     objective: Objective | None = None
     assumptions: tuple[Assumption, ...] = ()
@@ -25,16 +23,7 @@ class PlannerContext(ImmutableCogniEDABaseModel):
     evidences: tuple[Evidence, ...] = ()
     discoveries: tuple[Discovery, ...] = ()
     data_profile: DataProfile | None = None
+    conversation_history: ConversationHistory = Field(default_factory=ConversationHistory)
 
 
-class PlannerGraphContext(BaseModel):
-    """Injected non-transient dependencies available to Planner graph nodes."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
-
-    agent: object
-    deps: PlannerDeps
-    planner_context: PlannerContext
-    conversation_history: ConversationHistory
-    planner_instructions: tuple[str, ...]
-    answer_instructions: tuple[str, ...]
+__all__ = ("PlannerContext",)

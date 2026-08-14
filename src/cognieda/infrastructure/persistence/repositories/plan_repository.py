@@ -124,8 +124,8 @@ class PlanRepository:
                     for dependency in dependency_rows
                 ],
             },
-            context={"tasks": tuple(tasks)},
         )
+        plan.validate_tasks(tuple(tasks))
         if plan.fingerprint != header.fingerprint:
             raise ValueError("Persisted Plan fingerprint does not match exact content.")
         return plan

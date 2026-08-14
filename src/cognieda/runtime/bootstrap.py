@@ -4,15 +4,16 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from cognieda.infrastructure.llm import AgentFactory
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
+from cognieda.infrastructure.llm import AgentFactory
+from cognieda.infrastructure.persistence.init_db import init_db
+from cognieda.infrastructure.persistence.session import get_session
 
 from .application import Application
-from .workspace import MissingModelCredentialError
-from .workspace import Workspace
+from .workspace import MissingModelCredentialError, Workspace
 
 
 def _load_workspace_environment(workspace_path: Path) -> None:
@@ -25,6 +26,9 @@ def _load_workspace_environment(workspace_path: Path) -> None:
 def bootstrap_application(workspace_path: Path) -> Application:
     _load_workspace_environment(workspace_path)
     workspace = Workspace.open(workspace_path)
+    database_url = f"sqlite:///{(workspace.state_dir / 'cognieda.sqlite3').as_posix()}"
+    init_db(database_url)
+    session = get_session(database_url)
 
     try:
         model_config = workspace.project_config.resolve_model()
@@ -55,5 +59,6 @@ def bootstrap_application(workspace_path: Path) -> Application:
         workspace=workspace,
         planner_agent=planner,
         dispatcher=dispatcher,
+        session=session,
     )
 

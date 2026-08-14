@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Self
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
 
-from cognieda.schemas.artifacts import DataProfile, Discovery, Evidence, Objective
+from cognieda.schemas.artifacts import Task
 from cognieda.schemas.enums import AssumptionTestability
+from cognieda.schemas.plan import Plan
 
 
 class PlannerErrorCode(StrEnum):
@@ -14,7 +17,6 @@ class PlannerErrorCode(StrEnum):
     MODEL_UNAVAILABLE = "model_unavailable"
     INVALID_MODEL_RESULT = "invalid_model_result"
     INVALID_SUCCESSOR_STATE = "invalid_successor_state"
-    NO_AUTHORITATIVE_SUPPORT = "no_authoritative_support"
     RESPONSE_FAILED = "response_failed"
 
 
@@ -27,23 +29,6 @@ class PlannerControlledError(BaseModel):
     message: str = Field(min_length=1)
 
 
-class DirectResponse(BaseModel):
-    """Human-facing result that proposes no authoritative state transition."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    text: str = Field(min_length=1)
-
-
-class ObjectiveProposal(BaseModel):
-    """Canonical Objective proposed for validation by Application authority."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    objective: Objective
-    response: str = Field(min_length=1)
-
-
 class AssumptionAssessment(BaseModel):
     """Planner assessment of exact Human text; never an Assumption FCO."""
 
@@ -51,50 +36,104 @@ class AssumptionAssessment(BaseModel):
 
     source_text: str = Field(min_length=1)
     testability: AssumptionTestability
-    response: str = Field(min_length=1)
 
 
-class AuthoritativeAnswerRequest(BaseModel):
-    """Request drafting from the separate protected research-support context."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-
-type PlannerFinalResult = DirectResponse | ObjectiveProposal | AssumptionAssessment
-type PlannerCognitiveResult = PlannerFinalResult | AuthoritativeAnswerRequest
-
-
-class PlannerAnswerContext(BaseModel):
-    """Authorized support for answer drafting; planning context is excluded."""
+class PlannerCognitiveResult(BaseModel):
+    """One typed cognitive result shared by the plan and execute phases."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    request: str = Field(min_length=1)
-    objective: Objective | None = None
-    data_profile: DataProfile | None = None
-    evidences: tuple[Evidence, ...] = ()
-    discoveries: tuple[Discovery, ...] = ()
+    plan: Plan | None = None
+    tasks: tuple[Task, ...] = ()
+    response: str | None = Field(default=None, min_length=1)
+    human_input_request: str | None = Field(default=None, min_length=1)
+    replan_reason: str | None = Field(default=None, min_length=1)
+    assumption_assessment: AssumptionAssessment | None = None
 
     @model_validator(mode="after")
-    def _has_authoritative_support(self) -> PlannerAnswerContext:
-        if not self.evidences and not self.discoveries:
-            raise ValueError(
-                "Planner answer context requires admitted Evidence or governed Discovery."
+    def _coherent_result(self) -> Self:
+        if self.plan is None and self.tasks:
+            raise ValueError("Planner Tasks require one candidate Plan.")
+        if self.plan is not None:
+            self.plan.validate_tasks(self.tasks)
+            if self.human_input_request is not None:
+                raise ValueError("A complete Plan cannot also request clarification.")
+            if self.replan_reason is not None:
+                raise ValueError("A candidate Plan cannot also request replanning.")
+            if self.assumption_assessment is not None:
+                raise ValueError(
+                    "A candidate Assumption assessment must be admitted before planning."
+                )
+        if self.replan_reason is not None and self.human_input_request is not None:
+            raise ValueError("A result cannot request replanning and Human clarification.")
+        if not any(
+            (
+                self.plan is not None,
+                self.response is not None,
+                self.human_input_request is not None,
+                self.replan_reason is not None,
+                self.assumption_assessment is not None,
             )
+        ):
+            raise ValueError("PlannerCognitiveResult requires one meaningful result field.")
+        return self
+
+
+class PlanReviewAction(StrEnum):
+    APPROVE = "approve"
+    REJECT = "reject"
+    REVISE = "revise"
+
+
+class PlanReviewDecision(BaseModel):
+    """Exact Human authority supplied when resuming the approval interrupt."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    action: PlanReviewAction
+    plan_id: UUID
+    feedback: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _feedback_matches_action(self) -> Self:
+        if self.action is PlanReviewAction.APPROVE and self.feedback is not None:
+            raise ValueError("Approval does not accept revision feedback.")
+        if self.action is not PlanReviewAction.APPROVE and self.feedback is None:
+            raise ValueError("Rejection or revision requires explicit Human feedback.")
         return self
 
 
 class PlannerOutput(BaseModel):
-    """Application-facing envelope for one completed Planner turn."""
+    """Application-facing envelope for one Planner lifecycle snapshot."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid", frozen=True)
 
-    result: PlannerFinalResult
-    new_messages: tuple[ModelMessage, ...] = ()
+    cognitive_result: PlannerCognitiveResult
+    messages: tuple[ModelMessage, ...] = ()
     error: PlannerControlledError | None = None
 
     @property
     def response(self) -> str:
-        if isinstance(self.result, DirectResponse):
-            return self.result.text
-        return self.result.response
+        result = self.cognitive_result
+        if result.response is not None:
+            return result.response
+        if result.human_input_request is not None:
+            return result.human_input_request
+        if result.plan is not None:
+            return "A candidate Plan is ready for Human review."
+        if result.replan_reason is not None:
+            return result.replan_reason
+        if self.error is not None:
+            return self.error.message
+        return "Planner completed without a Human-facing response."
+
+
+__all__ = (
+    "AssumptionAssessment",
+    "PlannerCognitiveResult",
+    "PlannerControlledError",
+    "PlannerErrorCode",
+    "PlannerOutput",
+    "PlanReviewAction",
+    "PlanReviewDecision",
+)
