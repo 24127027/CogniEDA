@@ -8,11 +8,12 @@ from cognieda.infrastructure.llm import AgentFactory
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
-from cognieda.delegation import Capability, ExecutorDispatcher, ExecutorRegistry
+from cognieda.delegation import ExecutorDispatcher, ExecutorRegistry
 
 from .application import Application
 from .workspace import MissingModelCredentialError
 from .workspace import Workspace
+from .event_bus import EventBus
 
 
 def _load_workspace_environment(workspace_path: Path) -> None:
@@ -44,11 +45,13 @@ def bootstrap_application(workspace_path: Path) -> Application:
         model_config=model_config,
         agent_instruction=workspace.load_agent_instruction(),
     )
+    event_bus = EventBus()
 
     return Application(
         agent_factory=agent_factory,
         workspace=workspace,
         planner_agent=planner,
         dispatcher=dispatcher,
+        event_bus=event_bus,
     )
 

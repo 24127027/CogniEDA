@@ -4,6 +4,8 @@ from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.types import PlannerResult
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.delegation import ExecutorDispatcher
+from cognieda.runtime.event_bus import EventBus
+from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
 from cognieda.schemas.artifacts import SessionFrame
 
 from .conversation import ConversationHistory
@@ -19,55 +21,81 @@ class Application:
         planner_agent: Planner,
         dispatcher: ExecutorDispatcher,
         agent_factory: AgentFactoryPort,
+        event_bus: EventBus,
+
     ) -> None:
         self.workspace = workspace
         self.agent_factory = agent_factory
         self.planner_agent = planner_agent
+        self.event_bus = event_bus  
         self.dispatcher = dispatcher
         self.session_frame = SessionFrame()
         self.conversation_history = ConversationHistory()
 
-    async def submit_message(self, message: str) -> Message:
+    async def submit_message(self, message: str) -> None:
         if message.startswith("/"):
-            return await self._handle_command(message)
+            await self._handle_command(message)
+            return
 
         planner_context = build_planner_context(
             self.session_frame,
             self.conversation_history,
         )
+
         try:
             planner_output = await self.planner_agent.run(
                 message,
                 context=planner_context,
             )
         except MissingModelCredentialError as e:
-            return self._text(
+            self._emit_message(
                 f"{e}\n\n"
                 "Run '/provider key <provider>' to configure an API key."
             )
+            return
 
         if planner_output.messages:
-            self.conversation_history = self.conversation_history.add_turn(
-                planner_output.messages
+            self.conversation_history = (
+                self.conversation_history.add_turn(
+                    planner_output.messages
+                )
             )
 
-        return Message(
-            type=MessageType.TEXT,
-            role=MessageRole.ASSISTANT,
-            content=self._present_planner_result(planner_output.result),
-        )
+        self._emit_planner_result(planner_output.result)
 
-    @staticmethod
-    def _present_planner_result(result: PlannerResult) -> str:
-        if result.response is not None:
-            return result.response
-        if result.human_input_request is not None:
-            return result.human_input_request
+    def _emit_planner_result(self, result: PlannerResult) -> None:
         if result.plan is not None:
-            return f"Planner proposed a candidate Plan with {len(result.tasks)} Task(s)."
+            self.event_bus.publish(
+                PlanProposed(
+                    plan=result.plan,
+                    tasks=result.tasks,
+                )
+            )
+            return
+
+        if result.response is not None:
+            self._emit_message(result.response)
+            return
+
+        if result.human_input_request is not None:
+            self.event_bus.publish(
+                HumanInputRequested(
+                    message=Message(
+                        type=MessageType.TEXT,
+                        role=MessageRole.ASSISTANT,
+                        content=result.human_input_request,
+                    )
+                )
+            )
+            return
+
         if result.continue_execution:
-            return "The active Plan should continue execution."
-        raise ValueError("PlannerResult has no presentable conclusion.")
+            # No public event yet.
+            return
+
+        raise AssertionError(
+            "PlannerResult passed validation but has no conclusion."
+        )
 
     # TODO: Move command handling to a separate class or module for better separation of concerns
     async def _handle_command(self, command: str) -> Message:
@@ -257,4 +285,14 @@ class Application:
                 else None
             ),
             recreate_agent=recreate_agent,
+        )
+    def _emit_message(self, content: str) -> None:
+        self.event_bus.publish(
+            MessageProduced(
+                message=Message(
+                    type=MessageType.TEXT,
+                    role=MessageRole.ASSISTANT,
+                    content=content,
+                )
+            )
         )
