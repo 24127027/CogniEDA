@@ -79,7 +79,9 @@ class RecordingFactory:
         pass
 
 
-def _planner(result: PlannerResult, messages: tuple[ModelMessage, ...] = ()) -> tuple[
+def _planner(
+    result: PlannerResult, messages: tuple[ModelMessage, ...] = ()
+) -> tuple[
     Planner,
     RecordingAgent,
     PlannerDeps,
@@ -141,6 +143,7 @@ def test_planner_directly_owns_one_agent_and_invokes_it_once_with_exact_deps() -
     assert len(agent.calls) == 1
     prompt, kwargs = agent.calls[0]
     assert "What do we know?" in prompt
+    assert "Typed authoritative Planner context:" in prompt
     assert "conversation_history" not in prompt
     assert kwargs["output_type"] is PlannerResult
     assert kwargs["deps"] is deps

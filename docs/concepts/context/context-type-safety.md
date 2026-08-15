@@ -101,7 +101,7 @@ protocol revision; a raw frame or retrieval result cannot substitute for it.
 ## Implementation status
 
 **Partially implemented.** The current Planner receives every materialized
-Objective, Assumption, Task, Evidence, Discovery, and DataProfile retained in
+Objective, Assumption, Hypothesis, Evidence, Discovery, and DataProfile retained in
 SessionFrame through immutable `PlannerContext`. Native conversation history is
 kept outside `PlannerContext` and supplied separately as non-authoritative model
 message history. The single `plan_or_answer` operation may use admitted Evidence

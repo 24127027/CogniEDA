@@ -97,10 +97,11 @@ at a time; this is not a one-session-per-Workspace rule.
 ## Implementation status
 
 **Partially implemented.** Current source has a bounded materialized
-`SessionFrame` with one optional Objective, ordered Assumptions, Tasks and
+`SessionFrame` with one optional Objective, ordered Assumptions, Hypotheses,
 Evidence and Discoveries, and one optional DataProfile. The in-process
 application passes those objects without filtering into immutable
-`PlannerContext`. Native conversation history is supplied separately as
+`PlannerContext`; the objective-scoped active Plan is supplied separately in
+that context as coordination state. Native conversation history is supplied separately as
 non-authoritative model history. Phase 2 Planner may answer, ask for
 clarification, return a transient Plan plus exact Tasks, or signal continuation;
 Application does not retain or admit those candidate objects.

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from uuid import uuid4
-
 import pytest
 from pydantic import ValidationError
 
@@ -14,6 +12,7 @@ from cognieda.schemas import (
     DiscoveryClaim,
     Evidence,
     EvidenceProvenance,
+    Hypothesis,
     Objective,
     Task,
     ValidityBasis,
@@ -41,7 +40,7 @@ def _plan(objective: Objective, tasks: tuple[Task, ...]) -> Plan:
 def _evidence_and_discovery(
     task: Task,
     profile: DataProfile,
-) -> tuple[Evidence, Discovery]:
+) -> tuple[Evidence, Hypothesis, Discovery]:
     evidence = Evidence(
         task_id=task.task_id,
         data_profile_id=profile.data_profile_id,
@@ -53,9 +52,16 @@ def _evidence_and_discovery(
             data_profile_id=profile.data_profile_id,
         ),
     )
-    hypothesis_id = uuid4()
+    hypothesis = Hypothesis(
+        task_id=task.task_id,
+        profile_id=profile.data_profile_id,
+        statement="The admitted dataset has no missing values.",
+        scope="dataset:v1",
+        validation_method="complete count",
+        evidence_expectation="one admitted missingness observation",
+    )
     discovery = Discovery(
-        hypothesis_id=hypothesis_id,
+        hypothesis_id=hypothesis.hypothesis_id,
         evidence_ids=[evidence.evidence_id],
         claim=DiscoveryClaim(
             statement="No values were missing in the admitted dataset.",
@@ -66,13 +72,13 @@ def _evidence_and_discovery(
         validity_basis=ValidityBasis(
             data_profile_id=profile.data_profile_id,
             analysis_frame_refs=["analysis:missingness"],
-            hypothesis_id=hypothesis_id,
+            hypothesis_id=hypothesis.hypothesis_id,
             evidence_ids=[evidence.evidence_id],
             method="complete count",
             decision_rule="Support when missing count equals zero.",
         ),
     )
-    return evidence, discovery
+    return evidence, hypothesis, discovery
 
 
 def test_planner_context_and_result_have_exact_canonical_fields() -> None:
@@ -80,7 +86,7 @@ def test_planner_context_and_result_have_exact_canonical_fields() -> None:
         "active_plan",
         "objective",
         "assumptions",
-        "tasks",
+        "hypotheses",
         "evidences",
         "discoveries",
         "data_profile",
@@ -100,14 +106,14 @@ def test_planner_context_retains_all_typed_readable_state() -> None:
     assumption = Assumption(text="Rows represent customers.")
     task = _task(objective)
     profile = DataProfile(row_count=10, column_count=0, columns=())
-    evidence, discovery = _evidence_and_discovery(task, profile)
+    evidence, hypothesis, discovery = _evidence_and_discovery(task, profile)
     active_plan = _plan(objective, (task,))
 
     context = PlannerContext(
         active_plan=active_plan,
         objective=objective,
         assumptions=(assumption,),
-        tasks=(task,),
+        hypotheses=(hypothesis,),
         evidences=(evidence,),
         discoveries=(discovery,),
         data_profile=profile,
@@ -116,10 +122,14 @@ def test_planner_context_retains_all_typed_readable_state() -> None:
     assert context.active_plan is active_plan
     assert context.objective is objective
     assert context.assumptions == (assumption,)
-    assert context.tasks == (task,)
+    assert context.hypotheses == (hypothesis,)
     assert context.evidences == (evidence,)
     assert context.discoveries == (discovery,)
     assert context.data_profile is profile
+    assert "tasks" not in PlannerContext.model_fields
+    assert "conversation_history" not in PlannerContext.model_fields
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        PlannerContext(tasks=(task,))  # type: ignore[call-arg]
 
 
 def test_response_candidate_plan_and_human_input_request_are_valid() -> None:

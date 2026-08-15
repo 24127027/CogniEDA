@@ -16,7 +16,8 @@ These are verified constraints of the bounded current implementation.
 - The current materialized SessionFrame can hold one Objective and one
   DataProfile but is not the canonical reference-based session-membership FCO
   and does not implement Objective-bound multi-session isolation. It now
-  retains materialized Discovery membership for Planner readability, but that
+  retains materialized Hypothesis and Discovery research-state membership for
+  Planner readability, but it does not retain Tasks as research knowledge and
   does not implement validity-aware selection or the semantic graph.
 - Direct Task-to-Evidence linkage is a bounded transitional capability. Canonical
   Hypothesis, EvidenceRequest, ExecutionRun, AnalysisFrame, evaluation, and
@@ -47,7 +48,10 @@ These are verified constraints of the bounded current implementation.
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
   and `GovernanceDecision` have no supported implementation.
 - Hypothesis Analyst and Graph Miner remain unregistered scaffolds. Discovery
-  and Hypothesis remain canonical FCO names but have no active bounded runtime.
+  and Hypothesis remain canonical FCO names but have no active bounded creation
+  or scientific-investigation runtime. Materialized Hypotheses may be retained
+  in SessionFrame and read by Planner without granting Planner authoring
+  authority.
 - Planner may propose a new Objective only inside a transient candidate Plan.
   It cannot create or mutate Assumptions; a candidate may retain only exact
   already-admitted Assumptions. The runtime does not retain that candidate or

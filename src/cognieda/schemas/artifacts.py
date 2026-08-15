@@ -229,7 +229,7 @@ class SessionFrame(ImmutableCogniEDABaseModel):
 
     objective: Objective | None = None
     assumptions: tuple[Assumption, ...] = ()
-    tasks: tuple[Task, ...] = ()
+    hypotheses: tuple[Hypothesis, ...] = ()
     evidences: tuple[Evidence, ...] = ()
     discoveries: tuple[Discovery, ...] = ()
     data_profile: DataProfile | None = None
@@ -245,8 +245,8 @@ class SessionFrame(ImmutableCogniEDABaseModel):
             object_name="Assumption",
         )
         self._reject_duplicate_ids(
-            [task.task_id for task in self.tasks],
-            object_name="Task",
+            [hypothesis.hypothesis_id for hypothesis in self.hypotheses],
+            object_name="Hypothesis",
         )
         self._reject_duplicate_ids(
             [evidence.evidence_id for evidence in self.evidences],
@@ -257,13 +257,7 @@ class SessionFrame(ImmutableCogniEDABaseModel):
             object_name="Discovery",
         )
 
-        tasks_by_id = {task.task_id: task for task in self.tasks}
         for evidence in self.evidences:
-            task = tasks_by_id.get(evidence.task_id)
-            if task is None:
-                raise ValueError("SessionFrame rejects orphan Evidence without its Task.")
-            if task.status is not TaskStatus.COMPLETED:
-                raise ValueError("SessionFrame accepts Evidence only for COMPLETED Tasks.")
             if self.data_profile is None:
                 raise ValueError("SessionFrame cannot retain Evidence without a DataProfile.")
             if evidence.data_profile_id != self.data_profile.data_profile_id:
@@ -278,7 +272,7 @@ class SessionFrame(ImmutableCogniEDABaseModel):
         values: dict[str, object] = {
             "objective": self.objective,
             "assumptions": self.assumptions,
-            "tasks": self.tasks,
+            "hypotheses": self.hypotheses,
             "evidences": self.evidences,
             "discoveries": self.discoveries,
             "data_profile": self.data_profile,
@@ -294,29 +288,10 @@ class SessionFrame(ImmutableCogniEDABaseModel):
             raise ValueError("SessionFrame rejects duplicate Assumption IDs.")
         return self._validated_copy(assumptions=(*self.assumptions, assumption))
 
-    def add_task(self, task: Task) -> SessionFrame:
-        if any(item.task_id == task.task_id for item in self.tasks):
-            raise ValueError("SessionFrame rejects duplicate Task IDs.")
-        return self._validated_copy(tasks=(*self.tasks, task))
-
-    def set_task_status(self, task_id: UUID, status: TaskStatus) -> SessionFrame:
-        for index, task in enumerate(self.tasks):
-            if task.task_id == task_id:
-                replacement = Task(
-                    task_id=task.task_id,
-                    objective_id=task.objective_id,
-                    kind=task.kind,
-                    instruction=task.instruction,
-                    status=status,
-                )
-                return self._validated_copy(
-                    tasks=(
-                        *self.tasks[:index],
-                        replacement,
-                        *self.tasks[index + 1 :],
-                    )
-                )
-        raise ValueError("SessionFrame cannot update a Task it does not contain.")
+    def add_hypothesis(self, hypothesis: Hypothesis) -> SessionFrame:
+        if any(item.hypothesis_id == hypothesis.hypothesis_id for item in self.hypotheses):
+            raise ValueError("SessionFrame rejects duplicate Hypothesis IDs.")
+        return self._validated_copy(hypotheses=(*self.hypotheses, hypothesis))
 
     def add_evidence(self, evidence: Evidence) -> SessionFrame:
         return self._validated_copy(evidences=(*self.evidences, evidence))

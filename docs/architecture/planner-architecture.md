@@ -254,7 +254,7 @@ native model messages, and any controlled error. No LangGraph workflow or
 Planner-side tool is active in this phase.
 
 Application exact-materializes the current SessionFrame Objective,
-Assumptions, Tasks, Evidence, Discoveries, and DataProfile into immutable
+Assumptions, Hypotheses, Evidence, Discoveries, and DataProfile into immutable
 `PlannerContext`. It resolves the objective-scoped active Plan for the frame's
 exact current Objective and materializes that Plan without model inference.
 `PlannerContext` contains neither candidate Plan/Task state nor conversation
@@ -262,6 +262,9 @@ history. Native conversation history is supplied separately as model history but
 non-authoritative and is not duplicated into current-run `PlannerOutput.messages`.
 Evidence and Discovery may support an answer. Assumptions may guide planning
 but cannot support an empirical answer or be created by Planner.
+Task definitions for active Plan members are not put back into research state;
+a coordination-specific Task projection remains **Deferred** to the Planner
+LangGraph and Task-selection phase.
 
 Candidate validation rejects Tasks without a Plan, any Task bundle that does
 not exactly match Plan membership and Objective scope, unknown Assumption IDs,

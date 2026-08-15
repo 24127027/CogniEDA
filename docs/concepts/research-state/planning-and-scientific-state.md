@@ -35,7 +35,8 @@ flag is not an automatic rewrite or deletion of either object.
 
 ## Task is work; Plan is a plan
 
-A `Task` is a durable semantic work unit of exactly one canonical kind:
+A `Task` is durable coordination/work identity, not research knowledge. It has
+exactly one canonical kind:
 
 ```text
 DATA

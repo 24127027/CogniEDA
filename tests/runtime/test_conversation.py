@@ -133,13 +133,13 @@ def test_candidate_is_invocation_output_only_without_authoritative_writes(
     assert not hasattr(application, "_pending_plan")
     assert not hasattr(application, "_pending_tasks")
     assert application.session_frame.objective is None
-    assert application.session_frame.tasks == ()
+    assert application.session_frame.hypotheses == ()
     assert len(application.conversation_history.turns) == 1
     assert tuple(type(planner.contexts[0]).model_fields) == (
         "active_plan",
         "objective",
         "assumptions",
-        "tasks",
+        "hypotheses",
         "evidences",
         "discoveries",
         "data_profile",
@@ -226,7 +226,8 @@ def test_active_plan_materializes_only_from_authoritative_repository_state(
     continued = asyncio.run(application.submit_message("Continue active work."))
 
     assert planner.contexts[0].active_plan == admitted
-    assert planner.contexts[0].tasks == ()
+    assert planner.contexts[0].hypotheses == ()
+    assert "tasks" not in type(planner.contexts[0]).model_fields
     assert PlanRepository(db_session).get_by_id(admitted.plan_id) == admitted
     assert (
         ActivePlanRepository(db_session).get_by_objective_id(admitted.objective.objective_id)

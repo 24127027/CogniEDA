@@ -18,7 +18,7 @@ from .types import (
 
 
 class Planner:
-    """Human-facing cognitive coordinator over readable research state."""
+    """Human-facing coordinator over authoritative coordination and research state."""
 
     builtin_tools: tuple[()] = ()
 
@@ -134,8 +134,10 @@ class Planner:
 
     @staticmethod
     def _build_prompt(request: str, context: PlannerContext) -> str:
-        readable_state = context.model_dump_json()
-        return f"Human request:\n{request}\n\nTyped readable research state:\n{readable_state}"
+        planner_context = context.model_dump_json()
+        return (
+            f"Human request:\n{request}\n\nTyped authoritative Planner context:\n{planner_context}"
+        )
 
     @staticmethod
     def _validate_result_against_context(

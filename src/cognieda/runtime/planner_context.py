@@ -18,7 +18,7 @@ def build_planner_context(
         active_plan=active_plan,
         objective=session_frame.objective,
         assumptions=session_frame.assumptions,
-        tasks=session_frame.tasks,
+        hypotheses=session_frame.hypotheses,
         evidences=session_frame.evidences,
         discoveries=session_frame.discoveries,
         data_profile=session_frame.data_profile,
