@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+
 from cognieda.agents.planner.agent import Planner
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.execution import ExecutorDispatcher
 from cognieda.schemas.artifacts import SessionFrame
 
 from .conversation import ConversationHistory
-from .messages import Message, MessageRole, MessageType
+from .messages import ErrorEvent, MarkdownEvent, StatusEvent, UIEvent
 from .planner_context import apply_planner_output, build_planning_context
 from .workspace import Workspace, MissingModelCredentialError
 
@@ -26,9 +28,13 @@ class Application:
         self.session_frame = SessionFrame()
         self.conversation_history = ConversationHistory()
 
-    async def submit_message(self, message: str) -> Message:
+    async def submit_message(self, message: str) -> AsyncIterator[UIEvent]:
         if message.startswith("/"):
-            return await self._handle_command(message)
+            async for event in self._handle_command(message):
+                yield event
+            return
+
+        yield StatusEvent("Planning...")
 
         planning_context = build_planning_context(
             self.session_frame,
@@ -40,10 +46,11 @@ class Application:
                 planning_context=planning_context,
             )
         except MissingModelCredentialError as e:
-            return self._text(
+            yield ErrorEvent(
                 f"{e}\n\n"
                 "Run '/provider key <provider>' to configure an API key."
             )
+            return
 
         self.session_frame = apply_planner_output(self.session_frame, planner_output)
         if planner_output.new_messages:
@@ -51,14 +58,14 @@ class Application:
                 planner_output.new_messages
             )
 
-        return Message(
-            type=MessageType.TEXT,
-            role=MessageRole.ASSISTANT,
-            content=planner_output.response,
-        )
+        if planner_output.error is not None:
+            yield ErrorEvent(content=planner_output.response)
+            return
+
+        yield MarkdownEvent(content=planner_output.response)
 
     # TODO: Move command handling to a separate class or module for better separation of concerns
-    async def _handle_command(self, command: str) -> Message:
+    async def _handle_command(self, command: str) -> AsyncIterator[UIEvent]:
         parts = command.split()
 
         match parts:
@@ -73,9 +80,7 @@ class Application:
                     recreate_agent=True,
                 )
 
-                return self._text(
-                    f"Added skill '{name}'."
-                )
+                yield MarkdownEvent(f"Added skill '{name}'.")
 
             case ["/skill", "rm", name]:
                 self.workspace.remove_skill(name)
@@ -85,24 +90,23 @@ class Application:
                     recreate_agent=True,
                 )
 
-                return self._text(
-                    f"Removed skill '{name}'."
-                )
+                yield MarkdownEvent(f"Removed skill '{name}'.")
 
             case ["/skill", "list"]:
                 skills = self.workspace.load_skills_config()
 
                 if not skills:
-                    return self._text("No skills registered.")
+                    yield MarkdownEvent("No skills registered.")
+                    return
 
-                return self._text(
+                yield MarkdownEvent(
                     "\n".join(
                         f"{name}: {cfg['directories']}"
                         for name, cfg in skills.items()
                     )
                 )
 
-            case ["/skill", "use", worker, skill]:
+            case ["/skill", "use", worker, skill] | ["/skill", "assign", worker, skill]:
                 self.workspace.add_worker_skill(worker, skill)
 
                 await self._reload_runtime(
@@ -110,11 +114,9 @@ class Application:
                     recreate_agent=True,
                 )
 
-                return self._text(
-                    f"Assigned '{skill}' to '{worker}'."
-                )
+                yield MarkdownEvent(f"Assigned '{skill}' to '{worker}'.")
 
-            case ["/skill", "drop", worker, skill]:
+            case ["/skill", "drop", worker, skill] | ["/skill", "remove", worker, skill]:
                 self.workspace.remove_worker_skill(worker, skill)
 
                 await self._reload_runtime(
@@ -122,9 +124,7 @@ class Application:
                     recreate_agent=True,
                 )
 
-                return self._text(
-                    f"Removed '{skill}' from '{worker}'."
-                )
+                yield MarkdownEvent(f"Removed '{skill}' from '{worker}'.")
 
             #
             # Providers
@@ -135,19 +135,20 @@ class Application:
                 try:
                     self.workspace.project_config.validate()
                 except ValueError as e:
-                    return self._text(str(e))
+                    yield MarkdownEvent(str(e))
+                    return
                 provider = self.workspace.project_config.providers[profile]
 
                 configured = "yes" if provider.api_key_configured() else "no"
 
-                return self._text(
+                yield MarkdownEvent(
                     f"""Current provider : {profile}
         Model            : {provider.model}
         API key          : {configured}"""
                 )
 
             case ["/provider", "list"]:
-                return self._text(
+                yield MarkdownEvent(
                     "\n".join(
                         self.workspace.project_config.providers.keys()
                     )
@@ -160,9 +161,7 @@ class Application:
                     recreate_agent=True,
                 )
 
-                return self._text(
-                    f"Using provider '{profile}'."
-                )
+                yield MarkdownEvent(f"Using provider '{profile}'.")
 
             case ["/provider", "model", profile, model]:
                 self.workspace.set_provider_model(
@@ -174,9 +173,7 @@ class Application:
                     recreate_agent=True,
                 )
 
-                return self._text(
-                    f"Updated '{profile}' model to '{model}'."
-                )
+                yield MarkdownEvent(f"Updated '{profile}' model to '{model}'.")
             # TODO:
             # Prompting for secrets belongs to the CLI/UI layer.
             # Application should receive the API key as an argument rather than
@@ -195,9 +192,7 @@ class Application:
                     recreate_agent=True,
                 )
 
-                return self._text(
-                    f"Stored API key for '{profile}'."
-                )
+                yield MarkdownEvent(f"Stored API key for '{profile}'.")
 
             #
             # Planner
@@ -207,21 +202,10 @@ class Application:
                     reload_instruction=True,
                 )
 
-                return self._text(
-                    "Planner instructions reloaded."
-                )
+                yield MarkdownEvent("Planner instructions reloaded.")
 
             case _:
-                return self._text(
-                    f"Unknown command: '{command}'."
-                )
-
-    def _text(self, content: str) -> Message:
-        return Message(
-            type=MessageType.TEXT,
-            role=MessageRole.ASSISTANT,
-            content=content,
-        )
+                yield ErrorEvent(f"Unknown command: '{command}'.")
     
     async def _reload_runtime(
         self,

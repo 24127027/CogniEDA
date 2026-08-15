@@ -8,7 +8,7 @@ from rich.control import Control
 from rich.panel import Panel
 
 from cognieda.cli.renderer import Renderer
-from cognieda.runtime.messages import Message, MessageRole, MessageType
+from cognieda.runtime.messages import ErrorEvent, MarkdownEvent, StatusEvent
 
 
 def _renderer_output() -> tuple[Renderer, StringIO]:
@@ -27,13 +27,7 @@ def test_render_user_message_uses_panel() -> None:
     console = FakeConsole()
     renderer = Renderer(console=console)
 
-    renderer.render(
-        Message(
-            role=MessageRole.USER,
-            type=MessageType.TEXT,
-            content="Need a summary",
-        )
-    )
+    renderer.render_user_message("Need a summary")
 
     assert any(isinstance(item, Panel) for item in console.printed)
 
@@ -42,9 +36,7 @@ def test_render_assistant_message_uses_markdown_and_model_footer() -> None:
     renderer, buffer = _renderer_output()
 
     renderer.render(
-        Message(
-            role=MessageRole.ASSISTANT,
-            type=MessageType.TEXT,
+        MarkdownEvent(
             content="# Result\n\nReady",
             model="gemini-2.5-flash",
         )
@@ -55,6 +47,25 @@ def test_render_assistant_message_uses_markdown_and_model_footer() -> None:
     assert "Result" in output
     assert "Ready" in output
     assert "◆ gemini-2.5-flash" in output
+
+
+def test_render_status_event_uses_dim_text() -> None:
+    renderer, buffer = _renderer_output()
+
+    renderer.render(StatusEvent("Planning..."))
+
+    output = buffer.getvalue()
+    assert "Planning..." in output
+
+
+def test_render_error_event_uses_error_path() -> None:
+    renderer, buffer = _renderer_output()
+
+    renderer.render(ErrorEvent("broken formatter"))
+
+    output = buffer.getvalue()
+    assert "Error" in output
+    assert "broken formatter" in output
 
 
 def test_render_segments_uses_shared_background_without_border() -> None:

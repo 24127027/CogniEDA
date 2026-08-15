@@ -12,7 +12,7 @@ from rich.padding import Padding
 from rich.segment import ControlType
 from rich.text import Text
 
-from cognieda.runtime.messages import Message, MessageRole, MessageType
+from cognieda.runtime.messages import ErrorEvent, MarkdownEvent, StatusEvent, UIEvent
 
 console = Console()
 
@@ -40,6 +40,16 @@ class Renderer:
         self.console.print(f"[green]Workspace: {workspace_root}[/green]")
         self.console.print("[green]Session started.[/green]")
 
+    def render_user_message(self, text: str) -> None:
+        self.console.print(
+            Panel(
+                str(text),
+                border_style="cyan",
+                box=box.ROUNDED,
+                padding=(0, 1),
+            )
+        )
+
     def render_segments(self, segments: Iterable[str]) -> None:
         content = Text()
         segment_list = [str(segment) for segment in segments]
@@ -59,32 +69,26 @@ class Renderer:
 
         self.console.print(segment_area)
 
-    def render(self, message: Message) -> None:
-        match message.type, message.role:
-            case MessageType.ERROR, _:
-                self.console.print(f"[red][Error] {message.content}[/red]")
+    def render(self, event: UIEvent) -> None:
+        if isinstance(event, ErrorEvent):
+            self.console.print(f"[red][Error] {event.content}[/red]")
+            return
 
-            case MessageType.TEXT, MessageRole.USER:
-                self.console.print(
-                    Panel(
-                        str(message.content),
-                        border_style="cyan",
-                        box=box.ROUNDED,
-                        padding=(0, 1),
-                    )
+        if isinstance(event, StatusEvent):
+            self.console.print(Text(str(event.content), style="dim"))
+            return
+
+        if isinstance(event, MarkdownEvent):
+            self.console.print("[bold cyan]CogniEDA[/bold cyan]")
+            self.console.print(Markdown(str(event.content)))
+
+            if event.model:
+                model_text = Text(
+                    f"◆ {event.model}",
+                    style="dim",
+                    justify="right",
                 )
+                self.console.print(model_text)
+            return
 
-            case MessageType.TEXT, MessageRole.ASSISTANT:
-                self.console.print("[bold cyan]CogniEDA[/bold cyan]")
-                self.console.print(Markdown(str(message.content)))
-
-                if message.model:
-                    model_text = Text(
-                        f"◆ {message.model}",
-                        style="dim",
-                        justify="right",
-                    )
-                    self.console.print(model_text)
-
-            case _:
-                self.console.print(str(message.content))
+        self.console.print(str(event))

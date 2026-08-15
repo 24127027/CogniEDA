@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from cognieda.runtime.messages import Message, MessageRole, MessageType
+from cognieda.runtime.messages import ErrorEvent, MarkdownEvent, StatusEvent, UIEvent
 
 if TYPE_CHECKING:
     from cognieda.cli.renderer import Renderer
@@ -31,8 +32,8 @@ class MockApplication:
         self.received_messages: list[str] = []
         self.turn_count = 0
 
-    async def submit_message(self, message: str) -> Message:
-        """Return deterministic assistant messages without any planner or model calls."""
+    async def submit_message(self, message: str) -> AsyncIterator[UIEvent]:
+        """Yield deterministic UI presentation events without planner or model calls."""
 
         self.turn_count += 1
         text = message.strip()
@@ -40,10 +41,7 @@ class MockApplication:
 
         lowered = text.casefold()
         if lowered == "/help":
-            return Message(
-                role=MessageRole.ASSISTANT,
-                type=MessageType.TEXT,
-                model=self.model_name,
+            yield MarkdownEvent(
                 content=(
                     "# Mock UI playground\n\n"
                     "Use these commands to stress renderer behavior:\n"
@@ -54,13 +52,13 @@ class MockApplication:
                     "- /error your message : error surface\n"
                     "- any other input: echoed response\n"
                 ),
+                model=self.model_name,
             )
+            return
 
         if lowered == "/markdown":
-            return Message(
-                role=MessageRole.ASSISTANT,
-                type=MessageType.TEXT,
-                model=self.model_name,
+            yield StatusEvent("Planning...")
+            yield MarkdownEvent(
                 content=(
                     "# Render Sample\n\n"
                     "## Checklist\n"
@@ -73,40 +71,37 @@ class MockApplication:
                     "    return 'pass' if score >= 0.8 else 'review'\n"
                     "```\n"
                 ),
+                model=self.model_name,
             )
+            return
 
         if lowered == "/long":
-            return Message(
-                role=MessageRole.ASSISTANT,
-                type=MessageType.TEXT,
-                model=self.model_name,
+            yield StatusEvent("Analyzing...")
+            yield MarkdownEvent(
                 content=(
                     "This is a deliberately long assistant response used to test line wrapping, "
                     "spacing consistency, and readability for dense content in narrow terminals. "
                     "It should remain readable and stable even when the viewport changes width."
                 ),
+                model=self.model_name,
             )
+            return
 
         if lowered.startswith("/error"):
             details = text[6:].strip() or "Mock failure for renderer test"
-            return Message(
-                role=MessageRole.ASSISTANT,
-                type=MessageType.ERROR,
-                content=details,
-                model=self.model_name,
-            )
+            yield ErrorEvent(details)
+            return
 
-        return Message(
-            role=MessageRole.ASSISTANT,
-            type=MessageType.TEXT,
-            model=self.model_name,
+        yield StatusEvent("Planning...")
+        yield MarkdownEvent(
             content=(
                 f"Turn {self.turn_count}. You said: {text}\n\n"
                 "Use /help for built-in UI render scenarios."
             ),
+            model=self.model_name,
         )
 
-    def showcase_preview(self, message: str) -> tuple[tuple[str, ...], Message] | None:
+    def showcase_preview(self, message: str) -> tuple[tuple[str, ...], MarkdownEvent] | None:
         """Return a full UI showcase: segment area + assistant response in one input."""
 
         lowered = message.strip().casefold()
@@ -118,10 +113,7 @@ class MockApplication:
             "Showcase segment: normalized planning context",
             "Showcase segment: render-ready output",
         )
-        response = Message(
-            role=MessageRole.ASSISTANT,
-            type=MessageType.TEXT,
-            model=self.model_name,
+        response = MarkdownEvent(
             content=(
                 "# Showcase Response\n\n"
                 "This single command renders a full flow in one turn:\n"
@@ -140,6 +132,7 @@ class MockApplication:
                 "```\n"
                 "Use this to validate end-to-end visual rhythm."
             ),
+            model=self.model_name,
         )
         return segments, response
 
@@ -191,13 +184,7 @@ async def run_mock_repl(
         if not text:
             continue
 
-        resolved_renderer.render(
-            Message(
-                type=MessageType.TEXT,
-                role=MessageRole.USER,
-                content=text,
-            )
-        )
+        resolved_renderer.render_user_message(text)
 
         showcase = resolved_app.showcase_preview(text)
         if showcase is not None:
@@ -211,8 +198,8 @@ async def run_mock_repl(
             resolved_renderer.render_segments(segments)
             continue
 
-        response = await resolved_app.submit_message(text)
-        resolved_renderer.render(response)
+        async for event in resolved_app.submit_message(text):
+            resolved_renderer.render(event)
 
 
 def main() -> None:

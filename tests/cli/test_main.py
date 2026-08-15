@@ -4,7 +4,7 @@ import asyncio
 from types import SimpleNamespace
 
 from cognieda.cli.main import repl
-from cognieda.runtime.messages import MessageRole, MessageType
+from cognieda.runtime.messages import MarkdownEvent, StatusEvent
 
 
 class DummyRenderer:
@@ -18,8 +18,11 @@ class DummyRenderer:
     def read_input(self) -> str:
         return next(self._inputs)
 
-    def render(self, message) -> None:
-        self.rendered.append(message)
+    def render_user_message(self, text: str) -> None:
+        self.rendered.append(("user", text))
+
+    def render(self, event) -> None:
+        self.rendered.append(("event", event))
 
 
 class DummyApp:
@@ -27,12 +30,8 @@ class DummyApp:
         self.workspace = SimpleNamespace(root=SimpleNamespace())
 
     async def submit_message(self, text: str):
-        return SimpleNamespace(
-            type=MessageType.TEXT,
-            role=MessageRole.ASSISTANT,
-            content=f"echo: {text}",
-            model=None,
-        )
+        yield StatusEvent("Planning...")
+        yield MarkdownEvent(content=f"echo: {text}")
 
 
 def test_repl_renders_user_input_before_assistant_response() -> None:
@@ -41,14 +40,11 @@ def test_repl_renders_user_input_before_assistant_response() -> None:
 
     asyncio.run(repl(app, renderer))
 
-    assert len(renderer.rendered) == 2
+    assert len(renderer.rendered) == 3
     first = renderer.rendered[0]
     second = renderer.rendered[1]
+    third = renderer.rendered[2]
 
-    assert first.role is MessageRole.USER
-    assert first.type is MessageType.TEXT
-    assert first.content == "hello"
-
-    assert second.role is MessageRole.ASSISTANT
-    assert second.type is MessageType.TEXT
-    assert second.content == "echo: hello"
+    assert first == ("user", "hello")
+    assert second == ("event", StatusEvent("Planning..."))
+    assert third == ("event", MarkdownEvent(content="echo: hello"))
