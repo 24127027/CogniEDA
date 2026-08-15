@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from cognieda.agents.planner.context import PlannerContext
 from cognieda.infrastructure.persistence.repositories import ActivePlanRepository
@@ -46,4 +46,18 @@ class PlannerContextProvider:
         return build_planner_context(session_frame, active_plan=active_plan)
 
 
-__all__ = ("PlannerContextProvider", "build_planner_context")
+@dataclass
+class SessionFrameState:
+    """Mutable runtime holder for the current immutable SessionFrame value."""
+
+    current: SessionFrame = field(default_factory=SessionFrame)
+
+    def __call__(self) -> SessionFrame:
+        return self.current
+
+
+__all__ = (
+    "PlannerContextProvider",
+    "SessionFrameState",
+    "build_planner_context",
+)

@@ -74,18 +74,44 @@ def test_planner_has_no_session_frame_dependency_or_legacy_graph_surface() -> No
     from cognieda.agents.planner.context import PlannerContext
     from cognieda.agents.planner.types import PlannerOutput, PlannerResult
 
-    signature = inspect.signature(Planner.run)
+    signature = inspect.signature(Planner.handle_message)
     assert violations == []
     assert "session_frame" not in signature.parameters
-    assert signature.parameters["context"].default is inspect.Parameter.empty
+    assert tuple(signature.parameters) == ("self", "message")
     assert inspect.iscoroutinefunction(Planner.reload)
     assert "session_frame" not in PlannerContext.model_fields
     assert "session_frame" not in PlannerResult.model_fields
     assert "session_frame" not in PlannerOutput.model_fields
 
     planner_root = SOURCE_ROOT / "agents" / "planner"
-    for obsolete in ("model.py", "graph.py", "nodes.py"):
+    for obsolete in ("model.py",):
         assert not (planner_root / obsolete).exists()
+    for required in ("graph.py", "nodes.py", "state.py"):
+        assert (planner_root / required).is_file()
+
+
+def test_runtime_does_not_define_planner_lifecycle_internals() -> None:
+    forbidden = {
+        "PlannerState",
+        "PlannerGraphState",
+        "PlannerRuntime",
+        "PlannerRuntimeContext",
+        "build_planner_graph",
+    }
+    violations: list[str] = []
+    runtime_root = SOURCE_ROOT / "runtime"
+    for path in runtime_root.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name in forbidden:
+                    violations.append(
+                        f"{path.relative_to(PROJECT_ROOT)} defines {node.name}"
+                    )
+
+    assert violations == []
+    assert not (runtime_root / "planner_runtime.py").exists()
+    assert (runtime_root / "planner_context.py").is_file()
 
 
 def test_planner_production_source_has_no_obsolete_cognitive_symbols() -> None:

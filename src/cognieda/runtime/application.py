@@ -1,19 +1,14 @@
 from __future__ import annotations
 
-from sqlmodel import Session
-
 from cognieda.agents.planner.agent import Planner
+from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.application.ports import AgentFactoryPort
-from cognieda.application.services import PlanAdmissionService
-from cognieda.delegation import ExecutorDispatcher
-from cognieda.infrastructure.persistence.repositories import ActivePlanRepository
 from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
 from cognieda.schemas.artifacts import SessionFrame
 
 from .messages import Message, MessageRole, MessageType
-from .planner_context import PlannerContextProvider
-from .planner_runtime import PlannerRuntime, PlannerRuntimeContext, PlannerTurnOutcome
+from .planner_context import SessionFrameState
 from .workspace import MissingModelCredentialError, Workspace
 
 
@@ -22,28 +17,23 @@ class Application:
         self,
         workspace: Workspace,
         planner_agent: Planner,
-        dispatcher: ExecutorDispatcher,
         agent_factory: AgentFactoryPort,
         event_bus: EventBus,
-        session: Session,
+        session_frame_state: SessionFrameState,
     ) -> None:
         self.workspace = workspace
         self.agent_factory = agent_factory
         self.planner_agent = planner_agent
         self.event_bus = event_bus
-        self.dispatcher = dispatcher
-        self.session_frame = SessionFrame()
-        context_provider = PlannerContextProvider(
-            session_frame_provider=lambda: self.session_frame,
-            active_plans=ActivePlanRepository(session),
-        )
-        self.planner_runtime = PlannerRuntime(
-            runtime_context=PlannerRuntimeContext(
-                planner=planner_agent,
-                planner_context_provider=context_provider,
-                plan_admission=PlanAdmissionService(session),
-            )
-        )
+        self._session_frame_state = session_frame_state
+
+    @property
+    def session_frame(self) -> SessionFrame:
+        return self._session_frame_state.current
+
+    @session_frame.setter
+    def session_frame(self, value: SessionFrame) -> None:
+        self._session_frame_state.current = value
 
     async def submit_message(self, message: str) -> None:
         if message.startswith("/"):
@@ -52,7 +42,7 @@ class Application:
             return
 
         try:
-            outcome = await self.planner_runtime.handle_message(message)
+            outcome = await self.planner_agent.handle_message(message)
         except MissingModelCredentialError as e:
             self._emit_message(f"{e}\n\nRun '/provider key <provider>' to configure an API key.")
             return

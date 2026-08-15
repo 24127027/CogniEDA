@@ -97,11 +97,12 @@ These are verified constraints of the bounded current implementation.
 - Bootstrap composes the in-process S0 dispatcher and bounded Data Explorer.
   The installable `cognieda [PATH]` command reaches the development Planner
   REPL and is **Partially implemented**. Its Application owns materialized
-  SessionFrame state and one `PlannerRuntime`; graph state owns native-message
-  history, exact candidate state, and Human interrupt/resume only for the
-  current process. A provider exact-materializes active-Plan `PlannerContext`
-  fresh for every invocation. No durable graph recovery or supported end-to-end application
-  runtime, worker, service API, or product CLI exists.
+  SessionFrame state and invokes one fully composed Planner. Planner owns its
+  LangGraph, process-local checkpointer/thread, native-message history, exact
+  candidate state, and Human interrupt/resume. A provider exact-materializes
+  active-Plan `PlannerContext` fresh for every cognitive invocation. No durable
+  graph recovery or supported end-to-end application runtime, worker, service
+  API, or product CLI exists.
 - Application-to-CLI presentation uses an in-process EventBus. Normal Planner
   responses, transient Plan proposals, Human clarification requests, and
   command messages are published to renderer subscribers; submit calls do not

@@ -247,19 +247,20 @@ scientific proposal.
 ## Implementation status
 
 **Partially implemented.** The Planner directly owns one typed PydanticAI Agent
-and performs one `plan_or_answer` invocation per `Planner.run`. The in-process
-`PlannerRuntime` composes that call as a LangGraph `StateGraph` with exactly
-`plan_or_answer`, `await_human`, and `admit_candidate` lifecycle nodes. It does
-not add an execution node or a Planner-side tool.
+and its compiled LangGraph `StateGraph` with exactly `plan_or_answer`,
+`await_human`, and `admit_candidate` lifecycle nodes. `Planner.handle_message()`
+hides graph invocation, interrupt/resume, checkpointer, and thread mechanics
+from Application. The graph does not add an execution node or a Planner-side
+tool.
 
-`PlannerGraphState` owns the latest Human input, transient candidate Plan and
-exact Task bundle, native model-message history, current result/error, and a
-typed turn outcome. It does not own `PlannerContext`. The graph runtime context
-contains only the Planner, a fresh-context provider, and
-`PlanAdmissionService`; it contains no EventBus, dispatcher, candidate, or
-execution authority.
+`PlannerState` owns the latest Human input, transient candidate Plan and exact
+Task bundle, native model-message history, current result/error, and a typed
+turn outcome. It does not own `PlannerContext`. Non-checkpointed
+`PlannerGraphContext` contains only the current cognitive invoker, a
+fresh-context provider, and the deterministic Plan-admission port; it contains
+no EventBus, dispatcher, candidate, or execution authority.
 
-Application exact-materializes the current SessionFrame Objective,
+`PlannerContextProvider` exact-materializes the current SessionFrame Objective,
 Assumptions, Hypotheses, Evidence, Discoveries, and DataProfile into immutable
 `PlannerContext`. It resolves the objective-scoped active Plan for the frame's
 exact current Objective and materializes that Plan without model inference.
@@ -291,12 +292,17 @@ application-owned approval parser. Capability, provider, executor, worker, and
 execution routing are absent from the model-visible Planner contracts.
 
 If no candidate is pending, `continue_execution` still requires an active Plan.
-The runtime returns a visible controlled message that execution is not
-implemented and performs no dispatch. Application maps the typed graph outcome
-to EventBus presentation events; EventBus does not own lifecycle state.
-`InMemorySaver` and one runtime UUID per Application preserve isolated
-in-process threads only. Restart recovery and durable conversation/candidate
-checkpoints remain **Deferred**.
+Planner returns a visible controlled outcome that execution is not implemented
+and performs no dispatch. Application maps that typed outcome to EventBus
+presentation events; EventBus does not own lifecycle state. Planner-owned
+`InMemorySaver` and one Planner thread UUID preserve isolated in-process threads
+only. Restart recovery and durable conversation/candidate checkpoints remain
+**Deferred**.
+
+PR #53 is a structural precedent only for Planner-owned `agent.py`, `graph.py`,
+`nodes.py`, and `state.py` placement. Its checkpointed `PlannerContext`, typed
+`PlanReviewAction`/`PlanReviewDecision` review API, conversation-in-context
+model, and `execute` node are superseded and are not restored.
 
 The immutable Phase 1 `Plan` and `PlanDependency` domain
 contracts and side-effect-free application validation are **Implemented** with

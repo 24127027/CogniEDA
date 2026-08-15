@@ -42,6 +42,17 @@ class NeverDispatcher:
         raise AssertionError(f"Planner must not dispatch in Phase 2: {request}")
 
 
+class StaticContextProvider:
+    def materialize(self) -> PlannerContext:
+        return PlannerContext()
+
+
+class NeverAdmission:
+    def admit(self, plan: Plan, *, tasks: tuple[Task, ...]) -> Plan:
+        del plan, tasks
+        raise AssertionError("Direct cognitive invocation must not admit a Plan.")
+
+
 def _messages(request: str, response: str) -> tuple[ModelMessage, ...]:
     return (
         ModelRequest(parts=[UserPromptPart(content=request)]),
@@ -96,6 +107,8 @@ def _planner(
         deps,
         agent_factory=cast(AgentFactoryPort, factory),
         model_config=ModelConfig(provider="openai", model_name="test", api_key="test"),
+        planner_context_provider=StaticContextProvider(),
+        plan_admission=NeverAdmission(),
     )
     return planner, agent, deps, factory
 
@@ -127,7 +140,7 @@ def test_planner_directly_owns_one_agent_and_invokes_it_once_with_exact_deps() -
         current_messages,
     )
     output = asyncio.run(
-        planner.run(
+        planner._invoke_cognitive(
             "What do we know?",
             context=PlannerContext(),
             message_history=list(prior_messages),
@@ -136,7 +149,7 @@ def test_planner_directly_owns_one_agent_and_invokes_it_once_with_exact_deps() -
 
     assert planner._agent is agent
     assert not hasattr(planner, "model")
-    assert not hasattr(planner, "graph")
+    assert planner.graph is not None
     assert len(factory.calls) == 1
     assert factory.calls[0]["deps_type"] is PlannerDeps
     assert factory.calls[0]["builtin_tools"] == ()
@@ -166,7 +179,7 @@ def test_retained_candidate_is_supplied_as_fresh_lifecycle_context() -> None:
     planner, agent, _, _ = _planner(PlannerResult(response="Pricing is material."))
 
     output = asyncio.run(
-        planner.run(
+        planner._invoke_cognitive(
             "Why include pricing?",
             context=PlannerContext(objective=objective),
             candidate_plan=candidate.plan,
@@ -215,16 +228,18 @@ def test_fresh_context_does_not_replay_stale_snapshot_into_second_model_call() -
             model_name="test",
             api_key="test",
         ),
+        planner_context_provider=StaticContextProvider(),
+        plan_admission=NeverAdmission(),
     )
 
     first_output = asyncio.run(
-        planner.run(
+        planner._invoke_cognitive(
             "first human request",
             context=PlannerContext(objective=Objective(text="CTX_V1_ONLY")),
         )
     )
     second_output = asyncio.run(
-        planner.run(
+        planner._invoke_cognitive(
             "second human request",
             context=PlannerContext(objective=Objective(text="CTX_V2_ONLY")),
             message_history=list(first_output.messages),
@@ -301,7 +316,7 @@ def test_existing_evidence_and_discovery_can_support_response_without_plan() -> 
         discoveries=(discovery,),
     )
 
-    output = asyncio.run(planner.run("Can this be answered?", context=context))
+    output = asyncio.run(planner._invoke_cognitive("Can this be answered?", context=context))
 
     assert output.result.plan is None
     assert output.result.response == "A supported finding exists."
@@ -316,10 +331,14 @@ def test_candidate_plan_may_reuse_current_objective_or_propose_a_new_one() -> No
     new_planner, _, _, _ = _planner(_candidate(proposed))
 
     reused = asyncio.run(
-        reuse_planner.run("Investigate.", context=PlannerContext(objective=current))
+        reuse_planner._invoke_cognitive(
+            "Investigate.", context=PlannerContext(objective=current)
+        )
     )
     created = asyncio.run(
-        new_planner.run("Investigate.", context=PlannerContext(objective=current))
+        new_planner._invoke_cognitive(
+            "Investigate.", context=PlannerContext(objective=current)
+        )
     )
 
     assert reused.result.plan is not None
@@ -334,7 +353,7 @@ def test_candidate_plan_accepts_only_exact_admitted_assumptions() -> None:
 
     exact_planner, _, _, _ = _planner(_candidate(objective, assumptions=(admitted,)))
     exact = asyncio.run(
-        exact_planner.run(
+        exact_planner._invoke_cognitive(
             "Investigate.",
             context=PlannerContext(objective=objective, assumptions=(admitted,)),
         )
@@ -344,7 +363,7 @@ def test_candidate_plan_accepts_only_exact_admitted_assumptions() -> None:
     fabricated = Assumption(text="Fabricated premise.")
     unknown_planner, _, _, _ = _planner(_candidate(objective, assumptions=(fabricated,)))
     unknown = asyncio.run(
-        unknown_planner.run(
+        unknown_planner._invoke_cognitive(
             "Investigate.",
             context=PlannerContext(objective=objective, assumptions=(admitted,)),
         )
@@ -358,7 +377,7 @@ def test_candidate_plan_accepts_only_exact_admitted_assumptions() -> None:
     )
     changed_planner, _, _, _ = _planner(_candidate(objective, assumptions=(changed,)))
     mismatch = asyncio.run(
-        changed_planner.run(
+        changed_planner._invoke_cognitive(
             "Investigate.",
             context=PlannerContext(objective=objective, assumptions=(admitted,)),
         )
@@ -374,14 +393,16 @@ def test_continue_execution_requires_active_plan() -> None:
     planner_without_active, _, _, _ = _planner(PlannerResult(continue_execution=True))
 
     rejected = asyncio.run(
-        planner_without_active.run("Continue.", context=PlannerContext(objective=objective))
+        planner_without_active._invoke_cognitive(
+            "Continue.", context=PlannerContext(objective=objective)
+        )
     )
     assert rejected.error is not None
     assert rejected.error.code is PlannerErrorCode.INVALID_MODEL_RESULT
 
     planner_with_active, _, _, _ = _planner(PlannerResult(continue_execution=True))
     accepted = asyncio.run(
-        planner_with_active.run(
+        planner_with_active._invoke_cognitive(
             "Continue.",
             context=PlannerContext(objective=objective, active_plan=candidate.plan),
         )
@@ -391,7 +412,7 @@ def test_continue_execution_requires_active_plan() -> None:
 
     planner_with_candidate, _, _, _ = _planner(PlannerResult(continue_execution=True))
     candidate_authorized = asyncio.run(
-        planner_with_candidate.run(
+        planner_with_candidate._invoke_cognitive(
             "That looks right, proceed.",
             context=PlannerContext(objective=objective),
             candidate_plan=candidate.plan,
@@ -408,7 +429,9 @@ def test_discard_requires_exact_retained_candidate() -> None:
 
     without_candidate, _, _, _ = _planner(PlannerResult(discard_candidate=True))
     rejected = asyncio.run(
-        without_candidate.run("Abandon that proposal.", context=PlannerContext())
+        without_candidate._invoke_cognitive(
+            "Abandon that proposal.", context=PlannerContext()
+        )
     )
     assert rejected.error is not None
     assert rejected.error.code is PlannerErrorCode.INVALID_MODEL_RESULT
@@ -417,7 +440,7 @@ def test_discard_requires_exact_retained_candidate() -> None:
         PlannerResult(response="Discarded.", discard_candidate=True)
     )
     accepted = asyncio.run(
-        with_candidate.run(
+        with_candidate._invoke_cognitive(
             "Abandon that proposal.",
             context=PlannerContext(objective=objective),
             candidate_plan=candidate.plan,
@@ -429,7 +452,7 @@ def test_discard_requires_exact_retained_candidate() -> None:
 
 def test_empty_request_and_missing_model_fail_closed_without_invocation() -> None:
     planner, agent, _, _ = _planner(PlannerResult(response="unused"))
-    empty = asyncio.run(planner.run("  ", context=PlannerContext()))
+    empty = asyncio.run(planner._invoke_cognitive("  ", context=PlannerContext()))
 
     assert empty.error is not None
     assert empty.error.code is PlannerErrorCode.INVALID_REQUEST
@@ -440,8 +463,12 @@ def test_empty_request_and_missing_model_fail_closed_without_invocation() -> Non
         PlannerDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
         agent_factory=cast(AgentFactoryPort, factory),
         model_config=None,
+        planner_context_provider=StaticContextProvider(),
+        plan_admission=NeverAdmission(),
     )
-    missing = asyncio.run(unavailable.run("Investigate.", context=PlannerContext()))
+    missing = asyncio.run(
+        unavailable._invoke_cognitive("Investigate.", context=PlannerContext())
+    )
     assert missing.error is not None
     assert missing.error.code is PlannerErrorCode.MODEL_UNAVAILABLE
     assert factory.calls == []

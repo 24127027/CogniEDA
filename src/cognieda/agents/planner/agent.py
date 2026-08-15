@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import json
+from typing import Any, cast
+from uuid import UUID, uuid4
 
+from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.types import Command, StateSnapshot
 from pydantic import ValidationError
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage
@@ -12,7 +17,15 @@ from cognieda.schemas.artifacts import Task
 from cognieda.schemas.plan import Plan
 
 from .context import PlannerContext
-from .dependencies import PlannerDeps
+from .dependencies import (
+    PlanAdmissionPort,
+    PlannerContextProviderPort,
+    PlannerDeps,
+    PlannerGraphContext,
+)
+from .graph import build_graph, create_in_memory_checkpointer
+from .nodes import validate_candidate_state
+from .state import PlannerState, PlannerTurnOutcome, empty_planner_state
 from .types import (
     PlannerControlledError,
     PlannerErrorCode,
@@ -32,7 +45,11 @@ class Planner:
         *,
         agent_factory: AgentFactoryPort,
         model_config: ModelConfig | None,
+        planner_context_provider: PlannerContextProviderPort,
+        plan_admission: PlanAdmissionPort,
         agent_instruction: str | None = None,
+        checkpointer: BaseCheckpointSaver[Any] | None = None,
+        thread_id: UUID | None = None,
     ) -> None:
         self.deps = deps
         self._agent_factory = agent_factory
@@ -42,6 +59,17 @@ class Planner:
         self._agent: Agent[PlannerDeps] | None = None
         if model_config is not None:
             self._create_agent()
+        self._checkpointer = checkpointer or create_in_memory_checkpointer()
+        self._thread_id = thread_id or uuid4()
+        self._graph_config: RunnableConfig = {
+            "configurable": {"thread_id": str(self._thread_id)}
+        }
+        self._graph_context = PlannerGraphContext(
+            invoke_cognitive=self._invoke_cognitive,
+            planner_context_provider=planner_context_provider,
+            plan_admission=plan_admission,
+        )
+        self.graph = build_graph(self._checkpointer)
 
     def _assemble_instructions(self) -> list[str]:
         return instruction.assemble(
@@ -85,7 +113,44 @@ class Planner:
         if recreate_agent:
             self._agent = None
 
-    async def run(
+    async def handle_message(self, message: str) -> PlannerTurnOutcome:
+        """Handle or resume one Human turn without exposing graph mechanics."""
+
+        snapshot = await self.graph.aget_state(self._graph_config)
+        if self._is_interrupted(snapshot):
+            graph_input: PlannerState | Command[Any] = Command(resume=message)
+        else:
+            graph_input = self._state_from_snapshot(
+                snapshot,
+                latest_human_input=message,
+            )
+            graph_input["result"] = None
+            graph_input["error"] = None
+            graph_input["turn_outcome"] = None
+
+        await self.graph.ainvoke(
+            graph_input,
+            config=self._graph_config,
+            context=self._graph_context,
+        )
+        current = await self.graph.aget_state(self._graph_config)
+        state = self._state_from_snapshot(current)
+        outcome = state["turn_outcome"]
+        if outcome is None:
+            raise RuntimeError("Planner graph completed without a typed turn outcome.")
+        return outcome
+
+    async def _get_state(self) -> PlannerState:
+        """Inspect this Planner thread's current checkpointed lifecycle state."""
+
+        return self._state_from_snapshot(await self.graph.aget_state(self._graph_config))
+
+    async def _is_waiting_for_human(self) -> bool:
+        """Return whether this exact Planner thread is currently interrupted."""
+
+        return self._is_interrupted(await self.graph.aget_state(self._graph_config))
+
+    async def _invoke_cognitive(
         self,
         request: str,
         *,
@@ -161,6 +226,31 @@ class Planner:
             )
 
         return PlannerOutput(result=result, messages=messages)
+
+    @staticmethod
+    def _state_from_snapshot(
+        snapshot: StateSnapshot,
+        *,
+        latest_human_input: str | None = None,
+    ) -> PlannerState:
+        if not snapshot.values:
+            return empty_planner_state(latest_human_input)
+        prior = cast(PlannerState, snapshot.values)
+        state = PlannerState(
+            latest_human_input=latest_human_input,
+            candidate_plan=prior["candidate_plan"],
+            candidate_tasks=tuple(prior["candidate_tasks"]),
+            messages=tuple(prior["messages"]),
+            result=prior["result"],
+            error=prior["error"],
+            turn_outcome=prior["turn_outcome"],
+        )
+        validate_candidate_state(state)
+        return state
+
+    @staticmethod
+    def _is_interrupted(snapshot: StateSnapshot) -> bool:
+        return any(task.interrupts for task in snapshot.tasks)
 
     @staticmethod
     def _build_context_instruction(context: PlannerContext) -> str:
