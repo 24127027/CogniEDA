@@ -98,18 +98,21 @@ at a time; this is not a one-session-per-Workspace rule.
 
 **Partially implemented.** Current source has a bounded materialized
 `SessionFrame` with one optional Objective, ordered Assumptions, Hypotheses,
-Evidence and Discoveries, and one optional DataProfile. Application and the
-fresh-context provider share a workspace-scoped SQLite snapshot repository.
-The provider reads its latest committed frame and passes those objects without
-filtering into immutable `PlannerContext`; the objective-scoped active Plan is
+Evidence and Discoveries, and one optional DataProfile. A workspace-scoped
+SQLite snapshot repository remains authoritative for the current materialized
+frame. The fresh-context provider alone consumes that repository in the retained
+runtime; it reads the latest committed frame and passes those objects without
+filtering into immutable `PlannerContext`. The objective-scoped active Plan is
 supplied separately in that context as coordination state. The LangGraph state
-separately owns non-authoritative native conversation history and one exact
-self-contained transient Plan candidate. The latest Human input remains the current prompt, while serialized
+separately owns the active thread's non-authoritative native message history and
+one exact self-contained transient Plan candidate. The latest Human input remains the current prompt, while serialized
 `PlannerContext` is bounded as current-run data; historical conversational
 references never acquire current-state authority. Planner may answer, ask for
 clarification, retain/replace/discard a candidate, or authorize its exact
 admission. Application maps typed outcomes to presentation events but does not
-own candidate or conversation state.
+own repositories, candidate state, or conversation state. `ConversationHistory`
+remains a typed non-authoritative memory contract for a future `SessionMemory`
+composition with `SessionFrame`; durable unified session memory is **Deferred**.
 
 The current frame is restart-readable but is not the canonical typed-reference
 membership model. Mode-specific context eligibility, exact

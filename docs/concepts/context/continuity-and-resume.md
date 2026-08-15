@@ -149,14 +149,17 @@ model to infer intent.
 
 ## Implementation status
 
-**Partially implemented.** The current Application reads and writes its
-materialized SessionFrame through a workspace-scoped SQLite repository. The
-latest committed snapshot in that exact scope is restart-readable and the
-fresh-context provider reads it on every cognitive invocation. Planner owns a
-separate in-memory LangGraph checkpoint that retains native conversation
-history, the exact pending self-contained Plan, and interrupt state under one
-Planner thread UUID. This supports isolated in-process Human review and resume,
-not candidate or conversation restart recovery. Donor
+**Partially implemented.** A workspace-scoped SQLite repository remains
+authoritative for the current materialized SessionFrame. The latest committed
+snapshot in that exact scope is restart-readable, and the fresh-context provider
+reads it on every cognitive invocation; Application owns no repository facade.
+Planner owns a separate in-memory LangGraph checkpoint that retains the active
+thread's native messages, the exact pending self-contained Plan, and interrupt
+state under one Planner thread UUID. `ConversationHistory` exists as a typed
+non-authoritative memory contract, but it is neither synchronized with that
+graph state nor durably persisted. This supports isolated in-process Human
+review and resume, not candidate, unified session-memory, or conversation
+restart recovery. Donor
 operational records expose some attempt, outbox, lease, fencing, retry, and
 idempotency fields. Those uncomposed seams do not establish supported restart
 or recovery behavior.

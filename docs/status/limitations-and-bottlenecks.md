@@ -97,14 +97,17 @@ These are verified constraints of the bounded current implementation.
 
 - Bootstrap composes the in-process S0 dispatcher and bounded Data Explorer.
   The installable `cognieda [PATH]` command reaches the development Planner
-  REPL and is **Partially implemented**. Its Application reads and writes
-  workspace-scoped materialized SessionFrame state through the same repository
-  used by the fresh-context provider and invokes one fully composed Planner. Planner owns its
-  LangGraph, process-local checkpointer/thread, native-message history, exact
-  candidate state, and Human interrupt/resume. A provider exact-materializes
+  REPL and is **Partially implemented**. Bootstrap gives the workspace-scoped
+  authoritative SessionFrame repository to the fresh-context provider, not to
+  Application, and invokes one fully composed Planner. Planner owns its
+  LangGraph, process-local checkpointer/thread and required trusted typed
+  serializer, active native-message history, exact candidate state, and Human
+  interrupt/resume. A provider exact-materializes
   active-Plan `PlannerContext` fresh for every cognitive invocation. No durable
-  graph recovery or supported end-to-end application runtime, worker, service
-  API, or product CLI exists.
+  graph recovery, durable `ConversationHistory`, unified `SessionMemory`, or
+  supported end-to-end application runtime, worker, service API, or product CLI
+  exists. No retained runtime writer for current SessionFrame snapshots is
+  composed.
 - Application-to-CLI presentation uses an in-process EventBus. Normal Planner
   responses, transient Plan proposals, Human clarification requests, and
   command messages are published to renderer subscribers; submit calls do not
@@ -125,7 +128,7 @@ These are verified constraints of the bounded current implementation.
   and successor DataProfile handling exist.
 - Planner tests use deterministic fake and PydanticAI `FunctionModel`
   boundaries. They prove direct Agent ownership, one invocation per graph turn,
-  exact typed dependency injection, graph-owned native dialogue continuity,
+  exact typed dependency injection, active graph-thread native dialogue continuity,
   fresh current-run PlannerContext, candidate retain/replace/discard and exact
   admission, interrupt/resume, thread isolation, controlled failure retention,
   and active-Plan continuation without any executor call.

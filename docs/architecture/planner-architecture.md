@@ -256,11 +256,19 @@ from Application. The graph does not add an execution node or a Planner-side
 tool.
 
 `PlannerState` owns only the latest Human input, one self-contained transient
-candidate Plan, native model-message history, and a typed turn outcome. It does
+candidate Plan, the active thread's native model-message history, and a typed turn outcome. It does
 not own `PlannerContext`. Graph construction directly binds the Planner's
 cognitive invocation, the fresh-context port, and the deterministic
 Plan-admission port to node callables; there is no callback-only graph context
 object.
+
+`graph.py` declares the static topology: `START -> plan_or_answer`,
+`await_human -> plan_or_answer`, and `admit_candidate -> END`.
+`plan_or_answer` alone selects dynamic destinations because its semantic result
+may require Human input, exact candidate admission, or completion. No routing-only
+field or checkpointed `PlannerResult` is added. `Planner.handle_message()`
+rejects empty Human input as a controlled outcome before initial invocation or
+interrupt resume, so the successful `await_human` route remains static.
 
 `PlannerContextProvider` reads the workspace-scoped current SessionFrame from
 `SessionFrameRepository` on every invocation and exact-materializes its Objective,
@@ -269,9 +277,14 @@ Assumptions, Hypotheses, Evidence, Discoveries, and DataProfile into immutable
 exact current Objective and materializes that Plan without model inference.
 `PlannerContext` contains neither candidate Plan state nor conversation
 history. A `PlannerContextProvider` materializes it fresh for every Planner
-invocation. Native conversation history is graph-owned and supplied separately
-as PydanticAI `message_history`, while the latest Human text remains the current
-user prompt. Only `result.new_messages()` from the current run are appended.
+invocation. The active LangGraph thread checkpoints native messages and supplies
+them separately as PydanticAI `message_history`, while the latest Human text
+remains the current user prompt. Only `result.new_messages()` from the current
+run are appended. `ConversationHistory` remains a typed non-authoritative
+session-memory component, but this phase does not synchronize or durably persist
+it alongside graph state. A future unified `SessionMemory` is intended to
+compose `SessionFrame` and `ConversationHistory`; it must not derive research
+authority from conversation.
 The deterministic serialized `PlannerContext` is supplied fresh through the
 current-run instruction channel, explicitly bounded as data/state and declared
 to supersede historical research-state references. Replaceable authority is
@@ -298,10 +311,12 @@ execution routing are absent from the model-visible Planner contracts.
 If no candidate is pending, `continue_execution` still requires an active Plan.
 Planner returns a visible controlled outcome that execution is not implemented
 and performs no dispatch. Application maps that typed outcome to EventBus
-presentation events; EventBus does not own lifecycle state. Planner-owned
-`InMemorySaver` and one Planner thread UUID preserve isolated in-process threads
-only. Restart recovery and durable conversation/candidate checkpoints remain
-**Deferred**.
+presentation events; EventBus does not own lifecycle state. Application owns no
+persistence repository, Planner history, or `ConversationHistory` lifecycle.
+Planner-owned `InMemorySaver`, its smallest required trusted process-local typed
+serializer, and one Planner thread UUID preserve isolated in-process threads
+only. Restart recovery, durable `ConversationHistory`, unified `SessionMemory`,
+and durable conversation/candidate checkpoints remain **Deferred**.
 
 PR #53 is a structural precedent only for Planner-owned `agent.py`, `graph.py`,
 `nodes.py`, and `state.py` placement. Its checkpointed `PlannerContext`, typed
