@@ -4,14 +4,19 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
+from cognieda.runtime.events import (
+    HumanInputRequested,
+    MessageProduced,
+    PlanProposed,
+)
 
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[2]))
+
+    from cognieda.cli.prompt import Prompt
     from cognieda.cli.renderer import Renderer
-    from cognieda.runtime.messages import Message, MessageRole, MessageType
 else:
-    from ..runtime.messages import Message, MessageRole, MessageType
+    from .prompt import Prompt
     from .renderer import Renderer
 
 if TYPE_CHECKING:
@@ -34,13 +39,18 @@ async def repl(app: Application, renderer: Renderer) -> None:
 
     renderer.render_session_start(app.workspace.root)
 
+    prompt = Prompt(app)
+
     while True:
-        text = renderer.read_input()
+        try:
+            text = (await prompt.read()).strip()
+        except (EOFError, KeyboardInterrupt):
+            break
 
         if text in {"exit", "quit"}:
             break
 
         if not text:
             continue
-        
+
         await app.submit_message(text)
