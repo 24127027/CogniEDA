@@ -32,6 +32,10 @@ These are verified constraints of the bounded current implementation.
   Application retains its materialized SessionFrame and model-backed
   conversation turns, while conversation history remains outside
   `PlannerContext`. Application does not retain or admit Planner candidates.
+  The latest Human text remains the current prompt, native history remains
+  native `message_history`, and authoritative `PlannerContext` is serialized
+  deterministically and supplied fresh as data for each invocation rather than
+  accumulated inside Human prompts.
   Candidate lifecycle, conversational Human authorization, LangGraph
   interrupt/resume, restart/recovery, and complete-loop composition are
   **Deferred**.
@@ -103,6 +107,11 @@ These are verified constraints of the bounded current implementation.
   review/authorization and LangGraph interrupt/resume are not implemented. No
   durable recovery or supported end-to-end application
   runtime, worker, service API, or product CLI exists.
+- Application-to-CLI presentation uses an in-process EventBus. Normal Planner
+  responses, transient Plan proposals, Human clarification requests, and
+  command messages are published to renderer subscribers; submit calls do not
+  return rendered assistant Messages. Runtime events are not persisted, do not
+  retain candidates, and have no research-state or admission authority.
 - The local Data Explorer path executes only finite validated deterministic
   operations from an explicit absolute CSV or Parquet path. General-purpose
   Python, generated code, `exec`, `eval`, fuzzy column resolution, implicit
@@ -116,10 +125,13 @@ These are verified constraints of the bounded current implementation.
   blocked until successor dataset and DataProfile semantics exist.
 - `DATA_TRANSFORMATION` remains blocked until immutable successor dataset state
   and successor DataProfile handling exist.
-- Phase 2 Planner tests use a deterministic fake Agent boundary; they prove
+- Phase 2 Planner tests use deterministic fake and PydanticAI `FunctionModel`
+  boundaries; they prove
   direct Agent ownership, one invocation, exact typed dependency injection,
-  context/result coherence, native message isolation, and fail-closed
-  Assumption and active-Plan validation without any executor call.
+  context/result coherence, native dialogue continuity, fresh current-run
+  PlannerContext, absence of stale authoritative-context replay through the
+  active instruction channel, and fail-closed Assumption and active-Plan
+  validation without any executor call.
 - Workspace path selection and initialization are **Implemented**, but
   automatic dataset discovery or admission is **Unsupported**. The
   conventional `data/` directory does not itself establish a DataProfile.

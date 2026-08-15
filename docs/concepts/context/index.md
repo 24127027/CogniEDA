@@ -101,8 +101,11 @@ at a time; this is not a one-session-per-Workspace rule.
 Evidence and Discoveries, and one optional DataProfile. The in-process
 application passes those objects without filtering into immutable
 `PlannerContext`; the objective-scoped active Plan is supplied separately in
-that context as coordination state. Native conversation history is supplied separately as
-non-authoritative model history. Phase 2 Planner may answer, ask for
+that context as coordination state. Native conversation history is supplied
+separately as non-authoritative model history. The latest Human input remains
+the current prompt, while deterministic serialized `PlannerContext` is bounded
+as data and supplied fresh for that invocation; historical conversational
+references never acquire current-state authority. Phase 2 Planner may answer, ask for
 clarification, return a transient Plan plus exact Tasks, or signal continuation;
 Application does not retain or admit those candidate objects.
 

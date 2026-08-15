@@ -11,8 +11,8 @@ if __package__ in {None, ""}:
     from cognieda.cli.renderer import Renderer
     from cognieda.runtime.messages import Message, MessageRole, MessageType
 else:
-    from .renderer import Renderer
     from ..runtime.messages import Message, MessageRole, MessageType
+    from .renderer import Renderer
 
 if TYPE_CHECKING:
     from cognieda.runtime import Application

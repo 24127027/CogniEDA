@@ -4,7 +4,9 @@ import asyncio
 from types import SimpleNamespace
 
 from cognieda.cli.main import repl
-from cognieda.runtime.messages import MessageRole, MessageType
+from cognieda.runtime.event_bus import EventBus
+from cognieda.runtime.events import MessageProduced
+from cognieda.runtime.messages import Message, MessageRole, MessageType
 
 
 class DummyRenderer:
@@ -21,17 +23,30 @@ class DummyRenderer:
     def render(self, message) -> None:
         self.rendered.append(message)
 
+    def handle_message(self, event: MessageProduced) -> None:
+        self.render(event.message)
+
+    def handle_human_input(self, _event: object) -> None:
+        return None
+
+    def handle_plan(self, _event: object) -> None:
+        return None
+
 
 class DummyApp:
     def __init__(self) -> None:
         self.workspace = SimpleNamespace(root=SimpleNamespace())
+        self.event_bus = EventBus()
 
-    async def submit_message(self, text: str):
-        return SimpleNamespace(
-            type=MessageType.TEXT,
-            role=MessageRole.ASSISTANT,
-            content=f"echo: {text}",
-            model=None,
+    async def submit_message(self, text: str) -> None:
+        self.event_bus.publish(
+            MessageProduced(
+                message=Message(
+                    type=MessageType.TEXT,
+                    role=MessageRole.ASSISTANT,
+                    content=f"echo: {text}",
+                )
+            )
         )
 
 

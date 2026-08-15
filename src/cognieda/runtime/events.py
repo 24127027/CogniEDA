@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 
-from cognieda.agents.planner.types import Plan, Task
 from cognieda.runtime.messages import Message
+from cognieda.schemas.artifacts import Task
+from cognieda.schemas.plan import Plan
 
 
 @dataclass(frozen=True, slots=True)

@@ -170,6 +170,12 @@ configuration, dispatch infrastructure, and SQLite persistence seams. These
 foundations demonstrate important authority and traceability rules, but the
 direct Evidence path is transitional.
 
+The bounded runtime presentation path is event-driven: Application publishes
+typed runtime events and CLI renderer handlers subscribe to them. These events
+are presentation/orchestration signals only. In particular, a `PlanProposed`
+event neither admits nor activates its candidate and retains no authority across
+turns.
+
 The complete target architecture is not yet a supported end-to-end runtime.
 The immutable Phase 1 Plan domain contract and side-effect-free candidate
 validation are **Implemented**, and its append-only repository foundation is

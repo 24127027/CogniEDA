@@ -1,26 +1,25 @@
 from __future__ import annotations
 
-from asyncio import Task
 from collections.abc import Iterable
 from pathlib import Path
 
 from rich import box
-from rich.control import Control
 from rich.console import Console
+from rich.control import Control
 from rich.markdown import Markdown
-from rich.panel import Panel
 from rich.padding import Padding
+from rich.panel import Panel
 from rich.segment import ControlType
 from rich.text import Text
 
-from cognieda.runtime.messages import Message, MessageRole, MessageType
 from cognieda.runtime.events import (
     HumanInputRequested,
     MessageProduced,
     PlanProposed,
 )
-from cognieda.schemas.plan import Plan
+from cognieda.runtime.messages import Message, MessageRole, MessageType
 from cognieda.schemas.artifacts import Task
+from cognieda.schemas.plan import Plan
 
 console = Console()
 

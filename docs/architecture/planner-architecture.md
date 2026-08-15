@@ -258,8 +258,14 @@ Assumptions, Hypotheses, Evidence, Discoveries, and DataProfile into immutable
 `PlannerContext`. It resolves the objective-scoped active Plan for the frame's
 exact current Objective and materializes that Plan without model inference.
 `PlannerContext` contains neither candidate Plan/Task state nor conversation
-history. Native conversation history is supplied separately as model history but is
-non-authoritative and is not duplicated into current-run `PlannerOutput.messages`.
+history. Native conversation history is supplied separately as PydanticAI
+`message_history`, while the latest Human text remains the current user prompt.
+The deterministic serialized `PlannerContext` is supplied fresh through the
+current-run instruction channel, explicitly bounded as data/state and declared
+to supersede historical research-state references. Replaceable authority is
+therefore not appended to the conversational Human-message stream. Native
+history remains non-authoritative and is not duplicated into current-run
+`PlannerOutput.messages`.
 Evidence and Discovery may support an answer. Assumptions may guide planning
 but cannot support an empirical answer or be created by Planner.
 Task definitions for active Plan members are not put back into research state;

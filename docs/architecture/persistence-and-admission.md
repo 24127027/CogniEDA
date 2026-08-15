@@ -268,6 +268,10 @@ The current runtime does not retain a Planner candidate or call admission from
 a later conversation turn. Candidate retention, conversational Human
 authorization, and LangGraph interrupt/resume are **Deferred**. Native model
 history remains non-authoritative interaction state outside `PlannerContext`.
+Application materializes authoritative research state and the objective-scoped
+active Plan fresh for each invocation; neither conversation nor runtime events
+reconstruct, admit, or activate that state. `PlanProposed` is a transient
+presentation event and does not invoke `PlanAdmissionService`.
 
 The complete target boundary is not implemented. Canonical Task DAG execution,
 candidate lifecycle and review recovery, role-native result inbox processing,

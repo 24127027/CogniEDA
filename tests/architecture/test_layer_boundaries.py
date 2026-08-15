@@ -43,11 +43,10 @@ def test_planner_cannot_access_dataset_implementation_directly() -> None:
     assert violations == []
 
 
-def test_planner_cognitive_core_does_not_import_deferred_scientific_authority() -> None:
+def test_planner_cognitive_core_does_not_import_scientific_authoring_contracts() -> None:
     forbidden_symbols = {
         "EvidenceRequest",
         "GovernanceDecision",
-        "Hypothesis",
         "InvestigationProtocol",
     }
     violations: list[str] = []
@@ -58,9 +57,7 @@ def test_planner_cognitive_core_does_not_import_deferred_scientific_authority() 
                 continue
             imported = forbidden_symbols.intersection(alias.name for alias in node.names)
             if imported:
-                violations.append(
-                    f"{path.relative_to(PROJECT_ROOT)} imports {sorted(imported)}"
-                )
+                violations.append(f"{path.relative_to(PROJECT_ROOT)} imports {sorted(imported)}")
 
     assert violations == []
 
@@ -93,10 +90,7 @@ def test_planner_has_no_session_frame_dependency_or_legacy_graph_surface() -> No
 
 def test_planner_production_source_has_no_obsolete_cognitive_symbols() -> None:
     planner_root = SOURCE_ROOT / "agents" / "planner"
-    source = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in planner_root.rglob("*.py")
-    )
+    source = "\n".join(path.read_text(encoding="utf-8") for path in planner_root.rglob("*.py"))
 
     for obsolete in (
         "PlannerDecision",
@@ -140,11 +134,7 @@ def test_removed_ownership_packages_have_no_python_source() -> None:
         "tools",
     )
 
-    assert {
-        path
-        for path in removed
-        if any((SOURCE_ROOT / path).rglob("*.py"))
-    } == set()
+    assert {path for path in removed if any((SOURCE_ROOT / path).rglob("*.py"))} == set()
 
 
 def test_specialist_roles_are_peer_packages() -> None:
@@ -181,9 +171,7 @@ def test_data_explorer_has_no_dynamic_code_execution() -> None:
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
             and node.func.id in {"exec", "eval"}
-            for node in ast.walk(
-                ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-            )
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"), filename=str(path)))
         )
     ]
 
