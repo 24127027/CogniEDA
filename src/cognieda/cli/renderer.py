@@ -29,7 +29,7 @@ class Renderer:
         self.console = console or globals()["console"]
 
     def read_input(self) -> str:
-        text = self.console.input("").strip()
+        text = self.console.input("> ").strip()
 
         # Remove the terminal's echoed input line so only the styled user panel remains.
         is_terminal = getattr(self.console, "is_terminal", False) is True
