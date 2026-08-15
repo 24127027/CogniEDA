@@ -252,11 +252,11 @@ agent's retained transcript or hidden memory.
 ## Implementation status
 
 **Unsupported** end to end. The Planner cognitive core can answer, request
-clarification, or produce a transient validated Plan and Task bundle through
+clarification, or produce one transient validated self-contained Plan through
 one PydanticAI invocation per graph turn. The in-process LangGraph lifecycle
 retains, replaces, or discards an exact candidate across natural-language Human
 review and calls the application service only after typed authorization. That
-service atomically admits and activates the exact bundle on SQLite. The graph
+service atomically admits its Tasks and activates the exact Plan on SQLite. The graph
 performs no Plan execution.
 Generic capability dispatch foundations and several durable execution-safety
 transitions exist separately.

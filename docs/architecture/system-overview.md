@@ -175,13 +175,13 @@ The bounded runtime presentation path is event-driven: Application publishes
 typed runtime events and CLI renderer handlers subscribe to them. These events
 are presentation/orchestration signals only. In particular, `PlanProposed`
 neither admits nor activates a candidate; transient candidate authority belongs
-only to graph state until application authority admits the exact bundle.
+only to graph state until application authority admits the exact self-contained Plan.
 
 The complete target architecture is not yet a supported end-to-end runtime.
 The immutable Phase 1 Plan domain contract and side-effect-free candidate
 validation are **Implemented**, and its append-only repository foundation is
 **Verified on SQLite** with exact historical Objective and Assumption content
-snapshots. Transient Planner candidate authoring, graph-owned native history,
+snapshots plus full Task reconstruction. Transient Planner candidate authoring,
 candidate retain/replace/discard behavior, natural-language Human review, and
 LangGraph interrupt/resume are **Implemented** in process. A typed authorization
 result calls the atomic exact-bundle Objective/Task/Plan admission and

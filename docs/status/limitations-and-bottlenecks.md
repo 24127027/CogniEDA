@@ -8,14 +8,15 @@ These are verified constraints of the bounded current implementation.
 - The active typed research-state foundation is transitional and does not
   implement the minimum complete scientific loop defined by MVP-v2.
 - Active bounded Task has no Plan-driven dependency eligibility or parent/leaf
-  execution semantics. Immutable Plan candidates represent direct Task
-  membership, exact Objective and admitted Assumption basis, and grouped
+  execution semantics. Immutable Plan candidates contain full exact Task
+  definitions, exact Objective and admitted Assumption basis, and grouped
   structural dependencies. An independent application service can atomically
   persist an exact authorized bundle and select a Plan active by Objective, but
   only `DATA` is separately executable and no Plan drives execution.
 - The current materialized SessionFrame can hold one Objective and one
   DataProfile but is not the canonical reference-based session-membership FCO
-  and does not implement Objective-bound multi-session isolation. It now
+  and does not implement canonical Objective-bound multi-session identity. Its
+  append-only SQLite envelope is isolated by exact workspace scope. It now
   retains materialized Hypothesis and Discovery research-state membership for
   Planner readability, but it does not retain Tasks as research knowledge and
   does not implement validity-aware selection or the semantic graph.
@@ -29,14 +30,14 @@ These are verified constraints of the bounded current implementation.
   Data Explorer-to-Evidence admission are **Implemented** at bounded library
   surfaces. Planner performs one `plan_or_answer` invocation per graph turn
   with no tools or dispatch. Graph state owns native model history and the exact
-  transient Plan/Task candidate; `PlannerContext` owns neither and is
+  transient self-contained Plan candidate; `PlannerContext` owns neither and is
   materialized fresh for every invocation. Candidate retain/replace/discard,
   natural-language Human review, typed authorization, and interrupt/resume are
   implemented in process. Restart recovery, durable graph checkpoints, and
   complete-loop composition are **Deferred**.
 - The Phase 1 Plan domain and side-effect-free candidate validation are
   **Implemented**, and append-only repository behavior is **Verified on
-  SQLite** with exact Objective and Assumption snapshots for historical
+  SQLite** with exact Objective and Assumption snapshots plus full Task
   reconstruction. Planner can author a transient structurally validated
   candidate. Commit-boundary validation and persistence plus
   objective-scoped active selection are **Verified on SQLite** through an
@@ -55,8 +56,8 @@ These are verified constraints of the bounded current implementation.
   It cannot create or mutate Assumptions; a candidate may retain only exact
   already-admitted Assumptions. LangGraph retains that exact candidate across
   Human turns and may call the independent admission service after typed
-  authorization. The service atomically admits an exact authorized Objective,
-  Task, and Plan bundle. Task persistence supports status change only. Active Task
+  authorization. The service atomically admits the exact self-contained Plan,
+  its Objective, and its Tasks. Task persistence supports status change only. Active Task
   values are immutable; changing Task meaning requires a new identity, while
   status change produces a replacement with the same identity and instruction.
 - Application-authority Evidence admission is **Implemented** for the direct
@@ -96,8 +97,9 @@ These are verified constraints of the bounded current implementation.
 
 - Bootstrap composes the in-process S0 dispatcher and bounded Data Explorer.
   The installable `cognieda [PATH]` command reaches the development Planner
-  REPL and is **Partially implemented**. Its Application owns materialized
-  SessionFrame state and invokes one fully composed Planner. Planner owns its
+  REPL and is **Partially implemented**. Its Application reads and writes
+  workspace-scoped materialized SessionFrame state through the same repository
+  used by the fresh-context provider and invokes one fully composed Planner. Planner owns its
   LangGraph, process-local checkpointer/thread, native-message history, exact
   candidate state, and Human interrupt/resume. A provider exact-materializes
   active-Plan `PlannerContext` fresh for every cognitive invocation. No durable
@@ -140,10 +142,13 @@ These are verified constraints of the bounded current implementation.
   to M5-B.
 - Durable restart/resume, replay, claims, leases, result inbox, and multi-store
   migration are outside M1-A.
-- SessionFrame snapshots use an internal serialized SQLite envelope; this is a
-  bounded round-trip seam, not M5-A/M5-B durable runtime authority.
-- The persistence helper is not composed with `Workspace`; without an explicit
-  `COGNIEDA_DB_URL`, it retains a provisional package-local SQLite default.
+- SessionFrame snapshots use a workspace-scoped internal serialized SQLite
+  envelope. Latest committed state in that exact scope is authoritative for the
+  current materialized frame and restart-readable, but this is not the
+  canonical reference-based M5-A/M5-B session model or durable Planner graph state.
+- Bootstrap binds SessionFrame scope to the normalized Workspace root, but
+  without an explicit `COGNIEDA_DB_URL` persistence still uses a provisional
+  package-local SQLite database.
   Binding authoritative persistence under `<workspace>/.cognieda/state/` is
   **Deferred** rather than implied here.
 - No non-SQLite database is tested.

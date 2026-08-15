@@ -80,22 +80,24 @@ protected scientific evaluation.
 
 A `Plan` is a non-FCO immutable aggregate containing the exact Objective under
 which one complete research plan was constructed, the exact admitted Human
-Assumptions that materially influenced planning, and one Task DAG. Its content
-owns only:
+Assumptions that materially influenced planning, full exact Task definitions,
+and one Task DAG. Its content owns only:
 
-- canonical Task IDs as the direct and only membership representation;
+- canonical full Tasks as the direct and only writable membership representation;
 - explicit dependency edges between member Tasks;
 - a deterministic plan-content fingerprint.
 
 The fingerprint covers exact Objective and Assumption representations,
-canonical Task IDs, and canonical dependency edges. It
+canonical status-free Task semantic definitions, and canonical dependency edges. It
 excludes Task runtime status and all execution-routing, approval, activation,
 timestamp, conversation, model, and DataProfile-selection state. Assumptions
 remain planning basis only and cannot support protected evaluation.
 
-`task_ids` is the single membership source of truth. Changing membership or a
-dependency changes Plan content and its fingerprint without, by itself,
-creating a successor Task.
+`tasks` is the single writable membership source of truth; `task_ids` is
+derived exactly from canonical Task order. Changing Task meaning changes Plan
+content and its fingerprint; changing only mutable Task execution status does
+not. Changing membership or a dependency changes Plan content without, by
+itself, creating a successor Task.
 
 Plan contains no exact DataProfile identity,
 dataset reference, column binding, row filter, cohort, population, or variable
@@ -160,7 +162,7 @@ atomic commit transaction and objective-scoped active Plan selection are
 **Verified on SQLite**. The in-process Planner LangGraph lifecycle retains the
 exact candidate outside authoritative research state, resumes natural-language
 Human review, and calls `PlanAdmissionService` only when a typed
-`continue_execution` result authorizes that retained bundle. Application
+   `continue_execution` result authorizes that retained Plan. Application
 authority still performs all commit-boundary validation, persistence, and
 activation.
 
@@ -253,18 +255,19 @@ hides graph invocation, interrupt/resume, checkpointer, and thread mechanics
 from Application. The graph does not add an execution node or a Planner-side
 tool.
 
-`PlannerState` owns the latest Human input, transient candidate Plan and exact
-Task bundle, native model-message history, current result/error, and a typed
-turn outcome. It does not own `PlannerContext`. Non-checkpointed
-`PlannerGraphContext` contains only the current cognitive invoker, a
-fresh-context provider, and the deterministic Plan-admission port; it contains
-no EventBus, dispatcher, candidate, or execution authority.
+`PlannerState` owns only the latest Human input, one self-contained transient
+candidate Plan, native model-message history, and a typed turn outcome. It does
+not own `PlannerContext`. Graph construction directly binds the Planner's
+cognitive invocation, the fresh-context port, and the deterministic
+Plan-admission port to node callables; there is no callback-only graph context
+object.
 
-`PlannerContextProvider` exact-materializes the current SessionFrame Objective,
+`PlannerContextProvider` reads the workspace-scoped current SessionFrame from
+`SessionFrameRepository` on every invocation and exact-materializes its Objective,
 Assumptions, Hypotheses, Evidence, Discoveries, and DataProfile into immutable
 `PlannerContext`. It resolves the objective-scoped active Plan for the frame's
 exact current Objective and materializes that Plan without model inference.
-`PlannerContext` contains neither candidate Plan/Task state nor conversation
+`PlannerContext` contains neither candidate Plan state nor conversation
 history. A `PlannerContextProvider` materializes it fresh for every Planner
 invocation. Native conversation history is graph-owned and supplied separately
 as PydanticAI `message_history`, while the latest Human text remains the current
@@ -279,11 +282,12 @@ Task definitions for active Plan members are not put back into research state;
 a coordination-specific Task projection remains **Deferred** to Task selection
 and execution.
 
-Candidate validation rejects Tasks without a Plan, any Task bundle that does
-not exactly match Plan membership and Objective scope, unknown Assumption IDs,
-or changed content under an admitted Assumption ID. A candidate may reuse the
-current Objective or contain a newly proposed Objective. LangGraph retains its
-exact Plan and Task bundle across Human turns; a later Planner result may retain,
+Plan validation rejects duplicate Task identities, cross-Objective Tasks,
+invalid dependency endpoints, duplicate dependency groups, and cycles.
+Model/context validation rejects unknown Assumption IDs or changed content under
+an admitted Assumption ID. A candidate may reuse the current Objective or
+contain a newly proposed Objective. LangGraph retains the self-contained exact
+Plan across Human turns; a later Planner result may retain,
 replace, or explicitly discard it. A typed `continue_execution` result while a
 candidate is pending routes to `PlanAdmissionService`, whose success clears the
 candidate and whose controlled failure retains it for correction. Human review
@@ -309,7 +313,8 @@ contracts and side-effect-free application validation are **Implemented** with
 exact persisted Objective and Assumption content checks, persisted Task
 resolution, structural canonicalization, DAG guards, and deterministic
 fingerprinting. Append-only exact snapshot persistence and fail-closed
-identity/fingerprint reconstruction are **Verified on SQLite** as
+identity/fingerprint reconstruction, including full Task reconstruction, are
+**Verified on SQLite** as
 infrastructure for the approval boundary. `PlanDependency` is one canonical
 outgoing-adjacency group per prerequisite, while SQLite persistence remains
 normalized as atomic edges. Validation alone does not persist a candidate.

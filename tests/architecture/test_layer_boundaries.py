@@ -96,6 +96,7 @@ def test_runtime_does_not_define_planner_lifecycle_internals() -> None:
         "PlannerGraphState",
         "PlannerRuntime",
         "PlannerRuntimeContext",
+        "SessionFrameState",
         "build_planner_graph",
     }
     violations: list[str] = []
@@ -125,6 +126,10 @@ def test_planner_production_source_has_no_obsolete_cognitive_symbols() -> None:
         "PlannerModelInput",
         "PlannerAnswerInput",
         "PlannerResponseDraft",
+        "PlannerGraphContext",
+        "PlannerCognitiveInvoker",
+        "candidate_tasks",
+        "proposed_tasks",
         "selected_capability",
         "created_assumption",
         "created_objective",

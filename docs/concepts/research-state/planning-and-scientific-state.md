@@ -59,9 +59,11 @@ response synthesis is Planner behavior, not executable Task work.
 
 `Plan` is the non-FCO immutable aggregate for an entire proposed or approved
 research plan. It contains its exact Objective, the exact admitted Human
-Assumptions that materially influenced planning, canonical Task IDs as its
-direct and only membership representation, and explicit dependency edges.
-Those Plan semantics do not define Task identity.
+Assumptions that materially influenced planning, full canonical Task
+definitions as its direct and only writable membership representation, and
+explicit dependency edges. Task IDs are derived from those definitions. Those
+Plan semantics do not replace independent Task identity or include mutable Task
+execution status.
 
 Duplicate Assumption identities are invalid. Assumption content contributes to
 Plan fingerprint identity because it records the exact planning basis, but it
