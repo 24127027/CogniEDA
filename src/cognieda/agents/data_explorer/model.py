@@ -21,6 +21,7 @@ import pandas as pd
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.agents.utilities import instruction
 
+from .dependencies import DEDependencies
 from .tools import eda_toolset, profiling_toolset, sandbox_toolset
 from .types import EvaluationOutput, PlanningOutput
 
@@ -33,9 +34,21 @@ from .types import EvaluationOutput, PlanningOutput
 class DataExplorerDecisionModel(Protocol):
     """Typed model boundary used by the deterministic DE graph nodes."""
 
-    async def plan(self, prompt: str, df: pd.DataFrame) -> PlanningOutput: ...
+    async def plan(
+        self,
+        prompt: str,
+        df: pd.DataFrame,
+        *,
+        deps: DEDependencies | None = None,
+    ) -> PlanningOutput: ...
 
-    async def evaluate(self, prompt: str, df: pd.DataFrame | None) -> EvaluationOutput: ...
+    async def evaluate(
+        self,
+        prompt: str,
+        df: pd.DataFrame | None,
+        *,
+        deps: DEDependencies | None = None,
+    ) -> EvaluationOutput: ...
 
 
 # ---------------------------------------------------------------------------
@@ -72,10 +85,12 @@ class DataExplorerModel:
 
     def _reload_agent(self) -> None:
         # Agent is built without tools; toolsets are injected per call.
+        # deps_type is DEDependencies so that tools registered with @toolset.tool
+        # can access RunContext[DEDependencies] and read the DataProfile / Objective.
         self._agent = self._agent_factory.create_agent(
             worker="data_explorer",
             config=self._model_config,
-            deps_type=type(None),
+            deps_type=DEDependencies,
             builtin_tools=(),
         )
 
@@ -116,24 +131,38 @@ class DataExplorerModel:
             sandbox_toolset(frame),
         ]
 
-    async def plan(self, prompt: str, df: pd.DataFrame) -> PlanningOutput:
-        """Invoke the planning agent with all toolsets visible.
+    async def plan(
+        self,
+        prompt: str,
+        df: pd.DataFrame,
+        *,
+        deps: DEDependencies | None = None,
+    ) -> PlanningOutput:
+        """Invoke the planning agent with all toolsets and research context visible.
 
         The planning instruction tells the model to select tools for each step
         rather than calling them directly — the execute node does the actual
         dispatch.  Tools are still visible so the model can reason about what
-        is available.
+        is available.  DEDependencies carries the DataProfile and Objective so
+        that context-aware tools can validate column names at call time.
         """
         result = await self._agent.run(
             prompt,
             output_type=PlanningOutput,
             instructions=self._planning_instruction,
             toolsets=self._build_toolsets(df),
+            deps=deps or DEDependencies(),
         )
         return PlanningOutput.model_validate(result.output)
 
-    async def evaluate(self, prompt: str, df: pd.DataFrame | None = None) -> EvaluationOutput:
-        """Invoke the evaluation agent with all toolsets visible.
+    async def evaluate(
+        self,
+        prompt: str,
+        df: pd.DataFrame | None = None,
+        *,
+        deps: DEDependencies | None = None,
+    ) -> EvaluationOutput:
+        """Invoke the evaluation agent with all toolsets and research context visible.
 
         Evaluation primarily inspects accumulated execution results from the
         state.  Tools are available in case the model needs to re-examine the
@@ -145,6 +174,7 @@ class DataExplorerModel:
             output_type=EvaluationOutput,
             instructions=self._evaluate_instruction,
             toolsets=self._build_toolsets(df),
+            deps=deps or DEDependencies(),
         )
         return EvaluationOutput.model_validate(result.output)
 

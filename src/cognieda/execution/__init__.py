@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .capabilities import Capability
 from .contracts import (
+    DEExecutorContext,
     ExecutionFailure,
     ExecutionRequest,
     ExecutionResult,
@@ -17,6 +18,7 @@ from .registry import CapabilityNotRegisteredError, ExecutorRegistry
 __all__ = (
     "Capability",
     "CapabilityNotRegisteredError",
+    "DEExecutorContext",
     "ExecutionFailure",
     "ExecutionRequest",
     "ExecutionResult",
@@ -29,3 +31,4 @@ __all__ = (
     "PlannerWorkOutcome",
     "normalize_for_planner",
 )
+

@@ -10,10 +10,11 @@ from typing import Any
 
 import pandas as pd
 from pydantic import JsonValue
-from pydantic_ai import FunctionToolset
+from pydantic_ai import FunctionToolset, RunContext
 
 from cognieda.agents.data_explorer.analysis.profiling import DatasetProfiler, ProfilingOptions
 from cognieda.agents.data_explorer.analysis.validation import validate_profile_input_frame
+from cognieda.agents.data_explorer.dependencies import DEDependencies
 from cognieda.schemas.enums import VariableType
 
 
@@ -80,18 +81,33 @@ def profiling_toolset(df: pd.DataFrame) -> FunctionToolset:
     # Tool: missingness_report
     # ------------------------------------------------------------------
 
-    @toolset.tool_plain
-    def missingness_report(columns: list[str] | None = None) -> dict[str, JsonValue]:
+    @toolset.tool  # context-aware: validates columns against live DataProfile
+    def missingness_report(
+        ctx: RunContext[DEDependencies],
+        columns: list[str] | None = None,
+    ) -> dict[str, JsonValue]:
         """Return per-column missing value counts and ratios.
 
         Args:
             columns: Optional subset of column names to examine. All columns
                      are reported when None.
+
+        Uses the research DataProfile (when available) to validate that the
+        requested column names actually exist before executing, providing a
+        cleaner error message than a raw KeyError.
         """
         target_cols = columns if columns else list(_df.columns)
+
+        # Context-aware validation: cross-check against DataProfile column names
+        # when available to surface errors before touching the DataFrame.
+        known_cols = ctx.deps.column_names if ctx.deps.column_names else list(_df.columns)
+        invalid = [c for c in target_cols if c not in known_cols]
+        if invalid:
+            return {"error": f"Unknown columns (not in DataProfile or DataFrame): {invalid}"}
+
         missing = [c for c in target_cols if c not in _df.columns]
         if missing:
-            return {"error": f"Unknown columns: {missing}"}
+            return {"error": f"Columns not present in DataFrame: {missing}"}
 
         row_count = int(len(_df))
         per_column: list[dict[str, JsonValue]] = []

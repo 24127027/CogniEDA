@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from enum import StrEnum
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, model_validator
@@ -29,6 +29,28 @@ class ExecutorContext(BaseModel):
 
     dataset_path: str | None = None
     data_profile_id: UUID | None = None
+
+
+class DEExecutorContext(ExecutorContext):
+    """Extended context for the Data Explorer executor.
+
+    Carries the RAM-resident DataProfile object directly (MVP only).
+    In a persistence-backed phase this would be fetched by data_profile_id;
+    for the RAM MVP we pass the live object to avoid a DB round-trip.
+
+    # MVP NOTE: data_profile is a direct in-RAM reference.  It is intentionally
+    # NOT stored inside ExecutionResult.  The pointer pattern below (in
+    # ExecutionResult.emitted_artifacts) sends the UUID key, and the caller
+    # retains the live object separately.
+    """
+
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+    # In-memory DataFrame for the dataset.  Passed directly so the executor
+    # does not need to re-read the file.
+    dataframe: Any | None = None  # pd.DataFrame at runtime; typed Any to avoid heavy import
+    # RAM-resident DataProfile, if already produced by a prior profiling pass.
+    data_profile: Any | None = None  # DataProfile at runtime; typed Any to avoid circular import
 
 
 class BaseState(BaseModel):
@@ -77,8 +99,18 @@ class ExecutionResult(BaseModel):
     limitations: list[str] = Field(default_factory=list)
     failure: ExecutionFailure | None = None
 
+    # MVP RAM POINTER STORE — do NOT serialize full artifact payloads here.
+    # This dict maps a semantic key (e.g. "evidence", "data_profile") to the
+    # live in-RAM object produced by the executor.  The caller (Planner) reads
+    # this dict to retrieve the artifact and present it to the user.
+    # In a persistence-backed phase, this would be replaced by UUIDs that
+    # the Planner resolves through a repository.  For now, live objects are
+    # stored here and this field is explicitly excluded from result_digest
+    # computation (see normalize_for_planner).
+    emitted_artifacts: dict[str, Any] = Field(default_factory=dict)
+
     @model_validator(mode="after")
-    def _failure_matches_status(self) -> ExecutionResult:
+    def _failure_matches_status(self) -> "ExecutionResult":
         if self.status == ExecutionStatus.SUCCEEDED and self.failure is not None:
             raise ValueError("A successful execution result cannot contain a failure.")
         if self.status != ExecutionStatus.SUCCEEDED and self.failure is None:
@@ -113,8 +145,11 @@ class PlannerWorkOutcome(BaseModel):
 def normalize_for_planner(result: ExecutionResult) -> PlannerWorkOutcome:
     """Project only shared metadata; role-native payloads remain opaque to Planner."""
 
+    # Exclude emitted_artifacts from the digest — it contains live RAM objects
+    # that are not serializable and must not leak into the digest.
+    serializable = result.model_dump(mode="json", exclude={"emitted_artifacts"})
     serialized = json.dumps(
-        result.model_dump(mode="json"),
+        serializable,
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")

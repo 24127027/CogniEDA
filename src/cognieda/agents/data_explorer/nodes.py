@@ -23,6 +23,7 @@ from langgraph.runtime import Runtime
 from cognieda.schemas.artifacts import DataProfile, Evidence
 from cognieda.schemas.common import EvidenceProvenance
 
+from .dependencies import DEDependencies
 from .tools import eda_toolset, profiling_toolset, sandbox_toolset
 
 from .context import Context
@@ -186,16 +187,42 @@ def _load_df(context: Context) -> pd.DataFrame:
 
 
 def _build_planning_prompt(state: State, context: Context) -> str:
-    profile_json = (
-        context.de_input.data_profile.model_dump_json()
-        if context.de_input.data_profile is not None
-        else "null"
+    is_profiling_task = context.de_input.data_profile is None
+
+    # --- Boundary enforcement header (applies to all task paths) ---
+    # The DE is a mechanical data observer only. It extracts facts from data
+    # and profiles schemas.  It never draws scientific conclusions, performs
+    # statistical correlation between non-numeric/string columns, interprets
+    # patterns, or answers questions about dataset meaning.
+    _BOUNDARY = (
+        "ROLE BOUNDARY: You are a mechanical data observer. "
+        "You may ONLY produce AnalysisStep entries that extract raw data facts "
+        "(e.g. row counts, column names, missing value counts, value distributions, "
+        "numeric statistics, duplicate detection). "
+        "You must NOT attempt: scientific interpretation, statistical correlation of "
+        "non-numeric columns (e.g. string IDs or emails), natural-language summaries "
+        "of relationships, or any reasoning that goes beyond direct data extraction. "
+        "If the task instruction asks for something outside these bounds, return a "
+        "single-step plan with execution_type=BUILTIN_TOOL, builtin_tool_name='inspect_schema', "
+        "and set the step description to 'UNFEASIBLE: <reason>'. "
+        "The evaluator will detect this marker and reject the request cleanly."
     )
-    parts = [
-        f"Task instruction: {state.task_instruction}",
-        f"Dataset path: {state.dataset_path}",
-        f"DataProfile: {profile_json}",
-    ]
+
+    if is_profiling_task:
+        parts = [
+            _BOUNDARY,
+            "CRITICAL: The context lacks a DataProfile.",
+            "You MUST emit a plan with a single step that invokes the 'profile_dataset' builtin tool.",
+            "DO NOT attempt to perform the user's task instruction yet. Your only goal right now is to generate the profile.",
+        ]
+    else:
+        profile_json = context.de_input.data_profile.model_dump_json()
+        parts = [
+            _BOUNDARY,
+            f"Task instruction: {state.task_instruction}",
+            f"Dataset path: {state.dataset_path}",
+            f"DataProfile: {profile_json}",
+        ]
     if state.revision_feedback:
         parts.append(f"Revision feedback from previous iteration: {state.revision_feedback}")
     if state.execution_results:
@@ -213,9 +240,25 @@ def _build_evaluation_prompt(state: State) -> str:
         [r.model_dump(mode="json") for r in state.execution_results],
         default=str,
     )
+    succeeded_count = sum(
+        1 for r in state.execution_results if r.status is StepStatus.SUCCEEDED
+    )
     return (
         f"Task instruction: {state.task_instruction}\n\n"
-        f"Accumulated execution results:\n{results_json}"
+        f"Accumulated execution results:\n{results_json}\n\n"
+        f"Successful steps: {succeeded_count}\n\n"
+        "EVALUATION RULES:\n"
+        "1. You must return SATISFIED only if at least one step SUCCEEDED and its "
+        "output_payload contains meaningful data that answers or materially advances "
+        "the task instruction.\n"
+        "2. If zero steps succeeded, you MUST return NEEDS_REVISION or UNFEASIBLE "
+        "(never SATISFIED). An empty result cannot satisfy a task.\n"
+        "3. If any step description starts with 'UNFEASIBLE:', return UNFEASIBLE "
+        "and set revision_feedback to that description.\n"
+        "4. If the task requests scientifically invalid operations (e.g. correlation "
+        "between non-numeric/string columns), return UNFEASIBLE.\n"
+        "5. Return NEEDS_REVISION only if the data gathered is incomplete but the "
+        "task is still technically achievable with a revised plan."
     )
 
 
@@ -265,8 +308,16 @@ async def planning(state: State, runtime: Runtime[Context]) -> State:
 
     df = _load_df(runtime.context)
 
+    # Build research context for the planning agent.
+    # Tools that use @toolset.tool can access DataProfile and Objective
+    # via RunContext[DEDependencies] to validate column names before attempting ops.
+    deps = DEDependencies(
+        data_profile=runtime.context.de_input.data_profile,
+        objective=getattr(runtime.context.de_input, "objective", None),
+    )
+
     try:
-        output: PlanningOutput = await model.plan(prompt, df)
+        output: PlanningOutput = await model.plan(prompt, df, deps=deps)
         state.plan = list(output.steps)
     except Exception as exc:  # noqa: BLE001
         return _error(
@@ -367,8 +418,14 @@ async def check_result(state: State, runtime: Runtime[Context]) -> State:
     prompt = _build_evaluation_prompt(state)
     df = _load_df(runtime.context)
 
+    # Build research context for the evaluation agent (same as planning).
+    deps = DEDependencies(
+        data_profile=runtime.context.de_input.data_profile,
+        objective=getattr(runtime.context.de_input, "objective", None),
+    )
+
     try:
-        evaluation: EvaluationOutput = await model.evaluate(prompt, df)
+        evaluation: EvaluationOutput = await model.evaluate(prompt, df, deps=deps)
     except Exception as exc:  # noqa: BLE001
         return _error(
             state,
@@ -377,6 +434,36 @@ async def check_result(state: State, runtime: Runtime[Context]) -> State:
         )
 
     if evaluation.verdict is EvaluationVerdict.SATISFIED:
+        # Hard guardrail (Priority 2.1): the LLM may falsely report SATISFIED
+        # even when all tool executions failed (output_payload is empty for every
+        # step).  Trusting that verdict leads to Pydantic crashing downstream
+        # when Evidence.content is validated as empty.  We override here.
+        has_successful_payload = any(
+            r.status is StepStatus.SUCCEEDED and r.output_payload
+            for r in state.execution_results
+        )
+        if not has_successful_payload:
+            # Override to NEEDS_REVISION unless we are at the iteration budget;
+            # in that case treat as UNFEASIBLE to avoid infinite loops.
+            if state.iteration >= state.max_iterations - 1:
+                state.workflow_status = "blocked"
+                state.failure_reason = (
+                    "All execution steps failed to produce output. "
+                    "The request cannot be fulfilled with the available data "
+                    "and tools. Original evaluation summary: "
+                    + evaluation.summary
+                )
+                return state
+            # Force a revision with explanation.
+            state.iteration += 1
+            state.revision_feedback = (
+                "GUARDRAIL OVERRIDE: The previous plan produced zero successful "
+                "output payloads. Revise the plan to use only supported builtin "
+                "tools or valid code on numeric/string columns that exist in the "
+                "DataProfile. If the task is not achievable with these tools, "
+                "return a single step with description starting 'UNFEASIBLE: <reason>'."
+            )
+            return state
         _emit_output(state)
         return state
 
