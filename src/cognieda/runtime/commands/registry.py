@@ -70,8 +70,16 @@ class CommandRegistry:
     def commands(self) -> tuple[Command, ...]:
         return tuple(self._commands.values())
 
-    def suggest(self, prefix: str) -> tuple[CommandSuggestion, ...]:
-        normalized = prefix.removeprefix("/")
+    def suggest(
+        self,
+        prefix: str,
+    ) -> tuple[CommandSuggestion, ...]:
+        normalized = prefix.strip()
+
+        if normalized.startswith("/"):
+            normalized = normalized[1:]
+
+        normalized = normalized.replace(" ", ".")
 
         return tuple(
             CommandSuggestion(
