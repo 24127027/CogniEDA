@@ -3,10 +3,8 @@ from __future__ import annotations
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.application.ports import AgentFactoryPort
-from cognieda.infrastructure.persistence.repositories import SessionFrameRepository
 from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
-from cognieda.schemas.artifacts import SessionFrame
 
 from .messages import Message, MessageRole, MessageType
 from .workspace import MissingModelCredentialError, Workspace
@@ -19,21 +17,11 @@ class Application:
         planner_agent: Planner,
         agent_factory: AgentFactoryPort,
         event_bus: EventBus,
-        session_frames: SessionFrameRepository,
     ) -> None:
         self.workspace = workspace
         self.agent_factory = agent_factory
         self.planner_agent = planner_agent
         self.event_bus = event_bus
-        self._session_frames = session_frames
-
-    @property
-    def session_frame(self) -> SessionFrame:
-        return self._session_frames.get_current()
-
-    @session_frame.setter
-    def session_frame(self, value: SessionFrame) -> None:
-        self._session_frames.save_current(value)
 
     async def submit_message(self, message: str) -> None:
         if message.startswith("/"):

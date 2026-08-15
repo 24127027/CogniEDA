@@ -53,6 +53,7 @@ def build_graph(
             invoke_cognitive=invoke_cognitive,
             planner_context_provider=planner_context_provider,
         ),
+        destinations=("await_human", "admit_candidate", END),
     )
     builder.add_node("await_human", await_human)
     builder.add_node(
@@ -61,6 +62,7 @@ def build_graph(
     )
 
     builder.add_edge(START, "plan_or_answer")
+    builder.add_edge("await_human", "plan_or_answer")
     builder.add_edge("admit_candidate", END)
 
     return builder.compile(checkpointer=checkpointer)

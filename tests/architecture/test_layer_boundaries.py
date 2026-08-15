@@ -90,6 +90,45 @@ def test_planner_has_no_session_frame_dependency_or_legacy_graph_surface() -> No
         assert (planner_root / required).is_file()
 
 
+def test_planner_and_application_respect_session_repository_boundary() -> None:
+    planner_imports = _imports(_python_files("agents/planner"))
+    planner_violations = [
+        f"{path.relative_to(PROJECT_ROOT)} imports {module}"
+        for path, module in planner_imports
+        if module.startswith("cognieda.infrastructure.persistence")
+    ]
+    application_path = SOURCE_ROOT / "runtime" / "application.py"
+    application_violations = [
+        module
+        for _, module in _imports((application_path,))
+        if module.startswith("cognieda.infrastructure.persistence")
+    ]
+
+    from cognieda.agents.planner.agent import Planner
+    from cognieda.agents.planner.dependencies import PlannerContextProviderPort
+
+    constructor = inspect.signature(Planner).parameters
+    assert planner_violations == []
+    assert application_violations == []
+    assert constructor["planner_context_provider"].annotation in {
+        PlannerContextProviderPort,
+        "PlannerContextProviderPort",
+    }
+
+
+def test_conversation_memory_is_separate_from_authoritative_planner_context() -> None:
+    from cognieda.agents.planner.context import PlannerContext
+    from cognieda.agents.planner.state import PlannerState
+    from cognieda.runtime.application import Application
+    from cognieda.runtime.conversation import ConversationHistory, ConversationTurn
+
+    assert tuple(ConversationHistory.model_fields) == ("turns",)
+    assert tuple(ConversationTurn.model_fields) == ("turn_id", "messages")
+    assert "conversation_history" not in PlannerContext.model_fields
+    assert "context" not in PlannerState.__annotations__
+    assert not hasattr(Application, "conversation_history")
+
+
 def test_runtime_does_not_define_planner_lifecycle_internals() -> None:
     forbidden = {
         "PlannerState",

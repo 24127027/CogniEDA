@@ -6,6 +6,7 @@ from typing import Any, cast
 from uuid import UUID, uuid4
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import StateSnapshot
 from pydantic_ai.messages import (
     ModelMessage,
@@ -19,8 +20,9 @@ from sqlmodel import Session
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.dependencies import PlannerContextProviderPort, PlannerDeps
+from cognieda.agents.planner.graph import InProcessPlannerSerializer
 from cognieda.agents.planner.state import PlannerState, PlannerTurnOutcome
-from cognieda.agents.planner.types import PlannerOutput, PlannerResult
+from cognieda.agents.planner.types import PlannerErrorCode, PlannerOutput, PlannerResult
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.application.services import PlanAdmissionService
 from cognieda.delegation import ExecutionRequest, ExecutionResult, ExecutionStatus
@@ -192,6 +194,11 @@ def test_graph_state_and_outcome_have_exact_separate_ownership(
         "admit_candidate",
         "__end__",
     }
+    assert planner.graph.builder.edges == {
+        ("__start__", "plan_or_answer"),
+        ("await_human", "plan_or_answer"),
+        ("admit_candidate", "__end__"),
+    }
 
 
 def test_candidate_proposal_is_checkpointed_without_authoritative_writes(
@@ -220,6 +227,35 @@ def test_candidate_proposal_is_checkpointed_without_authoritative_writes(
     ) is None
     assert TaskRepository(db_session).get_by_id(candidate.plan.tasks[0].task_id) is None
     assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) is None
+
+
+def test_empty_human_input_is_rejected_before_interrupt_resume(
+    db_session: Session,
+) -> None:
+    candidate = _candidate_result()
+    assert candidate.plan is not None
+    first_messages = _messages("Investigate churn.", "Proposed a plan.")
+    planner = _planner(
+        (
+            PlannerOutput(result=candidate, messages=first_messages),
+            PlannerOutput(result=PlannerResult(response="The candidate remains available.")),
+        ),
+        db_session,
+    )
+
+    asyncio.run(planner.handle_message("Investigate churn."))
+    before = _state(planner)
+    rejected = asyncio.run(planner.handle_message("  "))
+
+    assert rejected.error is not None
+    assert rejected.error.code is PlannerErrorCode.INVALID_REQUEST
+    assert planner.requests == ["Investigate churn."]
+    assert _state(planner) == before
+    assert _is_waiting(planner)
+
+    resumed = asyncio.run(planner.handle_message("Why this scope?"))
+    assert resumed.response == "The candidate remains available."
+    assert planner.requests == ["Investigate churn.", "Why this scope?"]
 
 
 def test_natural_multiturn_review_retain_replace_and_authorize_exact_candidate(
@@ -316,6 +352,27 @@ def test_context_is_fresh_and_native_history_remains_graph_owned(
     assert planner.contexts[0] is not planner.contexts[1]
     assert planner.message_histories == [(), first_messages]
     assert _state(planner)["messages"] == (*first_messages, *second_messages)
+    assert "context" not in PlannerState.__annotations__
+
+
+def test_custom_serializer_is_required_for_nested_typed_plan_state() -> None:
+    candidate = _candidate_result()
+    assert candidate.plan is not None
+    state = {
+        "candidate_plan": candidate.plan,
+        "messages": _messages("Question.", "Answer."),
+    }
+
+    plain_serializer = InMemorySaver().serde
+    planner_serializer = InProcessPlannerSerializer()
+    plain = plain_serializer.loads_typed(plain_serializer.dumps_typed(state))
+    restored = planner_serializer.loads_typed(planner_serializer.dumps_typed(state))
+
+    assert isinstance(plain["candidate_plan"], Plan)
+    assert not isinstance(plain["candidate_plan"].tasks[0], Task)
+    assert restored == state
+    assert isinstance(restored["candidate_plan"].tasks[0], Task)
+    assert isinstance(restored["messages"], tuple)
 
 
 def test_discard_clears_candidate_and_repeat_discard_fails_closed(

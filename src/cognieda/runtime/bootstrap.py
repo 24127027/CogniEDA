@@ -73,5 +73,4 @@ def bootstrap_application(workspace_path: Path) -> Application:
         workspace=workspace,
         planner_agent=planner,
         event_bus=event_bus,
-        session_frames=session_frames,
     )

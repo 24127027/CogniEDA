@@ -116,6 +116,14 @@ class Planner:
     async def handle_message(self, message: str) -> PlannerTurnOutcome:
         """Handle or resume one Human turn without exposing graph mechanics."""
 
+        if not message.strip():
+            return PlannerTurnOutcome(
+                error=PlannerControlledError(
+                    code=PlannerErrorCode.INVALID_REQUEST,
+                    message="Planner requests cannot be empty.",
+                )
+            )
+
         snapshot = await self.graph.aget_state(self._graph_config)
         if self._is_interrupted(snapshot):
             graph_input: PlannerState | Command[Any] = Command(resume=message)
