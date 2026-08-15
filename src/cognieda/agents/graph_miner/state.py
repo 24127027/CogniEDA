@@ -1,4 +1,4 @@
-from cognieda.execution.contracts import BaseState
+from cognieda.delegation.contracts import BaseState
 
 # TODO: Put whatever agent need here
 

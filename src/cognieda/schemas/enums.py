@@ -179,14 +179,6 @@ class TaskKind(StrEnum):
     GRAPH = "graph"
 
 
-class PlanPriority(StrEnum):
-    """Finite coordination priority for a bound Task."""
-
-    LOW = "low"
-    NORMAL = "normal"
-    HIGH = "high"
-
-
 class HypothesisStatus(StrEnum):
     """Lifecycle states for a Hypothesis test contract."""
 

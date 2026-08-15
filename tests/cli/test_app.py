@@ -6,8 +6,6 @@ from unittest.mock import Mock
 import pytest
 
 from cognieda.cli import app as cli_app
-from cognieda.runtime.bootstrap import resolve_model_config
-from cognieda.runtime.workspace import Workspace
 
 
 def test_help_exits_before_application_bootstrap(monkeypatch, capsys) -> None:
@@ -30,6 +28,22 @@ def test_default_workspace_is_current_directory(monkeypatch, tmp_path: Path) -> 
     assert args.path == tmp_path
 
 
+def test_parse_args_defaults_to_real_mode(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    args = cli_app.parse_args([])
+
+    assert args.mode == "real"
+
+
+def test_parse_args_accepts_mock_mode(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    args = cli_app.parse_args(["--mode", "mock"])
+
+    assert args.mode == "mock"
+
+
 def test_main_forwards_selected_workspace_to_shared_repl(monkeypatch, tmp_path: Path) -> None:
     app = object()
     renderer = object()
@@ -49,6 +63,26 @@ def test_main_forwards_selected_workspace_to_shared_repl(monkeypatch, tmp_path: 
     bootstrap.assert_called_once_with(tmp_path)
     renderer_factory.assert_called_once_with()
     assert seen == [(app, renderer)]
+
+
+def test_main_runs_mock_repl_without_bootstrap_in_mock_mode(
+    monkeypatch, tmp_path: Path
+) -> None:
+    app = object()
+    mock_repl = Mock()
+    bootstrap = Mock(side_effect=AssertionError("bootstrap must not run in mock mode"))
+
+    async def fake_mock_repl(*_args: object, **_kwargs: object) -> None:
+        mock_repl()
+
+    monkeypatch.setattr(cli_app, "bootstrap_application", bootstrap)
+    monkeypatch.setattr(cli_app, "run_mock_repl", fake_mock_repl)
+    monkeypatch.setattr(cli_app, "Renderer", Mock(return_value=object()))
+
+    cli_app.main(["--mode", "mock", str(tmp_path)])
+
+    mock_repl.assert_called_once()
+    bootstrap.assert_not_called()
 
 
 def test_main_loads_selected_workspace_env_without_overriding_process_values(

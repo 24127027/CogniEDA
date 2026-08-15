@@ -5,6 +5,9 @@ from __future__ import annotations
 from uuid import UUID
 
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
+from cognieda.delegation import Capability, ExecutionFailure, ExecutionRequest, ExecutionStatus
+from cognieda.infrastructure.datasets import load_dataset
+from cognieda.schemas.enums import TaskKind
 
 from .context import Context, DEInput
 from .graph import build_graph
@@ -24,6 +27,12 @@ class DataExplorer:
     receive a strongly typed DataExplorerOutput containing either an admitted
     Evidence object, an admitted DataProfile, or a controlled error.
     """
+
+    CAPABILITIES: tuple[Capability, ...] = (
+        Capability.DATA_ANALYSIS,
+        Capability.DATA_PROFILING,
+        Capability.DATA_TRANSFORMATION,
+    )
 
     def __init__(
         self,

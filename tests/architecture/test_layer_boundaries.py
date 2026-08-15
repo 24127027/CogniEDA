@@ -43,14 +43,12 @@ def test_planner_cannot_access_dataset_implementation_directly() -> None:
     assert violations == []
 
 
-def test_mvp_planner_does_not_import_deferred_scientific_or_plan_contracts() -> None:
+def test_planner_cognitive_core_does_not_import_deferred_scientific_authority() -> None:
     forbidden_symbols = {
-        "Discovery",
         "EvidenceRequest",
         "GovernanceDecision",
         "Hypothesis",
         "InvestigationProtocol",
-        "PlanRevision",
     }
     violations: list[str] = []
     for path in _python_files("agents/planner"):
@@ -67,7 +65,7 @@ def test_mvp_planner_does_not_import_deferred_scientific_or_plan_contracts() -> 
     assert violations == []
 
 
-def test_planner_has_no_session_frame_dependency_or_result_surface() -> None:
+def test_planner_has_no_session_frame_dependency_or_legacy_graph_surface() -> None:
     planner_files = tuple(_python_files("agents/planner"))
     violations = [
         str(path.relative_to(PROJECT_ROOT))
@@ -76,15 +74,48 @@ def test_planner_has_no_session_frame_dependency_or_result_surface() -> None:
     ]
 
     from cognieda.agents.planner.agent import Planner
-    from cognieda.agents.planner.types import PlannerOutput, State
+    from cognieda.agents.planner.context import PlannerContext
+    from cognieda.agents.planner.types import PlannerOutput, PlannerResult
 
     signature = inspect.signature(Planner.run)
     assert violations == []
     assert "session_frame" not in signature.parameters
-    assert signature.parameters["planning_context"].default is inspect.Parameter.empty
-    assert inspect.iscoroutinefunction(Planner.reload_model)
-    assert "session_frame" not in State.model_fields
+    assert signature.parameters["context"].default is inspect.Parameter.empty
+    assert inspect.iscoroutinefunction(Planner.reload)
+    assert "session_frame" not in PlannerContext.model_fields
+    assert "session_frame" not in PlannerResult.model_fields
     assert "session_frame" not in PlannerOutput.model_fields
+
+    planner_root = SOURCE_ROOT / "agents" / "planner"
+    for obsolete in ("model.py", "graph.py", "nodes.py"):
+        assert not (planner_root / obsolete).exists()
+
+
+def test_planner_production_source_has_no_obsolete_cognitive_symbols() -> None:
+    planner_root = SOURCE_ROOT / "agents" / "planner"
+    source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in planner_root.rglob("*.py")
+    )
+
+    for obsolete in (
+        "PlannerDecision",
+        "PlannerAction",
+        "PlannerModel",
+        "PlannerModelInput",
+        "PlannerAnswerInput",
+        "PlannerResponseDraft",
+        "selected_capability",
+        "created_assumption",
+        "created_objective",
+        "created_task",
+        "work_outcome",
+        "understand_request",
+        "prepare_results",
+        "dispatch_work",
+        "compose_response",
+    ):
+        assert obsolete not in source
 
 
 def test_inward_layers_do_not_depend_on_cli() -> None:
@@ -131,7 +162,12 @@ def test_production_source_contains_only_python_files() -> None:
     non_python = [
         path.relative_to(PROJECT_ROOT)
         for path in SOURCE_ROOT.rglob("*")
-        if path.is_file() and path.suffix != ".py" and "__pycache__" not in path.parts
+        if (
+            path.is_file()
+            and path.suffix != ".py"
+            and "__pycache__" not in path.parts
+            and "instruction" not in path.parts
+        )
     ]
 
     assert non_python == []

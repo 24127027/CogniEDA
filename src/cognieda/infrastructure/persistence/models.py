@@ -18,7 +18,6 @@ from cognieda.schemas.enums import (
     PlannerNodeName,
     PlannerOperationApprovalState,
     PlannerOperationType,
-    PlanPriority,
     TaskKind,
     TaskStatus,
     UserDecisionStatus,
@@ -135,42 +134,53 @@ class TaskRecord(SQLModel, table=True):
     status: TaskStatus = Field(default=TaskStatus.PENDING, nullable=False, index=True)
 
 
-class PlanRevisionRecord(SQLModel, table=True):
-    """Immutable header for one exact authoritative PlanRevision snapshot."""
+class PlanRecord(SQLModel, table=True):
+    """Immutable header and Objective snapshot for one exact Plan."""
 
-    __tablename__ = "plan_revisions"
+    __tablename__ = "plans"
 
-    plan_revision_id: UUID = Field(primary_key=True)
+    plan_id: UUID = Field(primary_key=True)
     objective_id: UUID = Field(
         foreign_key="objectives.objective_id",
         nullable=False,
         index=True,
     )
-    contract_version: str = Field(nullable=False)
+    objective_snapshot: dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
     fingerprint: str = Field(nullable=False, index=True)
 
 
-class PlanTaskBindingRecord(SQLModel, table=True):
-    """One immutable Task binding belonging to one PlanRevision."""
+class PlanAssumptionRecord(SQLModel, table=True):
+    """Exact historical snapshot of one admitted planning Assumption."""
 
-    __tablename__ = "plan_task_bindings"
+    __tablename__ = "plan_assumptions"
 
-    plan_revision_id: UUID = Field(
-        foreign_key="plan_revisions.plan_revision_id",
+    plan_id: UUID = Field(foreign_key="plans.plan_id", primary_key=True)
+    assumption_id: UUID = Field(
+        foreign_key="assumptions.assumption_id",
+        primary_key=True,
+    )
+    assumption_snapshot: dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
+
+
+class PlanTaskRecord(SQLModel, table=True):
+    """Direct immutable Task membership belonging to one Plan."""
+
+    __tablename__ = "plan_tasks"
+
+    plan_id: UUID = Field(
+        foreign_key="plans.plan_id",
         primary_key=True,
     )
     task_id: UUID = Field(foreign_key="tasks.task_id", primary_key=True)
-    order_rank: int = Field(ge=0, nullable=False)
-    priority: PlanPriority = Field(nullable=False)
 
 
 class PlanDependencyRecord(SQLModel, table=True):
-    """One immutable prerequisite edge belonging to one PlanRevision."""
+    """One immutable prerequisite edge belonging to one Plan."""
 
     __tablename__ = "plan_dependencies"
 
-    plan_revision_id: UUID = Field(
-        foreign_key="plan_revisions.plan_revision_id",
+    plan_id: UUID = Field(
+        foreign_key="plans.plan_id",
         primary_key=True,
     )
     prerequisite_task_id: UUID = Field(foreign_key="tasks.task_id", primary_key=True)

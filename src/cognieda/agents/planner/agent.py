@@ -1,17 +1,24 @@
 from __future__ import annotations
 
-from cognieda.application.ports import AgentFactoryPort, ModelConfig
-from cognieda.execution import ExecutorContext
+from pydantic import ValidationError
+from pydantic_ai import Agent
+from pydantic_ai.messages import ModelMessage
 
-from .context import Context, PlanningContext
+from cognieda.agents.utilities import instruction
+from cognieda.application.ports import AgentFactoryPort, ModelConfig
+
+from .context import PlannerContext
 from .dependencies import PlannerDeps
-from .graph import build_graph
-from .model import PlannerDecisionModel, PlannerModel
-from .types import PlannerControlledError, PlannerErrorCode, PlannerOutput, State
+from .types import (
+    PlannerControlledError,
+    PlannerErrorCode,
+    PlannerOutput,
+    PlannerResult,
+)
 
 
 class Planner:
-    """Human-facing coordinator over typed MVP research state."""
+    """Human-facing cognitive coordinator over readable research state."""
 
     builtin_tools: tuple[()] = ()
 
@@ -19,31 +26,42 @@ class Planner:
         self,
         deps: PlannerDeps,
         *,
-        planner_model: PlannerDecisionModel | None = None,
-        agent_factory: AgentFactoryPort | None = None,
-        model_config: ModelConfig | None = None,
-        agent_instruction: str = "",
+        agent_factory: AgentFactoryPort,
+        model_config: ModelConfig | None,
+        agent_instruction: str | None = None,
     ) -> None:
-        if planner_model is not None:
-            if agent_factory is not None or model_config is not None:
-                raise ValueError(
-                    "Provide either planner_model or agent_factory plus model_config, not both."
-                )
-            self.model = planner_model
-        else:
-            if agent_factory is None or model_config is None:
-                raise ValueError(
-                    "Planner requires a typed planner_model or agent_factory plus model_config."
-                )
-            self.model = PlannerModel(
-                deps=deps,
-                agent_factory=agent_factory,
-                model_config=model_config,
-                agent_instruction=agent_instruction,
-            )
-
         self.deps = deps
-        self.graph = build_graph()
+        self._agent_factory = agent_factory
+        self._model_config = model_config
+        self._agent_instruction = agent_instruction
+        self._instructions = self._assemble_instructions()
+        self._agent: Agent[PlannerDeps] | None = None
+        if model_config is not None:
+            self._create_agent()
+
+    def _assemble_instructions(self) -> list[str]:
+        return instruction.assemble(
+            "plan_or_answer.txt",
+            agent_instruction=self._agent_instruction,
+        )
+
+    def _create_agent(self) -> None:
+        if self._model_config is None:
+            raise RuntimeError("Planner model configuration has not been configured.")
+        self._agent = self._agent_factory.create_agent(
+            worker="planner",
+            config=self._model_config,
+            deps_type=PlannerDeps,
+            builtin_tools=self.builtin_tools,
+        )
+
+    def _ensure_agent(self) -> Agent[PlannerDeps]:
+        if self._agent is None:
+            self._create_agent()
+        agent = self._agent
+        if agent is None:
+            raise RuntimeError("Planner Agent creation did not return an Agent.")
+        return agent
 
     async def reload(
         self,
@@ -52,63 +70,108 @@ class Planner:
         agent_instruction: str | None = None,
         recreate_agent: bool = False,
     ) -> None:
-        """Reload the planner's model and instructions.\n
-            * **model_config**: Optional new model configuration to use for the planner agent.\n
-            * **agent_instruction**: Optional new instruction string to use for the planner agent.\n
-            * **recreate_agent**: Recreate underlying agent\n
-                set to True automatically when model_config is provided
-        """
+        """Reload Planner configuration while preserving direct Agent ownership."""
 
-        self.model.reload(
-            model_config=model_config, 
-            agent_instruction=agent_instruction,
-            recreate_agent=recreate_agent
-        )
+        if model_config is not None:
+            self._model_config = model_config
+            recreate_agent = True
+        if agent_instruction is not None:
+            self._agent_instruction = agent_instruction
+        self._instructions = self._assemble_instructions()
+        if recreate_agent:
+            self._agent = None
 
     async def run(
         self,
-        query: str,
+        request: str,
         *,
-        planning_context: PlanningContext,
-        execution_context: ExecutorContext | None = None,
+        context: PlannerContext,
     ) -> PlannerOutput:
-        """Run one request against explicit read-only context and return typed results."""
+        """Invoke plan_or_answer exactly once without mutation or execution."""
 
-        if not query.strip():
-            error = PlannerControlledError(
-                code=PlannerErrorCode.INVALID_COMMAND,
-                message="Planner requests cannot be empty.",
+        if not request.strip():
+            return self._controlled_output(
+                PlannerErrorCode.INVALID_REQUEST,
+                "Planner requests cannot be empty.",
             )
-            return PlannerOutput(response=error.message, error=error)
 
-        state = State(
-            query=query,
-            execution_context=execution_context or ExecutorContext(),
-        )
-        context = Context(
-            planner_model=self.model,
-            dispatcher=self.deps.dispatcher,
-            planning_context=planning_context,
-        )
-        result = await self.graph.ainvoke(state, context=context)
-        final_state = State.model_validate(result)
-
-        if final_state.response is None:
-            error = PlannerControlledError(
-                code=PlannerErrorCode.RESPONSE_FAILED,
-                message="Planner graph completed without a human-facing response.",
+        try:
+            agent = self._ensure_agent()
+        except (RuntimeError, ValueError):
+            return self._controlled_output(
+                PlannerErrorCode.MODEL_UNAVAILABLE,
+                "Planner model configuration is unavailable.",
             )
-            final_state.error = error
-            final_state.response = error.message
 
+        prompt = self._build_prompt(request, context)
+        messages: tuple[ModelMessage, ...] = ()
+        try:
+            run_result = await agent.run(
+                prompt,
+                output_type=PlannerResult,
+                deps=self.deps,
+                message_history=context.conversation_history.model_messages(),
+                instructions=self._instructions,
+            )
+            messages = tuple(run_result.new_messages())
+            result = PlannerResult.model_validate(run_result.output)
+            self._validate_result_against_context(result, context)
+        except (ValidationError, ValueError):
+            return self._controlled_output(
+                PlannerErrorCode.INVALID_MODEL_RESULT,
+                "Planner produced a result that is invalid for the current context.",
+                messages=messages,
+            )
+        except Exception:
+            return self._controlled_output(
+                PlannerErrorCode.MODEL_UNAVAILABLE,
+                "Planner model invocation failed.",
+                messages=messages,
+            )
+
+        return PlannerOutput(result=result, messages=messages)
+
+    @staticmethod
+    def _build_prompt(request: str, context: PlannerContext) -> str:
+        readable_state = context.model_dump_json(exclude={"conversation_history"})
+        return f"Human request:\n{request}\n\nTyped readable research state:\n{readable_state}"
+
+    @staticmethod
+    def _validate_result_against_context(
+        result: PlannerResult,
+        context: PlannerContext,
+    ) -> None:
+        if result.continue_execution and context.active_plan is None:
+            raise ValueError("continue_execution requires an active Plan.")
+
+        if result.plan is None:
+            return
+
+        admitted_assumptions = {
+            assumption.assumption_id: assumption for assumption in context.assumptions
+        }
+        for assumption in result.plan.assumptions:
+            admitted = admitted_assumptions.get(assumption.assumption_id)
+            if admitted is None:
+                raise ValueError("Candidate Plan references an unknown Assumption.")
+            if admitted != assumption:
+                raise ValueError(
+                    "Candidate Plan changes the content of an admitted Assumption."
+                )
+
+    @staticmethod
+    def _controlled_output(
+        code: PlannerErrorCode,
+        message: str,
+        *,
+        messages: tuple[ModelMessage, ...] = (),
+    ) -> PlannerOutput:
+        error = PlannerControlledError(code=code, message=message)
         return PlannerOutput(
-            response=final_state.response,
-            decision=final_state.decision,
-            created_objective=final_state.created_objective,
-            created_assumption=final_state.created_assumption,
-            created_task=final_state.created_task,
-            selected_capability=final_state.selected_capability,
-            work_outcome=final_state.work_outcome,
-            new_messages=final_state.new_messages,
-            error=final_state.error,
+            result=PlannerResult(response=message),
+            messages=messages,
+            error=error,
         )
+
+
+__all__ = ("Planner",)

@@ -10,11 +10,12 @@ These are established architecture, not speculative enhancements:
 
 - preserve the canonical `DATA`, `SCIENTIFIC`, and `GRAPH` Task kinds while
   keeping Planner response synthesis outside Task execution and keeping Task
-  identity separate from PlanRevision dependency and coordination
+  identity separate from Plan dependency and coordination
   metadata;
-- integrate the implemented PlanRevision V1 domain and pure validator plus the
-  SQLite repository foundation with Planner authoring, human approval,
-  exact-object commit-boundary validation and persistence, active revision
+- integrate the implemented Phase 1 Plan domain and pure validator plus the
+  SQLite repository foundation and Phase 2 transient Planner authoring with
+  human approval,
+  exact-object commit-boundary validation and persistence, active Plan
   selection, activation, and Task DAG runtime;
 - preserve Planner-only human interaction while preventing Planner ownership
   of scientific feasibility, methods, parameters, protocols, obligations,

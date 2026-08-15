@@ -8,8 +8,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dotenv import load_dotenv
-
 from .main import repl
 from .renderer import Renderer
 
@@ -28,6 +26,12 @@ def build_parser() -> ArgumentParser:
     """Build the CLI parser without initializing application services."""
     parser = ArgumentParser(description="CogniEDA CLI")
     parser.add_argument(
+        "--mode",
+        choices=("real", "mock"),
+        default="real",
+        help="Run the real planner runtime or the mock UI playground",
+    )
+    parser.add_argument(
         "path",
         nargs="?",
         default=Path.cwd(),
@@ -42,14 +46,14 @@ def parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return build_parser().parse_args(argv)
 
 
-def load_workspace_environment(workspace_path: Path) -> None:
-    """Load a selected workspace's optional .env without replacing process values."""
-    load_dotenv(dotenv_path=workspace_path.expanduser().resolve() / ".env", override=False)
-
-
 def main(argv: Sequence[str] | None = None) -> None:
-    """Open the selected workspace and run the Planner REPL."""
     args = parse_args(argv)
-    load_workspace_environment(args.path)
-    app = bootstrap_application(args.path)
-    asyncio.run(repl(app, Renderer()))
+
+    if args.mode == "mock":
+        from .mock_application import MockApplication
+
+        app = MockApplication(workspace_root=args.path)
+    else:
+        app = bootstrap_application(args.path)
+
+    asyncio.run(repl(app, Renderer())) #type: ignore

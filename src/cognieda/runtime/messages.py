@@ -19,3 +19,4 @@ class Message:
     role: MessageRole
     type: MessageType
     content: Any
+    model: str | None = None
