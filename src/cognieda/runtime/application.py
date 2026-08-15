@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from getpass import getpass
+
 from sqlmodel import Session
 
 from cognieda.agents.planner.agent import Planner
@@ -51,7 +53,7 @@ class Application:
                 agent_factory=self.agent_factory,
                 planner=self.planner_agent,
                 reload_runtime=self._reload_runtime,
-                prompt_secret=input,
+                prompt_secret=getpass,
             ),
         )
 
