@@ -5,7 +5,7 @@ from typing import Awaitable, Callable, Protocol
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.runtime.messages import Message
-from cognieda.runtime.application import AgentFactoryPort
+from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.workspace import Workspace
 
 
