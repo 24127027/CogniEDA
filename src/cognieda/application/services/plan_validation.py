@@ -83,18 +83,18 @@ class PlanValidator:
             assumptions.append(persisted)
 
         for task in candidate.tasks:
-            persisted = self._tasks.get_by_id(task.task_id)
-            if persisted is None:
+            persisted_task = self._tasks.get_by_id(task.task_id)
+            if persisted_task is None:
                 raise PlanValidationError(
                     PlanValidationErrorCode.TASK_NOT_FOUND,
                     "Plan candidate references a missing persisted Task.",
                 )
-            if persisted.objective_id != candidate.objective.objective_id:
+            if persisted_task.objective_id != candidate.objective.objective_id:
                 raise PlanValidationError(
                     PlanValidationErrorCode.TASK_OBJECTIVE_MISMATCH,
                     "Every persisted Task must belong to the Plan Objective.",
                 )
-            if persisted.semantic_payload() != task.semantic_payload():
+            if persisted_task.semantic_payload() != task.semantic_payload():
                 raise PlanValidationError(
                     PlanValidationErrorCode.INVALID_CANDIDATE,
                     "Plan Task differs from the authoritative persisted Task definition.",

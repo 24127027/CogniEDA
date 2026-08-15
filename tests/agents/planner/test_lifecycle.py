@@ -6,6 +6,7 @@ from typing import Any, cast
 from uuid import UUID, uuid4
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.types import StateSnapshot
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -22,6 +23,7 @@ from cognieda.agents.planner.state import PlannerState, PlannerTurnOutcome
 from cognieda.agents.planner.types import PlannerOutput, PlannerResult
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.application.services import PlanAdmissionService
+from cognieda.delegation import ExecutionRequest, ExecutionResult, ExecutionStatus
 from cognieda.infrastructure.persistence.repositories import (
     ActivePlanRepository,
     ObjectiveRepository,
@@ -42,10 +44,16 @@ def _messages(request: str, response: str) -> tuple[ModelMessage, ...]:
 
 class RecordingDispatcher:
     def __init__(self) -> None:
-        self.requests: list[object] = []
+        self.requests: list[ExecutionRequest] = []
 
-    async def dispatch(self, request: object) -> None:
+    async def dispatch(self, request: ExecutionRequest) -> ExecutionResult:
         self.requests.append(request)
+        return ExecutionResult(
+            source_role="recording_dispatcher",
+            task_id=request.input.task.task_id,
+            work_id="recorded",
+            status=ExecutionStatus.SUCCEEDED,
+        )
 
 
 class MutableContextProvider:
@@ -144,7 +152,7 @@ def _planner(
     )
 
 
-def _snapshot(planner: Planner):
+def _snapshot(planner: Planner) -> StateSnapshot:
     return asyncio.run(planner.graph.aget_state(planner._graph_config))
 
 
@@ -199,10 +207,12 @@ def test_candidate_proposal_is_checkpointed_without_authoritative_writes(
 
     outcome = asyncio.run(planner.handle_message("Investigate churn."))
     state = _state(planner)
+    persisted_candidate = state["candidate_plan"]
 
     assert outcome.proposed_plan == candidate.plan
-    assert state["candidate_plan"] == candidate.plan
-    assert state["candidate_plan"].tasks == candidate.plan.tasks
+    assert persisted_candidate == candidate.plan
+    assert persisted_candidate is not None
+    assert persisted_candidate.tasks == candidate.plan.tasks
     assert state["messages"] == messages
     assert _is_waiting(planner)
     assert ObjectiveRepository(db_session).get_by_id(
@@ -356,9 +366,11 @@ def test_admission_failure_retains_exact_candidate_and_reports_controlled_error(
 
     asyncio.run(planner.handle_message("Investigate churn."))
     outcome = asyncio.run(planner.handle_message("Proceed with that exact proposal."))
+    persisted_candidate = _state(planner)["candidate_plan"]
 
-    assert _state(planner)["candidate_plan"] == candidate.plan
-    assert _state(planner)["candidate_plan"].tasks == candidate.plan.tasks
+    assert persisted_candidate == candidate.plan
+    assert persisted_candidate is not None
+    assert persisted_candidate.tasks == candidate.plan.tasks
     assert outcome.error is not None
     assert outcome.error.code.value == "plan_admission_failed"
     assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) is None

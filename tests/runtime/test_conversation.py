@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import cast
 from unittest.mock import AsyncMock, Mock
+
+import pytest
+from sqlmodel import Session
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.state import PlannerTurnOutcome
@@ -42,7 +46,7 @@ def _candidate() -> Plan:
 
 def _application(
     planner: Planner,
-    db_session,
+    db_session: Session,
     *,
     workspace: Workspace | None = None,
     agent_factory: AgentFactoryPort | None = None,
@@ -62,7 +66,9 @@ def _application(
     return application, events
 
 
-def test_application_maps_planner_outcome_to_presentation_events(db_session) -> None:
+def test_application_maps_planner_outcome_to_presentation_events(
+    db_session: Session,
+) -> None:
     plan = _candidate()
     planner = Mock(spec=Planner)
     planner.handle_message = AsyncMock(
@@ -91,7 +97,9 @@ def test_application_maps_planner_outcome_to_presentation_events(db_session) -> 
     )
 
 
-def test_application_maps_controlled_planner_failure_to_error_event(db_session) -> None:
+def test_application_maps_controlled_planner_failure_to_error_event(
+    db_session: Session,
+) -> None:
     planner = Mock(spec=Planner)
     error = PlannerControlledError(
         code=PlannerErrorCode.PLAN_ADMISSION_FAILED,
@@ -118,7 +126,7 @@ def test_application_has_no_planner_lifecycle_or_history_authority() -> None:
 
 
 def test_application_and_planner_context_share_persisted_session_frame_authority(
-    db_session,
+    db_session: Session,
 ) -> None:
     planner = Mock(spec=Planner)
     application, _ = _application(planner, db_session)
@@ -135,8 +143,8 @@ def test_application_and_planner_context_share_persisted_session_frame_authority
 
 
 def test_bootstrap_composes_planner_before_application(
-    tmp_path,
-    monkeypatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     database_path = tmp_path / "runtime.sqlite3"
     monkeypatch.setenv("COGNIEDA_DB_URL", f"sqlite:///{database_path.as_posix()}")
@@ -151,7 +159,7 @@ def test_bootstrap_composes_planner_before_application(
 
 
 def test_skill_assignment_reloads_tooling_and_planner_without_state_mutation(
-    db_session,
+    db_session: Session,
 ) -> None:
     workspace = Mock(spec=Workspace)
     workspace.project_config = Mock()
@@ -185,7 +193,9 @@ def test_skill_assignment_reloads_tooling_and_planner_without_state_mutation(
     ]
 
 
-def test_provider_and_reload_commands_publish_user_visible_messages(db_session) -> None:
+def test_provider_and_reload_commands_publish_user_visible_messages(
+    db_session: Session,
+) -> None:
     workspace = Mock(spec=Workspace)
     provider = Mock()
     provider.model = "test-model"
