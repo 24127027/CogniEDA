@@ -38,6 +38,16 @@ class Application:
         self.conversation_history = ConversationHistory()
 
     async def submit_message(self, message: str) -> None:
+        self.event_bus.publish(
+            MessageProduced(
+                message=Message(
+                    type=MessageType.TEXT,
+                    role=MessageRole.USER,
+                    content=message,
+                )
+            )
+        )
+
         if message.startswith("/"):
             command_result = await self._handle_command(message)
             self.event_bus.publish(MessageProduced(message=command_result))
