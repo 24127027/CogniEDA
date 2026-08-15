@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from asyncio import Task
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -13,6 +14,13 @@ from rich.segment import ControlType
 from rich.text import Text
 
 from cognieda.runtime.messages import Message, MessageRole, MessageType
+from cognieda.runtime.events import (
+    HumanInputRequested,
+    MessageProduced,
+    PlanProposed,
+)
+from cognieda.schemas.plan import Plan
+from cognieda.schemas.artifacts import Task
 
 console = Console()
 
@@ -88,3 +96,22 @@ class Renderer:
 
             case _:
                 self.console.print(str(message.content))
+
+    def handle_message(self, event: MessageProduced) -> None:
+        self.render(event.message)
+
+    def handle_human_input(self, event: HumanInputRequested) -> None:
+        self.render(event.message)
+
+    def handle_plan(self, event: PlanProposed) -> None:
+        self.render_plan(event.plan, event.tasks)
+
+    def render_plan(
+        self,
+        plan: Plan,
+        tasks: tuple[Task, ...],
+    ) -> None:
+        self.console.print("[bold cyan]Proposed Plan[/bold cyan]")
+
+        for index, task in enumerate(tasks, start=1):
+            self.console.print(f"{index}. {task}")
