@@ -27,6 +27,7 @@ import pandas as pd
 from pydantic_ai import FunctionToolset
 
 from cognieda.agents.data_explorer.tools.analyze_dataset import normalize_json_value
+from cognieda.agents.data_explorer.tools.analyze_dataset import parse_string_list
 
 SANDBOX_TIMEOUT = 15  # seconds
 
@@ -150,7 +151,7 @@ def sandbox_toolset(df: pd.DataFrame) -> FunctionToolset:
     @toolset.tool_plain
     def execute_code(
         code: str,
-        target_columns: list[str] | None = None,
+        target_columns: list[str] | str | None = None,
     ) -> dict[str, Any]:
         """Execute custom Python/Pandas code against the bound DataFrame.
 
@@ -165,6 +166,9 @@ def sandbox_toolset(df: pd.DataFrame) -> FunctionToolset:
             target_columns: Column names the code intends to access. Used for
                             provenance capture; does not restrict execution.
         """
+        if isinstance(target_columns, str):
+            target_columns = parse_string_list(target_columns)
+            
         namespace = _build_restricted_globals()
         namespace["df"] = _df.copy(deep=True)
 

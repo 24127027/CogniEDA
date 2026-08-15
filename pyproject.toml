@@ -52,6 +52,9 @@ addopts = [
 ]
 testpaths = ["tests", "README.md"]
 xfail_strict = true
+markers = [
+    "llm: integration tests requiring a live LLM API"
+]
 
 [tool.ruff]
 target-version = "py312"

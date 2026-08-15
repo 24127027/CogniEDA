@@ -5,7 +5,9 @@ Rules:
   directly answer the task instruction. Provide a concise summary of findings.
 - verdict=needs_revision: one or more steps failed, or the combined outputs are
   incomplete. Provide clear revision_feedback describing exactly what is missing
-  or incorrect so that planning can produce a corrective plan.
+  or incorrect so that planning can produce a corrective plan. If a builtin tool failed
+  due to its constraints (like exceeding max_groups) or doesn't exist, explicitly tell
+  the planner to use execution_type=code_generation.
 - verdict=unfeasible: the task cannot be resolved with the available dataset
   columns and bounded operations, regardless of retries. Explain why.
 - Do not interpret results scientifically, claim discoveries, evaluate hypotheses,

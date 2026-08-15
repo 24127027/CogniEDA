@@ -36,7 +36,7 @@ class FakeDataExplorerModel:
         self.plan_called_with: list[tuple[str, pd.DataFrame]] = []
         self.evaluate_called_with: list[tuple[str, pd.DataFrame | None]] = []
 
-    async def plan(self, prompt: str, df: pd.DataFrame) -> PlanningOutput:
+    async def plan(self, prompt: str, df: pd.DataFrame, *, deps: Any | None = None) -> PlanningOutput:
         self.plan_called_with.append((prompt, df))
         if isinstance(self.planning_output, Exception):
             raise self.planning_output
@@ -44,7 +44,7 @@ class FakeDataExplorerModel:
             raise NotImplementedError("planning_output not provided")
         return self.planning_output
 
-    async def evaluate(self, prompt: str, df: pd.DataFrame | None) -> EvaluationOutput:
+    async def evaluate(self, prompt: str, df: pd.DataFrame | None, *, deps: Any | None = None) -> EvaluationOutput:
         self.evaluate_called_with.append((prompt, df))
         if isinstance(self.evaluation_output, Exception):
             raise self.evaluation_output

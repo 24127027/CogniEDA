@@ -20,6 +20,9 @@ class DataAnalysisOperation(StrEnum):
     DESCRIPTIVE_STATISTICS = "descriptive_statistics"
     GROUP_SUMMARY = "group_summary"
     CORRELATION = "correlation"
+    # Sentinel for LangGraph-backed multi-step results where no single
+    # deterministic operation represents the full analysis.
+    GRAPH_MULTI_STEP = "graph_multi_step"
 
 
 class CorrelationMethod(StrEnum):
@@ -46,7 +49,10 @@ class DataAnalysisPlan(BaseModel):
             raise ValueError("Analysis columns must not contain duplicates.")
 
         expected_columns: int | tuple[int, int]
-        if self.operation is DataAnalysisOperation.ROW_COUNT:
+        if self.operation in {
+            DataAnalysisOperation.ROW_COUNT,
+            DataAnalysisOperation.GRAPH_MULTI_STEP,
+        }:
             expected_columns = 0
         elif self.operation in {
             DataAnalysisOperation.COLUMN_SUMMARY,

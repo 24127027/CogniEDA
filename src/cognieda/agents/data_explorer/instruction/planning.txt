@@ -26,10 +26,9 @@ Rules:
   Set builtin_tool_kwargs to a dict of keyword arguments matching the tool signature.
   For tools that operate on a single column, pass the column name in builtin_tool_kwargs
   (e.g. {"column": "age"}) AND in target_columns.
-- Choose execution_type=code_generation for custom aggregations, filters, or
-  multi-step logic that no single builtin tool covers. Set generated_code to valid
-  Pandas/Python using only the variable `df` (a deep copy of the dataset) and
-  standard library imports. The code must assign its output to a variable named `result`.
+- Choose execution_type=code_generation for custom aggregations, filters, statistical tests (e.g. t-tests), or
+  multi-step logic that no single builtin tool covers (or if a builtin tool failed due to its limits). Set generated_code to valid
+  Pandas/Python using only the variable `df` (a deep copy of the dataset). You may import standard libraries and common data science packages like `scipy`, `numpy`, or `statsmodels`. The code must assign its output to a variable named `result`.
 - Set expected_output_type to the Python type name the step should return ("dict",
   "float", "int", "list").
 - Each step must have a unique step_id (e.g. "s1", "s2").

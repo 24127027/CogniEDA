@@ -64,3 +64,22 @@ def normalize_json_value(value: Any) -> JsonValue:
     raise InvalidToolResultError(
         f"Tool output contains unsupported value type {type(value).__name__}."
     )
+
+
+def parse_string_list(value: str) -> list[str]:
+    """Robustly parse a string representation of a list of columns.
+    
+    Handles formats like:
+      - "['price', 'stock']"
+      - "price, stock"
+      - "'price', 'stock'"
+    """
+    import ast
+    try:
+        parsed = ast.literal_eval(value)
+        if isinstance(parsed, (list, tuple)):
+            return [str(c) for c in parsed]
+    except (SyntaxError, ValueError):
+        pass
+        
+    return [c.strip("[]'\" ") for c in value.split(",") if c.strip("[]'\" ")]

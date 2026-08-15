@@ -21,6 +21,7 @@ from cognieda.agents.data_explorer.tools.analyze_dataset import (
     InvalidAnalysisPlanError,
     InvalidToolResultError,
     normalize_json_value,
+    parse_string_list,
 )
 
 
@@ -265,7 +266,7 @@ def eda_toolset(df: pd.DataFrame) -> FunctionToolset:
 
     @toolset.tool_plain
     def correlation_matrix(
-        columns: list[str],
+        columns: list[str] | str,
         method: Literal["pearson", "spearman", "kendall"] = "pearson",
     ) -> dict[str, JsonValue]:
         """Compute the pairwise correlation matrix for a set of numeric columns.
@@ -274,6 +275,8 @@ def eda_toolset(df: pd.DataFrame) -> FunctionToolset:
             columns: List of 2 or more numeric column names.
             method: "pearson", "spearman", or "kendall".
         """
+        if isinstance(columns, str):
+            columns = parse_string_list(columns)
         if len(columns) < 2:
             raise InvalidAnalysisPlanError("correlation_matrix requires at least 2 columns.")
         _require_columns(*columns)

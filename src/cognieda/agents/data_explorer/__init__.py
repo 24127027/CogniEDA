@@ -1,17 +1,38 @@
 """Data Explorer agent package."""
 
 from .agent import DataExplorer
-from .context import DEInput
+from .contracts import (
+    CorrelationMethod,
+    DataAnalysisOperation,
+    DataAnalysisPlan,
+    DataAnalysisPlannerPort,
+    DataAnalysisPlanningRequest,
+    DataExplorerInput,
+    DataExplorerObservation,
+    DataExplorerResult,
+    DataExecutionProvenance,
+    DataProfileCandidate,
+)
 from .dependencies import DEDependencies
-from .executor_provider import DEExecutorProvider
-from .types import DataExplorerOutput, DEControlledError, DEErrorCode
+from .planning import DataAnalysisPlanner, UnsupportedAnalysisRequest
 
 __all__ = (
+    # Primary executor
     "DataExplorer",
-    "DEControlledError",
+    # Contract types
+    "CorrelationMethod",
+    "DataAnalysisOperation",
+    "DataAnalysisPlan",
+    "DataAnalysisPlannerPort",
+    "DataAnalysisPlanningRequest",
+    "DataExplorerInput",
+    "DataExplorerObservation",
+    "DataExplorerResult",
+    "DataExecutionProvenance",
+    "DataProfileCandidate",
+    # Dependencies (used by LangGraph nodes)
     "DEDependencies",
-    "DEErrorCode",
-    "DEExecutorProvider",
-    "DEInput",
-    "DataExplorerOutput",
+    # Planning
+    "DataAnalysisPlanner",
+    "UnsupportedAnalysisRequest",
 )

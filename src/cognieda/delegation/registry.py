@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Union
 
 from .capabilities import Capability
 from .contracts import Executor
 
+# A factory is any zero-arg callable returning an Executor, or an Executor class.
 ExecutorFactory = Callable[[], Executor]
 
 class CapabilityNotRegisteredError(LookupError):
@@ -58,6 +60,48 @@ class ExecutorRegistry:
                     f"Capability already registered: {capability}"
                 )
 
+            self._registrations[capability] = registration
+
+    def register_provider(
+        self,
+        provider: Union[ExecutorFactory, type],
+        *,
+        capabilities: tuple[Capability, ...],
+    ) -> None:
+        """Register a class or factory callable for the given explicit capabilities.
+
+        All capabilities share the same lazy instance (one factory call for all).
+
+        Args:
+            provider: An Executor subclass, or any zero-arg callable that returns
+                      an Executor.  When a class is passed it is used as the factory.
+            capabilities: Non-empty tuple of Capability values to map to this provider.
+
+        Raises:
+            ValueError: If capabilities is empty or a capability is already registered.
+            TypeError: If the factory returns an incompatible object.
+        """
+        if not capabilities:
+            raise ValueError(
+                "At least one capability must be specified when registering a provider."
+            )
+
+        # Normalise: if it's a class, wrap in a zero-arg lambda so we get fresh
+        # instances but share the same registration object (lazy singleton per registry).
+        factory: ExecutorFactory = provider if not isinstance(provider, type) else provider
+
+        # Validate all capabilities first before mutating state.
+        for capability in capabilities:
+            if not isinstance(capability, Capability):
+                raise TypeError(
+                    f"Invalid capability: {capability!r}. Must be a Capability instance."
+                )
+            if capability in self._registrations:
+                raise ValueError(f"Capability already registered: {capability}")
+
+        # One shared _Registration for all capabilities → same instance on resolve.
+        registration = _Registration(factory=factory)
+        for capability in capabilities:
             self._registrations[capability] = registration
 
     def resolve(self, capability: Capability) -> Executor:
