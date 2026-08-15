@@ -58,6 +58,16 @@ class Application:
         )
 
     async def submit_message(self, message: str) -> None:
+        self.event_bus.publish(
+            MessageProduced(
+                message=Message(
+                    type=MessageType.TEXT,
+                    role=MessageRole.USER,
+                    content=message,
+                )
+            )
+        )
+
         if message.startswith("/"):
             command_result = await self.command_handler.handle(message)
             self.event_bus.publish(

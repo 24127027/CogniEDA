@@ -42,13 +42,5 @@ async def repl(app: Application, renderer: Renderer) -> None:
 
         if not text:
             continue
-
-        renderer.render(
-            Message(
-                type=MessageType.TEXT,
-                role=MessageRole.USER,
-                content=text,
-            )
-        )
-
+        
         await app.submit_message(text)
