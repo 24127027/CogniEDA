@@ -8,7 +8,7 @@ from pydantic_ai import Agent
 
 from cognieda.agents.data_explorer.contracts import DataExplorerResult
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
-from cognieda.execution import Capability, ExecutionRequest
+from cognieda.delegation import Capability, ExecutionRequest
 from cognieda.schemas.artifacts import Discovery
 
 from .contracts import HypothesisAnalystResult

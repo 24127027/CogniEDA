@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from cognieda.execution import Capability, ExecutionRequest, ExecutionResult
+from cognieda.delegation import Capability, ExecutionRequest, ExecutionResult
 
 
 class GraphMiner:

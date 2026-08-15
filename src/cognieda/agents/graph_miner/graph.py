@@ -1,6 +1,6 @@
 from langgraph.graph.state import CompiledStateGraph
 
-from cognieda.execution import ExecutionResult, ExecutorContext, ExecutorInput
+from cognieda.delegation import ExecutionResult, ExecutorContext, ExecutorInput
 
 from .state import State
 

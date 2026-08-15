@@ -4,6 +4,8 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
+
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[2]))
     from cognieda.cli.renderer import Renderer
@@ -17,6 +19,19 @@ if TYPE_CHECKING:
 
 
 async def repl(app: Application, renderer: Renderer) -> None:
+    app.event_bus.subscribe(
+        MessageProduced,
+        renderer.handle_message,
+    )
+    app.event_bus.subscribe(
+        HumanInputRequested,
+        renderer.handle_human_input,
+    )
+    app.event_bus.subscribe(
+        PlanProposed,
+        renderer.handle_plan,
+    )
+
     renderer.render_session_start(app.workspace.root)
 
     while True:
@@ -35,5 +50,5 @@ async def repl(app: Application, renderer: Renderer) -> None:
                 content=text,
             )
         )
-        response = await app.submit_message(text)
-        renderer.render(response)
+
+        await app.submit_message(text)

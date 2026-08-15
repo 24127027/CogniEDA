@@ -197,7 +197,7 @@ wire format, or serialization details.
 ## Implementation status
 
 **Partially implemented.** At the S0 library boundary, one lightweight
-execution-owned `Capability` `StrEnum` drives an explicit `Capability -> ProviderFactory`
+execution-owned `Capability` `StrEnum` drives an explicit `Capability -> ExecutorFactory`
 registry. One dependency-aware factory may serve multiple capabilities and its
 provider instance is reused. Duplicate and absent registrations fail closed.
 The thin async dispatcher invokes the resolved provider and preserves provider

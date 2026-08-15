@@ -18,7 +18,7 @@ from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.types import PlannerErrorCode, PlannerResult
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
-from cognieda.execution import ExecutionRequest
+from cognieda.delegation import ExecutionRequest
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.schemas import (
     Assumption,

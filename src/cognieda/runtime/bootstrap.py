@@ -7,11 +7,12 @@ from dotenv import load_dotenv
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.dependencies import PlannerDeps
-from cognieda.execution import Capability, ExecutorDispatcher, ExecutorRegistry
+from cognieda.delegation import ExecutorDispatcher, ExecutorRegistry
 from cognieda.infrastructure.llm import AgentFactory
 from cognieda.infrastructure.persistence import get_session, init_db
 
 from .application import Application
+from .event_bus import EventBus
 from .workspace import MissingModelCredentialError, Workspace
 
 
@@ -34,12 +35,10 @@ def bootstrap_application(workspace_path: Path) -> Application:
     agent_factory = AgentFactory(tooling_config=workspace)
 
     registry = ExecutorRegistry()
-    registry.register_provider(
-        lambda: DataExplorer(config=model_config, agent_factory=agent_factory),
-        capabilities=(
-            Capability.DATA_ANALYSIS,
-            Capability.DATA_PROFILING,
-            Capability.DATA_TRANSFORMATION,
+    registry.register(
+        lambda: DataExplorer(
+            config=model_config,
+            agent_factory=agent_factory if model_config is not None else None,
         ),
     )
     dispatcher = ExecutorDispatcher(registry)
@@ -49,6 +48,7 @@ def bootstrap_application(workspace_path: Path) -> Application:
         model_config=model_config,
         agent_instruction=workspace.load_agent_instruction(),
     )
+    event_bus = EventBus()
 
     database_url = init_db()
 
@@ -57,6 +57,6 @@ def bootstrap_application(workspace_path: Path) -> Application:
         workspace=workspace,
         planner_agent=planner,
         dispatcher=dispatcher,
+        event_bus=event_bus,
         session=get_session(database_url),
     )
-

@@ -18,7 +18,7 @@ from cognieda.agents.data_explorer import (
     DataExplorerInput,
 )
 from cognieda.agents.data_explorer.planning import UnsupportedAnalysisRequest
-from cognieda.execution import (
+from cognieda.delegation import (
     Capability,
     ExecutionRequest,
     ExecutionStatus,

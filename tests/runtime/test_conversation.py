@@ -21,7 +21,7 @@ from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.types import PlannerOutput, PlannerResult
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.application.services import PlanAdmissionService
-from cognieda.execution import ExecutorDispatcher
+from cognieda.delegation import ExecutorDispatcher
 from cognieda.infrastructure.persistence.repositories import (
     ActivePlanRepository,
     ObjectiveRepository,
@@ -30,6 +30,13 @@ from cognieda.infrastructure.persistence.repositories import (
 )
 from cognieda.runtime.application import Application
 from cognieda.runtime.conversation import ConversationHistory, ConversationTurn
+from cognieda.runtime.event_bus import EventBus
+from cognieda.runtime.events import (
+    HumanInputRequested,
+    MessageProduced,
+    PlanProposed,
+    RuntimeEvent,
+)
 from cognieda.runtime.workspace import Workspace
 from cognieda.schemas import Objective, Plan, Task, TaskKind
 
@@ -88,14 +95,24 @@ def _candidate_result(
     )
 
 
-def _application(planner: SequencePlanner, db_session: Session) -> Application:
-    return Application(
+def _application(
+    planner: SequencePlanner,
+    db_session: Session,
+) -> tuple[Application, list[RuntimeEvent]]:
+    event_bus = EventBus()
+    events: list[RuntimeEvent] = []
+    event_bus.subscribe(MessageProduced, events.append)
+    event_bus.subscribe(PlanProposed, events.append)
+    event_bus.subscribe(HumanInputRequested, events.append)
+    application = Application(
         workspace=cast(Workspace, object()),
         planner_agent=cast(Planner, planner),
         dispatcher=cast(ExecutorDispatcher, object()),
         agent_factory=cast(AgentFactoryPort, object()),
+        event_bus=event_bus,
         session=db_session,
     )
+    return application, events
 
 
 def test_application_has_no_separate_plan_review_api() -> None:
@@ -125,11 +142,12 @@ def test_candidate_is_invocation_output_only_without_authoritative_writes(
     candidate = _candidate_result()
     assert candidate.plan is not None
     planner = SequencePlanner((PlannerOutput(result=candidate, messages=first_messages),))
-    application = _application(planner, db_session)
+    application, events = _application(planner, db_session)
 
     first = asyncio.run(application.submit_message("Investigate churn."))
 
-    assert first.content == "I propose a bounded investigation."
+    assert first is None
+    assert events == [PlanProposed(plan=candidate.plan, tasks=candidate.tasks)]
     assert not hasattr(application, "_pending_plan")
     assert not hasattr(application, "_pending_tasks")
     assert application.session_frame.objective is None
@@ -171,7 +189,7 @@ def test_conversation_history_is_passed_separately_from_planner_context(
             ),
         )
     )
-    application = _application(planner, db_session)
+    application, events = _application(planner, db_session)
 
     asyncio.run(application.submit_message("First request"))
     asyncio.run(application.submit_message("Second request"))
@@ -183,6 +201,10 @@ def test_conversation_history_is_passed_separately_from_planner_context(
     assert application.conversation_history.model_messages() == [
         *first_messages,
         *second_messages,
+    ]
+    assert [event.message.content for event in events if isinstance(event, MessageProduced)] == [
+        "First response",
+        "Second response",
     ]
 
 
@@ -197,12 +219,13 @@ def test_followup_cannot_admit_an_invocation_local_candidate(
             PlannerOutput(result=PlannerResult(continue_execution=True)),
         )
     )
-    application = _application(planner, db_session)
+    application, events = _application(planner, db_session)
 
     asyncio.run(application.submit_message("Investigate churn."))
     continued = asyncio.run(application.submit_message("Proceed with that plan."))
 
-    assert continued.content == "The current Plan should continue execution."
+    assert continued is None
+    assert events == [PlanProposed(plan=candidate.plan, tasks=candidate.tasks)]
     assert all(context.active_plan is None for context in planner.contexts)
     assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) is None
     assert ObjectiveRepository(db_session).get_by_id(candidate.plan.objective.objective_id) is None
@@ -220,7 +243,7 @@ def test_active_plan_materializes_only_from_authoritative_repository_state(
     assert candidate.plan is not None
     admitted = PlanAdmissionService(db_session).admit(candidate.plan, tasks=candidate.tasks)
     planner = SequencePlanner((PlannerOutput(result=PlannerResult(continue_execution=True)),))
-    application = _application(planner, db_session)
+    application, events = _application(planner, db_session)
     application.session_frame = application.session_frame.set_objective(candidate.plan.objective)
 
     continued = asyncio.run(application.submit_message("Continue active work."))
@@ -233,7 +256,30 @@ def test_active_plan_materializes_only_from_authoritative_repository_state(
         ActivePlanRepository(db_session).get_by_objective_id(admitted.objective.objective_id)
         == admitted
     )
-    assert continued.content == "The current Plan should continue execution."
+    assert continued is None
+    assert events == []
+
+
+def test_human_clarification_is_published_without_authoritative_mutation(
+    db_session: Session,
+) -> None:
+    planner = SequencePlanner(
+        (
+            PlannerOutput(
+                result=PlannerResult(human_input_request="Which cohort is in scope?"),
+            ),
+        )
+    )
+    application, events = _application(planner, db_session)
+    original_frame = application.session_frame
+
+    result = asyncio.run(application.submit_message("Investigate churn."))
+
+    assert result is None
+    assert application.session_frame is original_frame
+    assert len(events) == 1
+    assert isinstance(events[0], HumanInputRequested)
+    assert events[0].message.content == "Which cohort is in scope?"
 
 
 def test_skill_assignment_reloads_tooling_and_planner_without_state_mutation(
@@ -250,8 +296,11 @@ def test_skill_assignment_reloads_tooling_and_planner_without_state_mutation(
         planner_agent=planner,
         dispatcher=cast(ExecutorDispatcher, object()),
         agent_factory=cast(AgentFactoryPort, agent_factory),
+        event_bus=EventBus(),
         session=db_session,
     )
+    events: list[MessageProduced] = []
+    application.event_bus.subscribe(MessageProduced, events.append)
     original_frame = application.session_frame
 
     response = asyncio.run(application.submit_message("/skill use planner review"))
@@ -265,4 +314,50 @@ def test_skill_assignment_reloads_tooling_and_planner_without_state_mutation(
     )
     planner.run.assert_not_called()
     assert application.session_frame is original_frame
-    assert response.content == "Assigned 'review' to 'planner'."
+    assert response is None
+    assert [event.message.content for event in events] == ["Assigned 'review' to 'planner'."]
+
+
+def test_provider_and_reload_commands_publish_user_visible_messages(
+    db_session: Session,
+) -> None:
+    workspace = Mock(spec=Workspace)
+    provider = Mock()
+    provider.model = "test-model"
+    provider.api_key_configured.return_value = True
+    workspace.project_config = Mock()
+    workspace.project_config.default_provider = "openai"
+    workspace.project_config.providers = {"openai": provider}
+    workspace.load_agent_instruction.return_value = "reloaded instructions"
+    planner = Mock(spec=Planner)
+    planner.reload = AsyncMock()
+    event_bus = EventBus()
+    events: list[MessageProduced] = []
+    event_bus.subscribe(MessageProduced, events.append)
+    application = Application(
+        workspace=workspace,
+        planner_agent=planner,
+        dispatcher=cast(ExecutorDispatcher, object()),
+        agent_factory=cast(AgentFactoryPort, Mock()),
+        event_bus=event_bus,
+        session=db_session,
+    )
+
+    provider_result = asyncio.run(application.submit_message("/provider"))
+    reload_result = asyncio.run(application.submit_message("/reload"))
+
+    assert provider_result is None
+    assert reload_result is None
+    assert [event.message.content for event in events] == [
+        (
+            "Current provider : openai\n"
+            "        Model            : test-model\n"
+            "        API key          : yes"
+        ),
+        "Planner instructions reloaded.",
+    ]
+    planner.reload.assert_awaited_once_with(
+        model_config=None,
+        agent_instruction="reloaded instructions",
+        recreate_agent=False,
+    )
