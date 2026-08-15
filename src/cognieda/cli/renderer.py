@@ -103,7 +103,7 @@ class Renderer:
         self.render(event.message)
 
     def handle_plan(self, event: PlanProposed) -> None:
-        self.render_plan(event.plan, event.tasks)
+        self.render_plan(event.plan, event.plan.tasks)
 
     def render_plan(
         self,

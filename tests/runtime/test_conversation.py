@@ -22,19 +22,18 @@ from cognieda.runtime.workspace import Workspace
 from cognieda.schemas import Objective, Plan, Task, TaskKind
 
 
-def _candidate() -> tuple[Plan, tuple[Task, ...]]:
+def _candidate() -> Plan:
     objective = Objective(text="Understand customer churn.")
     task = Task(
         objective_id=objective.objective_id,
         kind=TaskKind.DATA,
         instruction="Profile churn labels.",
     )
-    plan = Plan.create(
+    plan = Plan(
         objective=objective,
-        task_ids=(task.task_id,),
         tasks=(task,),
     )
-    return plan, (task,)
+    return plan
 
 
 def _application(
@@ -59,15 +58,13 @@ def _application(
 
 
 def test_application_maps_planner_outcome_to_presentation_events() -> None:
-    plan, tasks = _candidate()
+    plan = _candidate()
     planner = Mock(spec=Planner)
     planner.handle_message = AsyncMock(
         return_value=PlannerTurnOutcome(
-            candidate_plan=plan,
-            candidate_tasks=tasks,
+            proposed_plan=plan,
             response="I propose a bounded investigation.",
             human_input_request="Does this scope look right?",
-            awaiting_human=True,
         )
     )
     application, events = _application(planner)

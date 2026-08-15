@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command, StateSnapshot
 from pydantic import ValidationError
 from pydantic_ai import Agent
@@ -13,7 +14,6 @@ from pydantic_ai.messages import ModelMessage
 
 from cognieda.agents.utilities import instruction
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
-from cognieda.schemas.artifacts import Task
 from cognieda.schemas.plan import Plan
 
 from .context import PlannerContext
@@ -21,11 +21,9 @@ from .dependencies import (
     PlanAdmissionPort,
     PlannerContextProviderPort,
     PlannerDeps,
-    PlannerGraphContext,
 )
-from .graph import build_graph, create_in_memory_checkpointer
-from .nodes import validate_candidate_state
-from .state import PlannerState, PlannerTurnOutcome, empty_planner_state
+from .graph import InProcessPlannerSerializer, build_graph
+from .state import PlannerState, PlannerTurnOutcome
 from .types import (
     PlannerControlledError,
     PlannerErrorCode,
@@ -59,17 +57,19 @@ class Planner:
         self._agent: Agent[PlannerDeps] | None = None
         if model_config is not None:
             self._create_agent()
-        self._checkpointer = checkpointer or create_in_memory_checkpointer()
+        self._checkpointer = checkpointer or InMemorySaver(
+            serde=InProcessPlannerSerializer()
+        )
         self._thread_id = thread_id or uuid4()
         self._graph_config: RunnableConfig = {
             "configurable": {"thread_id": str(self._thread_id)}
         }
-        self._graph_context = PlannerGraphContext(
+        self.graph = build_graph(
+            self._checkpointer,
             invoke_cognitive=self._invoke_cognitive,
             planner_context_provider=planner_context_provider,
             plan_admission=plan_admission,
         )
-        self.graph = build_graph(self._checkpointer)
 
     def _assemble_instructions(self) -> list[str]:
         return instruction.assemble(
@@ -124,14 +124,11 @@ class Planner:
                 snapshot,
                 latest_human_input=message,
             )
-            graph_input["result"] = None
-            graph_input["error"] = None
             graph_input["turn_outcome"] = None
 
         await self.graph.ainvoke(
             graph_input,
             config=self._graph_config,
-            context=self._graph_context,
         )
         current = await self.graph.aget_state(self._graph_config)
         state = self._state_from_snapshot(current)
@@ -140,23 +137,12 @@ class Planner:
             raise RuntimeError("Planner graph completed without a typed turn outcome.")
         return outcome
 
-    async def _get_state(self) -> PlannerState:
-        """Inspect this Planner thread's current checkpointed lifecycle state."""
-
-        return self._state_from_snapshot(await self.graph.aget_state(self._graph_config))
-
-    async def _is_waiting_for_human(self) -> bool:
-        """Return whether this exact Planner thread is currently interrupted."""
-
-        return self._is_interrupted(await self.graph.aget_state(self._graph_config))
-
     async def _invoke_cognitive(
         self,
         request: str,
         *,
         context: PlannerContext,
         candidate_plan: Plan | None = None,
-        candidate_tasks: tuple[Task, ...] = (),
         message_history: list[ModelMessage] | None = None,
     ) -> PlannerOutput:
         """Invoke plan_or_answer exactly once without mutation or execution."""
@@ -165,14 +151,6 @@ class Planner:
             return self._controlled_output(
                 PlannerErrorCode.INVALID_REQUEST,
                 "Planner requests cannot be empty.",
-            )
-
-        try:
-            self._validate_candidate_bundle(candidate_plan, candidate_tasks)
-        except ValueError:
-            return self._controlled_output(
-                PlannerErrorCode.INVALID_LIFECYCLE_STATE,
-                "Planner candidate state is invalid.",
             )
 
         try:
@@ -186,7 +164,6 @@ class Planner:
         current_context_instruction = self._build_context_instruction(context)
         current_candidate_instruction = self._build_candidate_instruction(
             candidate_plan,
-            candidate_tasks,
         )
         messages: tuple[ModelMessage, ...] = ()
         try:
@@ -210,7 +187,6 @@ class Planner:
             self._validate_result_against_context(
                 result,
                 context,
-                candidate_plan=candidate_plan,
             )
         except (ValidationError, ValueError):
             return self._controlled_output(
@@ -234,19 +210,19 @@ class Planner:
         latest_human_input: str | None = None,
     ) -> PlannerState:
         if not snapshot.values:
-            return empty_planner_state(latest_human_input)
+            return PlannerState(
+                latest_human_input=latest_human_input,
+                candidate_plan=None,
+                messages=(),
+                turn_outcome=None,
+            )
         prior = cast(PlannerState, snapshot.values)
-        state = PlannerState(
+        return PlannerState(
             latest_human_input=latest_human_input,
             candidate_plan=prior["candidate_plan"],
-            candidate_tasks=tuple(prior["candidate_tasks"]),
             messages=tuple(prior["messages"]),
-            result=prior["result"],
-            error=prior["error"],
             turn_outcome=prior["turn_outcome"],
         )
-        validate_candidate_state(state)
-        return state
 
     @staticmethod
     def _is_interrupted(snapshot: StateSnapshot) -> bool:
@@ -273,15 +249,11 @@ class Planner:
     @staticmethod
     def _build_candidate_instruction(
         candidate_plan: Plan | None,
-        candidate_tasks: tuple[Task, ...],
     ) -> str | None:
         if candidate_plan is None:
             return None
         candidate = json.dumps(
-            {
-                "plan": candidate_plan.model_dump(mode="json"),
-                "tasks": [task.model_dump(mode="json") for task in candidate_tasks],
-            },
+            candidate_plan.model_dump(mode="json"),
             sort_keys=True,
             separators=(",", ":"),
             ensure_ascii=False,
@@ -298,32 +270,10 @@ class Planner:
         )
 
     @staticmethod
-    def _validate_candidate_bundle(
-        candidate_plan: Plan | None,
-        candidate_tasks: tuple[Task, ...],
-    ) -> None:
-        if candidate_plan is None:
-            if candidate_tasks:
-                raise ValueError("Candidate Tasks require a retained candidate Plan.")
-            return
-        candidate_plan.validate_tasks(candidate_tasks)
-
-    @staticmethod
     def _validate_result_against_context(
         result: PlannerResult,
         context: PlannerContext,
-        *,
-        candidate_plan: Plan | None,
     ) -> None:
-        if (
-            result.continue_execution
-            and candidate_plan is None
-            and context.active_plan is None
-        ):
-            raise ValueError("continue_execution requires a retained or active Plan.")
-        if result.discard_candidate and candidate_plan is None:
-            raise ValueError("discard_candidate requires a retained candidate Plan.")
-
         if result.plan is None:
             return
 

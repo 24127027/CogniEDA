@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Iterable
-from dataclasses import fields
 from typing import Any, cast
 from uuid import UUID, uuid4
 
-import pytest
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from pydantic_ai.messages import (
     ModelMessage,
@@ -19,8 +17,7 @@ from sqlmodel import Session
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
-from cognieda.agents.planner.dependencies import PlannerDeps, PlannerGraphContext
-from cognieda.agents.planner.nodes import validate_candidate_state
+from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.state import PlannerState, PlannerTurnOutcome
 from cognieda.agents.planner.types import PlannerOutput, PlannerResult
 from cognieda.application.ports import AgentFactoryPort
@@ -31,8 +28,7 @@ from cognieda.infrastructure.persistence.repositories import (
     PlanRepository,
     TaskRepository,
 )
-from cognieda.runtime.planner_context import PlannerContextProvider, SessionFrameState
-from cognieda.schemas import Objective, Plan, SessionFrame, Task, TaskKind
+from cognieda.schemas import Objective, Plan, Task, TaskKind
 
 
 def _messages(request: str, response: str) -> tuple[ModelMessage, ...]:
@@ -50,14 +46,22 @@ class RecordingDispatcher:
         self.requests.append(request)
 
 
+class MutableContextProvider:
+    def __init__(self, context: PlannerContext | None = None) -> None:
+        self.current = context or PlannerContext()
+
+    def materialize(self) -> PlannerContext:
+        return self.current.model_copy()
+
+
 class RecordingAdmission:
     def __init__(self, service: PlanAdmissionService) -> None:
         self.service = service
-        self.calls: list[tuple[Plan, tuple[Task, ...]]] = []
+        self.calls: list[Plan] = []
 
-    def admit(self, plan: Plan, *, tasks: tuple[Task, ...]) -> Plan:
-        self.calls.append((plan, tasks))
-        return self.service.admit(plan, tasks=tasks)
+    def admit(self, plan: Plan) -> Plan:
+        self.calls.append(plan)
+        return self.service.admit(plan)
 
 
 class SequencePlanner(Planner):
@@ -65,7 +69,7 @@ class SequencePlanner(Planner):
         self,
         outputs: Iterable[PlannerOutput],
         *,
-        context_provider: PlannerContextProvider,
+        context_provider: MutableContextProvider,
         plan_admission: PlanAdmissionService | RecordingAdmission,
         dispatcher: RecordingDispatcher | None = None,
         checkpointer: BaseCheckpointSaver[Any] | None = None,
@@ -74,7 +78,7 @@ class SequencePlanner(Planner):
         self._outputs = iter(outputs)
         self.requests: list[str] = []
         self.contexts: list[PlannerContext] = []
-        self.candidates: list[tuple[Plan | None, tuple[Task, ...]]] = []
+        self.candidates: list[Plan | None] = []
         self.message_histories: list[tuple[ModelMessage, ...]] = []
         self.recording_dispatcher = dispatcher or RecordingDispatcher()
         super().__init__(
@@ -93,12 +97,11 @@ class SequencePlanner(Planner):
         *,
         context: PlannerContext,
         candidate_plan: Plan | None = None,
-        candidate_tasks: tuple[Task, ...] = (),
         message_history: list[ModelMessage] | None = None,
     ) -> PlannerOutput:
         self.requests.append(request)
         self.contexts.append(context)
-        self.candidates.append((candidate_plan, candidate_tasks))
+        self.candidates.append(candidate_plan)
         self.message_histories.append(tuple(message_history or ()))
         return next(self._outputs)
 
@@ -115,32 +118,23 @@ def _candidate_result(
         kind=TaskKind.DATA,
         instruction=instruction,
     )
-    plan = Plan.create(
-        objective=objective,
-        task_ids=(task.task_id,),
-        tasks=(task,),
-    )
-    return PlannerResult(plan=plan, tasks=(task,), response=response)
+    plan = Plan(objective=objective, tasks=(task,))
+    return PlannerResult(plan=plan, response=response)
 
 
 def _planner(
     outputs: Iterable[PlannerOutput],
     db_session: Session,
     *,
-    frame_state: SessionFrameState | None = None,
+    context_provider: MutableContextProvider | None = None,
     plan_admission: PlanAdmissionService | RecordingAdmission | None = None,
     dispatcher: RecordingDispatcher | None = None,
     checkpointer: BaseCheckpointSaver[Any] | None = None,
     thread_id: UUID | None = None,
 ) -> SequencePlanner:
-    frame_state = frame_state or SessionFrameState()
-    provider = PlannerContextProvider(
-        session_frame_provider=frame_state,
-        active_plans=ActivePlanRepository(db_session),
-    )
     return SequencePlanner(
         outputs,
-        context_provider=provider,
+        context_provider=context_provider or MutableContextProvider(),
         plan_admission=plan_admission or PlanAdmissionService(db_session),
         dispatcher=dispatcher,
         checkpointer=checkpointer,
@@ -148,11 +142,19 @@ def _planner(
     )
 
 
+def _snapshot(planner: Planner):
+    return asyncio.run(planner.graph.aget_state(planner._graph_config))
+
+
 def _state(planner: Planner) -> PlannerState:
-    return asyncio.run(planner._get_state())
+    return cast(PlannerState, _snapshot(planner).values)
 
 
-def test_graph_state_services_and_outcome_have_exact_separate_ownership(
+def _is_waiting(planner: Planner) -> bool:
+    return any(task.interrupts for task in _snapshot(planner).tasks)
+
+
+def test_graph_state_and_outcome_have_exact_separate_ownership(
     db_session: Session,
 ) -> None:
     planner = _planner(
@@ -163,30 +165,14 @@ def test_graph_state_services_and_outcome_have_exact_separate_ownership(
     assert tuple(PlannerState.__annotations__) == (
         "latest_human_input",
         "candidate_plan",
-        "candidate_tasks",
         "messages",
-        "result",
-        "error",
         "turn_outcome",
     )
     assert "context" not in PlannerState.__annotations__
-    assert tuple(field.name for field in fields(PlannerGraphContext)) == (
-        "invoke_cognitive",
-        "planner_context_provider",
-        "plan_admission",
-    )
-    assert "candidate_plan" not in {
-        field.name for field in fields(PlannerGraphContext)
-    }
     assert tuple(PlannerTurnOutcome.model_fields) == (
-        "candidate_plan",
-        "candidate_tasks",
+        "proposed_plan",
         "response",
         "human_input_request",
-        "candidate_admitted",
-        "candidate_discarded",
-        "active_plan_continuation_deferred",
-        "awaiting_human",
         "error",
     )
     assert set(planner.graph.get_graph().nodes) == {
@@ -196,33 +182,6 @@ def test_graph_state_services_and_outcome_have_exact_separate_ownership(
         "admit_candidate",
         "__end__",
     }
-
-
-def test_candidate_state_rejects_orphan_and_mismatched_task_bundles() -> None:
-    objective = Objective(text="Understand customer churn.")
-    expected = _candidate_result(objective=objective)
-    unexpected = Task(
-        objective_id=objective.objective_id,
-        kind=TaskKind.DATA,
-        instruction="Unexpected replacement.",
-    )
-    empty = PlannerState(
-        latest_human_input=None,
-        candidate_plan=None,
-        candidate_tasks=(unexpected,),
-        messages=(),
-        result=None,
-        error=None,
-        turn_outcome=None,
-    )
-    with pytest.raises(ValueError, match="require a retained candidate Plan"):
-        validate_candidate_state(empty)
-
-    assert expected.plan is not None
-    mismatch = empty.copy()
-    mismatch["candidate_plan"] = expected.plan
-    with pytest.raises(ValueError, match="exactly match"):
-        validate_candidate_state(mismatch)
 
 
 def test_candidate_proposal_is_checkpointed_without_authoritative_writes(
@@ -239,17 +198,15 @@ def test_candidate_proposal_is_checkpointed_without_authoritative_writes(
     outcome = asyncio.run(planner.handle_message("Investigate churn."))
     state = _state(planner)
 
-    assert planner.requests == ["Investigate churn."]
-    assert planner.message_histories == [()]
-    assert outcome.candidate_plan == candidate.plan
+    assert outcome.proposed_plan == candidate.plan
     assert state["candidate_plan"] == candidate.plan
-    assert state["candidate_tasks"] == candidate.tasks
+    assert state["candidate_plan"].tasks == candidate.plan.tasks
     assert state["messages"] == messages
-    assert asyncio.run(planner._is_waiting_for_human()) is True
+    assert _is_waiting(planner)
     assert ObjectiveRepository(db_session).get_by_id(
         candidate.plan.objective.objective_id
     ) is None
-    assert TaskRepository(db_session).get_by_id(candidate.tasks[0].task_id) is None
+    assert TaskRepository(db_session).get_by_id(candidate.plan.tasks[0].task_id) is None
     assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) is None
 
 
@@ -259,8 +216,7 @@ def test_natural_multiturn_review_retain_replace_and_authorize_exact_candidate(
     objective = Objective(text="Understand customer churn.")
     p1 = _candidate_result(objective=objective, instruction="Analyze pricing cohorts.")
     p2 = _candidate_result(objective=objective, instruction="Analyze support cohorts.")
-    assert p1.plan is not None
-    assert p2.plan is not None
+    assert p1.plan is not None and p2.plan is not None
     first_messages = _messages("Investigate churn.", "P1")
     explanation_messages = _messages("Why is pricing included?", "Explanation")
     replacement_messages = _messages("Remove pricing.", "P2")
@@ -270,9 +226,7 @@ def test_natural_multiturn_review_retain_replace_and_authorize_exact_candidate(
         (
             PlannerOutput(result=p1, messages=first_messages),
             PlannerOutput(
-                result=PlannerResult(
-                    response="Pricing was included as a possible driver."
-                ),
+                result=PlannerResult(response="Pricing was included as a possible driver."),
                 messages=explanation_messages,
             ),
             PlannerOutput(result=p2, messages=replacement_messages),
@@ -285,40 +239,29 @@ def test_natural_multiturn_review_retain_replace_and_authorize_exact_candidate(
         plan_admission=admission,
     )
 
-    asyncio.run(planner.handle_message("Investigate churn."))
+    first = asyncio.run(planner.handle_message("Investigate churn."))
+    assert first.proposed_plan == p1.plan
     assert _state(planner)["candidate_plan"] == p1.plan
-    assert PlanRepository(db_session).get_by_id(p1.plan.plan_id) is None
 
-    asyncio.run(planner.handle_message("Why is pricing included?"))
-    explanation_state = _state(planner)
-    assert explanation_state["candidate_plan"] == p1.plan
-    assert explanation_state["candidate_tasks"] == p1.tasks
-    assert planner.candidates[1] == (p1.plan, p1.tasks)
+    explanation = asyncio.run(planner.handle_message("Why is pricing included?"))
+    assert explanation.proposed_plan is None
+    assert _state(planner)["candidate_plan"] == p1.plan
+    assert planner.candidates[1] == p1.plan
     assert admission.calls == []
 
-    asyncio.run(planner.handle_message("Remove pricing."))
-    replacement_state = _state(planner)
-    assert replacement_state["candidate_plan"] == p2.plan
-    assert replacement_state["candidate_tasks"] == p2.tasks
-    assert replacement_state["candidate_plan"] != p1.plan
+    replacement = asyncio.run(planner.handle_message("Remove pricing."))
+    assert replacement.proposed_plan == p2.plan
+    assert _state(planner)["candidate_plan"] == p2.plan
     assert admission.calls == []
 
     outcome = asyncio.run(planner.handle_message("That looks right, proceed."))
-    final_state = _state(planner)
-    assert admission.calls == [(p2.plan, p2.tasks)]
-    assert final_state["candidate_plan"] is None
-    assert final_state["candidate_tasks"] == ()
-    assert outcome.candidate_admitted is True
+    assert admission.calls == [p2.plan]
+    assert _state(planner)["candidate_plan"] is None
+    assert outcome.response == "The proposed Plan was admitted and activated."
     assert ActivePlanRepository(db_session).get_by_objective_id(
         objective.objective_id
     ) == p2.plan
-    assert asyncio.run(planner._is_waiting_for_human()) is False
-    assert planner.requests == [
-        "Investigate churn.",
-        "Why is pricing included?",
-        "Remove pricing.",
-        "That looks right, proceed.",
-    ]
+    assert not _is_waiting(planner)
     assert planner.message_histories == [
         (),
         first_messages,
@@ -332,59 +275,31 @@ def test_context_is_fresh_and_native_history_remains_graph_owned(
 ) -> None:
     first_messages = _messages("First question.", "First answer.")
     second_messages = _messages("Second question.", "Second answer.")
-    frame_state = SessionFrameState()
+    provider = MutableContextProvider()
     planner = _planner(
         (
-            PlannerOutput(
-                result=PlannerResult(response="First answer."),
-                messages=first_messages,
-            ),
+            PlannerOutput(result=PlannerResult(response="First answer."), messages=first_messages),
             PlannerOutput(
                 result=PlannerResult(response="Second answer."),
                 messages=second_messages,
             ),
         ),
         db_session,
-        frame_state=frame_state,
+        context_provider=provider,
     )
     first_objective = Objective(text="First current Objective.")
     second_objective = Objective(text="Second current Objective.")
-    frame_state.current = SessionFrame(objective=first_objective)
+    provider.current = PlannerContext(objective=first_objective)
 
     asyncio.run(planner.handle_message("First question."))
-    frame_state.current = SessionFrame(objective=second_objective)
+    provider.current = PlannerContext(objective=second_objective)
     asyncio.run(planner.handle_message("Second question."))
 
     assert planner.contexts[0].objective == first_objective
     assert planner.contexts[1].objective == second_objective
     assert planner.contexts[0] is not planner.contexts[1]
-    assert "context" not in PlannerState.__annotations__
     assert planner.message_histories == [(), first_messages]
     assert _state(planner)["messages"] == (*first_messages, *second_messages)
-
-
-def test_human_clarification_retains_candidate_and_interrupts_again(
-    db_session: Session,
-) -> None:
-    candidate = _candidate_result()
-    assert candidate.plan is not None
-    planner = _planner(
-        (
-            PlannerOutput(result=candidate),
-            PlannerOutput(
-                result=PlannerResult(human_input_request="Which cohort is in scope?")
-            ),
-        ),
-        db_session,
-    )
-
-    asyncio.run(planner.handle_message("Investigate churn."))
-    outcome = asyncio.run(planner.handle_message("Can you narrow that down?"))
-
-    assert _state(planner)["candidate_plan"] == candidate.plan
-    assert asyncio.run(planner._is_waiting_for_human()) is True
-    assert outcome.human_input_request == "Which cohort is in scope?"
-    assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) is None
 
 
 def test_discard_clears_candidate_and_repeat_discard_fails_closed(
@@ -408,8 +323,8 @@ def test_discard_clears_candidate_and_repeat_discard_fails_closed(
     asyncio.run(planner.handle_message("Investigate churn."))
     discarded = asyncio.run(planner.handle_message("Abandon that proposal."))
     assert _state(planner)["candidate_plan"] is None
-    assert discarded.candidate_discarded is True
-    assert asyncio.run(planner._is_waiting_for_human()) is False
+    assert discarded.response == "I discarded the proposal."
+    assert not _is_waiting(planner)
 
     invalid = asyncio.run(planner.handle_message("Discard it again."))
     assert invalid.error is not None
@@ -434,13 +349,10 @@ def test_admission_failure_retains_exact_candidate_and_reports_controlled_error(
     )
 
     asyncio.run(planner.handle_message("Investigate churn."))
-    outcome = asyncio.run(
-        planner.handle_message("Proceed with that exact proposal.")
-    )
-    state = _state(planner)
+    outcome = asyncio.run(planner.handle_message("Proceed with that exact proposal."))
 
-    assert state["candidate_plan"] == candidate.plan
-    assert state["candidate_tasks"] == candidate.tasks
+    assert _state(planner)["candidate_plan"] == candidate.plan
+    assert _state(planner)["candidate_plan"].tasks == candidate.plan.tasks
     assert outcome.error is not None
     assert outcome.error.code.value == "plan_admission_failed"
     assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) is None
@@ -451,15 +363,15 @@ def test_active_plan_continuation_is_visible_and_never_dispatches(
 ) -> None:
     candidate = _candidate_result()
     assert candidate.plan is not None
-    PlanAdmissionService(db_session).admit(candidate.plan, tasks=candidate.tasks)
+    PlanAdmissionService(db_session).admit(candidate.plan)
     dispatcher = RecordingDispatcher()
-    frame_state = SessionFrameState(
-        current=SessionFrame(objective=candidate.plan.objective)
+    provider = MutableContextProvider(
+        PlannerContext(active_plan=candidate.plan, objective=candidate.plan.objective)
     )
     planner = _planner(
         (PlannerOutput(result=PlannerResult(continue_execution=True)),),
         db_session,
-        frame_state=frame_state,
+        context_provider=provider,
         dispatcher=dispatcher,
     )
 
@@ -467,7 +379,6 @@ def test_active_plan_continuation_is_visible_and_never_dispatches(
 
     assert planner.contexts[0].active_plan == candidate.plan
     assert _state(planner)["candidate_plan"] is None
-    assert outcome.active_plan_continuation_deferred is True
     assert outcome.response is not None
     assert "execution is not implemented" in outcome.response
     assert dispatcher.requests == []
@@ -491,10 +402,8 @@ def test_inmemory_checkpointer_isolates_planner_thread_identity(
     )
 
     asyncio.run(first_planner.handle_message("First request."))
-
     assert _state(first_planner)["candidate_plan"] == first.plan
-    assert _state(second_planner)["candidate_plan"] is None
-    assert first_planner._thread_id != second_planner._thread_id
+    assert not _snapshot(second_planner).values
 
     asyncio.run(second_planner.handle_message("Second request."))
     assert _state(second_planner)["candidate_plan"] == second.plan

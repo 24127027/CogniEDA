@@ -54,13 +54,8 @@ class Application:
             self._emit_message(outcome.error.message, message_type=MessageType.ERROR)
             return
 
-        if outcome.candidate_plan is not None:
-            self.event_bus.publish(
-                PlanProposed(
-                    plan=outcome.candidate_plan,
-                    tasks=outcome.candidate_tasks,
-                )
-            )
+        if outcome.proposed_plan is not None:
+            self.event_bus.publish(PlanProposed(plan=outcome.proposed_plan))
 
         if outcome.response is not None:
             self._emit_message(outcome.response)

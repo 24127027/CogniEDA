@@ -83,7 +83,7 @@ class Plan(ImmutableCogniEDABaseModel):
         )
 
     @model_validator(mode="after")
-    def _validate_tasks_and_dependencies(self) -> Plan:
+    def _validate_membership_and_dependencies(self) -> Plan:
         for task in self.tasks:
             if task.objective_id != self.objective.objective_id:
                 raise ValueError("Every Plan Task must belong to the Plan Objective.")

@@ -48,8 +48,8 @@ class StaticContextProvider:
 
 
 class NeverAdmission:
-    def admit(self, plan: Plan, *, tasks: tuple[Task, ...]) -> Plan:
-        del plan, tasks
+    def admit(self, plan: Plan) -> Plan:
+        del plan
         raise AssertionError("Direct cognitive invocation must not admit a Plan.")
 
 
@@ -123,13 +123,12 @@ def _candidate(
         kind=TaskKind.DATA,
         instruction="Profile missing values.",
     )
-    plan = Plan.create(
+    plan = Plan(
         objective=objective,
         assumptions=assumptions,
-        task_ids=(task.task_id,),
         tasks=(task,),
     )
-    return PlannerResult(plan=plan, tasks=(task,), response="Proposed a bounded plan.")
+    return PlannerResult(plan=plan, response="Proposed a bounded plan.")
 
 
 def test_planner_directly_owns_one_agent_and_invokes_it_once_with_exact_deps() -> None:
@@ -183,7 +182,6 @@ def test_retained_candidate_is_supplied_as_fresh_lifecycle_context() -> None:
             "Why include pricing?",
             context=PlannerContext(objective=objective),
             candidate_plan=candidate.plan,
-            candidate_tasks=candidate.tasks,
         )
     )
 
@@ -386,19 +384,19 @@ def test_candidate_plan_accepts_only_exact_admitted_assumptions() -> None:
     assert mismatch.error.code is PlannerErrorCode.INVALID_MODEL_RESULT
 
 
-def test_continue_execution_requires_active_plan() -> None:
+def test_cognitive_boundary_leaves_continue_lifecycle_validation_to_graph() -> None:
     objective = Objective(text="Understand retention.")
     candidate = _candidate(objective)
     assert candidate.plan is not None
     planner_without_active, _, _, _ = _planner(PlannerResult(continue_execution=True))
 
-    rejected = asyncio.run(
+    without_state = asyncio.run(
         planner_without_active._invoke_cognitive(
             "Continue.", context=PlannerContext(objective=objective)
         )
     )
-    assert rejected.error is not None
-    assert rejected.error.code is PlannerErrorCode.INVALID_MODEL_RESULT
+    assert without_state.error is None
+    assert without_state.result.continue_execution is True
 
     planner_with_active, _, _, _ = _planner(PlannerResult(continue_execution=True))
     accepted = asyncio.run(
@@ -416,25 +414,24 @@ def test_continue_execution_requires_active_plan() -> None:
             "That looks right, proceed.",
             context=PlannerContext(objective=objective),
             candidate_plan=candidate.plan,
-            candidate_tasks=candidate.tasks,
         )
     )
     assert candidate_authorized.error is None
 
 
-def test_discard_requires_exact_retained_candidate() -> None:
+def test_cognitive_boundary_leaves_discard_lifecycle_validation_to_graph() -> None:
     objective = Objective(text="Understand retention.")
     candidate = _candidate(objective)
     assert candidate.plan is not None
 
     without_candidate, _, _, _ = _planner(PlannerResult(discard_candidate=True))
-    rejected = asyncio.run(
+    without_state = asyncio.run(
         without_candidate._invoke_cognitive(
             "Abandon that proposal.", context=PlannerContext()
         )
     )
-    assert rejected.error is not None
-    assert rejected.error.code is PlannerErrorCode.INVALID_MODEL_RESULT
+    assert without_state.error is None
+    assert without_state.result.discard_candidate is True
 
     with_candidate, _, _, _ = _planner(
         PlannerResult(response="Discarded.", discard_candidate=True)
@@ -444,7 +441,6 @@ def test_discard_requires_exact_retained_candidate() -> None:
             "Abandon that proposal.",
             context=PlannerContext(objective=objective),
             candidate_plan=candidate.plan,
-            candidate_tasks=candidate.tasks,
         )
     )
     assert accepted.error is None

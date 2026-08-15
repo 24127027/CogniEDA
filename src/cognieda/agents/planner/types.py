@@ -5,7 +5,6 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
 
-from cognieda.schemas.artifacts import Task
 from cognieda.schemas.plan import Plan
 
 
@@ -34,7 +33,6 @@ class PlannerResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     plan: Plan | None = None
-    tasks: tuple[Task, ...] = ()
     response: str | None = Field(default=None, min_length=1)
     human_input_request: str | None = Field(default=None, min_length=1)
     continue_execution: bool = False
@@ -42,10 +40,6 @@ class PlannerResult(BaseModel):
 
     @model_validator(mode="after")
     def _validate_coherence(self) -> PlannerResult:
-        if self.tasks and self.plan is None:
-            raise ValueError("PlannerResult tasks require a candidate Plan.")
-        if self.plan is not None:
-            self.plan.validate_tasks(self.tasks)
         if self.continue_execution and self.plan is not None:
             raise ValueError(
                 "continue_execution cannot accompany a new candidate Plan."
