@@ -8,6 +8,10 @@ from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.agents.planner.types import PlannerControlledError, PlannerErrorCode
 from cognieda.application.ports import AgentFactoryPort
+from cognieda.infrastructure.persistence.repositories import (
+    ActivePlanRepository,
+    SessionFrameRepository,
+)
 from cognieda.runtime.application import Application
 from cognieda.runtime.bootstrap import bootstrap_application
 from cognieda.runtime.event_bus import EventBus
@@ -17,9 +21,9 @@ from cognieda.runtime.events import (
     PlanProposed,
     RuntimeEvent,
 )
-from cognieda.runtime.planner_context import SessionFrameState
+from cognieda.runtime.planner_context import PlannerContextProvider
 from cognieda.runtime.workspace import Workspace
-from cognieda.schemas import Objective, Plan, Task, TaskKind
+from cognieda.schemas import Objective, Plan, SessionFrame, Task, TaskKind
 
 
 def _candidate() -> Plan:
@@ -38,6 +42,7 @@ def _candidate() -> Plan:
 
 def _application(
     planner: Planner,
+    db_session,
     *,
     workspace: Workspace | None = None,
     agent_factory: AgentFactoryPort | None = None,
@@ -52,12 +57,12 @@ def _application(
         planner_agent=planner,
         agent_factory=agent_factory or cast(AgentFactoryPort, object()),
         event_bus=event_bus,
-        session_frame_state=SessionFrameState(),
+        session_frames=SessionFrameRepository(db_session),
     )
     return application, events
 
 
-def test_application_maps_planner_outcome_to_presentation_events() -> None:
+def test_application_maps_planner_outcome_to_presentation_events(db_session) -> None:
     plan = _candidate()
     planner = Mock(spec=Planner)
     planner.handle_message = AsyncMock(
@@ -67,7 +72,7 @@ def test_application_maps_planner_outcome_to_presentation_events() -> None:
             human_input_request="Does this scope look right?",
         )
     )
-    application, events = _application(planner)
+    application, events = _application(planner, db_session)
 
     asyncio.run(application.submit_message("Investigate churn."))
 
@@ -86,7 +91,7 @@ def test_application_maps_planner_outcome_to_presentation_events() -> None:
     )
 
 
-def test_application_maps_controlled_planner_failure_to_error_event() -> None:
+def test_application_maps_controlled_planner_failure_to_error_event(db_session) -> None:
     planner = Mock(spec=Planner)
     error = PlannerControlledError(
         code=PlannerErrorCode.PLAN_ADMISSION_FAILED,
@@ -95,7 +100,7 @@ def test_application_maps_controlled_planner_failure_to_error_event() -> None:
     planner.handle_message = AsyncMock(
         return_value=PlannerTurnOutcome(error=error)
     )
-    application, events = _application(planner)
+    application, events = _application(planner, db_session)
 
     asyncio.run(application.submit_message("Proceed."))
 
@@ -112,6 +117,23 @@ def test_application_has_no_planner_lifecycle_or_history_authority() -> None:
     assert not hasattr(Application, "planner_runtime")
 
 
+def test_application_and_planner_context_share_persisted_session_frame_authority(
+    db_session,
+) -> None:
+    planner = Mock(spec=Planner)
+    application, _ = _application(planner, db_session)
+    frame = SessionFrame(objective=Objective(text="Persisted current Objective."))
+
+    application.session_frame = frame
+    provider = PlannerContextProvider(
+        session_frames=application._session_frames,
+        active_plans=ActivePlanRepository(db_session),
+    )
+
+    assert application.session_frame == frame
+    assert provider.materialize().objective == frame.objective
+
+
 def test_bootstrap_composes_planner_before_application(
     tmp_path,
     monkeypatch,
@@ -124,10 +146,13 @@ def test_bootstrap_composes_planner_before_application(
     assert isinstance(application.planner_agent, Planner)
     assert application.planner_agent.graph is not None
     assert not hasattr(application, "planner_runtime")
-    assert application.session_frame is application._session_frame_state.current
+    assert application.session_frame == SessionFrame()
+    assert isinstance(application._session_frames, SessionFrameRepository)
 
 
-def test_skill_assignment_reloads_tooling_and_planner_without_state_mutation() -> None:
+def test_skill_assignment_reloads_tooling_and_planner_without_state_mutation(
+    db_session,
+) -> None:
     workspace = Mock(spec=Workspace)
     workspace.project_config = Mock()
     workspace.project_config.try_resolve_model.return_value = None
@@ -137,6 +162,7 @@ def test_skill_assignment_reloads_tooling_and_planner_without_state_mutation() -
     agent_factory = Mock()
     application, events = _application(
         planner,
+        db_session,
         workspace=workspace,
         agent_factory=cast(AgentFactoryPort, agent_factory),
     )
@@ -152,14 +178,14 @@ def test_skill_assignment_reloads_tooling_and_planner_without_state_mutation() -
         recreate_agent=True,
     )
     planner.handle_message.assert_not_awaited()
-    assert application.session_frame is original_frame
+    assert application.session_frame == original_frame
     produced = [event for event in events if isinstance(event, MessageProduced)]
     assert [event.message.content for event in produced] == [
         "Assigned 'review' to 'planner'."
     ]
 
 
-def test_provider_and_reload_commands_publish_user_visible_messages() -> None:
+def test_provider_and_reload_commands_publish_user_visible_messages(db_session) -> None:
     workspace = Mock(spec=Workspace)
     provider = Mock()
     provider.model = "test-model"
@@ -171,7 +197,7 @@ def test_provider_and_reload_commands_publish_user_visible_messages() -> None:
     planner = Mock(spec=Planner)
     planner.reload = AsyncMock()
     planner.handle_message = AsyncMock()
-    application, events = _application(planner, workspace=workspace)
+    application, events = _application(planner, db_session, workspace=workspace)
 
     asyncio.run(application.submit_message("/provider"))
     asyncio.run(application.submit_message("/reload"))

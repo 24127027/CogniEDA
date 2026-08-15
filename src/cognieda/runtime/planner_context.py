@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from cognieda.agents.planner.context import PlannerContext
-from cognieda.infrastructure.persistence.repositories import ActivePlanRepository
+from cognieda.infrastructure.persistence.repositories import (
+    ActivePlanRepository,
+    SessionFrameRepository,
+)
 from cognieda.schemas.artifacts import SessionFrame
 from cognieda.schemas.plan import Plan
 
@@ -33,31 +35,18 @@ def build_planner_context(
 class PlannerContextProvider:
     """Materialize fresh Planner-readable authority for each cognitive invocation."""
 
-    session_frame_provider: Callable[[], SessionFrame]
+    session_frames: SessionFrameRepository
     active_plans: ActivePlanRepository
 
     def materialize(self) -> PlannerContext:
-        session_frame = self.session_frame_provider()
+        session_frame = self.session_frames.get_current()
         active_plan = None
         if session_frame.objective is not None:
             active_plan = self.active_plans.get_by_objective_id(
                 session_frame.objective.objective_id
             )
         return build_planner_context(session_frame, active_plan=active_plan)
-
-
-@dataclass
-class SessionFrameState:
-    """Mutable runtime holder for the current immutable SessionFrame value."""
-
-    current: SessionFrame = field(default_factory=SessionFrame)
-
-    def __call__(self) -> SessionFrame:
-        return self.current
-
-
 __all__ = (
     "PlannerContextProvider",
-    "SessionFrameState",
     "build_planner_context",
 )

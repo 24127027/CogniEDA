@@ -17,7 +17,7 @@ from sqlmodel import Session
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
-from cognieda.agents.planner.dependencies import PlannerDeps
+from cognieda.agents.planner.dependencies import PlannerContextProviderPort, PlannerDeps
 from cognieda.agents.planner.state import PlannerState, PlannerTurnOutcome
 from cognieda.agents.planner.types import PlannerOutput, PlannerResult
 from cognieda.application.ports import AgentFactoryPort
@@ -26,9 +26,11 @@ from cognieda.infrastructure.persistence.repositories import (
     ActivePlanRepository,
     ObjectiveRepository,
     PlanRepository,
+    SessionFrameRepository,
     TaskRepository,
 )
-from cognieda.schemas import Objective, Plan, Task, TaskKind
+from cognieda.runtime.planner_context import PlannerContextProvider
+from cognieda.schemas import Objective, Plan, SessionFrame, Task, TaskKind
 
 
 def _messages(request: str, response: str) -> tuple[ModelMessage, ...]:
@@ -69,7 +71,7 @@ class SequencePlanner(Planner):
         self,
         outputs: Iterable[PlannerOutput],
         *,
-        context_provider: MutableContextProvider,
+        context_provider: PlannerContextProviderPort,
         plan_admission: PlanAdmissionService | RecordingAdmission,
         dispatcher: RecordingDispatcher | None = None,
         checkpointer: BaseCheckpointSaver[Any] | None = None,
@@ -126,7 +128,7 @@ def _planner(
     outputs: Iterable[PlannerOutput],
     db_session: Session,
     *,
-    context_provider: MutableContextProvider | None = None,
+    context_provider: PlannerContextProviderPort | None = None,
     plan_admission: PlanAdmissionService | RecordingAdmission | None = None,
     dispatcher: RecordingDispatcher | None = None,
     checkpointer: BaseCheckpointSaver[Any] | None = None,
@@ -275,7 +277,11 @@ def test_context_is_fresh_and_native_history_remains_graph_owned(
 ) -> None:
     first_messages = _messages("First question.", "First answer.")
     second_messages = _messages("Second question.", "Second answer.")
-    provider = MutableContextProvider()
+    session_frames = SessionFrameRepository(db_session, scope_key="fresh-context")
+    provider = PlannerContextProvider(
+        session_frames=session_frames,
+        active_plans=ActivePlanRepository(db_session),
+    )
     planner = _planner(
         (
             PlannerOutput(result=PlannerResult(response="First answer."), messages=first_messages),
@@ -289,10 +295,10 @@ def test_context_is_fresh_and_native_history_remains_graph_owned(
     )
     first_objective = Objective(text="First current Objective.")
     second_objective = Objective(text="Second current Objective.")
-    provider.current = PlannerContext(objective=first_objective)
+    session_frames.save_current(SessionFrame(objective=first_objective))
 
     asyncio.run(planner.handle_message("First question."))
-    provider.current = PlannerContext(objective=second_objective)
+    session_frames.save_current(SessionFrame(objective=second_objective))
     asyncio.run(planner.handle_message("Second question."))
 
     assert planner.contexts[0].objective == first_objective
