@@ -251,12 +251,13 @@ agent's retained transcript or hidden memory.
 
 ## Implementation status
 
-**Unsupported** end to end. The Phase 2 Planner cognitive core can answer,
-request clarification, or produce a transient validated Plan and Task bundle
-through one direct PydanticAI invocation. A bounded application service
-atomically admits and activates an exact authorized bundle on SQLite, but no
-current runtime candidate lifecycle or conversational Human-authorization path
-calls it. It performs no Plan execution.
+**Unsupported** end to end. The Planner cognitive core can answer, request
+clarification, or produce a transient validated Plan and Task bundle through
+one PydanticAI invocation per graph turn. The in-process LangGraph lifecycle
+retains, replaces, or discards an exact candidate across natural-language Human
+review and calls the application service only after typed authorization. That
+service atomically admits and activates the exact bundle on SQLite. The graph
+performs no Plan execution.
 Generic capability dispatch foundations and several durable execution-safety
 transitions exist separately.
 
@@ -266,8 +267,7 @@ dependency. Capability dispatch is not model-visible Planner cognition, and
 Phase 2 exposes no Planner tool. These separate foundations do not establish
 the end-to-end research-state flow.
 
-Planner LangGraph candidate retention, Human interrupt/resume, conversational
-authorization, durable review recovery, Plan execution, role-native contracts, full specialist
+Durable review recovery, Plan execution, role-native contracts, full specialist
 implementations, EvidenceRequest-to-Evidence admission, protected evaluation,
 governance, Discovery admission, full PlannerWorkOutcome consumption, and
 validity-aware presentation sequence remain incomplete or absent. Data

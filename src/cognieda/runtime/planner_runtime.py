@@ -7,13 +7,14 @@ from dataclasses import dataclass
 from typing import Any, Literal, TypedDict, cast
 from uuid import UUID, uuid4
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.serde.base import SerializerProtocol
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.runtime import Runtime
-from langgraph.types import Command, RunnableConfig, StateSnapshot, interrupt
+from langgraph.types import Command, StateSnapshot, interrupt
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai.messages import ModelMessage
 

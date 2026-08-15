@@ -264,17 +264,19 @@ records, persists the immutable Plan, and writes one objective-scoped active
 pointer in a single transaction. Any failure rolls the complete transaction
 back. This service does not interpret Human text.
 
-The current runtime does not retain a Planner candidate or call admission from
-a later conversation turn. Candidate retention, conversational Human
-authorization, and LangGraph interrupt/resume are **Deferred**. Native model
+The in-process Planner LangGraph retains an exact candidate Plan and Task bundle
+outside authoritative research state. A later natural-language Human turn is
+interpreted by Planner; only a typed `continue_execution` result with that
+candidate pending calls `PlanAdmissionService`. Admission success clears the
+candidate, while failure rolls back and retains it for correction. Native model
 history remains non-authoritative interaction state outside `PlannerContext`.
 Application materializes authoritative research state and the objective-scoped
-active Plan fresh for each invocation; neither conversation nor runtime events
-reconstruct, admit, or activate that state. `PlanProposed` is a transient
-presentation event and does not invoke `PlanAdmissionService`.
+active Plan fresh for each invocation. Runtime events present lifecycle results
+but do not reconstruct, admit, or activate state; `PlanProposed` remains a
+presentation event rather than an authority boundary.
 
-The complete target boundary is not implemented. Canonical Task DAG execution,
-candidate lifecycle and review recovery, role-native result inbox processing,
+The complete target boundary is not implemented. Durable candidate and review
+recovery, canonical Task DAG execution, role-native result inbox processing,
 complete replay coordination, scientific Evidence admission from
 `EvidenceRequest`, governance
 workflow, Discovery admission from exact governed proposals, and end-to-end

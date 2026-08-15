@@ -139,7 +139,7 @@ concern. Proposed Tasks cannot execute.
 
 ## Proposal, approval, and activation
 
-The **Design target** planning sequence is:
+The planning sequence is:
 
 1. The Planner constructs transient canonical Objective, Task, and
    `Plan` objects, including the complete Task DAG. Domain construction
@@ -153,14 +153,16 @@ The **Design target** planning sequence is:
    activates the exact candidate that preceded that Human response.
 
 There is no mandatory separate application preflight or admission stage before
-Human review. The implemented `PlanValidator` is a side-effect-free
-boundary for requiring exact persisted Objective and Assumption content,
-resolving exact Task membership, and verifying a canonical candidate without
-side effects. The atomic commit transaction and objective-scoped active Plan
-selection are **Verified on SQLite** as an independently callable
-application-authority surface. Conversational authorization and the transient
-candidate lifecycle are deferred to the Planner LangGraph phase; the current
-runtime does not connect a later Human prompt to Plan admission.
+Human review. The implemented `PlanValidator` is a side-effect-free boundary
+for requiring exact persisted Objective and Assumption content, resolving exact
+Task membership, and verifying a canonical candidate without side effects. The
+atomic commit transaction and objective-scoped active Plan selection are
+**Verified on SQLite**. The in-process Planner LangGraph lifecycle retains the
+exact candidate outside authoritative research state, resumes natural-language
+Human review, and calls `PlanAdmissionService` only when a typed
+`continue_execution` result authorizes that retained bundle. Application
+authority still performs all commit-boundary validation, persistence, and
+activation.
 
 Authorization is not activation. The Plan visible to a user must be the same
 exact Plan that application authority activates. A changed proposal remains a
@@ -244,44 +246,57 @@ scientific proposal.
 
 ## Implementation status
 
-**Partially implemented.** The Phase 2 cognitive core directly owns one typed
-PydanticAI Agent and performs one `plan_or_answer` invocation per
-`Planner.run`. The model produces one `PlannerResult`: an immediate response, a
-necessary Human clarification request, a transient candidate `Plan` with its
-exact Task bundle, or a signal that a supplied active Plan should continue.
-`PlannerOutput` is the separate runtime envelope for that result, current-run
-native model messages, and any controlled error. No LangGraph workflow or
-Planner-side tool is active in this phase.
+**Partially implemented.** The Planner directly owns one typed PydanticAI Agent
+and performs one `plan_or_answer` invocation per `Planner.run`. The in-process
+`PlannerRuntime` composes that call as a LangGraph `StateGraph` with exactly
+`plan_or_answer`, `await_human`, and `admit_candidate` lifecycle nodes. It does
+not add an execution node or a Planner-side tool.
+
+`PlannerGraphState` owns the latest Human input, transient candidate Plan and
+exact Task bundle, native model-message history, current result/error, and a
+typed turn outcome. It does not own `PlannerContext`. The graph runtime context
+contains only the Planner, a fresh-context provider, and
+`PlanAdmissionService`; it contains no EventBus, dispatcher, candidate, or
+execution authority.
 
 Application exact-materializes the current SessionFrame Objective,
 Assumptions, Hypotheses, Evidence, Discoveries, and DataProfile into immutable
 `PlannerContext`. It resolves the objective-scoped active Plan for the frame's
 exact current Objective and materializes that Plan without model inference.
 `PlannerContext` contains neither candidate Plan/Task state nor conversation
-history. Native conversation history is supplied separately as PydanticAI
-`message_history`, while the latest Human text remains the current user prompt.
+history. A `PlannerContextProvider` materializes it fresh for every Planner
+invocation. Native conversation history is graph-owned and supplied separately
+as PydanticAI `message_history`, while the latest Human text remains the current
+user prompt. Only `result.new_messages()` from the current run are appended.
 The deterministic serialized `PlannerContext` is supplied fresh through the
 current-run instruction channel, explicitly bounded as data/state and declared
 to supersede historical research-state references. Replaceable authority is
-therefore not appended to the conversational Human-message stream. Native
-history remains non-authoritative and is not duplicated into current-run
-`PlannerOutput.messages`.
+therefore not appended to the conversational Human-message stream.
 Evidence and Discovery may support an answer. Assumptions may guide planning
 but cannot support an empirical answer or be created by Planner.
 Task definitions for active Plan members are not put back into research state;
-a coordination-specific Task projection remains **Deferred** to the Planner
-LangGraph and Task-selection phase.
+a coordination-specific Task projection remains **Deferred** to Task selection
+and execution.
 
 Candidate validation rejects Tasks without a Plan, any Task bundle that does
 not exactly match Plan membership and Objective scope, unknown Assumption IDs,
 or changed content under an admitted Assumption ID. A candidate may reuse the
-current Objective or contain a newly proposed Objective, but it remains output
-of that invocation only. Application does not retain, replace, clear, or admit
-the candidate. The `continue_execution` signal requires a supplied active Plan
-and performs no execution. Candidate retention, conversational Human
-authorization, and interrupt/resume are **Deferred** to the Planner LangGraph
-phase. Capability, provider, executor, worker, and execution routing are absent
-from the model-visible Planner contracts.
+current Objective or contain a newly proposed Objective. LangGraph retains its
+exact Plan and Task bundle across Human turns; a later Planner result may retain,
+replace, or explicitly discard it. A typed `continue_execution` result while a
+candidate is pending routes to `PlanAdmissionService`, whose success clears the
+candidate and whose controlled failure retains it for correction. Human review
+uses LangGraph interrupt/resume state rather than keywords, regexes, or an
+application-owned approval parser. Capability, provider, executor, worker, and
+execution routing are absent from the model-visible Planner contracts.
+
+If no candidate is pending, `continue_execution` still requires an active Plan.
+The runtime returns a visible controlled message that execution is not
+implemented and performs no dispatch. Application maps the typed graph outcome
+to EventBus presentation events; EventBus does not own lifecycle state.
+`InMemorySaver` and one runtime UUID per Application preserve isolated
+in-process threads only. Restart recovery and durable conversation/candidate
+checkpoints remain **Deferred**.
 
 The immutable Phase 1 `Plan` and `PlanDependency` domain
 contracts and side-effect-free application validation are **Implemented** with
@@ -293,11 +308,10 @@ infrastructure for the approval boundary. `PlanDependency` is one canonical
 outgoing-adjacency group per prerequisite, while SQLite persistence remains
 normalized as atomic edges. Validation alone does not persist a candidate.
 Atomic exact-bundle admission and objective-scoped active selection are
-**Verified on SQLite** as independent application-authority services. No
-current runtime path invokes admission from a Planner candidate. Candidate
-lifecycle, conversational Human authorization, LangGraph interrupt/resume,
-Task DAG execution, and replanning runtime are **Deferred**. Active
-Task exposes all three canonical kinds, but only the
+**Verified on SQLite** through the runtime's application-authority service.
+Task DAG selection/execution, plan completion, successor/replanning
+orchestration, and durable lifecycle recovery are **Deferred**. Active Task
+exposes all three canonical kinds, but only the
 separate bounded `DATA` execution subsystem is executable; Planner does not
 dispatch it in Phase 2. GeneratedView coordination, durable SessionFrame
 composition, and the end-to-end recovery model remain **Deferred** target

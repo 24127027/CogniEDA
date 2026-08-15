@@ -165,27 +165,28 @@ The detailed contracts belong to [Authority boundaries](authority-boundaries.md)
 
 **Partially implemented.** Current main provides a bounded typed research-state
 foundation, Planner behavior, deterministic Data Explorer operations, direct
-Task-to-Evidence admission, in-process conversation continuity, model-provider
-configuration, dispatch infrastructure, and SQLite persistence seams. These
+Task-to-Evidence admission, an in-process Planner LangGraph lifecycle,
+model-provider configuration, dispatch infrastructure, and SQLite persistence
+seams. These
 foundations demonstrate important authority and traceability rules, but the
 direct Evidence path is transitional.
 
 The bounded runtime presentation path is event-driven: Application publishes
 typed runtime events and CLI renderer handlers subscribe to them. These events
-are presentation/orchestration signals only. In particular, a `PlanProposed`
-event neither admits nor activates its candidate and retains no authority across
-turns.
+are presentation/orchestration signals only. In particular, `PlanProposed`
+neither admits nor activates a candidate; transient candidate authority belongs
+only to graph state until application authority admits the exact bundle.
 
 The complete target architecture is not yet a supported end-to-end runtime.
 The immutable Phase 1 Plan domain contract and side-effect-free candidate
 validation are **Implemented**, and its append-only repository foundation is
 **Verified on SQLite** with exact historical Objective and Assumption content
-snapshots. Transient Planner candidate authoring is **Implemented** through one
-direct `plan_or_answer` invocation with no tools or execution. Atomic exact-
-bundle Objective/Task/Plan admission and objective-scoped active selection are
-**Verified on SQLite** as independent application-authority services.
-Conversational Human authorization, candidate retention, Planner LangGraph
-interrupt/resume, Task DAG runtime, durable candidate recovery,
+snapshots. Transient Planner candidate authoring, graph-owned native history,
+candidate retain/replace/discard behavior, natural-language Human review, and
+LangGraph interrupt/resume are **Implemented** in process. A typed authorization
+result calls the atomic exact-bundle Objective/Task/Plan admission and
+objective-scoped active-selection service, which is **Verified on SQLite**.
+The graph performs no execution. Task DAG runtime, durable candidate recovery,
 scientific
 investigation and protocol, canonical Evidence lineage, protected evaluation,
 governance, Discovery admission, semantic graph inquiry, and restart-safe

@@ -150,7 +150,10 @@ model to infer intent.
 ## Implementation status
 
 **Partially implemented.** The current application retains its materialized
-SessionFrame and native conversation history only while the process is alive.
+SessionFrame while the process is alive. Its `PlannerRuntime` uses an
+in-memory LangGraph checkpoint to retain native conversation history, the exact
+pending Plan/Task candidate, and interrupt state under one runtime UUID. This
+supports isolated in-process Human review and resume, not restart recovery.
 SQLite repositories can round-trip bounded SessionFrame snapshots, and donor
 operational records expose some attempt, outbox, lease, fencing, retry, and
 idempotency fields. Those uncomposed seams do not establish supported restart
