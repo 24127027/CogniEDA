@@ -13,12 +13,14 @@ from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
 from cognieda.schemas.artifacts import SessionFrame
 from cognieda.schemas.plan import Plan
+from cognieda.runtime.commands.types import CommandSuggestion
 from cognieda.runtime.commands import (
     CommandContext,
     CommandHandler,
     CommandParser,
     create_command_registry,
 )
+
 
 from .conversation import ConversationHistory
 from .messages import Message, MessageRole, MessageType
@@ -56,6 +58,12 @@ class Application:
                 prompt_secret=getpass,
             ),
         )
+
+    def suggest_commands(
+        self,
+        prefix: str,
+    ) -> tuple[CommandSuggestion, ...]:
+        return self.command_handler.suggest(prefix)
 
     async def submit_message(self, message: str) -> None:
         self.event_bus.publish(

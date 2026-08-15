@@ -9,7 +9,7 @@ from cognieda.runtime.messages import (
 from .base import CommandContext
 from .parser import CommandParser
 from .registry import CommandNotFoundError, CommandRegistry
-
+from .types import CommandSuggestion
 
 class CommandHandler:
     def __init__(
@@ -36,6 +36,12 @@ class CommandHandler:
             self._context,
         )
 
+    def suggest(
+        self,
+        prefix: str,
+    ) -> tuple[CommandSuggestion, ...]:
+        return self._registry.suggest(prefix)
+
     @staticmethod
     def _error(message: str) -> Message:
         return Message(
@@ -43,3 +49,4 @@ class CommandHandler:
             role=MessageRole.ASSISTANT,
             content=message,
         )
+    

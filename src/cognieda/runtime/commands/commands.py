@@ -15,6 +15,7 @@ def text(content: str) -> Message:
 
 class SkillAddCommand:
     name = "skill.add"
+    description = "Add a skill to the workspace."
 
     async def execute(
         self,
@@ -38,6 +39,7 @@ class SkillAddCommand:
 
 class SkillRemoveCommand:
     name = "skill.rm"
+    description = "Remove a skill from the workspace."
 
     async def execute(
         self,
@@ -61,6 +63,7 @@ class SkillRemoveCommand:
 
 class SkillListCommand:
     name = "skill.list"
+    description = "List all registered skills."
 
     async def execute(
         self,
@@ -85,6 +88,7 @@ class SkillListCommand:
 
 class SkillUseCommand:
     name = "skill.use"
+    description = "Assign a skill to a worker."
 
     async def execute(
         self,
@@ -108,6 +112,7 @@ class SkillUseCommand:
 
 class SkillDropCommand:
     name = "skill.drop"
+    description = "Remove a skill from a worker."
 
     async def execute(
         self,
@@ -131,6 +136,7 @@ class SkillDropCommand:
 
 class ProviderStatusCommand:
     name = "provider"
+    description = "Display the status of the current provider."
 
     async def execute(
         self,
@@ -160,6 +166,7 @@ API key          : {configured}"""
 
 class ProviderListCommand:
     name = "provider.list"
+    description = "List all configured providers."
 
     async def execute(
         self,
@@ -178,6 +185,7 @@ class ProviderListCommand:
 
 class ProviderUseCommand:
     name = "provider.use"
+    description = "Switch to a different provider."
 
     async def execute(
         self,
@@ -200,6 +208,7 @@ class ProviderUseCommand:
 
 class ProviderModelCommand:
     name = "provider.model"
+    description = "Set the model for a provider."
 
     async def execute(
         self,
@@ -227,6 +236,7 @@ class ProviderModelCommand:
 
 class ProviderKeyCommand:
     name = "provider.key"
+    description = "Set the API key for a provider."
 
     async def execute(
         self,
@@ -258,6 +268,7 @@ class ProviderKeyCommand:
 
 class ReloadCommand:
     name = "reload"
+    description = "Reload the planner instructions."
 
     async def execute(
         self,
