@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from enum import StrEnum
 from uuid import UUID
 
@@ -14,7 +13,6 @@ from cognieda.infrastructure.persistence.repositories import (
     ObjectiveRepository,
     TaskRepository,
 )
-from cognieda.schemas.artifacts import Task
 from cognieda.schemas.plan import Plan
 
 
@@ -49,8 +47,6 @@ class PlanValidator:
     def validate(
         self,
         candidate: Plan,
-        *,
-        tasks: Iterable[Task] | None = None,
     ) -> Plan:
         """Return canonical content without persistence or runtime inspection."""
 
@@ -86,30 +82,23 @@ class PlanValidator:
                 )
             assumptions.append(persisted)
 
-        supplied_tasks = None if tasks is None else tuple(tasks)
-        if supplied_tasks is not None:
-            try:
-                candidate.validate_tasks(supplied_tasks)
-            except ValueError as exc:
-                raise PlanValidationError(
-                    PlanValidationErrorCode.INVALID_CANDIDATE,
-                    f"Plan candidate Task bundle is invalid: {exc}",
-                ) from exc
-
-        persisted_tasks: list[Task] = []
-        for task_id in candidate.task_ids:
-            task = self._tasks.get_by_id(task_id)
-            if task is None:
+        for task in candidate.tasks:
+            persisted = self._tasks.get_by_id(task.task_id)
+            if persisted is None:
                 raise PlanValidationError(
                     PlanValidationErrorCode.TASK_NOT_FOUND,
                     "Plan candidate references a missing persisted Task.",
                 )
-            if task.objective_id != candidate.objective.objective_id:
+            if persisted.objective_id != candidate.objective.objective_id:
                 raise PlanValidationError(
                     PlanValidationErrorCode.TASK_OBJECTIVE_MISMATCH,
                     "Every persisted Task must belong to the Plan Objective.",
                 )
-            persisted_tasks.append(task)
+            if persisted.semantic_payload() != task.semantic_payload():
+                raise PlanValidationError(
+                    PlanValidationErrorCode.INVALID_CANDIDATE,
+                    "Plan Task differs from the authoritative persisted Task definition.",
+                )
 
         try:
             canonical = Plan.model_validate(
@@ -117,7 +106,7 @@ class PlanValidator:
                     "plan_id": candidate.plan_id,
                     "objective": objective,
                     "assumptions": assumptions,
-                    "task_ids": candidate.task_ids,
+                    "tasks": candidate.tasks,
                     "dependencies": [
                         {
                             "prerequisite_task_id": dependency.prerequisite_task_id,
@@ -127,7 +116,6 @@ class PlanValidator:
                     ],
                 }
             )
-            canonical.validate_tasks(persisted_tasks)
         except (TypeError, ValueError, ValidationError) as exc:
             raise PlanValidationError(
                 PlanValidationErrorCode.INVALID_CANDIDATE,
