@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from io import StringIO
-from unittest.mock import Mock
 
 from rich.console import Console
 from rich.control import Control
 from rich.panel import Panel
 
 from cognieda.cli.renderer import Renderer
+from cognieda.runtime.events import PlanProposed
 from cognieda.runtime.messages import Message, MessageRole, MessageType
+from cognieda.schemas import Objective, Plan, Task, TaskKind
 
 
 def _renderer_output() -> tuple[Renderer, StringIO]:
@@ -67,6 +68,27 @@ def test_render_segments_uses_shared_background_without_border() -> None:
     assert "second segment" in output
     assert "╭" not in output
     assert "┌" not in output
+
+
+def test_plan_event_handler_renders_transient_candidate() -> None:
+    objective = Objective(text="Understand retention.")
+    task = Task(
+        objective_id=objective.objective_id,
+        kind=TaskKind.DATA,
+        instruction="Profile retention cohorts.",
+    )
+    plan = Plan.create(
+        objective=objective,
+        task_ids=(task.task_id,),
+        tasks=(task,),
+    )
+    renderer, buffer = _renderer_output()
+
+    renderer.handle_plan(PlanProposed(plan=plan, tasks=(task,)))
+
+    output = buffer.getvalue()
+    assert "Proposed Plan" in output
+    assert "Profile retention cohorts" in output
 
 
 def test_read_input_uses_renderer_prompt_and_strips_whitespace() -> None:

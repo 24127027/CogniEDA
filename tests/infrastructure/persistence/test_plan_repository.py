@@ -79,7 +79,7 @@ def _plan(
             (
                 PlanDependency(
                     prerequisite_task_id=task_tuple[0].task_id,
-                    dependent_task_id=task_tuple[1].task_id,
+                    dependent_task_ids=tuple(task.task_id for task in task_tuple[1:]),
                 ),
             )
             if len(task_tuple) > 1
@@ -109,6 +109,36 @@ def test_exact_plan_round_trip_includes_normalized_content(db_session: Session) 
     assert len(db_session.exec(select(PlanAssumptionRecord)).all()) == 2
     assert len(db_session.exec(select(PlanTaskRecord)).all()) == 2
     assert len(db_session.exec(select(PlanDependencyRecord)).all()) == 1
+
+
+def test_grouped_dependency_flattens_and_reconstructs_exactly(
+    db_session: Session,
+) -> None:
+    objective, assumptions, tasks = _persisted_bundle(db_session)
+    third = TaskRepository(db_session).create(
+        Task(
+            objective_id=objective.objective_id,
+            kind=TaskKind.DATA,
+            instruction="Inspect a second dependent view.",
+        )
+    )
+    all_tasks = (*tasks, third)
+    plan = _plan(objective, assumptions, all_tasks)
+
+    loaded = _persist(db_session, plan)
+    edge_rows = db_session.exec(select(PlanDependencyRecord)).all()
+
+    assert loaded == plan
+    assert len(loaded.dependencies) == 1
+    assert loaded.dependencies[0].dependent_task_ids == tuple(
+        sorted((tasks[1].task_id, third.task_id), key=str)
+    )
+    assert {
+        (row.prerequisite_task_id, row.dependent_task_id) for row in edge_rows
+    } == {
+        (tasks[0].task_id, tasks[1].task_id),
+        (tasks[0].task_id, third.task_id),
+    }
 
 
 @pytest.mark.parametrize("missing", ["objective", "assumption", "task"])

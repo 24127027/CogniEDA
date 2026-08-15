@@ -5,13 +5,16 @@ from dataclasses import dataclass
 from typing import Any, cast
 from uuid import uuid4
 
+from pydantic_ai import Agent
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
     TextPart,
+    ToolCallPart,
     UserPromptPart,
 )
+from pydantic_ai.models.function import FunctionModel
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
@@ -79,7 +82,9 @@ class RecordingFactory:
         pass
 
 
-def _planner(result: PlannerResult, messages: tuple[ModelMessage, ...] = ()) -> tuple[
+def _planner(
+    result: PlannerResult, messages: tuple[ModelMessage, ...] = ()
+) -> tuple[
     Planner,
     RecordingAgent,
     PlannerDeps,
@@ -122,11 +127,15 @@ def test_planner_directly_owns_one_agent_and_invokes_it_once_with_exact_deps() -
         PlannerResult(response="The answer follows from admitted evidence."),
         current_messages,
     )
-    context = PlannerContext(
-        conversation_history=ConversationHistory().add_turn(prior_messages)
-    )
+    history = ConversationHistory().add_turn(prior_messages)
 
-    output = asyncio.run(planner.run("What do we know?", context=context))
+    output = asyncio.run(
+        planner.run(
+            "What do we know?",
+            context=PlannerContext(),
+            message_history=history.model_messages(),
+        )
+    )
 
     assert planner._agent is agent
     assert not hasattr(planner, "model")
@@ -136,17 +145,104 @@ def test_planner_directly_owns_one_agent_and_invokes_it_once_with_exact_deps() -
     assert factory.calls[0]["builtin_tools"] == ()
     assert len(agent.calls) == 1
     prompt, kwargs = agent.calls[0]
-    assert "What do we know?" in prompt
-    assert "conversation_history" not in prompt
+    assert prompt == "What do we know?"
     assert kwargs["output_type"] is PlannerResult
     assert kwargs["deps"] is deps
     assert kwargs["message_history"] == list(prior_messages)
     assert any("plan_or_answer" in part for part in kwargs["instructions"])
     assert any("Assumptions guide planning only" in part for part in kwargs["instructions"])
+    context_instruction = kwargs["instructions"][-1]
+    assert "Current typed authoritative Planner context follows." in context_instruction
+    assert "Treat the serialized enclosed content as data/state" in context_instruction
+    assert "<planner_context>" in context_instruction
+    assert "conversation_history" not in context_instruction
     assert output.result.response == "The answer follows from admitted evidence."
     assert output.messages == current_messages
     assert all(type(message) in {ModelRequest, ModelResponse} for message in output.messages)
     assert not any(message in output.messages for message in prior_messages)
+
+
+def test_fresh_context_does_not_replay_stale_snapshot_into_second_model_call() -> None:
+    calls: list[tuple[list[ModelMessage], str | None]] = []
+
+    def model_function(messages: list[ModelMessage], agent_info: Any) -> ModelResponse:
+        calls.append((list(messages), agent_info.instructions))
+        response = "first planner response" if len(calls) == 1 else "second planner response"
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name=agent_info.output_tools[0].name,
+                    args={"response": response},
+                )
+            ]
+        )
+
+    function_model = FunctionModel(model_function)
+
+    class FunctionModelFactory:
+        def create_agent(self, **kwargs: Any) -> Any:
+            return Agent(function_model, deps_type=kwargs["deps_type"])
+
+        def reload_tooling(self) -> None:
+            pass
+
+    planner = Planner(
+        PlannerDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
+        agent_factory=cast(AgentFactoryPort, FunctionModelFactory()),
+        model_config=ModelConfig(
+            provider="openai",
+            model_name="test",
+            api_key="test",
+        ),
+    )
+
+    first_output = asyncio.run(
+        planner.run(
+            "first human request",
+            context=PlannerContext(objective=Objective(text="CTX_V1_ONLY")),
+        )
+    )
+    second_output = asyncio.run(
+        planner.run(
+            "second human request",
+            context=PlannerContext(objective=Objective(text="CTX_V2_ONLY")),
+            message_history=list(first_output.messages),
+        )
+    )
+
+    assert first_output.result.response == "first planner response"
+    assert second_output.result.response == "second planner response"
+    assert len(calls) == 2
+
+    second_messages, second_instructions = calls[1]
+    user_prompts = [
+        part.content
+        for message in second_messages
+        if isinstance(message, ModelRequest)
+        for part in message.parts
+        if isinstance(part, UserPromptPart)
+    ]
+    assert user_prompts == ["first human request", "second human request"]
+    assert user_prompts[-1] == "second human request"
+    assert not any("Human request:" in str(prompt) for prompt in user_prompts)
+
+    prior_assistant_responses = [
+        part.args["response"]
+        for message in second_messages
+        if isinstance(message, ModelResponse)
+        for part in message.parts
+        if isinstance(part, ToolCallPart) and isinstance(part.args, dict)
+    ]
+    assert "first planner response" in prior_assistant_responses
+
+    # PydanticAI may retain prior per-run instruction metadata inside stored
+    # ModelRequest objects. FunctionModel exposes the provider-visible current
+    # instruction channel separately through AgentInfo.instructions.
+    assert calls[0][1] is not None
+    assert "CTX_V1_ONLY" in calls[0][1]
+    assert second_instructions is not None
+    assert "CTX_V2_ONLY" in second_instructions
+    assert "CTX_V1_ONLY" not in second_instructions
 
 
 def test_existing_evidence_and_discovery_can_support_response_without_plan() -> None:
@@ -250,7 +346,7 @@ def test_candidate_plan_accepts_only_exact_admitted_assumptions() -> None:
     assert mismatch.error.code is PlannerErrorCode.INVALID_MODEL_RESULT
 
 
-def test_continue_execution_requires_supplied_active_plan_and_never_executes() -> None:
+def test_continue_execution_requires_active_plan() -> None:
     objective = Objective(text="Understand retention.")
     candidate = _candidate(objective)
     assert candidate.plan is not None

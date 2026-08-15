@@ -170,15 +170,23 @@ configuration, dispatch infrastructure, and SQLite persistence seams. These
 foundations demonstrate important authority and traceability rules, but the
 direct Evidence path is transitional.
 
+The bounded runtime presentation path is event-driven: Application publishes
+typed runtime events and CLI renderer handlers subscribe to them. These events
+are presentation/orchestration signals only. In particular, a `PlanProposed`
+event neither admits nor activates its candidate and retains no authority across
+turns.
+
 The complete target architecture is not yet a supported end-to-end runtime.
 The immutable Phase 1 Plan domain contract and side-effect-free candidate
 validation are **Implemented**, and its append-only repository foundation is
 **Verified on SQLite** with exact historical Objective and Assumption content
-snapshots. No application path currently persists a Plan. Phase 2 transient
-Planner candidate authoring is **Implemented** through one direct
-`plan_or_answer` invocation with no tools or execution. Human approval, exact
-post-approval validation and persistence, activation, active selection, Task
-DAG runtime, scientific
+snapshots. Transient Planner candidate authoring is **Implemented** through one
+direct `plan_or_answer` invocation with no tools or execution. Atomic exact-
+bundle Objective/Task/Plan admission and objective-scoped active selection are
+**Verified on SQLite** as independent application-authority services.
+Conversational Human authorization, candidate retention, Planner LangGraph
+interrupt/resume, Task DAG runtime, durable candidate recovery,
+scientific
 investigation and protocol, canonical Evidence lineage, protected evaluation,
 governance, Discovery admission, semantic graph inquiry, and restart-safe
 continuity remain **Deferred**. [Current state](../status/current-state.md)

@@ -19,10 +19,16 @@ A SessionFrame may conceptually track references to:
 
 - Objectives and the active Objective;
 - planning Assumptions;
-- Tasks;
+- Hypotheses;
 - DataProfiles and the active DataProfile;
 - admitted Evidence; and
-- Hypotheses and Discoveries when the supported workflow requires them.
+- Discoveries.
+
+Task remains a First-Class Object for bounded coordination/work identity and
+Plan membership, but it is not research knowledge and is not SessionFrame
+research-state membership. A coordination-specific Task projection may be
+needed by a later Planner execution phase; it must remain distinct from the
+frame-derived research-state base.
 
 The frame preserves membership over time. Moving from one question to another
 does not authorize context construction to rank, filter, or truncate retained
@@ -140,25 +146,37 @@ closed rather than being repaired from prose or “latest record” heuristics.
 
 **Partially implemented.** Current source has a bounded immutable M1-A
 `SessionFrame` value containing one optional materialized Objective, ordered
-materialized Assumptions, Tasks, Evidence, and Discoveries, and one optional
+materialized Assumptions, Hypotheses, Evidence, and Discoveries, and one optional
 materialized DataProfile. Validated replacement seams protect duplicate
-identity and direct Task/DataProfile/Evidence consistency, and SQLite can
-round-trip bounded frame snapshots.
+identity and direct DataProfile/Evidence consistency, and SQLite can round-trip
+bounded frame snapshots. Evidence retains Task provenance, but the frame does
+not require the referenced Task as membership; supported Evidence admission
+still requires an authoritative completed Task at the repository and
+application-service boundaries.
 
 The in-process application exact-copies all six current materialized member
 categories into immutable `PlannerContext`. Planner receives that context and
 returns a response, Human clarification request, transient Plan plus exact Task
 bundle, or continuation signal; it never receives, mutates, or returns
-SessionFrame. Application does not admit candidate state in Phase 2.
-Conversation history remains an explicit non-authoritative context field and
-native message-history input.
+SessionFrame. Application materializes the exact active Plan for the frame's
+current Objective into `PlannerContext`; the independent Plan admission service
+can atomically admit an exact authorized Plan/Task bundle. Active Plan is
+explicit coordination state in `PlannerContext`, not SessionFrame research
+membership.
+Conversation history remains a separate non-authoritative native
+message-history input and is not a `PlannerContext` field.
 
 The current value is not the canonical typed-reference membership FCO. It has
 no frame identity, Objective-bound session identity, reference manifest,
 active Objective/DataProfile selectors distinct from materialized objects,
 successor lineage, or runtime reload authority. The in-process application
 retains it only for the current process. Canonical durable session continuity
-and restart reconstruction remain **Deferred**.
+and restart reconstruction remain **Deferred**. Current source does not define
+how an existing Objective-scoped frame succeeds to a newly approved different
+Objective while preserving or dropping prior Hypotheses, Evidence, and
+Discoveries. It also does not define a coordination-specific projection for
+the semantic Task definitions in an active Plan.
+The runtime therefore does not apply a transient candidate to the frame.
 
 Continue with [Context type safety](context-type-safety.md) for the rules that
 govern operation-specific selection and [Continuity and resume](continuity-and-resume.md)

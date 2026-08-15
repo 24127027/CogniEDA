@@ -1,4 +1,4 @@
-"""M1-A SessionFrame lineage and ordering invariants."""
+"""M1-A SessionFrame research-membership and ordering invariants."""
 
 from uuid import UUID, uuid4
 
@@ -8,14 +8,18 @@ from pydantic import ValidationError
 from cognieda.schemas import (
     Assumption,
     DataProfile,
+    Discovery,
+    DiscoveryClaim,
     Evidence,
     EvidenceProvenance,
+    Hypothesis,
     Objective,
     SessionFrame,
     Task,
     TaskKind,
-    TaskStatus,
+    ValidityBasis,
 )
+from cognieda.schemas.enums import DiscoveryEpistemicStatus
 
 
 def _profile() -> DataProfile:
@@ -25,14 +29,23 @@ def _profile() -> DataProfile:
 def _task(
     instruction: str,
     *,
-    status: TaskStatus = TaskStatus.PENDING,
     objective_id: UUID | None = None,
 ) -> Task:
     return Task(
         objective_id=objective_id or uuid4(),
         kind=TaskKind.DATA,
         instruction=instruction,
-        status=status,
+    )
+
+
+def _hypothesis(task: Task, profile: DataProfile, statement: str) -> Hypothesis:
+    return Hypothesis(
+        task_id=task.task_id,
+        profile_id=profile.data_profile_id,
+        statement=statement,
+        scope="dataset:empty.csv",
+        validation_method="bounded deterministic check",
+        evidence_expectation="one admitted observation",
     )
 
 
@@ -51,27 +64,52 @@ def _evidence(task: Task, profile: DataProfile) -> Evidence:
     )
 
 
-def test_session_frame_retains_typed_state_in_insertion_order() -> None:
+def _discovery(evidence: Evidence, hypothesis_id: UUID) -> Discovery:
+    return Discovery(
+        hypothesis_id=hypothesis_id,
+        evidence_ids=[evidence.evidence_id],
+        claim=DiscoveryClaim(statement="The dataset is empty.", scope="dataset:empty.csv"),
+        epistemic_status=DiscoveryEpistemicStatus.SUPPORTED,
+        scope="dataset:empty.csv",
+        validity_basis=ValidityBasis(
+            data_profile_id=evidence.data_profile_id,
+            analysis_frame_refs=["analysis:row-count"],
+            hypothesis_id=hypothesis_id,
+            evidence_ids=[evidence.evidence_id],
+            method="row count",
+            decision_rule="Support when row count equals zero.",
+        ),
+    )
+
+
+def test_session_frame_retains_typed_research_state_in_insertion_order() -> None:
     objective = Objective(text="Understand retention")
     assumptions = [Assumption(text="First"), Assumption(text="Second")]
-    tasks = [
-        _task("First task", status=TaskStatus.COMPLETED, objective_id=objective.objective_id),
-        _task("Second task", status=TaskStatus.COMPLETED, objective_id=objective.objective_id),
-    ]
     profile = _profile()
+    tasks = [
+        _task("First task", objective_id=objective.objective_id),
+        _task("Second task", objective_id=objective.objective_id),
+    ]
+    hypotheses = [
+        _hypothesis(tasks[0], profile, "First proposition"),
+        _hypothesis(tasks[1], profile, "Second proposition"),
+    ]
     evidences = [_evidence(tasks[0], profile), _evidence(tasks[1], profile)]
 
     frame = SessionFrame(
         objective=objective,
         assumptions=assumptions,
-        tasks=tasks,
+        hypotheses=hypotheses,
         evidences=evidences,
         data_profile=profile,
     )
 
     assert frame.objective is objective
     assert [item.text for item in frame.assumptions] == ["First", "Second"]
-    assert [item.instruction for item in frame.tasks] == ["First task", "Second task"]
+    assert [item.statement for item in frame.hypotheses] == [
+        "First proposition",
+        "Second proposition",
+    ]
     assert [item.evidence_id for item in frame.evidences] == [
         evidences[0].evidence_id,
         evidences[1].evidence_id,
@@ -83,7 +121,7 @@ def test_session_frame_retains_typed_state_in_insertion_order() -> None:
     ("field", "value_factory", "message"),
     [
         ("assumptions", lambda item: [item, item], "Assumption"),
-        ("tasks", lambda item: [item, item], "Task"),
+        ("hypotheses", lambda item: [item, item], "Hypothesis"),
         ("evidences", lambda item: [item, item], "Evidence"),
     ],
 )
@@ -92,13 +130,13 @@ def test_session_frame_rejects_duplicate_ids(field, value_factory, message) -> N
     task = _task("Profile data")
     values = {
         "assumptions": [],
-        "tasks": [task],
+        "hypotheses": [],
         "evidences": [],
         "data_profile": profile,
     }
     item = {
         "assumptions": Assumption(text="Duplicate"),
-        "tasks": task,
+        "hypotheses": _hypothesis(task, profile, "Duplicate"),
         "evidences": _evidence(task, profile),
     }[field]
     values[field] = value_factory(item)
@@ -107,117 +145,95 @@ def test_session_frame_rejects_duplicate_ids(field, value_factory, message) -> N
         SessionFrame(**values)
 
 
-def test_session_frame_rejects_orphan_evidence() -> None:
+def test_session_frame_retains_evidence_without_task_membership() -> None:
     profile = _profile()
-    evidence = _evidence(_task("Missing task"), profile)
+    evidence = _evidence(_task("Provenance-only Task reference"), profile)
 
-    with pytest.raises(ValidationError, match="orphan Evidence"):
-        SessionFrame(data_profile=profile, evidences=[evidence])
+    frame = SessionFrame(data_profile=profile, evidences=[evidence])
+
+    assert frame.evidences == (evidence,)
+    assert "tasks" not in SessionFrame.model_fields
 
 
 def test_session_frame_rejects_evidence_without_data_profile() -> None:
-    task = _task("Count rows", status=TaskStatus.COMPLETED)
-    evidence = _evidence(task, _profile())
+    evidence = _evidence(_task("Count rows"), _profile())
 
     with pytest.raises(ValidationError, match="without a DataProfile"):
-        SessionFrame(tasks=[task], evidences=[evidence])
+        SessionFrame(evidences=[evidence])
 
 
 def test_session_frame_rejects_evidence_for_non_active_data_profile() -> None:
-    task = _task("Count rows", status=TaskStatus.COMPLETED)
-    evidence = _evidence(task, _profile())
+    evidence = _evidence(_task("Count rows"), _profile())
 
     with pytest.raises(ValidationError, match="active SessionFrame DataProfile"):
-        SessionFrame(tasks=[task], evidences=[evidence], data_profile=_profile())
+        SessionFrame(evidences=[evidence], data_profile=_profile())
 
 
-def test_mutation_seams_preserve_invariants_and_order() -> None:
-    frame = SessionFrame()
+def test_add_hypothesis_returns_immutable_successor_and_preserves_order() -> None:
     profile = _profile()
-    objective = Objective(text="Explore")
-    first_task = _task("First", objective_id=objective.objective_id)
-    second_task = _task(
-        "Second",
-        status=TaskStatus.COMPLETED,
-        objective_id=objective.objective_id,
-    )
+    first = _hypothesis(_task("First"), profile, "First proposition")
+    second = _hypothesis(_task("Second"), profile, "Second proposition")
+    original = SessionFrame()
 
-    frame = frame.set_objective(objective)
-    frame = frame.add_assumption(Assumption(text="Planning premise"))
-    frame = frame.add_task(first_task)
-    frame = frame.add_task(second_task)
-    frame = frame.set_data_profile(profile)
-    frame = frame.add_evidence(_evidence(second_task, profile))
-    frame = frame.set_task_status(first_task.task_id, TaskStatus.RUNNING)
+    successor = original.add_hypothesis(first).add_hypothesis(second)
 
-    assert [task.instruction for task in frame.tasks] == ["First", "Second"]
-    assert frame.tasks[0] is not first_task
-    assert frame.tasks[0].task_id == first_task.task_id
-    assert frame.tasks[0].objective_id == first_task.objective_id
-    assert frame.tasks[0].kind is first_task.kind
-    assert frame.tasks[0].instruction == first_task.instruction
-    assert frame.tasks[0].status is TaskStatus.RUNNING
-
-    with pytest.raises(ValueError, match="orphan Evidence"):
-        frame.add_evidence(_evidence(_task("Orphan"), profile))
-    with pytest.raises(ValueError, match="DataProfile"):
-        frame.set_data_profile(_profile())
+    assert original.hypotheses == ()
+    assert successor.hypotheses == (first, second)
+    with pytest.raises(ValueError, match="duplicate Hypothesis"):
+        successor.add_hypothesis(first)
 
 
-@pytest.mark.parametrize(
-    "status",
-    [TaskStatus.PENDING, TaskStatus.RUNNING, TaskStatus.FAILED],
-)
-def test_incomplete_task_cannot_admit_evidence(status: TaskStatus) -> None:
-    task = _task("Run bounded analysis", status=status)
+def test_mutation_seams_preserve_research_membership_invariants() -> None:
+    original = SessionFrame()
     profile = _profile()
-    frame = SessionFrame(tasks=(task,), data_profile=profile)
-
-    with pytest.raises(ValidationError, match="only for COMPLETED Tasks"):
-        frame.add_evidence(_evidence(task, profile))
-
-    assert frame.evidences == ()
-    assert frame.tasks[0].status is status
-
-
-def test_completed_task_can_admit_evidence() -> None:
-    task = _task("Run bounded analysis", status=TaskStatus.COMPLETED)
-    profile = _profile()
+    task = _task("Observe")
+    hypothesis = _hypothesis(task, profile, "The dataset is empty")
     evidence = _evidence(task, profile)
-    frame = SessionFrame(tasks=(task,), data_profile=profile)
 
-    frame = frame.add_evidence(evidence)
+    successor = original.set_objective(Objective(text="Explore"))
+    successor = successor.add_assumption(Assumption(text="Planning premise"))
+    successor = successor.add_hypothesis(hypothesis)
+    successor = successor.set_data_profile(profile)
+    successor = successor.add_evidence(evidence)
 
-    assert frame.evidences == (evidence,)
+    assert original == SessionFrame()
+    assert successor.hypotheses == (hypothesis,)
+    assert successor.evidences == (evidence,)
+    with pytest.raises(ValueError, match="DataProfile"):
+        successor.set_data_profile(_profile())
 
 
-def test_task_with_evidence_cannot_transition_away_from_completed() -> None:
-    task = _task("Run bounded analysis", status=TaskStatus.COMPLETED)
+def test_discovery_membership_does_not_fabricate_hypothesis_membership() -> None:
     profile = _profile()
+    evidence = _evidence(_task("Observe"), profile)
+    discovery = _discovery(evidence, uuid4())
+
     frame = SessionFrame(
-        tasks=(task,),
-        evidences=(_evidence(task, profile),),
         data_profile=profile,
+        evidences=(evidence,),
+        discoveries=(discovery,),
     )
 
-    with pytest.raises(ValidationError, match="only for COMPLETED Tasks"):
-        frame.set_task_status(task.task_id, TaskStatus.FAILED)
+    assert frame.discoveries == (discovery,)
+    assert frame.hypotheses == ()
 
-    assert frame.tasks[0].status is TaskStatus.COMPLETED
+
+def test_session_frame_has_no_task_lifecycle_mutation_responsibility() -> None:
+    assert "tasks" not in SessionFrame.model_fields
+    assert not hasattr(SessionFrame, "add_task")
+    assert not hasattr(SessionFrame, "set_task_status")
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        SessionFrame(tasks=())  # type: ignore[call-arg]
 
 
 def test_session_frame_collections_cannot_bypass_validation_by_direct_mutation() -> None:
-    task = _task("Profile data")
-    frame = SessionFrame(tasks=(task,))
+    profile = _profile()
+    hypothesis = _hypothesis(_task("Investigate"), profile, "A proposition")
+    frame = SessionFrame(hypotheses=(hypothesis,))
 
     with pytest.raises(AttributeError):
-        frame.tasks.append(task)  # type: ignore[attr-defined]
+        frame.hypotheses.append(hypothesis)  # type: ignore[attr-defined]
     with pytest.raises(AttributeError):
-        frame.evidences.append(_evidence(task, _profile()))  # type: ignore[attr-defined]
+        frame.evidences.append(_evidence(_task("Observe"), profile))  # type: ignore[attr-defined]
     with pytest.raises(ValidationError, match="frozen"):
-        frame.tasks = (*frame.tasks, task)
-
-
-def test_session_frame_rejects_unknown_task_status_update() -> None:
-    with pytest.raises(ValueError, match="does not contain"):
-        SessionFrame().set_task_status(uuid4(), TaskStatus.COMPLETED)
+        frame.hypotheses = (*frame.hypotheses, hypothesis)

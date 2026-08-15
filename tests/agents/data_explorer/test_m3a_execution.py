@@ -96,9 +96,7 @@ def _run(request: ExecutionRequest):
     return asyncio.run(DataExplorer(analysis_planner=InstructionPlanFake()).run(request))
 
 
-def _profile_projection(
-    dataset_path: Path | None, data_profile_id
-) -> DataProfile | None:
+def _profile_projection(dataset_path: Path | None, data_profile_id) -> DataProfile | None:
     if data_profile_id is None:
         return None
     if dataset_path is not None and dataset_path.exists():
@@ -158,14 +156,7 @@ def test_real_request_dispatches_through_registered_data_explorer(tmp_path) -> N
         data_profile_id=uuid4(),
     )
     registry = ExecutorRegistry()
-    registry.register_provider(
-        lambda: DataExplorer(analysis_planner=InstructionPlanFake()),
-        capabilities=(
-            Capability.DATA_ANALYSIS,
-            Capability.DATA_PROFILING,
-            Capability.DATA_TRANSFORMATION,
-        ),
-    )
+    registry.register(lambda: DataExplorer(analysis_planner=InstructionPlanFake()))
 
     result = asyncio.run(ExecutorDispatcher(registry).dispatch(request))
 
@@ -392,9 +383,7 @@ def test_analysis_and_profiling_do_not_mutate_source_dataset(tmp_path) -> None:
             data_profile_id=uuid4(),
         )
     )
-    profiling = _run(
-        _request(dataset_path, None, capability=Capability.DATA_PROFILING)
-    )
+    profiling = _run(_request(dataset_path, None, capability=Capability.DATA_PROFILING))
 
     assert analysis.status is ExecutionStatus.SUCCEEDED
     assert profiling.status is ExecutionStatus.SUCCEEDED

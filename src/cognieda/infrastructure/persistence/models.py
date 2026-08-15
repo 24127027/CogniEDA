@@ -187,6 +187,22 @@ class PlanDependencyRecord(SQLModel, table=True):
     dependent_task_id: UUID = Field(foreign_key="tasks.task_id", primary_key=True)
 
 
+class ActivePlanRecord(SQLModel, table=True):
+    """Objective-scoped lifecycle pointer to one authoritative active Plan."""
+
+    __tablename__ = "active_plans"
+
+    objective_id: UUID = Field(
+        foreign_key="objectives.objective_id",
+        primary_key=True,
+    )
+    plan_id: UUID = Field(
+        foreign_key="plans.plan_id",
+        nullable=False,
+        unique=True,
+    )
+
+
 class HypothesisRecord(TimestampedRecord, table=True):
     """Persisted Hypothesis FCO."""
 

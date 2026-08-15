@@ -121,7 +121,7 @@ class PlanValidator:
                     "dependencies": [
                         {
                             "prerequisite_task_id": dependency.prerequisite_task_id,
-                            "dependent_task_id": dependency.dependent_task_id,
+                            "dependent_task_ids": dependency.dependent_task_ids,
                         }
                         for dependency in candidate.dependencies
                     ],

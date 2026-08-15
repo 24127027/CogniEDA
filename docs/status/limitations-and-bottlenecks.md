@@ -7,18 +7,17 @@ These are verified constraints of the bounded current implementation.
 
 - The active typed research-state foundation is transitional and does not
   implement the minimum complete scientific loop defined by MVP-v2.
-- Active bounded Task has no runtime-selected Plan membership,
-  dependency eligibility, approval, activation, or parent/leaf execution
-  semantics. Immutable Plan candidates can represent direct Task membership,
-  exact Objective and admitted Assumption basis, and structural dependencies
-  and can be validated without persistence.
-  The append-only repository is an isolated
-  infrastructure foundation; only `DATA` is executable and no Plan
-  drives execution.
+- Active bounded Task has no Plan-driven dependency eligibility or parent/leaf
+  execution semantics. Immutable Plan candidates represent direct Task
+  membership, exact Objective and admitted Assumption basis, and grouped
+  structural dependencies. An independent application service can atomically
+  persist an exact authorized bundle and select a Plan active by Objective, but
+  only `DATA` is separately executable and no Plan drives execution.
 - The current materialized SessionFrame can hold one Objective and one
   DataProfile but is not the canonical reference-based session-membership FCO
   and does not implement Objective-bound multi-session isolation. It now
-  retains materialized Discovery membership for Planner readability, but that
+  retains materialized Hypothesis and Discovery research-state membership for
+  Planner readability, but it does not retain Tasks as research knowledge and
   does not implement validity-aware selection or the semantic graph.
 - Direct Task-to-Evidence linkage is a bounded transitional capability. Canonical
   Hypothesis, EvidenceRequest, ExecutionRun, AnalysisFrame, evaluation, and
@@ -29,28 +28,40 @@ These are verified constraints of the bounded current implementation.
 - The Phase 2 Planner cognitive core, append-only native model conversation
   history, and deterministic Data Explorer-to-Evidence admission are
   **Implemented** at separate bounded library surfaces. Planner performs one
-  direct `plan_or_answer` invocation with no tools, persistence, approval, or
-  dispatch. The in-process Application retains its materialized SessionFrame
-  and model-backed conversation turns, but does not admit candidate Plan state;
-  durable restart/recovery and complete-loop composition are **Deferred**.
+  direct `plan_or_answer` invocation with no tools or dispatch. The in-process
+  Application retains its materialized SessionFrame and model-backed
+  conversation turns, while conversation history remains outside
+  `PlannerContext`. Application does not retain or admit Planner candidates.
+  The latest Human text remains the current prompt, native history remains
+  native `message_history`, and authoritative `PlannerContext` is serialized
+  deterministically and supplied fresh as data for each invocation rather than
+  accumulated inside Human prompts.
+  Candidate lifecycle, conversational Human authorization, LangGraph
+  interrupt/resume, restart/recovery, and complete-loop composition are
+  **Deferred**.
 - The Phase 1 Plan domain and side-effect-free candidate validation are
   **Implemented**, and append-only repository behavior is **Verified on
   SQLite** with exact Objective and Assumption snapshots for historical
   reconstruction. Planner can author a transient structurally validated
-  candidate, but no application path persists one. Human approval,
-  commit-boundary validation and persistence, activation, active selection,
-  and Task DAG runtime are **Deferred**.
+  candidate for one invocation. Commit-boundary validation and persistence plus
+  objective-scoped active selection are **Verified on SQLite** through an
+  independent application service; conversational authorization is
+  **Deferred**. Task DAG runtime is **Deferred**.
   `ScientificInvestigationRun`, `InvestigationPlan`,
   `InvestigationProtocol`, `EvidenceRequest`, `DataWorkOrder`,
   `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal`,
   and `GovernanceDecision` have no supported implementation.
 - Hypothesis Analyst and Graph Miner remain unregistered scaffolds. Discovery
-  and Hypothesis remain canonical FCO names but have no active bounded runtime.
+  and Hypothesis remain canonical FCO names but have no active bounded creation
+  or scientific-investigation runtime. Materialized Hypotheses may be retained
+  in SessionFrame and read by Planner without granting Planner authoring
+  authority.
 - Planner may propose a new Objective only inside a transient candidate Plan.
   It cannot create or mutate Assumptions; a candidate may retain only exact
-  already-admitted Assumptions. Application does not apply candidate Objective,
-  Task, or Plan state in Phase 2. Human review and durable candidate admission
-  remain **Deferred**. Task persistence supports status change only. Active Task
+  already-admitted Assumptions. The runtime does not retain that candidate or
+  connect a later Human response to admission. The independent admission
+  service may atomically admit an exact authorized Objective, Task, and Plan
+  bundle. Task persistence supports status change only. Active Task
   values are immutable; changing Task meaning requires a new identity, while
   status change produces a replacement with the same identity and instruction.
 - Application-authority Evidence admission is **Implemented** for the direct
@@ -91,10 +102,16 @@ These are verified constraints of the bounded current implementation.
 - Bootstrap composes the in-process S0 dispatcher and bounded Data Explorer.
   The installable `cognieda [PATH]` command reaches the development Planner
   REPL and is **Partially implemented**. Its Application owns materialized
-  SessionFrame state, exact `PlannerContext` materialization, and complete
-  native-message model turns only for the
-  current process; no durable recovery, supported end-to-end application
+  SessionFrame state, exact active-Plan `PlannerContext` materialization, and
+  complete native-message model turns only for the current process. Candidate
+  review/authorization and LangGraph interrupt/resume are not implemented. No
+  durable recovery or supported end-to-end application
   runtime, worker, service API, or product CLI exists.
+- Application-to-CLI presentation uses an in-process EventBus. Normal Planner
+  responses, transient Plan proposals, Human clarification requests, and
+  command messages are published to renderer subscribers; submit calls do not
+  return rendered assistant Messages. Runtime events are not persisted, do not
+  retain candidates, and have no research-state or admission authority.
 - The local Data Explorer path executes only finite validated deterministic
   operations from an explicit absolute CSV or Parquet path. General-purpose
   Python, generated code, `exec`, `eval`, fuzzy column resolution, implicit
@@ -108,10 +125,13 @@ These are verified constraints of the bounded current implementation.
   blocked until successor dataset and DataProfile semantics exist.
 - `DATA_TRANSFORMATION` remains blocked until immutable successor dataset state
   and successor DataProfile handling exist.
-- Phase 2 Planner tests use a deterministic fake Agent boundary; they prove
+- Phase 2 Planner tests use deterministic fake and PydanticAI `FunctionModel`
+  boundaries; they prove
   direct Agent ownership, one invocation, exact typed dependency injection,
-  context/result coherence, native message isolation, and fail-closed
-  Assumption and active-Plan validation without any executor call.
+  context/result coherence, native dialogue continuity, fresh current-run
+  PlannerContext, absence of stale authoritative-context replay through the
+  active instruction channel, and fail-closed Assumption and active-Plan
+  validation without any executor call.
 - Workspace path selection and initialization are **Implemented**, but
   automatic dataset discovery or admission is **Unsupported**. The
   conventional `data/` directory does not itself establish a DataProfile.

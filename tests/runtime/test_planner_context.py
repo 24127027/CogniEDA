@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from uuid import uuid4
-
 import pytest
 from pydantic import ValidationError
 
-from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.planner_context import build_planner_context
 from cognieda.schemas import (
     Assumption,
@@ -14,7 +11,9 @@ from cognieda.schemas import (
     DiscoveryClaim,
     Evidence,
     EvidenceProvenance,
+    Hypothesis,
     Objective,
+    Plan,
     SessionFrame,
     Task,
     ValidityBasis,
@@ -43,9 +42,16 @@ def _full_frame() -> SessionFrame:
             data_profile_id=profile.data_profile_id,
         ),
     )
-    hypothesis_id = uuid4()
+    hypothesis = Hypothesis(
+        task_id=task.task_id,
+        profile_id=profile.data_profile_id,
+        statement="The admitted dataset contains 42 rows.",
+        scope="dataset:v1",
+        validation_method="row count",
+        evidence_expectation="one admitted row-count observation",
+    )
     discovery = Discovery(
-        hypothesis_id=hypothesis_id,
+        hypothesis_id=hypothesis.hypothesis_id,
         evidence_ids=[evidence.evidence_id],
         claim=DiscoveryClaim(
             statement="The admitted dataset contains 42 rows.",
@@ -56,7 +62,7 @@ def _full_frame() -> SessionFrame:
         validity_basis=ValidityBasis(
             data_profile_id=profile.data_profile_id,
             analysis_frame_refs=["analysis:row-count"],
-            hypothesis_id=hypothesis_id,
+            hypothesis_id=hypothesis.hypothesis_id,
             evidence_ids=[evidence.evidence_id],
             method="row count",
             decision_rule="Support when the admitted count is 42.",
@@ -65,7 +71,7 @@ def _full_frame() -> SessionFrame:
     return SessionFrame(
         objective=objective,
         assumptions=(assumption,),
-        tasks=(task,),
+        hypotheses=(hypothesis,),
         evidences=(evidence,),
         discoveries=(discovery,),
         data_profile=profile,
@@ -74,20 +80,18 @@ def _full_frame() -> SessionFrame:
 
 def test_builder_exactly_materializes_every_readable_session_frame_member() -> None:
     frame = _full_frame()
-    history = ConversationHistory()
 
-    context = build_planner_context(frame, history)
+    context = build_planner_context(frame)
 
     assert context.active_plan is None
     assert context.objective == frame.objective
     assert context.assumptions == frame.assumptions
-    assert context.tasks == frame.tasks
+    assert context.hypotheses == frame.hypotheses
     assert context.evidences == frame.evidences
     assert context.discoveries == frame.discoveries
     assert context.data_profile == frame.data_profile
-    assert context.conversation_history == history
     with pytest.raises(ValidationError, match="frozen"):
-        context.tasks = ()
+        context.hypotheses = ()
 
 
 def test_session_frame_retains_discovery_membership_immutably() -> None:
@@ -101,3 +105,38 @@ def test_session_frame_retains_discovery_membership_immutably() -> None:
     assert successor.discoveries == (discovery,)
     with pytest.raises(ValidationError, match="duplicate Discovery"):
         SessionFrame(discoveries=(discovery, discovery))
+
+
+def test_builder_materializes_exact_active_plan_for_current_objective() -> None:
+    frame = _full_frame()
+    assert frame.objective is not None
+    task = Task(
+        objective_id=frame.objective.objective_id,
+        kind=TaskKind.DATA,
+        instruction="Count rows.",
+    )
+    plan = Plan.create(
+        objective=frame.objective,
+        assumptions=frame.assumptions,
+        task_ids=(task.task_id,),
+        tasks=(task,),
+    )
+
+    context = build_planner_context(
+        frame,
+        active_plan=plan,
+    )
+
+    assert context.active_plan is plan
+
+
+def test_builder_rejects_active_plan_for_different_objective() -> None:
+    frame = _full_frame()
+    other = Objective(text="Different Objective.")
+    plan = Plan.create(objective=other, task_ids=(), tasks=())
+
+    with pytest.raises(ValueError, match="exact SessionFrame Objective"):
+        build_planner_context(
+            frame,
+            active_plan=plan,
+        )

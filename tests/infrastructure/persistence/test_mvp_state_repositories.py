@@ -23,6 +23,7 @@ from cognieda.schemas import (
     DataProfile,
     Evidence,
     EvidenceProvenance,
+    Hypothesis,
     Objective,
     SessionFrame,
     Task,
@@ -125,9 +126,21 @@ def test_data_profile_evidence_and_session_frame_round_trip_with_direct_lineage(
             tool_reference="pandas:len",
         ),
     )
+    hypothesis = Hypothesis(
+        task_id=task.task_id,
+        profile_id=profile.data_profile_id,
+        statement="The dataset contains three rows.",
+        scope="dataset:customers.csv",
+        validation_method="row count",
+        evidence_expectation="one admitted row-count observation",
+    )
 
     persisted = EvidenceRepository(db_session).create(evidence)
-    frame = SessionFrame(tasks=[task], data_profile=profile, evidences=[persisted])
+    frame = SessionFrame(
+        hypotheses=[hypothesis],
+        data_profile=profile,
+        evidences=[persisted],
+    )
     persisted_frame = SessionFrameRepository(db_session).create(frame)
 
     assert DataProfileRepository(db_session).get_by_id(profile.data_profile_id) == profile

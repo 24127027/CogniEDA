@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from sqlmodel import Session
+
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.types import PlannerResult
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.delegation import ExecutorDispatcher
+from cognieda.infrastructure.persistence.repositories import ActivePlanRepository
 from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
 from cognieda.schemas.artifacts import SessionFrame
+from cognieda.schemas.plan import Plan
 
 from .conversation import ConversationHistory
 from .messages import Message, MessageRole, MessageType
@@ -22,46 +26,49 @@ class Application:
         dispatcher: ExecutorDispatcher,
         agent_factory: AgentFactoryPort,
         event_bus: EventBus,
-
+        session: Session,
     ) -> None:
         self.workspace = workspace
         self.agent_factory = agent_factory
         self.planner_agent = planner_agent
-        self.event_bus = event_bus  
+        self.event_bus = event_bus
         self.dispatcher = dispatcher
+        self._active_plans = ActivePlanRepository(session)
         self.session_frame = SessionFrame()
         self.conversation_history = ConversationHistory()
 
     async def submit_message(self, message: str) -> None:
         if message.startswith("/"):
-            await self._handle_command(message)
+            command_result = await self._handle_command(message)
+            self.event_bus.publish(MessageProduced(message=command_result))
             return
 
+        active_plan = self._resolve_active_plan()
         planner_context = build_planner_context(
             self.session_frame,
-            self.conversation_history,
+            active_plan=active_plan,
         )
 
         try:
             planner_output = await self.planner_agent.run(
                 message,
                 context=planner_context,
+                message_history=self.conversation_history.model_messages(),
             )
         except MissingModelCredentialError as e:
-            self._emit_message(
-                f"{e}\n\n"
-                "Run '/provider key <provider>' to configure an API key."
-            )
+            self._emit_message(f"{e}\n\nRun '/provider key <provider>' to configure an API key.")
             return
 
         if planner_output.messages:
-            self.conversation_history = (
-                self.conversation_history.add_turn(
-                    planner_output.messages
-                )
-            )
+            self.conversation_history = self.conversation_history.add_turn(planner_output.messages)
 
         self._emit_planner_result(planner_output.result)
+
+    def _resolve_active_plan(self) -> Plan | None:
+        objective = self.session_frame.objective
+        if objective is None:
+            return None
+        return self._active_plans.get_by_objective_id(objective.objective_id)
 
     def _emit_planner_result(self, result: PlannerResult) -> None:
         if result.plan is not None:
@@ -93,9 +100,7 @@ class Application:
             # No public event yet.
             return
 
-        raise AssertionError(
-            "PlannerResult passed validation but has no conclusion."
-        )
+        raise AssertionError("PlannerResult passed validation but has no conclusion.")
 
     # TODO: Move command handling to a separate class or module for better separation of concerns
     async def _handle_command(self, command: str) -> Message:
@@ -113,9 +118,7 @@ class Application:
                     recreate_agent=True,
                 )
 
-                return self._text(
-                    f"Added skill '{name}'."
-                )
+                return self._text(f"Added skill '{name}'.")
 
             case ["/skill", "rm", name]:
                 self.workspace.remove_skill(name)
@@ -125,9 +128,7 @@ class Application:
                     recreate_agent=True,
                 )
 
-                return self._text(
-                    f"Removed skill '{name}'."
-                )
+                return self._text(f"Removed skill '{name}'.")
 
             case ["/skill", "list"]:
                 skills = self.workspace.load_skills_config()
@@ -136,10 +137,7 @@ class Application:
                     return self._text("No skills registered.")
 
                 return self._text(
-                    "\n".join(
-                        f"{name}: {cfg['directories']}"
-                        for name, cfg in skills.items()
-                    )
+                    "\n".join(f"{name}: {cfg['directories']}" for name, cfg in skills.items())
                 )
 
             case ["/skill", "use", worker, skill]:
@@ -150,9 +148,7 @@ class Application:
                     recreate_agent=True,
                 )
 
-                return self._text(
-                    f"Assigned '{skill}' to '{worker}'."
-                )
+                return self._text(f"Assigned '{skill}' to '{worker}'.")
 
             case ["/skill", "drop", worker, skill]:
                 self.workspace.remove_worker_skill(worker, skill)
@@ -162,9 +158,7 @@ class Application:
                     recreate_agent=True,
                 )
 
-                return self._text(
-                    f"Removed '{skill}' from '{worker}'."
-                )
+                return self._text(f"Removed '{skill}' from '{worker}'.")
 
             #
             # Providers
@@ -187,11 +181,7 @@ class Application:
                 )
 
             case ["/provider", "list"]:
-                return self._text(
-                    "\n".join(
-                        self.workspace.project_config.providers.keys()
-                    )
-                )
+                return self._text("\n".join(self.workspace.project_config.providers.keys()))
 
             case ["/provider", "use", profile]:
                 self.workspace.use_provider(profile)
@@ -200,9 +190,7 @@ class Application:
                     recreate_agent=True,
                 )
 
-                return self._text(
-                    f"Using provider '{profile}'."
-                )
+                return self._text(f"Using provider '{profile}'.")
 
             case ["/provider", "model", profile, model]:
                 self.workspace.set_provider_model(
@@ -214,17 +202,13 @@ class Application:
                     recreate_agent=True,
                 )
 
-                return self._text(
-                    f"Updated '{profile}' model to '{model}'."
-                )
+                return self._text(f"Updated '{profile}' model to '{model}'.")
             # TODO:
             # Prompting for secrets belongs to the CLI/UI layer.
             # Application should receive the API key as an argument rather than
             # calling input() directly.
             case ["/provider", "key", profile]:
-                api_key = input(
-                    f"{profile} API key: "
-                ).strip()
+                api_key = input(f"{profile} API key: ").strip()
 
                 self.workspace.set_provider_api_key(
                     profile,
@@ -235,9 +219,7 @@ class Application:
                     recreate_agent=True,
                 )
 
-                return self._text(
-                    f"Stored API key for '{profile}'."
-                )
+                return self._text(f"Stored API key for '{profile}'.")
 
             #
             # Planner
@@ -247,14 +229,10 @@ class Application:
                     reload_instruction=True,
                 )
 
-                return self._text(
-                    "Planner instructions reloaded."
-                )
+                return self._text("Planner instructions reloaded.")
 
             case _:
-                return self._text(
-                    f"Unknown command: '{command}'."
-                )
+                return self._text(f"Unknown command: '{command}'.")
 
     def _text(self, content: str) -> Message:
         return Message(
@@ -262,7 +240,7 @@ class Application:
             role=MessageRole.ASSISTANT,
             content=content,
         )
-    
+
     async def _reload_runtime(
         self,
         *,
@@ -275,17 +253,14 @@ class Application:
 
         await self.planner_agent.reload(
             model_config=(
-                self.workspace.project_config.try_resolve_model()
-                if recreate_agent
-                else None
+                self.workspace.project_config.try_resolve_model() if recreate_agent else None
             ),
             agent_instruction=(
-                self.workspace.load_agent_instruction()
-                if reload_instruction
-                else None
+                self.workspace.load_agent_instruction() if reload_instruction else None
             ),
             recreate_agent=recreate_agent,
         )
+
     def _emit_message(self, content: str) -> None:
         self.event_bus.publish(
             MessageProduced(
