@@ -14,8 +14,6 @@ if TYPE_CHECKING:
 
 
 class CommandCompleter(Completer):
-    """Provides slash-command completions from the Application."""
-
     def __init__(self, application: Application) -> None:
         self.application = application
 
@@ -24,38 +22,18 @@ class CommandCompleter(Completer):
         document: Document,
         complete_event,
     ):
-        text = document.text
+        text = document.text_before_cursor
 
-        # Only activate completion for slash commands.
         if not text.startswith("/"):
             return
 
-        # Do not suggest while entering command arguments.
-        #
-        # Examples:
-        #   "/ski"          -> suggestions
-        #   "/skill"        -> suggestions
-        #   "/skill "       -> suggestions for subcommands
-        #   "/skill add "   -> no suggestions
-        if text.count(" ") > 1:
-            return
-
-        suggestions = self._suggestions(text)
-
-        for suggestion in suggestions:
+        for suggestion in self.application.suggest_commands(text):
             yield Completion(
-                suggestion.name,
+                text=suggestion.name,
                 start_position=-len(text),
                 display=suggestion.name,
                 display_meta=suggestion.description,
             )
-
-    def _suggestions(
-        self,
-        text: str,
-    ) -> tuple[CommandSuggestion, ...]:
-        return self.application.suggest_commands(text)
-
 
 class Prompt:
     """Interactive terminal prompt.
@@ -65,21 +43,17 @@ class Prompt:
     """
 
     def __init__(
-        self,
-        application: Application,
-        *,
-        prompt: str = "> ",
-    ) -> None:
-        self.application = application
-
-        self._session: PromptSession[str] = PromptSession(
-            history=InMemoryHistory(),
-            completer=CommandCompleter(application),
-            complete_while_typing=True,
-        )
-
-        self._prompt = prompt
+            self,
+            application: Application,
+            *,
+            prompt: str = "> ",
+        ) -> None:
+            self._session = PromptSession(
+                history=InMemoryHistory(),
+                completer=CommandCompleter(application),
+                complete_while_typing=True,
+            )
+            self._prompt = prompt
 
     async def read(self) -> str:
-        """Read one submitted line from the user."""
         return await self._session.prompt_async(self._prompt)
