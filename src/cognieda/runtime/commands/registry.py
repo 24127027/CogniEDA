@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from .base import Command
+from .base import Command, ResolvedCommand
 
 
 class CommandNotFoundError(Exception):
@@ -24,7 +24,41 @@ class CommandRegistry:
 
         self._commands[command.name] = command
 
-    def resolve(self, name: str) -> Command:
+    def resolve(self, tokens: tuple[str, ...]) -> ResolvedCommand:
+        if not tokens:
+            raise CommandNotFoundError("Empty command.")
+
+        if not tokens[0].startswith("/"):
+            raise CommandNotFoundError("Not a command.")
+
+        parts = [tokens[0][1:], *tokens[1:]]
+
+        # Find the longest registered command name.
+        #
+        # Example:
+        #
+        # /skill add foo ./skills/foo
+        #
+        # candidates:
+        #   skill.add.foo
+        #   skill.add
+        #   skill
+        #
+        # "skill.add" wins.
+        for length in range(len(parts), 0, -1):
+            name = ".".join(parts[:length])
+
+            if name in self._commands:
+                return ResolvedCommand(
+                    name=name,
+                    args=tuple(parts[length:]),
+                )
+
+        raise CommandNotFoundError(
+            f"Unknown command: '{' '.join(tokens)}'."
+        )
+
+    def get(self, name: str) -> Command:
         try:
             return self._commands[name]
         except KeyError:
@@ -36,13 +70,6 @@ class CommandRegistry:
         return tuple(self._commands.values())
 
     def suggest(self, prefix: str) -> tuple[Command, ...]:
-        """
-        Used later by CLI/TUI autocomplete.
-
-        Example:
-            suggest("skill")
-            suggest("skill.")
-        """
         normalized = prefix.removeprefix("/")
 
         return tuple(

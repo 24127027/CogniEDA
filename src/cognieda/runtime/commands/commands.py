@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from cognieda.runtime.messages import Message, MessageRole, MessageType
 
-from .base import CommandContext, ParsedCommand
+from .base import CommandContext, ResolvedCommand
 
 
 def text(content: str) -> Message:
@@ -18,7 +18,7 @@ class SkillAddCommand:
 
     async def execute(
         self,
-        command: ParsedCommand,
+        command: ResolvedCommand,
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 2:
@@ -41,7 +41,7 @@ class SkillRemoveCommand:
 
     async def execute(
         self,
-        command: ParsedCommand,
+        command: ResolvedCommand,
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 1:
@@ -64,7 +64,7 @@ class SkillListCommand:
 
     async def execute(
         self,
-        command: ParsedCommand,
+        command: ResolvedCommand,
         context: CommandContext,
     ) -> Message:
         if command.args:
@@ -88,7 +88,7 @@ class SkillUseCommand:
 
     async def execute(
         self,
-        command: ParsedCommand,
+        command: ResolvedCommand,
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 2:
@@ -111,7 +111,7 @@ class SkillDropCommand:
 
     async def execute(
         self,
-        command: ParsedCommand,
+        command: ResolvedCommand,
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 2:
@@ -134,7 +134,7 @@ class ProviderStatusCommand:
 
     async def execute(
         self,
-        command: ParsedCommand,
+        command: ResolvedCommand,
         context: CommandContext,
     ) -> Message:
         if command.args:
@@ -163,7 +163,7 @@ class ProviderListCommand:
 
     async def execute(
         self,
-        command: ParsedCommand,
+        command: ResolvedCommand,
         context: CommandContext,
     ) -> Message:
         if command.args:
@@ -181,7 +181,7 @@ class ProviderUseCommand:
 
     async def execute(
         self,
-        command: ParsedCommand,
+        command: ResolvedCommand,
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 1:
@@ -203,7 +203,7 @@ class ProviderModelCommand:
 
     async def execute(
         self,
-        command: ParsedCommand,
+        command: ResolvedCommand,
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 2:
@@ -230,7 +230,7 @@ class ProviderKeyCommand:
 
     async def execute(
         self,
-        command: ParsedCommand,
+        command: ResolvedCommand,
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 1:
@@ -261,7 +261,7 @@ class ReloadCommand:
 
     async def execute(
         self,
-        command: ParsedCommand,
+        command: ResolvedCommand,
         context: CommandContext,
     ) -> Message:
         if command.args:

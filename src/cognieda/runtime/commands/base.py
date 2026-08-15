@@ -4,13 +4,18 @@ from dataclasses import dataclass
 from typing import Awaitable, Callable, Protocol
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.messages import Message
+from cognieda.runtime.application import AgentFactoryPort
 from cognieda.runtime.workspace import Workspace
 
 
 @dataclass(frozen=True)
 class ParsedCommand:
+    tokens: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ResolvedCommand:
     name: str
     args: tuple[str, ...]
 
@@ -30,7 +35,7 @@ class Command(Protocol):
 
     async def execute(
         self,
-        command: ParsedCommand,
+        command: ResolvedCommand,
         context: CommandContext,
     ) -> Message:
         ...
