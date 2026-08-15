@@ -11,6 +11,12 @@ from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
 from cognieda.schemas.artifacts import SessionFrame
 from cognieda.schemas.plan import Plan
+from cognieda.runtime.commands import (
+    CommandContext,
+    CommandHandler,
+    CommandParser,
+    create_command_registry,
+)
 
 from .conversation import ConversationHistory
 from .messages import Message, MessageRole, MessageType
@@ -37,10 +43,24 @@ class Application:
         self.session_frame = SessionFrame()
         self.conversation_history = ConversationHistory()
 
+        self.command_handler = CommandHandler(
+            parser=CommandParser(),
+            registry=create_command_registry(),
+            context=CommandContext(
+                workspace=self.workspace,
+                agent_factory=self.agent_factory,
+                planner=self.planner_agent,
+                reload_runtime=self._reload_runtime,
+                prompt_secret=input,
+            ),
+        )
+
     async def submit_message(self, message: str) -> None:
         if message.startswith("/"):
-            command_result = await self._handle_command(message)
-            self.event_bus.publish(MessageProduced(message=command_result))
+            command_result = await self.command_handler.handle(message)
+            self.event_bus.publish(
+                MessageProduced(message=command_result)
+            )
             return
 
         active_plan = self._resolve_active_plan()
