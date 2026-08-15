@@ -15,6 +15,8 @@ class PlannerErrorCode(StrEnum):
     INVALID_REQUEST = "invalid_request"
     MODEL_UNAVAILABLE = "model_unavailable"
     INVALID_MODEL_RESULT = "invalid_model_result"
+    INVALID_LIFECYCLE_STATE = "invalid_lifecycle_state"
+    PLAN_ADMISSION_FAILED = "plan_admission_failed"
 
 
 class PlannerControlledError(BaseModel):
@@ -36,6 +38,7 @@ class PlannerResult(BaseModel):
     response: str | None = Field(default=None, min_length=1)
     human_input_request: str | None = Field(default=None, min_length=1)
     continue_execution: bool = False
+    discard_candidate: bool = False
 
     @model_validator(mode="after")
     def _validate_coherence(self) -> PlannerResult:
@@ -51,12 +54,19 @@ class PlannerResult(BaseModel):
             raise ValueError(
                 "continue_execution cannot accompany a Human input request."
             )
+        if self.discard_candidate and self.plan is not None:
+            raise ValueError("discard_candidate cannot accompany a new candidate Plan.")
+        if self.discard_candidate and self.continue_execution:
+            raise ValueError("discard_candidate cannot accompany continue_execution.")
+        if self.discard_candidate and self.human_input_request is not None:
+            raise ValueError("discard_candidate cannot accompany a Human input request.")
         if not any(
             (
                 self.plan is not None,
                 self.response is not None,
                 self.human_input_request is not None,
                 self.continue_execution,
+                self.discard_candidate,
             )
         ):
             raise ValueError("PlannerResult must contain a meaningful conclusion.")

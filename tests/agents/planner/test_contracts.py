@@ -97,6 +97,7 @@ def test_planner_context_and_result_have_exact_canonical_fields() -> None:
         "response",
         "human_input_request",
         "continue_execution",
+        "discard_candidate",
     )
     assert tuple(PlannerOutput.model_fields) == ("result", "messages", "error")
 
@@ -179,6 +180,27 @@ def test_candidate_cannot_be_generated_and_authorized_in_same_result() -> None:
         PlannerResult(
             human_input_request="Confirm the cohort.",
             continue_execution=True,
+        )
+
+
+def test_discard_signal_has_exact_structural_conflicts() -> None:
+    objective = Objective(text="Understand customer retention.")
+    task = _task(objective)
+    plan = _plan(objective, (task,))
+
+    assert PlannerResult(discard_candidate=True).discard_candidate is True
+    assert PlannerResult(
+        response="Discarded the proposal.",
+        discard_candidate=True,
+    ).response == "Discarded the proposal."
+    with pytest.raises(ValidationError, match="new candidate Plan"):
+        PlannerResult(plan=plan, tasks=(task,), discard_candidate=True)
+    with pytest.raises(ValidationError, match="continue_execution"):
+        PlannerResult(continue_execution=True, discard_candidate=True)
+    with pytest.raises(ValidationError, match="Human input request"):
+        PlannerResult(
+            human_input_request="Which proposal?",
+            discard_candidate=True,
         )
 
 

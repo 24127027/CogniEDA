@@ -22,7 +22,6 @@ from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.types import PlannerErrorCode, PlannerResult
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.delegation import ExecutionRequest
-from cognieda.runtime.conversation import ConversationHistory
 from cognieda.schemas import (
     Assumption,
     DataProfile,
@@ -127,13 +126,11 @@ def test_planner_directly_owns_one_agent_and_invokes_it_once_with_exact_deps() -
         PlannerResult(response="The answer follows from admitted evidence."),
         current_messages,
     )
-    history = ConversationHistory().add_turn(prior_messages)
-
     output = asyncio.run(
         planner.run(
             "What do we know?",
             context=PlannerContext(),
-            message_history=history.model_messages(),
+            message_history=list(prior_messages),
         )
     )
 
@@ -160,6 +157,30 @@ def test_planner_directly_owns_one_agent_and_invokes_it_once_with_exact_deps() -
     assert output.messages == current_messages
     assert all(type(message) in {ModelRequest, ModelResponse} for message in output.messages)
     assert not any(message in output.messages for message in prior_messages)
+
+
+def test_retained_candidate_is_supplied_as_fresh_lifecycle_context() -> None:
+    objective = Objective(text="Understand retention.")
+    candidate = _candidate(objective)
+    assert candidate.plan is not None
+    planner, agent, _, _ = _planner(PlannerResult(response="Pricing is material."))
+
+    output = asyncio.run(
+        planner.run(
+            "Why include pricing?",
+            context=PlannerContext(objective=objective),
+            candidate_plan=candidate.plan,
+            candidate_tasks=candidate.tasks,
+        )
+    )
+
+    assert output.error is None
+    _, kwargs = agent.calls[0]
+    candidate_instruction = kwargs["instructions"][-1]
+    assert "Current exact retained Planner candidate follows." in candidate_instruction
+    assert "<planner_candidate>" in candidate_instruction
+    assert str(candidate.plan.plan_id) in candidate_instruction
+    assert "supersedes historical conversational references" in candidate_instruction
 
 
 def test_fresh_context_does_not_replay_stale_snapshot_into_second_model_call() -> None:
@@ -367,6 +388,43 @@ def test_continue_execution_requires_active_plan() -> None:
     )
     assert accepted.error is None
     assert accepted.result.continue_execution is True
+
+    planner_with_candidate, _, _, _ = _planner(PlannerResult(continue_execution=True))
+    candidate_authorized = asyncio.run(
+        planner_with_candidate.run(
+            "That looks right, proceed.",
+            context=PlannerContext(objective=objective),
+            candidate_plan=candidate.plan,
+            candidate_tasks=candidate.tasks,
+        )
+    )
+    assert candidate_authorized.error is None
+
+
+def test_discard_requires_exact_retained_candidate() -> None:
+    objective = Objective(text="Understand retention.")
+    candidate = _candidate(objective)
+    assert candidate.plan is not None
+
+    without_candidate, _, _, _ = _planner(PlannerResult(discard_candidate=True))
+    rejected = asyncio.run(
+        without_candidate.run("Abandon that proposal.", context=PlannerContext())
+    )
+    assert rejected.error is not None
+    assert rejected.error.code is PlannerErrorCode.INVALID_MODEL_RESULT
+
+    with_candidate, _, _, _ = _planner(
+        PlannerResult(response="Discarded.", discard_candidate=True)
+    )
+    accepted = asyncio.run(
+        with_candidate.run(
+            "Abandon that proposal.",
+            context=PlannerContext(objective=objective),
+            candidate_plan=candidate.plan,
+            candidate_tasks=candidate.tasks,
+        )
+    )
+    assert accepted.error is None
 
 
 def test_empty_request_and_missing_model_fail_closed_without_invocation() -> None:

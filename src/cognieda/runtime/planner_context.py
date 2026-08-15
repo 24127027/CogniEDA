@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
+
 from cognieda.agents.planner.context import PlannerContext
+from cognieda.infrastructure.persistence.repositories import ActivePlanRepository
 from cognieda.schemas.artifacts import SessionFrame
 from cognieda.schemas.plan import Plan
 
@@ -25,4 +29,21 @@ def build_planner_context(
     )
 
 
-__all__ = ("build_planner_context",)
+@dataclass(frozen=True)
+class PlannerContextProvider:
+    """Materialize fresh Planner-readable authority for each cognitive invocation."""
+
+    session_frame_provider: Callable[[], SessionFrame]
+    active_plans: ActivePlanRepository
+
+    def materialize(self) -> PlannerContext:
+        session_frame = self.session_frame_provider()
+        active_plan = None
+        if session_frame.objective is not None:
+            active_plan = self.active_plans.get_by_objective_id(
+                session_frame.objective.objective_id
+            )
+        return build_planner_context(session_frame, active_plan=active_plan)
+
+
+__all__ = ("PlannerContextProvider", "build_planner_context")
