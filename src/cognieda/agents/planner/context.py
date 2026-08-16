@@ -13,14 +13,12 @@ from cognieda.schemas.artifacts import (
     Objective,
 )
 from cognieda.schemas.common import ImmutableCogniEDABaseModel
-from cognieda.schemas.plan import Plan
 
 
 class PlannerContext(ImmutableCogniEDABaseModel):
     """Authoritative coordination and readable research state for one invocation."""
 
-    active_plan: Plan | None = None
-    objective: Objective | None = None
+    objectives: tuple[Objective, ...] = ()
     assumptions: tuple[Assumption, ...] = ()
     hypotheses: tuple[Hypothesis, ...] = ()
     evidences: tuple[Evidence, ...] = ()

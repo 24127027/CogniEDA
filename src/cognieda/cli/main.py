@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from cognieda.runtime.events import (
-    AssistantThinkingFinished, 
-    AssistantThinkingStarted, 
-    HumanInputRequested, 
-    MessageProduced, 
-    PlanProposed
+    AssistantThinkingFinished,
+    AssistantThinkingStarted,
+    HumanInputRequested,
+    MessageProduced,
+    PlanProposed,
 )
 from .prompt import Prompt
 from .renderer import Renderer
@@ -33,7 +33,7 @@ async def repl(app: Application, renderer: Renderer) -> None:
         AssistantThinkingStarted,
         renderer.handle_thinking_started,
     )
-    
+
     app.event_bus.subscribe(
         AssistantThinkingFinished,
         renderer.handle_thinking_finished,

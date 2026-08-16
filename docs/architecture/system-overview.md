@@ -99,7 +99,7 @@ the final step.
 ## Semantic graph and total persistence
 
 The semantic Knowledge Graph is not the complete persistence model. It contains
-exactly:
+exactly four node types:
 
 ```text
 Objective
@@ -107,6 +107,13 @@ Hypothesis
 Evidence
 Discovery
 ```
+
+In the future semantic Knowledge Graph, one Objective may associate with
+multiple Hypotheses and one Hypothesis may be relevant to multiple Objectives.
+Hypothesis scientific identity remains Objective-independent, and scientific
+validity remains grounded through the `Hypothesis -> Evidence -> Discovery`
+lineage. Exact Objective-Hypothesis relation types, edge representation,
+persistence, and admission remain deferred until semantic graph implementation.
 
 Other durable state remains outside that graph. This includes `DataProfile`,
 `Assumption`, `Task`, `SessionFrame`, planning and protocol records,

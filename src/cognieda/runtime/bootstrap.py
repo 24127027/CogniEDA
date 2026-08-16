@@ -14,7 +14,6 @@ from cognieda.delegation import ExecutorDispatcher, ExecutorRegistry
 from cognieda.infrastructure.llm import AgentFactory
 from cognieda.infrastructure.persistence import get_session, init_db
 from cognieda.infrastructure.persistence.repositories import (
-    ActivePlanRepository,
     SessionFrameRepository,
 )
 
@@ -58,16 +57,10 @@ def bootstrap_application(workspace_path: Path) -> Application:
         session,
         scope_key=str(session_id),
     )
-    active_plans = ActivePlanRepository(session)
 
     def planner_context_factory() -> PlannerContext:
         frame = session_frames.get_current()
-        active_plan = (
-            active_plans.get_by_objective_id(frame.objective.objective_id)
-            if frame.objective is not None
-            else None
-        )
-        return build_planner_context(frame, active_plan=active_plan)
+        return build_planner_context(frame)
 
     planner = Planner(
         deps=PlannerToolDeps(dispatcher=dispatcher),

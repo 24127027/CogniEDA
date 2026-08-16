@@ -47,20 +47,48 @@ case, filesystem presence is not a DataProfile, and changed data requires a
 successor physical dataset plus a successor DataProfile rather than an
 in-place identity rewrite. See [Workspace ownership](../../development/workspace-layout.md).
 
-## Objective scope
+## Objective scope and Hypothesis independence
 
-Each Task and scientific investigation is governed within one Objective. One
-Objective may have many Tasks and many scientific investigations over time. A
-Workspace may contain multiple active Objectives, but a Task or Hypothesis does
-not acquire direct multi-Objective ownership.
+Each Task and Plan is coordinated within one focal Objective. One Objective may
+have many Tasks and many scientific investigations over time. A Workspace may
+contain multiple active Objectives.
 
-Objective boundaries also constrain context and reuse. Work from another
-Objective can motivate a proposal, but it does not automatically become
-authoritative state in the new Objective.
+However, a `Hypothesis` represents an empirical scientific proposition whose
+scientific identity and validity are independent of Objective ownership. A
+Hypothesis contains no `objective_id`, `objective_ids`, or equivalent Objective
+membership fields. Adding, removing, or changing a research Objective does not
+mutate an existing Hypothesis or manufacture duplicate Hypotheses for the same
+proposition.
+
+In the future semantic Knowledge Graph, one Objective may associate with
+multiple Hypotheses and one Hypothesis may be relevant to multiple Objectives.
+Exact Objective-Hypothesis relation types, edge representation, persistence,
+admission, and governance remain deferred until semantic graph implementation.
+
+Objective relevance is research-intent/context semantics. It must not:
+- alter Hypothesis scientific identity;
+- alter Evidence or Discovery validity;
+- imply that an Objective scientifically supports a Hypothesis;
+- authorize unvetted cross-Objective Evidence reuse; or
+- act as an automatic LLM similarity edge.
 
 ## High-level scientific lineage
 
-The foundational lineage is:
+The target conceptual graph separates scientific lineage from research-intent
+relevance:
+
+```text
+                  Objective (research scope)
+                      : (future graph association)
+                      :
+                  Hypothesis (scientific commitment)
+                      |
+          +-----------+-----------+
+          |                       |
+       Evidence                Discovery
+```
+
+The foundational lineage rules are:
 
 ```text
 Objective

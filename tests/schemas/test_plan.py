@@ -234,9 +234,9 @@ def test_many_to_one_dependency_requires_all_incoming_prerequisites() -> None:
 
     assert plan.eligible_task_ids() == (first.task_id, second.task_id)
     assert plan.eligible_task_ids(completed_task_ids={first.task_id}) == (second.task_id,)
-    assert plan.eligible_task_ids(
-        completed_task_ids={first.task_id, second.task_id}
-    ) == (dependent.task_id,)
+    assert plan.eligible_task_ids(completed_task_ids={first.task_id, second.task_id}) == (
+        dependent.task_id,
+    )
 
 
 def test_dependent_input_order_does_not_change_fingerprint() -> None:
@@ -417,7 +417,10 @@ def test_plan_is_immutable_non_fco_and_respects_planner_ownership_surfaces() -> 
     assert "pending_plan" not in PlannerContext.model_fields
     assert "pending_tasks" not in PlannerContext.model_fields
     assert "conversation_history" not in PlannerContext.model_fields
-    assert "active_plan" in PlannerContext.model_fields
+    assert "active_plan" not in PlannerContext.model_fields
+    assert "active_plans" not in PlannerContext.model_fields
+    assert "objective" not in PlannerContext.model_fields
+    assert "objectives" in PlannerContext.model_fields
     assert "plan" in PlannerResult.model_fields
     assert "plan" not in PlannerOutput.model_fields
 

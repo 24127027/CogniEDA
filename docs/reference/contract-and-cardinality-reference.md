@@ -119,6 +119,7 @@ rejected.
 
 | Source | Target | Canonical cardinality | Consequence |
 | --- | --- | --- | --- |
+| Objective | Hypothesis | many-to-many (M:N) target | In the future semantic Knowledge Graph, one Objective may connect to zero or many Hypotheses and one Hypothesis may be relevant to multiple Objectives. Exact relation types, edge representation, persistence, and admission remain deferred until semantic graph implementation. Hypothesis scientific identity and validity remain Objective-independent. |
 | eligible feasible leaf `SCIENTIFIC` Task | Hypothesis | exactly one | infeasible or otherwise ineligible Tasks have none; feasible work cannot fork into competing Hypotheses |
 | parent Task | Hypothesis | zero | parent Tasks cannot enter scientific commitment |
 | parent Task | Discovery | zero | parent summaries are GeneratedViews, not Discoveries |

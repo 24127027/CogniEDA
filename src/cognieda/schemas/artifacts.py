@@ -237,7 +237,7 @@ class UserDecision(CogniEDABaseModel):
 class SessionFrame(ImmutableCogniEDABaseModel):
     """Authoritative typed research state for the single active MVP session."""
 
-    objective: Objective | None = None
+    objectives: tuple[Objective, ...] = ()
     assumptions: tuple[Assumption, ...] = ()
     hypotheses: tuple[Hypothesis, ...] = ()
     evidences: tuple[Evidence, ...] = ()
@@ -250,6 +250,10 @@ class SessionFrame(ImmutableCogniEDABaseModel):
         return self
 
     def _check_research_state(self) -> None:
+        self._reject_duplicate_ids(
+            [objective.objective_id for objective in self.objectives],
+            object_name="Objective",
+        )
         self._reject_duplicate_ids(
             [assumption.assumption_id for assumption in self.assumptions],
             object_name="Assumption",
@@ -280,7 +284,7 @@ class SessionFrame(ImmutableCogniEDABaseModel):
 
     def _validated_copy(self, **updates: object) -> SessionFrame:
         values: dict[str, object] = {
-            "objective": self.objective,
+            "objectives": self.objectives,
             "assumptions": self.assumptions,
             "hypotheses": self.hypotheses,
             "evidences": self.evidences,
@@ -290,8 +294,10 @@ class SessionFrame(ImmutableCogniEDABaseModel):
         values.update(updates)
         return SessionFrame.model_validate(values)
 
-    def set_objective(self, objective: Objective | None) -> SessionFrame:
-        return self._validated_copy(objective=objective)
+    def add_objective(self, objective: Objective) -> SessionFrame:
+        if any(item.objective_id == objective.objective_id for item in self.objectives):
+            raise ValueError("SessionFrame rejects duplicate Objective IDs.")
+        return self._validated_copy(objectives=(*self.objectives, objective))
 
     def add_assumption(self, assumption: Assumption) -> SessionFrame:
         if any(item.assumption_id == assumption.assumption_id for item in self.assumptions):

@@ -82,13 +82,36 @@ def _discovery(evidence: Evidence, hypothesis_id: UUID) -> Discovery:
     )
 
 
+def test_session_frame_exact_fields_and_empty_defaults() -> None:
+    assert tuple(SessionFrame.model_fields) == (
+        "objectives",
+        "assumptions",
+        "hypotheses",
+        "evidences",
+        "discoveries",
+        "data_profile",
+    )
+    assert "objective" not in SessionFrame.model_fields
+    assert not hasattr(SessionFrame, "set_objective")
+    assert hasattr(SessionFrame, "add_objective")
+
+    empty = SessionFrame()
+    assert empty.objectives == ()
+    assert empty.assumptions == ()
+    assert empty.hypotheses == ()
+    assert empty.evidences == ()
+    assert empty.discoveries == ()
+    assert empty.data_profile is None
+
+
 def test_session_frame_retains_typed_research_state_in_insertion_order() -> None:
-    objective = Objective(text="Understand retention")
+    objective_1 = Objective(text="Understand retention")
+    objective_2 = Objective(text="Understand churn")
     assumptions = [Assumption(text="First"), Assumption(text="Second")]
     profile = _profile()
     tasks = [
-        _task("First task", objective_id=objective.objective_id),
-        _task("Second task", objective_id=objective.objective_id),
+        _task("First task", objective_id=objective_1.objective_id),
+        _task("Second task", objective_id=objective_2.objective_id),
     ]
     hypotheses = [
         _hypothesis(tasks[0], profile, "First proposition"),
@@ -97,14 +120,14 @@ def test_session_frame_retains_typed_research_state_in_insertion_order() -> None
     evidences = [_evidence(tasks[0], profile), _evidence(tasks[1], profile)]
 
     frame = SessionFrame(
-        objective=objective,
+        objectives=[objective_1, objective_2],
         assumptions=assumptions,
         hypotheses=hypotheses,
         evidences=evidences,
         data_profile=profile,
     )
 
-    assert frame.objective is objective
+    assert frame.objectives == (objective_1, objective_2)
     assert [item.text for item in frame.assumptions] == ["First", "Second"]
     assert [item.statement for item in frame.hypotheses] == [
         "First proposition",
@@ -120,6 +143,7 @@ def test_session_frame_retains_typed_research_state_in_insertion_order() -> None
 @pytest.mark.parametrize(
     ("field", "value_factory", "message"),
     [
+        ("objectives", lambda item: [item, item], "Objective"),
         ("assumptions", lambda item: [item, item], "Assumption"),
         ("hypotheses", lambda item: [item, item], "Hypothesis"),
         ("evidences", lambda item: [item, item], "Evidence"),
@@ -129,12 +153,14 @@ def test_session_frame_rejects_duplicate_ids(field, value_factory, message) -> N
     profile = _profile()
     task = _task("Profile data")
     values = {
+        "objectives": [],
         "assumptions": [],
         "hypotheses": [],
         "evidences": [],
         "data_profile": profile,
     }
     item = {
+        "objectives": Objective(text="Duplicate"),
         "assumptions": Assumption(text="Duplicate"),
         "hypotheses": _hypothesis(task, profile, "Duplicate"),
         "evidences": _evidence(task, profile),
@@ -169,6 +195,19 @@ def test_session_frame_rejects_evidence_for_non_active_data_profile() -> None:
         SessionFrame(evidences=[evidence], data_profile=_profile())
 
 
+def test_add_objective_returns_immutable_successor_and_preserves_order() -> None:
+    first = Objective(text="First Objective")
+    second = Objective(text="Second Objective")
+    original = SessionFrame()
+
+    successor = original.add_objective(first).add_objective(second)
+
+    assert original.objectives == ()
+    assert successor.objectives == (first, second)
+    with pytest.raises(ValueError, match="duplicate Objective"):
+        successor.add_objective(first)
+
+
 def test_add_hypothesis_returns_immutable_successor_and_preserves_order() -> None:
     profile = _profile()
     first = _hypothesis(_task("First"), profile, "First proposition")
@@ -189,14 +228,16 @@ def test_mutation_seams_preserve_research_membership_invariants() -> None:
     task = _task("Observe")
     hypothesis = _hypothesis(task, profile, "The dataset is empty")
     evidence = _evidence(task, profile)
+    objective = Objective(text="Explore")
 
-    successor = original.set_objective(Objective(text="Explore"))
+    successor = original.add_objective(objective)
     successor = successor.add_assumption(Assumption(text="Planning premise"))
     successor = successor.add_hypothesis(hypothesis)
     successor = successor.set_data_profile(profile)
     successor = successor.add_evidence(evidence)
 
     assert original == SessionFrame()
+    assert successor.objectives == (objective,)
     assert successor.hypotheses == (hypothesis,)
     assert successor.evidences == (evidence,)
     with pytest.raises(ValueError, match="DataProfile"):

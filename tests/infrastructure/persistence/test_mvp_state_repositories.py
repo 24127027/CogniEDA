@@ -156,8 +156,10 @@ def test_data_profile_evidence_and_session_frame_round_trip_with_direct_lineage(
 def test_session_frame_current_is_scoped_and_restart_readable(
     db_session: Session,
 ) -> None:
-    first = SessionFrame(objective=Objective(text="First workspace Objective."))
-    second = SessionFrame(objective=Objective(text="Second workspace Objective."))
+    obj_1 = Objective(text="First workspace Objective.")
+    obj_2 = Objective(text="Second workspace Objective.")
+    first = SessionFrame(objectives=(obj_1, obj_2))
+    second = SessionFrame(objectives=(Objective(text="Third workspace Objective."),))
     first_repository = SessionFrameRepository(db_session, scope_key="workspace:first")
     second_repository = SessionFrameRepository(db_session, scope_key="workspace:second")
 
@@ -165,6 +167,7 @@ def test_session_frame_current_is_scoped_and_restart_readable(
     first_repository.save_current(first)
     second_repository.save_current(second)
     assert first_repository.get_current() == first
+    assert first_repository.get_current().objectives == (obj_1, obj_2)
     assert second_repository.get_current() == second
 
     restarted_session = Session(db_session.get_bind())
@@ -173,7 +176,9 @@ def test_session_frame_current_is_scoped_and_restart_readable(
             restarted_session,
             scope_key="workspace:first",
         )
-        assert restarted.get_current() == first
+        loaded = restarted.get_current()
+        assert loaded == first
+        assert loaded.objectives == (obj_1, obj_2)
     finally:
         restarted_session.close()
 

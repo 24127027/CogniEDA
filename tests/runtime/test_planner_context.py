@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from cognieda.agents.planner.context import PlannerContext
 from cognieda.runtime.planner_context import build_planner_context
 from cognieda.schemas import (
     Assumption,
@@ -13,7 +14,6 @@ from cognieda.schemas import (
     EvidenceProvenance,
     Hypothesis,
     Objective,
-    Plan,
     SessionFrame,
     Task,
     ValidityBasis,
@@ -22,10 +22,11 @@ from cognieda.schemas.enums import DiscoveryEpistemicStatus, TaskKind, TaskStatu
 
 
 def _full_frame() -> SessionFrame:
-    objective = Objective(text="Understand dataset completeness.")
+    objective_1 = Objective(text="Understand dataset completeness.")
+    objective_2 = Objective(text="Understand churn rate.")
     assumption = Assumption(text="Rows represent independent observations.")
     task = Task(
-        objective_id=objective.objective_id,
+        objective_id=objective_1.objective_id,
         kind=TaskKind.DATA,
         instruction="Count rows.",
         status=TaskStatus.COMPLETED,
@@ -69,7 +70,7 @@ def _full_frame() -> SessionFrame:
         ),
     )
     return SessionFrame(
-        objective=objective,
+        objectives=(objective_1, objective_2),
         assumptions=(assumption,),
         hypotheses=(hypothesis,),
         evidences=(evidence,),
@@ -78,18 +79,34 @@ def _full_frame() -> SessionFrame:
     )
 
 
-def test_builder_exactly_materializes_every_readable_session_frame_member() -> None:
+def test_planner_context_exact_fields_and_no_singular_or_plan_fields() -> None:
+    assert tuple(PlannerContext.model_fields) == (
+        "objectives",
+        "assumptions",
+        "hypotheses",
+        "evidences",
+        "discoveries",
+        "data_profile",
+    )
+    assert "active_plans" not in PlannerContext.model_fields
+    assert "active_plan" not in PlannerContext.model_fields
+    assert "objective" not in PlannerContext.model_fields
+
+
+def test_builder_materializes_all_readable_frame_members() -> None:
     frame = _full_frame()
 
     context = build_planner_context(frame)
 
-    assert context.active_plan is None
-    assert context.objective == frame.objective
+    assert context.objectives == frame.objectives
+    assert len(context.objectives) == 2
     assert context.assumptions == frame.assumptions
     assert context.hypotheses == frame.hypotheses
     assert context.evidences == frame.evidences
     assert context.discoveries == frame.discoveries
     assert context.data_profile == frame.data_profile
+    assert "active_plans" not in PlannerContext.model_fields
+    assert "active_plan" not in PlannerContext.model_fields
     with pytest.raises(ValidationError, match="frozen"):
         context.hypotheses = ()
 
@@ -107,35 +124,7 @@ def test_session_frame_retains_discovery_membership_immutably() -> None:
         SessionFrame(discoveries=(discovery, discovery))
 
 
-def test_builder_materializes_exact_active_plan_for_current_objective() -> None:
+def test_builder_does_not_accept_plan_parameters() -> None:
     frame = _full_frame()
-    assert frame.objective is not None
-    task = Task(
-        objective_id=frame.objective.objective_id,
-        kind=TaskKind.DATA,
-        instruction="Count rows.",
-    )
-    plan = Plan(
-        objective=frame.objective,
-        assumptions=frame.assumptions,
-        tasks=(task,),
-    )
-
-    context = build_planner_context(
-        frame,
-        active_plan=plan,
-    )
-
-    assert context.active_plan is plan
-
-
-def test_builder_rejects_active_plan_for_different_objective() -> None:
-    frame = _full_frame()
-    other = Objective(text="Different Objective.")
-    plan = Plan(objective=other, tasks=())
-
-    with pytest.raises(ValueError, match="exact SessionFrame Objective"):
-        build_planner_context(
-            frame,
-            active_plan=plan,
-        )
+    with pytest.raises(TypeError):
+        build_planner_context(frame, active_plans=())  # type: ignore[call-arg]

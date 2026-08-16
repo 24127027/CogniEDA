@@ -1,30 +1,29 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from getpass import getpass
-from typing import Callable
 from uuid import UUID
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.application.ports import AgentFactoryPort
-from cognieda.runtime.conversation import ConversationHistory
-from cognieda.runtime.event_bus import EventBus
-from cognieda.runtime.events import (
-    HumanInputRequested, 
-    MessageProduced, 
-    PlanProposed, 
-    AssistantThinkingStarted, 
-    AssistantThinkingFinished
-)
-from cognieda.runtime.commands.types import CommandSuggestion
 from cognieda.runtime.commands import (
     CommandContext,
     CommandHandler,
     CommandParser,
     create_command_registry,
 )
-
+from cognieda.runtime.commands.types import CommandSuggestion
+from cognieda.runtime.conversation import ConversationHistory
+from cognieda.runtime.event_bus import EventBus
+from cognieda.runtime.events import (
+    AssistantThinkingFinished,
+    AssistantThinkingStarted,
+    HumanInputRequested,
+    MessageProduced,
+    PlanProposed,
+)
 
 from .messages import Message, MessageRole, MessageType
 from .workspace import MissingModelCredentialError, Workspace
@@ -48,18 +47,6 @@ class Application:
         self.session_id = session_id
         self.conversation_history = conversation_history
         self.planner_context_factory = planner_context_factory
-
-        self.command_handler = CommandHandler(
-            parser=CommandParser(),
-            registry=create_command_registry(),
-            context=CommandContext(
-                workspace=self.workspace,
-                agent_factory=self.agent_factory,
-                planner=self.planner_agent,
-                reload_runtime=self._reload_runtime,
-                prompt_secret=getpass,
-            ),
-        )
 
         self.command_handler = CommandHandler(
             parser=CommandParser(),
@@ -110,18 +97,20 @@ class Application:
 
         try:
             await self.event_bus.publish(AssistantThinkingStarted())
-            outcome, completed_segment = await self.planner_agent.handle_message(
+            outcome, completed_segments = await self.planner_agent.handle_message(
                 message,
                 context=context,
                 message_history=message_history,
             )
             await self.event_bus.publish(AssistantThinkingFinished())
         except MissingModelCredentialError as e:
-            await self._emit_message(f"{e}\n\nRun '/provider key <provider>' to configure an API key.")
+            await self._emit_message(
+                f"{e}\n\nRun '/provider key <provider>' to configure an API key."
+            )
             return
 
-        if completed_segment is not None:
-            self.conversation_history = self.conversation_history.commit_segment(completed_segment)
+        if completed_segments:
+            self.conversation_history = self.conversation_history.add_turn(completed_segments)
 
         await self._emit_planner_outcome(outcome)
 

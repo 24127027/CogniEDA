@@ -40,7 +40,7 @@ class PlannerState(TypedDict, total=False):
     latest_human_input: str | None
     candidate_plan: Plan | None
     turn_outcome: PlannerTurnOutcome | None
-    completed_segment: ConversationSegment | None
+    completed_segments: tuple[ConversationSegment, ...]
 
 
 __all__ = (

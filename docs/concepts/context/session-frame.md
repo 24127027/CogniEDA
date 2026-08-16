@@ -153,7 +153,7 @@ closed rather than being repaired from prose or “latest record” heuristics.
 ## Current implementation
 
 **Partially implemented.** Current source has a bounded immutable M1-A
-`SessionFrame` value containing one optional materialized Objective, ordered
+`SessionFrame` value containing ordered materialized Objectives,
 materialized Assumptions, Hypotheses, Evidence, and Discoveries, and one optional
 materialized DataProfile. Validated replacement seams protect duplicate
 identity and direct DataProfile/Evidence consistency, and SQLite can round-trip
@@ -168,11 +168,9 @@ on every cognitive invocation and exact-copies all six current materialized memb
 categories into immutable `PlannerContext`. Planner receives that context and
 returns a response, Human clarification request, self-contained transient Plan,
 or continuation signal; it never receives, mutates, or returns SessionFrame.
-The provider materializes the exact active Plan for the frame's current Objective
-into `PlannerContext`; the independent Plan admission service can atomically
-admit an exact authorized Plan and its embedded Tasks. Active Plan is
-explicit coordination state in `PlannerContext`, not SessionFrame research
-membership.
+Plan selection and history are decoupled from SessionFrame Objective membership,
+and `PlannerContext` does not project active Plans. The independent Plan admission
+service can atomically admit an exact authorized Plan and its embedded Tasks.
 Application owns no concrete repository-backed SessionFrame facade and delegates
 session operations to minimal runtime logic. The active graph's transient state and the
 Application-owned `ConversationHistory` (composed of `ConversationTurn`s and
