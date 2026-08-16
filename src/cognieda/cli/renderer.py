@@ -35,36 +35,6 @@ class Renderer:
     def __init__(self, console: Console | None = None) -> None:
         self.console = console or globals()["console"]
 
-    def read_input(self) -> str:
-        prompt = "> "
-        text = self.console.input(prompt).strip()
-
-        if self.console.is_terminal and not self.console.is_dumb_terminal:
-            self._erase_input(prompt, text)
-
-        return text
-
-    def _erase_input(self, prompt: str, text: str) -> None:
-        width = self.console.width
-
-        input_width = cell_len(prompt) + cell_len(text)
-        rows = max(1, (input_width + width - 1) // width)
-
-        controls = [Control.move(y=-rows)]
-
-        for index in range(rows):
-            controls.append(
-                Control((ControlType.ERASE_IN_LINE, 2))
-            )
-
-            if index < rows - 1:
-                controls.append(Control.move(y=1))
-
-        controls.append(Control.move(y=1))
-        controls.append(Control.move_to_column(0))
-
-        self.console.control(*controls)
-
     def render_session_start(self, workspace_root: Path) -> None:
         self.console.print(f"[green]Workspace: {workspace_root}[/green]")
         self.console.print("[green]Session started.[/green]")
