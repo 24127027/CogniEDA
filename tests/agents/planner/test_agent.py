@@ -42,11 +42,6 @@ class NeverDispatcher:
         raise AssertionError(f"Planner must not dispatch in Phase 2: {request}")
 
 
-class StaticContextProvider:
-    def materialize(self) -> PlannerContext:
-        return PlannerContext()
-
-
 class NeverAdmission:
     def admit(self, plan: Plan) -> Plan:
         del plan
@@ -107,7 +102,6 @@ def _planner(
         deps,
         agent_factory=cast(AgentFactoryPort, factory),
         model_config=ModelConfig(provider="openai", model_name="test", api_key="test"),
-        planner_context_provider=StaticContextProvider(),
         plan_admission=NeverAdmission(),
     )
     return planner, agent, deps, factory
@@ -138,6 +132,7 @@ def test_planner_directly_owns_one_agent_and_invokes_it_once_with_exact_deps() -
         PlannerResult(response="The answer follows from admitted evidence."),
         current_messages,
     )
+
     output = asyncio.run(
         planner._invoke_cognitive(
             "What do we know?",
@@ -213,6 +208,7 @@ def test_fresh_context_does_not_replay_stale_snapshot_into_second_model_call() -
 
     class FunctionModelFactory:
         def create_agent(self, **kwargs: Any) -> Any:
+
             return Agent(function_model, deps_type=kwargs["deps_type"])
 
         def reload_tooling(self) -> None:
@@ -226,7 +222,6 @@ def test_fresh_context_does_not_replay_stale_snapshot_into_second_model_call() -
             model_name="test",
             api_key="test",
         ),
-        planner_context_provider=StaticContextProvider(),
         plan_admission=NeverAdmission(),
     )
 
@@ -459,12 +454,10 @@ def test_empty_request_and_missing_model_fail_closed_without_invocation() -> Non
         PlannerDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
         agent_factory=cast(AgentFactoryPort, factory),
         model_config=None,
-        planner_context_provider=StaticContextProvider(),
         plan_admission=NeverAdmission(),
     )
     missing = asyncio.run(
         unavailable._invoke_cognitive("Investigate.", context=PlannerContext())
     )
-    assert missing.error is not None
     assert missing.error.code is PlannerErrorCode.MODEL_UNAVAILABLE
     assert factory.calls == []

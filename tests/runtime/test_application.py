@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from collections.abc import Callable
 from typing import cast
 from unittest.mock import AsyncMock, Mock
 
 from cognieda.agents.planner.agent import Planner
+from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.agents.planner.types import PlannerControlledError, PlannerErrorCode
 from cognieda.application.ports import AgentFactoryPort
@@ -36,6 +38,7 @@ def _application(
     *,
     workspace: Workspace | None = None,
     agent_factory: AgentFactoryPort | None = None,
+    planner_context_factory: Callable[[], PlannerContext] | None = None,
 ) -> tuple[Application, list[RuntimeEvent]]:
     event_bus = EventBus()
     events: list[RuntimeEvent] = []
@@ -47,6 +50,7 @@ def _application(
         planner_agent=planner,
         agent_factory=agent_factory or cast(AgentFactoryPort, object()),
         event_bus=event_bus,
+        planner_context_factory=planner_context_factory or (lambda: PlannerContext()),
     )
     return application, events
 
@@ -61,11 +65,15 @@ def test_application_maps_planner_outcome_to_presentation_events() -> None:
             human_input_request="Does this scope look right?",
         )
     )
-    application, events = _application(planner)
+    test_context = PlannerContext(objective=Objective(text="churn"))
+    application, events = _application(
+        planner,
+        planner_context_factory=lambda: test_context,
+    )
 
     asyncio.run(application.submit_message("Investigate churn."))
 
-    planner.handle_message.assert_awaited_once_with("Investigate churn.")
+    planner.handle_message.assert_awaited_once_with("Investigate churn.", context=test_context)
     assert [type(event) for event in events] == [
         PlanProposed,
         MessageProduced,
@@ -100,12 +108,66 @@ def test_application_maps_controlled_planner_failure_to_error_event() -> None:
 def test_application_has_no_planner_or_session_memory_authority() -> None:
     constructor_parameters = inspect.signature(Application).parameters
 
+    assert "planner_context_factory" in constructor_parameters
     assert "session_frames" not in constructor_parameters
+    assert "active_plans" not in constructor_parameters
     assert not hasattr(Application, "session_frame")
     assert not hasattr(Application, "review_plan")
     assert not hasattr(Application, "_apply_planner_result")
     assert not hasattr(Application, "conversation_history")
     assert not hasattr(Application, "planner_runtime")
+
+
+def test_application_supplies_fresh_planner_context_for_each_turn() -> None:
+    planner = Mock(spec=Planner)
+    planner.handle_message = AsyncMock(
+        side_effect=[
+            PlannerTurnOutcome(response="First answer."),
+            PlannerTurnOutcome(response="Second answer."),
+        ]
+    )
+    turn_contexts = [
+        PlannerContext(objective=Objective(text="First objective")),
+        PlannerContext(objective=Objective(text="Second objective")),
+    ]
+    context_iter = iter(turn_contexts)
+
+    application, events = _application(
+        planner,
+        planner_context_factory=lambda: next(context_iter),
+    )
+
+    asyncio.run(application.submit_message("First question."))
+    asyncio.run(application.submit_message("Second question."))
+
+    assert planner.handle_message.await_count == 2
+    planner.handle_message.assert_has_awaits([
+        (( "First question.",), {"context": turn_contexts[0]}),
+        (( "Second question.",), {"context": turn_contexts[1]}),
+    ])
+
+
+def test_application_fails_closed_when_context_factory_raises() -> None:
+    planner = Mock(spec=Planner)
+    planner.handle_message = AsyncMock()
+
+    def broken_factory() -> PlannerContext:
+        raise RuntimeError("Persistence failure while building context.")
+
+    application, events = _application(
+        planner,
+        planner_context_factory=broken_factory,
+    )
+
+    asyncio.run(application.submit_message("Investigate."))
+
+    planner.handle_message.assert_not_awaited()
+    assert len(events) == 1
+    event = cast(MessageProduced, events[0])
+    assert event.message.type.value == "error"
+    assert "Planner authoritative context could not be materialized." in event.message.content
+
+
 
 
 def test_skill_assignment_reloads_tooling_and_planner() -> None:

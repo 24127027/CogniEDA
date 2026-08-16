@@ -34,6 +34,18 @@ class PlannerTurnOutcome(BaseModel):
         return self
 
 
+class PlannerGraphInput(TypedDict):
+    """Run-scoped input accepted by the compiled Planner graph."""
+
+    latest_human_input: str
+
+
+class PlannerGraphOutput(TypedDict):
+    """Presentation facts returned by one compiled Planner graph invocation."""
+
+    turn_outcome: PlannerTurnOutcome | None
+
+
 class PlannerState(TypedDict):
     """Checkpointed Planner lifecycle state; never authoritative research state."""
 
@@ -43,4 +55,10 @@ class PlannerState(TypedDict):
     turn_outcome: PlannerTurnOutcome | None
 
 
-__all__ = ("PlannerState", "PlannerTurnOutcome")
+__all__ = (
+    "PlannerGraphInput",
+    "PlannerGraphOutput",
+    "PlannerState",
+    "PlannerTurnOutcome",
+)
+

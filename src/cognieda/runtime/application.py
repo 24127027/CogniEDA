@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from cognieda.agents.planner.agent import Planner
+from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.event_bus import EventBus
@@ -17,11 +20,13 @@ class Application:
         planner_agent: Planner,
         agent_factory: AgentFactoryPort,
         event_bus: EventBus,
+        planner_context_factory: Callable[[], PlannerContext],
     ) -> None:
         self.workspace = workspace
         self.agent_factory = agent_factory
         self.planner_agent = planner_agent
         self.event_bus = event_bus
+        self._planner_context_factory = planner_context_factory
 
     async def submit_message(self, message: str) -> None:
         if message.startswith("/"):
@@ -30,7 +35,16 @@ class Application:
             return
 
         try:
-            outcome = await self.planner_agent.handle_message(message)
+            context = self._planner_context_factory()
+        except Exception:
+            self._emit_message(
+                "Planner authoritative context could not be materialized.",
+                message_type=MessageType.ERROR,
+            )
+            return
+
+        try:
+            outcome = await self.planner_agent.handle_message(message, context=context)
         except MissingModelCredentialError as e:
             self._emit_message(f"{e}\n\nRun '/provider key <provider>' to configure an API key.")
             return

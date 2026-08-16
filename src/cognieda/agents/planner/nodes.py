@@ -3,24 +3,26 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 
 from langgraph.graph import END
+from langgraph.runtime import Runtime
 from langgraph.types import Command, interrupt
 from pydantic_ai.messages import ModelMessage
 
 from cognieda.schemas.plan import Plan
 
 from .context import PlannerContext
-from .dependencies import PlanAdmissionPort, PlannerContextProviderPort
+from .dependencies import PlanAdmissionPort
 from .state import PlannerState, PlannerTurnOutcome
 from .types import PlannerControlledError, PlannerErrorCode, PlannerOutput
 
 
 async def plan_or_answer(
     state: PlannerState,
+    runtime: Runtime[PlannerContext],
     *,
     invoke_cognitive: Callable[..., Awaitable[PlannerOutput]],
-    planner_context_provider: PlannerContextProviderPort,
 ) -> Command[str]:
-    request = state["latest_human_input"]
+    planner_context: PlannerContext = runtime.context
+    request = state.get("latest_human_input")
     if request is None or not request.strip():
         error = PlannerControlledError(
             code=PlannerErrorCode.INVALID_LIFECYCLE_STATE,
@@ -31,38 +33,34 @@ async def plan_or_answer(
             goto=END,
         )
 
-    try:
-        planner_context: PlannerContext = planner_context_provider.materialize()
-    except Exception:
-        error = PlannerControlledError(
-            code=PlannerErrorCode.INVALID_LIFECYCLE_STATE,
-            message="Planner authoritative context could not be materialized.",
-        )
-        return Command(
-            update={"turn_outcome": PlannerTurnOutcome(error=error)},
-            goto=END,
-        )
+    candidate_plan = state.get("candidate_plan")
+    existing_messages = state.get("messages", ())
 
     output = await invoke_cognitive(
         request,
         context=planner_context,
-        candidate_plan=state["candidate_plan"],
-        message_history=list(state["messages"]),
+        candidate_plan=candidate_plan,
+        message_history=list(existing_messages),
     )
-    messages: tuple[ModelMessage, ...] = (*state["messages"], *output.messages)
+    messages: tuple[ModelMessage, ...] = (*existing_messages, *output.messages)
     result = output.result
-    base_update: dict[str, object] = {"messages": messages}
+    base_update: dict[str, object] = {
+        "messages": messages,
+        "candidate_plan": candidate_plan,
+    }
+
+
 
     if output.error is not None:
         outcome = PlannerTurnOutcome(response=result.response, error=output.error)
         return Command(update={**base_update, "turn_outcome": outcome}, goto=END)
 
     try:
-        if result.discard_candidate and state["candidate_plan"] is None:
+        if result.discard_candidate and candidate_plan is None:
             raise ValueError("discard_candidate requires a retained candidate.")
         if (
             result.continue_execution
-            and state["candidate_plan"] is None
+            and candidate_plan is None
             and planner_context.active_plan is None
         ):
             raise ValueError("continue_execution requires a retained or active Plan.")
@@ -92,7 +90,7 @@ async def plan_or_answer(
         )
 
     if result.continue_execution:
-        if state["candidate_plan"] is not None:
+        if candidate_plan is not None:
             return Command(update=base_update, goto="admit_candidate")
         outcome = PlannerTurnOutcome(
             response=(
@@ -120,7 +118,7 @@ async def plan_or_answer(
         human_input_request=result.human_input_request,
     )
     awaiting_human = (
-        result.human_input_request is not None or state["candidate_plan"] is not None
+        result.human_input_request is not None or candidate_plan is not None
     )
     return Command(
         update={**base_update, "turn_outcome": outcome},
@@ -131,7 +129,7 @@ async def plan_or_answer(
 def await_human(
     state: PlannerState,
 ) -> dict[str, object]:
-    outcome = state["turn_outcome"]
+    outcome = state.get("turn_outcome")
     if outcome is None:
         raise ValueError("Human wait requires a typed Planner turn outcome.")
 
@@ -150,7 +148,7 @@ def admit_candidate(
     *,
     plan_admission: PlanAdmissionPort,
 ) -> dict[str, object]:
-    plan: Plan | None = state["candidate_plan"]
+    plan: Plan | None = state.get("candidate_plan")
     if plan is None:
         raise ValueError("Candidate admission requires a retained candidate Plan.")
     try:
@@ -170,3 +168,4 @@ def admit_candidate(
 
 
 __all__ = ("admit_candidate", "await_human", "plan_or_answer")
+

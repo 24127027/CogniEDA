@@ -19,9 +19,14 @@ from sqlmodel import Session
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
-from cognieda.agents.planner.dependencies import PlannerContextProviderPort, PlannerDeps
-from cognieda.agents.planner.graph import InProcessPlannerSerializer
-from cognieda.agents.planner.state import PlannerState, PlannerTurnOutcome
+from cognieda.agents.planner.dependencies import PlannerDeps
+from cognieda.agents.planner.graph import InProcessPlannerSerializer, build_graph
+from cognieda.agents.planner.state import (
+    PlannerGraphInput,
+    PlannerGraphOutput,
+    PlannerState,
+    PlannerTurnOutcome,
+)
 from cognieda.agents.planner.types import PlannerErrorCode, PlannerOutput, PlannerResult
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.application.services import PlanAdmissionService
@@ -33,7 +38,7 @@ from cognieda.infrastructure.persistence.repositories import (
     SessionFrameRepository,
     TaskRepository,
 )
-from cognieda.runtime.planner_context import PlannerContextProvider
+from cognieda.runtime.planner_context import build_planner_context
 from cognieda.schemas import Objective, Plan, SessionFrame, Task, TaskKind
 
 
@@ -81,7 +86,6 @@ class SequencePlanner(Planner):
         self,
         outputs: Iterable[PlannerOutput],
         *,
-        context_provider: PlannerContextProviderPort,
         plan_admission: PlanAdmissionService | RecordingAdmission,
         dispatcher: RecordingDispatcher | None = None,
         checkpointer: BaseCheckpointSaver[Any] | None = None,
@@ -97,7 +101,6 @@ class SequencePlanner(Planner):
             deps=PlannerDeps(dispatcher=self.recording_dispatcher),
             agent_factory=cast(AgentFactoryPort, object()),
             model_config=None,
-            planner_context_provider=context_provider,
             plan_admission=plan_admission,
             checkpointer=checkpointer,
             thread_id=thread_id,
@@ -138,7 +141,6 @@ def _planner(
     outputs: Iterable[PlannerOutput],
     db_session: Session,
     *,
-    context_provider: PlannerContextProviderPort | None = None,
     plan_admission: PlanAdmissionService | RecordingAdmission | None = None,
     dispatcher: RecordingDispatcher | None = None,
     checkpointer: BaseCheckpointSaver[Any] | None = None,
@@ -146,7 +148,6 @@ def _planner(
 ) -> SequencePlanner:
     return SequencePlanner(
         outputs,
-        context_provider=context_provider or MutableContextProvider(),
         plan_admission=plan_admission or PlanAdmissionService(db_session),
         dispatcher=dispatcher,
         checkpointer=checkpointer,
@@ -212,7 +213,9 @@ def test_candidate_proposal_is_checkpointed_without_authoritative_writes(
         db_session,
     )
 
-    outcome = asyncio.run(planner.handle_message("Investigate churn."))
+    outcome = asyncio.run(
+        planner.handle_message("Investigate churn.", context=PlannerContext())
+    )
     state = _state(planner)
     persisted_candidate = state["candidate_plan"]
 
@@ -243,9 +246,9 @@ def test_empty_human_input_is_rejected_before_interrupt_resume(
         db_session,
     )
 
-    asyncio.run(planner.handle_message("Investigate churn."))
+    asyncio.run(planner.handle_message("Investigate churn.", context=PlannerContext()))
     before = _state(planner)
-    rejected = asyncio.run(planner.handle_message("  "))
+    rejected = asyncio.run(planner.handle_message("  ", context=PlannerContext()))
 
     assert rejected.error is not None
     assert rejected.error.code is PlannerErrorCode.INVALID_REQUEST
@@ -253,7 +256,7 @@ def test_empty_human_input_is_rejected_before_interrupt_resume(
     assert _state(planner) == before
     assert _is_waiting(planner)
 
-    resumed = asyncio.run(planner.handle_message("Why this scope?"))
+    resumed = asyncio.run(planner.handle_message("Why this scope?", context=PlannerContext()))
     assert resumed.response == "The candidate remains available."
     assert planner.requests == ["Investigate churn.", "Why this scope?"]
 
@@ -286,23 +289,24 @@ def test_natural_multiturn_review_retain_replace_and_authorize_exact_candidate(
         db_session,
         plan_admission=admission,
     )
+    context = PlannerContext(objective=objective)
 
-    first = asyncio.run(planner.handle_message("Investigate churn."))
+    first = asyncio.run(planner.handle_message("Investigate churn.", context=context))
     assert first.proposed_plan == p1.plan
     assert _state(planner)["candidate_plan"] == p1.plan
 
-    explanation = asyncio.run(planner.handle_message("Why is pricing included?"))
+    explanation = asyncio.run(planner.handle_message("Why is pricing included?", context=context))
     assert explanation.proposed_plan is None
     assert _state(planner)["candidate_plan"] == p1.plan
     assert planner.candidates[1] == p1.plan
     assert admission.calls == []
 
-    replacement = asyncio.run(planner.handle_message("Remove pricing."))
+    replacement = asyncio.run(planner.handle_message("Remove pricing.", context=context))
     assert replacement.proposed_plan == p2.plan
     assert _state(planner)["candidate_plan"] == p2.plan
     assert admission.calls == []
 
-    outcome = asyncio.run(planner.handle_message("That looks right, proceed."))
+    outcome = asyncio.run(planner.handle_message("That looks right, proceed.", context=context))
     assert admission.calls == [p2.plan]
     assert _state(planner)["candidate_plan"] is None
     assert outcome.response == "The proposed Plan was admitted and activated."
@@ -324,10 +328,6 @@ def test_context_is_fresh_and_native_history_remains_graph_owned(
     first_messages = _messages("First question.", "First answer.")
     second_messages = _messages("Second question.", "Second answer.")
     session_frames = SessionFrameRepository(db_session, scope_key="fresh-context")
-    provider = PlannerContextProvider(
-        session_frames=session_frames,
-        active_plans=ActivePlanRepository(db_session),
-    )
     planner = _planner(
         (
             PlannerOutput(result=PlannerResult(response="First answer."), messages=first_messages),
@@ -337,15 +337,17 @@ def test_context_is_fresh_and_native_history_remains_graph_owned(
             ),
         ),
         db_session,
-        context_provider=provider,
     )
     first_objective = Objective(text="First current Objective.")
     second_objective = Objective(text="Second current Objective.")
     session_frames.save_current(SessionFrame(objective=first_objective))
 
-    asyncio.run(planner.handle_message("First question."))
+    context_1 = build_planner_context(session_frames.get_current())
+    asyncio.run(planner.handle_message("First question.", context=context_1))
+
     session_frames.save_current(SessionFrame(objective=second_objective))
-    asyncio.run(planner.handle_message("Second question."))
+    context_2 = build_planner_context(session_frames.get_current())
+    asyncio.run(planner.handle_message("Second question.", context=context_2))
 
     assert planner.contexts[0].objective == first_objective
     assert planner.contexts[1].objective == second_objective
@@ -393,13 +395,17 @@ def test_discard_clears_candidate_and_repeat_discard_fails_closed(
         db_session,
     )
 
-    asyncio.run(planner.handle_message("Investigate churn."))
-    discarded = asyncio.run(planner.handle_message("Abandon that proposal."))
+    asyncio.run(planner.handle_message("Investigate churn.", context=PlannerContext()))
+    discarded = asyncio.run(
+        planner.handle_message("Abandon that proposal.", context=PlannerContext())
+    )
     assert _state(planner)["candidate_plan"] is None
     assert discarded.response == "I discarded the proposal."
     assert not _is_waiting(planner)
 
-    invalid = asyncio.run(planner.handle_message("Discard it again."))
+    invalid = asyncio.run(
+        planner.handle_message("Discard it again.", context=PlannerContext())
+    )
     assert invalid.error is not None
     assert invalid.error.code.value == "invalid_lifecycle_state"
 
@@ -421,8 +427,10 @@ def test_admission_failure_retains_exact_candidate_and_reports_controlled_error(
         db_session,
     )
 
-    asyncio.run(planner.handle_message("Investigate churn."))
-    outcome = asyncio.run(planner.handle_message("Proceed with that exact proposal."))
+    asyncio.run(planner.handle_message("Investigate churn.", context=PlannerContext()))
+    outcome = asyncio.run(
+        planner.handle_message("Proceed with that exact proposal.", context=PlannerContext())
+    )
     persisted_candidate = _state(planner)["candidate_plan"]
 
     assert persisted_candidate == candidate.plan
@@ -440,17 +448,14 @@ def test_active_plan_continuation_is_visible_and_never_dispatches(
     assert candidate.plan is not None
     PlanAdmissionService(db_session).admit(candidate.plan)
     dispatcher = RecordingDispatcher()
-    provider = MutableContextProvider(
-        PlannerContext(active_plan=candidate.plan, objective=candidate.plan.objective)
-    )
+    context = PlannerContext(active_plan=candidate.plan, objective=candidate.plan.objective)
     planner = _planner(
         (PlannerOutput(result=PlannerResult(continue_execution=True)),),
         db_session,
-        context_provider=provider,
         dispatcher=dispatcher,
     )
 
-    outcome = asyncio.run(planner.handle_message("Continue active work."))
+    outcome = asyncio.run(planner.handle_message("Continue active work.", context=context))
 
     assert planner.contexts[0].active_plan == candidate.plan
     assert _state(planner)["candidate_plan"] is None
@@ -476,10 +481,112 @@ def test_inmemory_checkpointer_isolates_planner_thread_identity(
         thread_id=uuid4(),
     )
 
-    asyncio.run(first_planner.handle_message("First request."))
+    asyncio.run(first_planner.handle_message("First request.", context=PlannerContext()))
     assert _state(first_planner)["candidate_plan"] == first.plan
     assert not _snapshot(second_planner).values
 
-    asyncio.run(second_planner.handle_message("Second request."))
+    asyncio.run(second_planner.handle_message("Second request.", context=PlannerContext()))
     assert _state(second_planner)["candidate_plan"] == second.plan
     assert _state(first_planner)["candidate_plan"] == first.plan
+
+
+def test_interrupt_resume_receives_fresh_context_while_preserving_candidate_and_history(
+    db_session: Session,
+) -> None:
+    """Turn 1 interrupts with C1; Turn 2 resumes with C2 and sees C2 in plan_or_answer."""
+    objective_1 = Objective(text="Initial objective S1.")
+    objective_2 = Objective(text="Changed authoritative objective S2.")
+    candidate = _candidate_result(objective=objective_1, instruction="Profile S1 data.")
+    assert candidate.plan is not None
+
+    turn1_messages = _messages("Propose plan.", "Here is the proposal.")
+    turn2_messages = _messages("Explain why S2 matters.", "Here is the explanation for S2.")
+
+    planner = _planner(
+        (
+            PlannerOutput(result=candidate, messages=turn1_messages),
+            PlannerOutput(
+                result=PlannerResult(response="Explanation with fresh context."),
+                messages=turn2_messages,
+            ),
+        ),
+        db_session,
+    )
+
+    # Turn 1: Propose candidate -> awaits human review
+    context_1 = PlannerContext(objective=objective_1)
+    outcome_1 = asyncio.run(planner.handle_message("Propose plan.", context=context_1))
+    assert outcome_1.proposed_plan == candidate.plan
+    assert _is_waiting(planner)
+    assert _state(planner)["candidate_plan"] == candidate.plan
+    assert len(planner.contexts) == 1
+    assert planner.contexts[0].objective == objective_1
+
+    # Between turns: authoritative state changes to S2
+    context_2 = PlannerContext(objective=objective_2)
+
+    # Turn 2: Human asks a question while candidate is waiting (resumes interrupt)
+    outcome_2 = asyncio.run(
+        planner.handle_message("Explain why S2 matters.", context=context_2)
+    )
+
+    assert outcome_2.response == "Explanation with fresh context."
+
+
+    # Invariant checks:
+    # 1. plan_or_answer in Turn 2 received context_2 (S2)
+    assert len(planner.contexts) == 2
+    assert planner.contexts[1].objective == objective_2
+    assert planner.contexts[1] is not planner.contexts[0]
+
+    # 2. Retained candidate survives across the interrupt-resume boundary
+    assert _state(planner)["candidate_plan"] == candidate.plan
+    assert planner.candidates[1] == candidate.plan
+
+    # 3. Model message history survives across the interrupt-resume boundary
+    assert planner.message_histories[1] == turn1_messages
+    assert _state(planner)["messages"] == (*turn1_messages, *turn2_messages)
+
+
+def test_planner_context_is_not_checkpointed(db_session: Session) -> None:
+    """Checkpointer must store only lifecycle state, never PlannerContext."""
+    objective = Objective(text="Scope verification.")
+    planner = _planner(
+        (PlannerOutput(result=PlannerResult(response="Done.")),),
+        db_session,
+    )
+    context = PlannerContext(objective=objective)
+    asyncio.run(planner.handle_message("Run test.", context=context))
+
+    snapshot = _snapshot(planner)
+    values = snapshot.values
+    assert isinstance(values, dict)
+    assert "context" not in values
+    assert "planner_context" not in values
+    assert not any(isinstance(v, PlannerContext) for v in values.values())
+
+
+def test_build_graph_schema_types() -> None:
+    """build_graph must declare StateGraph with correct StateT, ContextT, InputT, OutputT."""
+    checkpointer = InMemorySaver(serde=InProcessPlannerSerializer())
+
+    async def fake_invoke(request: str, **kwargs: Any) -> PlannerOutput:
+        return PlannerOutput(result=PlannerResult(response="ok"))
+
+    class FakeAdmission:
+        def admit(self, plan: Plan) -> Plan:
+            return plan
+
+    graph = build_graph(
+        checkpointer,
+        invoke_cognitive=fake_invoke,
+        plan_admission=FakeAdmission(),
+    )
+
+    # Verify builder schemas
+    builder = graph.builder
+    assert builder.state_schema is PlannerState
+    assert builder.context_schema is PlannerContext
+    assert builder.input_schema is PlannerGraphInput
+    assert builder.output_schema is PlannerGraphOutput
+

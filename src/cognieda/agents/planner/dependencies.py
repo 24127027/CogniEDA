@@ -6,20 +6,12 @@ from typing import Protocol
 from cognieda.application.ports import ExecutorDispatcherPort
 from cognieda.schemas.plan import Plan
 
-from .context import PlannerContext
-
 
 @dataclass(frozen=True)
 class PlannerDeps:
     """Model-hidden dependencies reserved for future semantic Planner tools."""
 
     dispatcher: ExecutorDispatcherPort
-
-
-class PlannerContextProviderPort(Protocol):
-    """Outer-state adapter that materializes fresh Planner-readable authority."""
-
-    def materialize(self) -> PlannerContext: ...
 
 
 class PlanAdmissionPort(Protocol):
@@ -30,6 +22,5 @@ class PlanAdmissionPort(Protocol):
 
 __all__ = (
     "PlanAdmissionPort",
-    "PlannerContextProviderPort",
     "PlannerDeps",
 )

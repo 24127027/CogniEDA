@@ -270,21 +270,24 @@ field or checkpointed `PlannerResult` is added. `Planner.handle_message()`
 rejects empty Human input as a controlled outcome before initial invocation or
 interrupt resume, so the successful `await_human` route remains static.
 
-`PlannerContextProvider` reads the workspace-scoped current SessionFrame from
-`SessionFrameRepository` on every invocation and exact-materializes its Objective,
-Assumptions, Hypotheses, Evidence, Discoveries, and DataProfile into immutable
-`PlannerContext`. It resolves the objective-scoped active Plan for the frame's
-exact current Objective and materializes that Plan without model inference.
-`PlannerContext` contains neither candidate Plan state nor conversation
-history. A `PlannerContextProvider` materializes it fresh for every Planner
-invocation. The active LangGraph thread checkpoints native messages and supplies
-them separately as PydanticAI `message_history`, while the latest Human text
+`build_planner_context` reads the workspace-scoped current SessionFrame and
+exact-materializes its Objective, Assumptions, Hypotheses, Evidence, Discoveries,
+and DataProfile into immutable `PlannerContext`. It resolves the objective-scoped
+active Plan for the frame's exact current Objective and materializes that Plan
+without model inference. `PlannerContext` contains neither candidate Plan state
+nor conversation history. Application materializes it fresh for every Human turn
+via its injected context factory and passes it to `Planner.handle_message(message, context=context)`.
+LangGraph receives `context=context` on each invocation, providing `Runtime[PlannerContext]`
+to `plan_or_answer` via `runtime.context`. `PlannerContext` is never checkpointed.
+The active LangGraph thread checkpoints native messages and candidate lifecycle state,
+supplying messages separately as PydanticAI `message_history`, while the latest Human text
 remains the current user prompt. Only `result.new_messages()` from the current
 run are appended. `ConversationHistory` remains a typed non-authoritative
 session-memory component, but this phase does not synchronize or durably persist
 it alongside graph state. A future unified `SessionMemory` is intended to
 compose `SessionFrame` and `ConversationHistory`; it must not derive research
 authority from conversation.
+
 The deterministic serialized `PlannerContext` is supplied fresh through the
 current-run instruction channel, explicitly bounded as data/state and declared
 to supersede historical research-state references. Replaceable authority is

@@ -271,13 +271,14 @@ interpreted by Planner; only a typed `continue_execution` result with that
 candidate pending calls `PlanAdmissionService`. Admission success clears the
 candidate, while failure rolls back and retains it for correction. Native model
 history remains non-authoritative interaction state outside `PlannerContext`.
-`PlannerContextProvider` materializes authoritative research state and the
-objective-scoped active Plan fresh for each cognitive invocation. Planner calls
-the deterministic application-authority admission service only from its
-admission node; Planner cognition does not persist directly. Application maps
-Planner lifecycle outcomes to runtime events, which do not reconstruct, admit,
-or activate state; `PlanProposed` remains a presentation event rather than an
-authority boundary.
+Application materializes authoritative research state and the objective-scoped
+active Plan fresh into `PlannerContext` for each Human turn and passes it into
+`Planner.handle_message()`. Planner calls the deterministic application-authority
+admission service only from its admission node; Planner cognition does not persist
+directly. Application maps Planner lifecycle outcomes to runtime events, which do
+not reconstruct, admit, or activate state; `PlanProposed` remains a presentation
+event rather than an authority boundary.
+
 
 The complete target boundary is not implemented. Durable candidate and review
 recovery, canonical Task DAG execution, role-native result inbox processing,

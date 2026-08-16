@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, cast
+from typing import Any
 from uuid import UUID, uuid4
 
 from langchain_core.runnables import RunnableConfig
@@ -19,11 +19,10 @@ from cognieda.schemas.plan import Plan
 from .context import PlannerContext
 from .dependencies import (
     PlanAdmissionPort,
-    PlannerContextProviderPort,
     PlannerDeps,
 )
 from .graph import InProcessPlannerSerializer, build_graph
-from .state import PlannerState, PlannerTurnOutcome
+from .state import PlannerGraphInput, PlannerTurnOutcome
 from .types import (
     PlannerControlledError,
     PlannerErrorCode,
@@ -43,7 +42,6 @@ class Planner:
         *,
         agent_factory: AgentFactoryPort,
         model_config: ModelConfig | None,
-        planner_context_provider: PlannerContextProviderPort,
         plan_admission: PlanAdmissionPort,
         agent_instruction: str | None = None,
         checkpointer: BaseCheckpointSaver[Any] | None = None,
@@ -67,7 +65,6 @@ class Planner:
         self.graph = build_graph(
             self._checkpointer,
             invoke_cognitive=self._invoke_cognitive,
-            planner_context_provider=planner_context_provider,
             plan_admission=plan_admission,
         )
 
@@ -113,7 +110,12 @@ class Planner:
         if recreate_agent:
             self._agent = None
 
-    async def handle_message(self, message: str) -> PlannerTurnOutcome:
+    async def handle_message(
+        self,
+        message: str,
+        *,
+        context: PlannerContext,
+    ) -> PlannerTurnOutcome:
         """Handle or resume one Human turn without exposing graph mechanics."""
 
         if not message.strip():
@@ -126,21 +128,16 @@ class Planner:
 
         snapshot = await self.graph.aget_state(self._graph_config)
         if self._is_interrupted(snapshot):
-            graph_input: PlannerState | Command[Any] = Command(resume=message)
+            graph_input: PlannerGraphInput | Command[Any] = Command(resume=message)
         else:
-            graph_input = self._state_from_snapshot(
-                snapshot,
-                latest_human_input=message,
-            )
-            graph_input["turn_outcome"] = None
+            graph_input = {"latest_human_input": message}
 
-        await self.graph.ainvoke(
+        graph_output = await self.graph.ainvoke(
             graph_input,
             config=self._graph_config,
+            context=context,
         )
-        current = await self.graph.aget_state(self._graph_config)
-        state = self._state_from_snapshot(current)
-        outcome = state["turn_outcome"]
+        outcome = graph_output.get("turn_outcome")
         if outcome is None:
             raise RuntimeError("Planner graph completed without a typed turn outcome.")
         return outcome
@@ -212,29 +209,9 @@ class Planner:
         return PlannerOutput(result=result, messages=messages)
 
     @staticmethod
-    def _state_from_snapshot(
-        snapshot: StateSnapshot,
-        *,
-        latest_human_input: str | None = None,
-    ) -> PlannerState:
-        if not snapshot.values:
-            return PlannerState(
-                latest_human_input=latest_human_input,
-                candidate_plan=None,
-                messages=(),
-                turn_outcome=None,
-            )
-        prior = cast(PlannerState, snapshot.values)
-        return PlannerState(
-            latest_human_input=latest_human_input,
-            candidate_plan=prior["candidate_plan"],
-            messages=tuple(prior["messages"]),
-            turn_outcome=prior["turn_outcome"],
-        )
-
-    @staticmethod
     def _is_interrupted(snapshot: StateSnapshot) -> bool:
         return any(task.interrupts for task in snapshot.tasks)
+
 
     @staticmethod
     def _build_context_instruction(context: PlannerContext) -> str:

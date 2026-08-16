@@ -77,7 +77,8 @@ def test_planner_has_no_session_frame_dependency_or_legacy_graph_surface() -> No
     signature = inspect.signature(Planner.handle_message)
     assert violations == []
     assert "session_frame" not in signature.parameters
-    assert tuple(signature.parameters) == ("self", "message")
+    assert tuple(signature.parameters) == ("self", "message", "context")
+    assert signature.parameters["context"].annotation in {PlannerContext, "PlannerContext"}
     assert inspect.iscoroutinefunction(Planner.reload)
     assert "session_frame" not in PlannerContext.model_fields
     assert "session_frame" not in PlannerResult.model_fields
@@ -105,15 +106,11 @@ def test_planner_and_application_respect_session_repository_boundary() -> None:
     ]
 
     from cognieda.agents.planner.agent import Planner
-    from cognieda.agents.planner.dependencies import PlannerContextProviderPort
 
     constructor = inspect.signature(Planner).parameters
     assert planner_violations == []
     assert application_violations == []
-    assert constructor["planner_context_provider"].annotation in {
-        PlannerContextProviderPort,
-        "PlannerContextProviderPort",
-    }
+    assert "planner_context_provider" not in constructor
 
 
 def test_conversation_memory_is_separate_from_authoritative_planner_context() -> None:
