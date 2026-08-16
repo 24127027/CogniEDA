@@ -18,7 +18,7 @@ from pydantic_ai.models.function import FunctionModel
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
-from cognieda.agents.planner.dependencies import PlannerDeps
+from cognieda.agents.planner.dependencies import PlannerToolDeps
 from cognieda.agents.planner.types import PlannerErrorCode, PlannerResult
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.delegation import ExecutionRequest
@@ -92,12 +92,12 @@ def _planner(
 ) -> tuple[
     Planner,
     RecordingAgent,
-    PlannerDeps,
+    PlannerToolDeps,
     RecordingFactory,
 ]:
     agent = RecordingAgent(FakeRunResult(output=result, messages=messages))
     factory = RecordingFactory(agent)
-    deps = PlannerDeps(dispatcher=NeverDispatcher())  # type: ignore[arg-type]
+    deps = PlannerToolDeps(dispatcher=NeverDispatcher())  # type: ignore[arg-type]
     planner = Planner(
         deps,
         agent_factory=cast(AgentFactoryPort, factory),
@@ -145,7 +145,7 @@ def test_planner_directly_owns_one_agent_and_invokes_it_once_with_exact_deps() -
     assert not hasattr(planner, "model")
     assert planner.graph is not None
     assert len(factory.calls) == 1
-    assert factory.calls[0]["deps_type"] is PlannerDeps
+    assert factory.calls[0]["deps_type"] is PlannerToolDeps
     assert factory.calls[0]["builtin_tools"] == ()
     assert len(agent.calls) == 1
     prompt, kwargs = agent.calls[0]
@@ -161,9 +161,12 @@ def test_planner_directly_owns_one_agent_and_invokes_it_once_with_exact_deps() -
     assert "<planner_context>" in context_instruction
     assert "conversation_history" not in context_instruction
     assert output.result.response == "The answer follows from admitted evidence."
-    assert output.messages == current_messages
-    assert all(type(message) in {ModelRequest, ModelResponse} for message in output.messages)
-    assert not any(message in output.messages for message in prior_messages)
+    assert output.segment is not None
+    assert all(
+        type(message) in {ModelRequest, ModelResponse}
+        for message in output.segment.messages
+    )
+    assert not any(message in output.segment.messages for message in prior_messages)
 
 
 def test_retained_candidate_is_supplied_as_fresh_lifecycle_context() -> None:
@@ -208,14 +211,13 @@ def test_fresh_context_does_not_replay_stale_snapshot_into_second_model_call() -
 
     class FunctionModelFactory:
         def create_agent(self, **kwargs: Any) -> Any:
-
             return Agent(function_model, deps_type=kwargs["deps_type"])
 
         def reload_tooling(self) -> None:
             pass
 
     planner = Planner(
-        PlannerDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
+        PlannerToolDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
         agent_factory=cast(AgentFactoryPort, FunctionModelFactory()),
         model_config=ModelConfig(
             provider="openai",
@@ -231,11 +233,12 @@ def test_fresh_context_does_not_replay_stale_snapshot_into_second_model_call() -
             context=PlannerContext(objective=Objective(text="CTX_V1_ONLY")),
         )
     )
+    first_history = list(first_output.segment.messages) if first_output.segment else []
     second_output = asyncio.run(
         planner._invoke_cognitive(
             "second human request",
             context=PlannerContext(objective=Objective(text="CTX_V2_ONLY")),
-            message_history=list(first_output.messages),
+            message_history=first_history,
         )
     )
 
@@ -451,7 +454,7 @@ def test_empty_request_and_missing_model_fail_closed_without_invocation() -> Non
 
     factory = RecordingFactory(agent)
     unavailable = Planner(
-        PlannerDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
+        PlannerToolDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
         agent_factory=cast(AgentFactoryPort, factory),
         model_config=None,
         plan_admission=NeverAdmission(),

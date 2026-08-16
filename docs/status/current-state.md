@@ -144,30 +144,31 @@ durable recovery remain **Deferred**.
 
 Planner-focused tests use deterministic fake Agent and PydanticAI
 `FunctionModel` boundaries to verify direct Agent ownership, exact typed
-dependency injection, one invocation per graph turn, native history
+`PlannerToolDeps` dependency injection, one invocation per graph turn, native history
 pass-through and current-message isolation, fresh current-run context,
 stale-context non-replay, exact candidate validation, and absence of
 model-visible Capability. Planner lifecycle tests prove exact graph-state and
-non-checkpointed service-context shapes, candidate retain/replace/discard,
+non-checkpointed `PlannerRunContext` shapes, candidate retain/replace/discard,
 multi-turn natural-language authorization, real SQLite admission exactly once,
 controlled admission failure retention, interrupt/re-interrupt behavior, thread
 isolation, fresh `PlannerContext`, and visible active-Plan deferral without
 dispatch. A focused serializer regression proves plain LangGraph serialization
 does not preserve nested typed Plan Tasks and that the trusted process-local
 serializer does. Conversation contract tests prove non-empty native-message
-turns, immutable ordered append, duplicate-ID rejection, and exact flattening.
+turns, immutable ordered append, duplicate-ID rejection, exact flattening,
+and causal truncation from a `ConversationSegment` pruning subsequent model context.
 Runtime Application tests prove response, proposal, clarification, error, and
 command publication without transferring lifecycle authority to EventBus or
-giving Application repository or conversation-history ownership. Bootstrap
-tests prove SessionFrame and active-Plan repositories enter only the fresh-context
-provider before that port and deterministic admission enter Planner. Independent
-service tests prove atomic admission and rollback; runtime context tests prove that the exact
+giving Application direct persistence repository ownership. Bootstrap
+tests prove `ChatSession` owns session-scoped SessionFrame and active-Plan
+repositories while Planner is wired with `PlannerToolDeps` and `session_id` as `thread_id`.
+Independent service tests prove atomic admission and rollback; runtime context tests prove that the exact
 objective-scoped active Plan reaches `PlannerContext` alongside all six
 materialized SessionFrame research-state member categories. Layer tests verify
 no dataset implementation or scientific-authority import, no concrete
-SessionFrame repository in Planner or Application, no `PlannerContext` in
-checkpoint state, and no legacy Planner model, classifier, or capability-selection
-surface.
+SessionFrame repository in Planner or Application, no `PlannerContext` or duplicate
+conversation history in checkpoint state, and no legacy Planner model, classifier, or
+capability-selection surface.
 Workspace ownership and documentation
 regressions retain their existing boundaries. M3-A focused tests additionally
 execute real CSV and Parquet data, all seven allowlisted operations, explicit

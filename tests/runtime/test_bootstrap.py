@@ -6,11 +6,13 @@ from typing import Any
 import pytest
 
 import cognieda.runtime.bootstrap as bootstrap_module
+from cognieda.agents.planner.dependencies import PlannerToolDeps
 from cognieda.application.services import PlanAdmissionService
 from cognieda.runtime.application import Application
+from cognieda.runtime.session import ChatSession
 
 
-def test_bootstrap_wires_planner_context_factory_to_application(
+def test_bootstrap_wires_chat_session_to_application(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -30,10 +32,10 @@ def test_bootstrap_wires_planner_context_factory_to_application(
     dependencies = captured["planner_dependencies"]
     assert isinstance(application, Application)
     assert application.planner_agent is captured["planner"]
-    assert "planner_context_provider" not in dependencies
+    assert isinstance(application.session, ChatSession)
+    assert dependencies["thread_id"] == application.session.session_id
+    assert isinstance(dependencies["deps"], PlannerToolDeps)
     assert isinstance(dependencies["plan_admission"], PlanAdmissionService)
-    assert callable(application._planner_context_factory)
     assert not hasattr(application, "_session_frames")
     assert not hasattr(application, "session_frame")
     assert not hasattr(application, "active_plans")
-

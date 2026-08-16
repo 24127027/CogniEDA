@@ -12,10 +12,10 @@ from langgraph.checkpoint.serde.base import SerializerProtocol
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from .context import PlannerContext
+from .context import PlannerRunContext
 from .dependencies import PlanAdmissionPort
 from .nodes import admit_candidate, await_human, plan_or_answer
-from .state import PlannerGraphInput, PlannerGraphOutput, PlannerState
+from .state import PlannerState
 from .types import PlannerOutput
 
 
@@ -39,17 +39,15 @@ def build_graph(
     plan_admission: PlanAdmissionPort,
 ) -> CompiledStateGraph[
     PlannerState,
-    PlannerContext,
-    PlannerGraphInput,
-    PlannerGraphOutput,
+    PlannerRunContext,
+    PlannerState,
+    PlannerState,
 ]:
     """Compile the current Planner lifecycle without an execution node."""
 
     builder = StateGraph(
         state_schema=PlannerState,
-        context_schema=PlannerContext,
-        input_schema=PlannerGraphInput,
-        output_schema=PlannerGraphOutput,
+        context_schema=PlannerRunContext,
     )
     builder.add_node(
         "plan_or_answer",
@@ -70,7 +68,6 @@ def build_graph(
     builder.add_edge("admit_candidate", END)
 
     return builder.compile(checkpointer=checkpointer)
-
 
 
 __all__ = (

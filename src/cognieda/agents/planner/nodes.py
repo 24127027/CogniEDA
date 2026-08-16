@@ -5,11 +5,10 @@ from collections.abc import Awaitable, Callable
 from langgraph.graph import END
 from langgraph.runtime import Runtime
 from langgraph.types import Command, interrupt
-from pydantic_ai.messages import ModelMessage
 
 from cognieda.schemas.plan import Plan
 
-from .context import PlannerContext
+from .context import PlannerContext, PlannerRunContext
 from .dependencies import PlanAdmissionPort
 from .state import PlannerState, PlannerTurnOutcome
 from .types import PlannerControlledError, PlannerErrorCode, PlannerOutput
@@ -17,11 +16,14 @@ from .types import PlannerControlledError, PlannerErrorCode, PlannerOutput
 
 async def plan_or_answer(
     state: PlannerState,
-    runtime: Runtime[PlannerContext],
+    runtime: Runtime[PlannerRunContext],
     *,
     invoke_cognitive: Callable[..., Awaitable[PlannerOutput]],
 ) -> Command[str]:
-    planner_context: PlannerContext = runtime.context
+    run_context: PlannerRunContext = runtime.context
+    planner_context: PlannerContext = run_context.planner_context
+    message_history = list(run_context.message_history)
+
     request = state.get("latest_human_input")
     if request is None or not request.strip():
         error = PlannerControlledError(
@@ -34,22 +36,18 @@ async def plan_or_answer(
         )
 
     candidate_plan = state.get("candidate_plan")
-    existing_messages = state.get("messages", ())
 
     output = await invoke_cognitive(
         request,
         context=planner_context,
         candidate_plan=candidate_plan,
-        message_history=list(existing_messages),
+        message_history=message_history,
     )
-    messages: tuple[ModelMessage, ...] = (*existing_messages, *output.messages)
     result = output.result
     base_update: dict[str, object] = {
-        "messages": messages,
         "candidate_plan": candidate_plan,
+        "completed_segment": None,
     }
-
-
 
     if output.error is not None:
         outcome = PlannerTurnOutcome(response=result.response, error=output.error)
@@ -74,6 +72,8 @@ async def plan_or_answer(
             goto=END,
         )
 
+    segment = output.segment
+
     if result.plan is not None:
         outcome = PlannerTurnOutcome(
             proposed_plan=result.plan,
@@ -82,8 +82,8 @@ async def plan_or_answer(
         )
         return Command(
             update={
-                **base_update,
                 "candidate_plan": result.plan,
+                "completed_segment": segment,
                 "turn_outcome": outcome,
             },
             goto="await_human",
@@ -91,14 +91,27 @@ async def plan_or_answer(
 
     if result.continue_execution:
         if candidate_plan is not None:
-            return Command(update=base_update, goto="admit_candidate")
+            return Command(
+                update={
+                    "candidate_plan": candidate_plan,
+                    "completed_segment": segment,
+                },
+                goto="admit_candidate",
+            )
         outcome = PlannerTurnOutcome(
             response=(
                 "The active Plan is ready to continue, but Plan execution is not "
                 "implemented in this runtime phase."
             )
         )
-        return Command(update={**base_update, "turn_outcome": outcome}, goto=END)
+        return Command(
+            update={
+                "candidate_plan": None,
+                "completed_segment": segment,
+                "turn_outcome": outcome,
+            },
+            goto=END,
+        )
 
     if result.discard_candidate:
         outcome = PlannerTurnOutcome(
@@ -106,8 +119,8 @@ async def plan_or_answer(
         )
         return Command(
             update={
-                **base_update,
                 "candidate_plan": None,
+                "completed_segment": segment,
                 "turn_outcome": outcome,
             },
             goto=END,
@@ -121,7 +134,11 @@ async def plan_or_answer(
         result.human_input_request is not None or candidate_plan is not None
     )
     return Command(
-        update={**base_update, "turn_outcome": outcome},
+        update={
+            "candidate_plan": candidate_plan,
+            "completed_segment": segment,
+            "turn_outcome": outcome,
+        },
         goto="await_human" if awaiting_human else END,
     )
 
@@ -140,7 +157,11 @@ def await_human(
     else:
         reason = "candidate_followup"
     answer: str = interrupt({"reason": reason})
-    return {"latest_human_input": answer, "turn_outcome": None}
+    return {
+        "latest_human_input": answer,
+        "turn_outcome": None,
+        "completed_segment": None,
+    }
 
 
 def admit_candidate(
@@ -168,4 +189,3 @@ def admit_candidate(
 
 
 __all__ = ("admit_candidate", "await_human", "plan_or_answer")
-

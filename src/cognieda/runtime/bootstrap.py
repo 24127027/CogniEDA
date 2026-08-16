@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import uuid4
 
 from dotenv import load_dotenv
 
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.context import PlannerContext
-from cognieda.agents.planner.dependencies import PlannerDeps
+from cognieda.agents.planner.dependencies import PlannerToolDeps
 from cognieda.application.services import PlanAdmissionService
 from cognieda.delegation import ExecutorDispatcher, ExecutorRegistry
 from cognieda.infrastructure.llm import AgentFactory
@@ -19,7 +19,7 @@ from cognieda.infrastructure.persistence.repositories import (
 
 from .application import Application
 from .event_bus import EventBus
-from .planner_context import build_planner_context
+from .session import ChatSession
 from .workspace import MissingModelCredentialError, Workspace
 
 
@@ -51,30 +51,23 @@ def bootstrap_application(workspace_path: Path) -> Application:
     dispatcher = ExecutorDispatcher(registry)
     database_url = init_db()
     session = get_session(database_url)
-    session_frames = SessionFrameRepository(
-        session,
-        scope_key=workspace.root.as_posix(),
+    session_id = uuid4()
+    chat_session = ChatSession(
+        session_id=session_id,
+        session_frames=SessionFrameRepository(
+            session,
+            scope_key=str(session_id),
+        ),
+        active_plans=ActivePlanRepository(session),
     )
-    active_plans = ActivePlanRepository(session)
-
-    def current_planner_context() -> PlannerContext:
-        frame = session_frames.get_current()
-        active_plan = (
-            active_plans.get_by_objective_id(frame.objective.objective_id)
-            if frame.objective is not None
-            else None
-        )
-        return build_planner_context(
-            frame,
-            active_plan=active_plan,
-        )
 
     planner = Planner(
-        deps=PlannerDeps(dispatcher=dispatcher),
+        deps=PlannerToolDeps(dispatcher=dispatcher),
         agent_factory=agent_factory,
         model_config=model_config,
         plan_admission=PlanAdmissionService(session),
         agent_instruction=workspace.load_agent_instruction(),
+        thread_id=session_id,
     )
     event_bus = EventBus()
 
@@ -83,5 +76,8 @@ def bootstrap_application(workspace_path: Path) -> Application:
         workspace=workspace,
         planner_agent=planner,
         event_bus=event_bus,
-        planner_context_factory=current_planner_context,
+        session=chat_session,
     )
+
+
+__all__ = ("bootstrap_application",)

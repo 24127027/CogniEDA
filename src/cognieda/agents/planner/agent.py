@@ -14,15 +14,16 @@ from pydantic_ai.messages import ModelMessage
 
 from cognieda.agents.utilities import instruction
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
+from cognieda.runtime.conversation import ConversationSegment
 from cognieda.schemas.plan import Plan
 
-from .context import PlannerContext
+from .context import PlannerContext, PlannerRunContext
 from .dependencies import (
     PlanAdmissionPort,
-    PlannerDeps,
+    PlannerToolDeps,
 )
 from .graph import InProcessPlannerSerializer, build_graph
-from .state import PlannerGraphInput, PlannerTurnOutcome
+from .state import PlannerTurnOutcome
 from .types import (
     PlannerControlledError,
     PlannerErrorCode,
@@ -38,7 +39,7 @@ class Planner:
 
     def __init__(
         self,
-        deps: PlannerDeps,
+        deps: PlannerToolDeps,
         *,
         agent_factory: AgentFactoryPort,
         model_config: ModelConfig | None,
@@ -47,12 +48,12 @@ class Planner:
         checkpointer: BaseCheckpointSaver[Any] | None = None,
         thread_id: UUID | None = None,
     ) -> None:
-        self.deps = deps
+        self.tool_deps = deps
         self._agent_factory = agent_factory
         self._model_config = model_config
         self._agent_instruction = agent_instruction
         self._instructions = self._assemble_instructions()
-        self._agent: Agent[PlannerDeps] | None = None
+        self._agent: Agent[PlannerToolDeps] | None = None
         if model_config is not None:
             self._create_agent()
         self._checkpointer = checkpointer or InMemorySaver(
@@ -80,11 +81,11 @@ class Planner:
         self._agent = self._agent_factory.create_agent(
             worker="planner",
             config=self._model_config,
-            deps_type=PlannerDeps,
+            deps_type=PlannerToolDeps,
             builtin_tools=self.builtin_tools,
         )
 
-    def _ensure_agent(self) -> Agent[PlannerDeps]:
+    def _ensure_agent(self) -> Agent[PlannerToolDeps]:
         if self._agent is None:
             self._create_agent()
         agent = self._agent
@@ -115,32 +116,42 @@ class Planner:
         message: str,
         *,
         context: PlannerContext,
-    ) -> PlannerTurnOutcome:
+        message_history: tuple[ModelMessage, ...] = (),
+    ) -> tuple[PlannerTurnOutcome, ConversationSegment | None]:
         """Handle or resume one Human turn without exposing graph mechanics."""
 
         if not message.strip():
-            return PlannerTurnOutcome(
-                error=PlannerControlledError(
-                    code=PlannerErrorCode.INVALID_REQUEST,
-                    message="Planner requests cannot be empty.",
-                )
+            return (
+                PlannerTurnOutcome(
+                    error=PlannerControlledError(
+                        code=PlannerErrorCode.INVALID_REQUEST,
+                        message="Planner requests cannot be empty.",
+                    )
+                ),
+                None,
             )
 
         snapshot = await self.graph.aget_state(self._graph_config)
         if self._is_interrupted(snapshot):
-            graph_input: PlannerGraphInput | Command[Any] = Command(resume=message)
+            graph_input: Command[Any] | dict[str, object] = Command(resume=message)
         else:
             graph_input = {"latest_human_input": message}
+
+        run_context = PlannerRunContext(
+            planner_context=context,
+            message_history=message_history,
+        )
 
         graph_output = await self.graph.ainvoke(
             graph_input,
             config=self._graph_config,
-            context=context,
+            context=run_context,
         )
         outcome = graph_output.get("turn_outcome")
         if outcome is None:
             raise RuntimeError("Planner graph completed without a typed turn outcome.")
-        return outcome
+        completed_segment = graph_output.get("completed_segment")
+        return outcome, completed_segment
 
     async def _invoke_cognitive(
         self,
@@ -170,12 +181,12 @@ class Planner:
         current_candidate_instruction = self._build_candidate_instruction(
             candidate_plan,
         )
-        messages: tuple[ModelMessage, ...] = ()
+        new_messages: tuple[ModelMessage, ...] = ()
         try:
             run_result = await agent.run(
                 request,
                 output_type=PlannerResult,
-                deps=self.deps,
+                deps=self.tool_deps,
                 message_history=message_history,
                 instructions=[
                     *self._instructions,
@@ -187,7 +198,7 @@ class Planner:
                     ),
                 ],
             )
-            messages = tuple(run_result.new_messages())
+            new_messages = tuple(run_result.new_messages())
             result = PlannerResult.model_validate(run_result.output)
             self._validate_result_against_context(
                 result,
@@ -197,21 +208,23 @@ class Planner:
             return self._controlled_output(
                 PlannerErrorCode.INVALID_MODEL_RESULT,
                 "Planner produced a result that is invalid for the current context.",
-                messages=messages,
             )
         except Exception:
             return self._controlled_output(
                 PlannerErrorCode.MODEL_UNAVAILABLE,
                 "Planner model invocation failed.",
-                messages=messages,
             )
 
-        return PlannerOutput(result=result, messages=messages)
+        segment = (
+            ConversationSegment(messages=new_messages)
+            if new_messages
+            else None
+        )
+        return PlannerOutput(result=result, segment=segment)
 
     @staticmethod
     def _is_interrupted(snapshot: StateSnapshot) -> bool:
         return any(task.interrupts for task in snapshot.tasks)
-
 
     @staticmethod
     def _build_context_instruction(context: PlannerContext) -> str:
@@ -276,13 +289,11 @@ class Planner:
     def _controlled_output(
         code: PlannerErrorCode,
         message: str,
-        *,
-        messages: tuple[ModelMessage, ...] = (),
     ) -> PlannerOutput:
         error = PlannerControlledError(code=code, message=message)
         return PlannerOutput(
             result=PlannerResult(response=message),
-            messages=messages,
+            segment=None,
             error=error,
         )
 

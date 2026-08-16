@@ -207,9 +207,9 @@ failure as a controlled error.
 
 The current PydanticAI adapter exposes a typed data-capability request through
 Planner dependencies. Focused tests validate adapter to dispatcher to
-registered-provider invocation without a model endpoint. Bootstrap explicitly
-composes a registry, Data Explorer provider factory, dispatcher, and
-`PlannerDeps`; availability no longer depends on executor module import order.
+registered-provider invocation without a model endpoint. Bootstrap explicitly composes a registry, Data Explorer provider factory,
+dispatcher, and `PlannerToolDeps`; availability no longer depends on executor
+module import order.
 
 `ExecutionResult` now contains only shared transport metadata.
 `DataExplorerResult` and the deferred `HypothesisAnalystResult` own their

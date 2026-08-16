@@ -5,10 +5,6 @@ from __future__ import annotations
 from sqlmodel import SQLModel
 
 from cognieda.infrastructure.persistence import models  # noqa: F401
-from cognieda.infrastructure.persistence.migrations import (
-    upgrade_execution_attempt_schema,
-    upgrade_session_frame_scope_schema,
-)
 from cognieda.infrastructure.persistence.session import create_db_engine, get_database_url
 
 
@@ -17,8 +13,6 @@ def init_db(database_url: str | None = None) -> str:
 
     resolved_url = database_url or get_database_url()
     engine = create_db_engine(resolved_url)
-    upgrade_execution_attempt_schema(engine)
-    upgrade_session_frame_scope_schema(engine)
     SQLModel.metadata.create_all(engine)
     return resolved_url
 

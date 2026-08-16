@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from pydantic_ai.messages import ModelMessage
 
+from cognieda.runtime.conversation import ConversationSegment
 from cognieda.schemas.plan import Plan
 
 from .types import PlannerControlledError
@@ -34,31 +34,16 @@ class PlannerTurnOutcome(BaseModel):
         return self
 
 
-class PlannerGraphInput(TypedDict):
-    """Run-scoped input accepted by the compiled Planner graph."""
-
-    latest_human_input: str
-
-
-class PlannerGraphOutput(TypedDict):
-    """Presentation facts returned by one compiled Planner graph invocation."""
-
-    turn_outcome: PlannerTurnOutcome | None
-
-
-class PlannerState(TypedDict):
+class PlannerState(TypedDict, total=False):
     """Checkpointed Planner lifecycle state; never authoritative research state."""
 
     latest_human_input: str | None
     candidate_plan: Plan | None
-    messages: tuple[ModelMessage, ...]
     turn_outcome: PlannerTurnOutcome | None
+    completed_segment: ConversationSegment | None
 
 
 __all__ = (
-    "PlannerGraphInput",
-    "PlannerGraphOutput",
     "PlannerState",
     "PlannerTurnOutcome",
 )
-

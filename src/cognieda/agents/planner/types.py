@@ -3,8 +3,8 @@ from __future__ import annotations
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from pydantic_ai.messages import ModelMessage
 
+from cognieda.runtime.conversation import ConversationSegment
 from cognieda.schemas.plan import Plan
 
 
@@ -73,7 +73,7 @@ class PlannerOutput(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     result: PlannerResult
-    messages: tuple[ModelMessage, ...] = ()
+    segment: ConversationSegment | None = None
     error: PlannerControlledError | None = None
 
 

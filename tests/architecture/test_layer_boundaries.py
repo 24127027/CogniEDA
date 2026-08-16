@@ -77,7 +77,7 @@ def test_planner_has_no_session_frame_dependency_or_legacy_graph_surface() -> No
     signature = inspect.signature(Planner.handle_message)
     assert violations == []
     assert "session_frame" not in signature.parameters
-    assert tuple(signature.parameters) == ("self", "message", "context")
+    assert tuple(signature.parameters) == ("self", "message", "context", "message_history")
     assert signature.parameters["context"].annotation in {PlannerContext, "PlannerContext"}
     assert inspect.iscoroutinefunction(Planner.reload)
     assert "session_frame" not in PlannerContext.model_fields
@@ -117,10 +117,15 @@ def test_conversation_memory_is_separate_from_authoritative_planner_context() ->
     from cognieda.agents.planner.context import PlannerContext
     from cognieda.agents.planner.state import PlannerState
     from cognieda.runtime.application import Application
-    from cognieda.runtime.conversation import ConversationHistory, ConversationTurn
+    from cognieda.runtime.conversation import (
+        ConversationHistory,
+        ConversationSegment,
+        ConversationTurn,
+    )
 
     assert tuple(ConversationHistory.model_fields) == ("turns",)
-    assert tuple(ConversationTurn.model_fields) == ("turn_id", "messages")
+    assert tuple(ConversationTurn.model_fields) == ("turn_id", "segments")
+    assert tuple(ConversationSegment.model_fields) == ("segment_id", "messages")
     assert "conversation_history" not in PlannerContext.model_fields
     assert "context" not in PlannerState.__annotations__
     assert not hasattr(Application, "conversation_history")

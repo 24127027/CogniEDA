@@ -4,11 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from cognieda.agents.planner.context import PlannerContext
-from cognieda.agents.planner.state import (
-    PlannerGraphInput,
-    PlannerGraphOutput,
-    PlannerState,
-)
+from cognieda.agents.planner.state import PlannerState
 from cognieda.agents.planner.types import PlannerOutput, PlannerResult
 from cognieda.schemas import (
     Assumption,
@@ -85,7 +81,6 @@ def _evidence_and_discovery(
     return evidence, hypothesis, discovery
 
 
-
 def test_planner_context_and_result_have_exact_canonical_fields() -> None:
     assert tuple(PlannerContext.model_fields) == (
         "active_plan",
@@ -103,15 +98,14 @@ def test_planner_context_and_result_have_exact_canonical_fields() -> None:
         "continue_execution",
         "discard_candidate",
     )
-    assert tuple(PlannerOutput.model_fields) == ("result", "messages", "error")
-    assert tuple(PlannerGraphInput.__annotations__) == ("latest_human_input",)
-    assert tuple(PlannerGraphOutput.__annotations__) == ("turn_outcome",)
+    assert tuple(PlannerOutput.model_fields) == ("result", "segment", "error")
     assert tuple(PlannerState.__annotations__) == (
         "latest_human_input",
         "candidate_plan",
-        "messages",
         "turn_outcome",
+        "completed_segment",
     )
+    assert "messages" not in PlannerState.__annotations__
     assert "context" not in PlannerState.__annotations__
 
 

@@ -73,6 +73,20 @@ class AgentTooling:
 
         return cls(config=config, mcp_toolsets=mcp_toolsets, skills=skills)
 
+    @classmethod
+    def from_config_path(
+        cls,
+        path: Path,
+        mcp_path: Path,
+        skills_path: Path,
+    ) -> "AgentTooling":
+        class _DirectConfig:
+            agents_config_path = path
+            mcp_config_path = mcp_path
+            skills_config_path = skills_path
+
+        return cls.load(_DirectConfig())
+
     def toolsets_for(
         self,
         worker: str,

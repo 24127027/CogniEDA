@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Callable
 from typing import cast
 from unittest.mock import AsyncMock, Mock
 
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
+
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.agents.planner.types import PlannerControlledError, PlannerErrorCode
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.application import Application
+from cognieda.runtime.conversation import ConversationSegment
 from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import (
     HumanInputRequested,
@@ -19,6 +20,7 @@ from cognieda.runtime.events import (
     PlanProposed,
     RuntimeEvent,
 )
+from cognieda.runtime.session import ChatSession
 from cognieda.runtime.workspace import Workspace
 from cognieda.schemas import Objective, Plan, Task, TaskKind
 
@@ -38,7 +40,7 @@ def _application(
     *,
     workspace: Workspace | None = None,
     agent_factory: AgentFactoryPort | None = None,
-    planner_context_factory: Callable[[], PlannerContext] | None = None,
+    session: ChatSession | None = None,
 ) -> tuple[Application, list[RuntimeEvent]]:
     event_bus = EventBus()
     events: list[RuntimeEvent] = []
@@ -50,7 +52,7 @@ def _application(
         planner_agent=planner,
         agent_factory=agent_factory or cast(AgentFactoryPort, object()),
         event_bus=event_bus,
-        planner_context_factory=planner_context_factory or (lambda: PlannerContext()),
+        session=session,
     )
     return application, events
 
@@ -59,21 +61,28 @@ def test_application_maps_planner_outcome_to_presentation_events() -> None:
     plan = _candidate()
     planner = Mock(spec=Planner)
     planner.handle_message = AsyncMock(
-        return_value=PlannerTurnOutcome(
-            proposed_plan=plan,
-            response="I propose a bounded investigation.",
-            human_input_request="Does this scope look right?",
+        return_value=(
+            PlannerTurnOutcome(
+                proposed_plan=plan,
+                response="I propose a bounded investigation.",
+                human_input_request="Does this scope look right?",
+            ),
+            None,
         )
     )
-    test_context = PlannerContext(objective=Objective(text="churn"))
+    session = ChatSession()
     application, events = _application(
         planner,
-        planner_context_factory=lambda: test_context,
+        session=session,
     )
 
     asyncio.run(application.submit_message("Investigate churn."))
 
-    planner.handle_message.assert_awaited_once_with("Investigate churn.", context=test_context)
+    planner.handle_message.assert_awaited_once_with(
+        "Investigate churn.",
+        context=session.current_planner_context(),
+        message_history=(),
+    )
     assert [type(event) for event in events] == [
         PlanProposed,
         MessageProduced,
@@ -94,7 +103,9 @@ def test_application_maps_controlled_planner_failure_to_error_event() -> None:
         code=PlannerErrorCode.PLAN_ADMISSION_FAILED,
         message="The proposed Plan could not be admitted.",
     )
-    planner.handle_message = AsyncMock(return_value=PlannerTurnOutcome(error=error))
+    planner.handle_message = AsyncMock(
+        return_value=(PlannerTurnOutcome(error=error), None)
+    )
     application, events = _application(planner)
 
     asyncio.run(application.submit_message("Proceed."))
@@ -105,10 +116,10 @@ def test_application_maps_controlled_planner_failure_to_error_event() -> None:
     assert event.message.content == error.message
 
 
-def test_application_has_no_planner_or_session_memory_authority() -> None:
+def test_application_has_no_concrete_repositories_or_session_frame_authority() -> None:
     constructor_parameters = inspect.signature(Application).parameters
 
-    assert "planner_context_factory" in constructor_parameters
+    assert "session" in constructor_parameters
     assert "session_frames" not in constructor_parameters
     assert "active_plans" not in constructor_parameters
     assert not hasattr(Application, "session_frame")
@@ -118,45 +129,74 @@ def test_application_has_no_planner_or_session_memory_authority() -> None:
     assert not hasattr(Application, "planner_runtime")
 
 
-def test_application_supplies_fresh_planner_context_for_each_turn() -> None:
+def test_application_commits_returned_completed_segment_to_session() -> None:
     planner = Mock(spec=Planner)
+    segment = ConversationSegment(
+        messages=(
+            ModelRequest(parts=[UserPromptPart(content="Hello")]),
+            ModelResponse(parts=[TextPart(content="World")]),
+        )
+    )
+    planner.handle_message = AsyncMock(
+        return_value=(
+            PlannerTurnOutcome(response="World"),
+            segment,
+        )
+    )
+    session = ChatSession()
+    application, events = _application(planner, session=session)
+
+    assert session.model_messages() == []
+
+    asyncio.run(application.submit_message("Hello"))
+
+    assert session.model_messages() == list(segment.messages)
+    assert len(session.conversation_history.turns) == 1
+
+
+def test_application_multiple_submit_messages_remain_in_same_chat_session() -> None:
+    planner = Mock(spec=Planner)
+    seg1 = ConversationSegment(
+        messages=(
+            ModelRequest(parts=[UserPromptPart(content="First")]),
+            ModelResponse(parts=[TextPart(content="Ans1")]),
+        )
+    )
+    seg2 = ConversationSegment(
+        messages=(
+            ModelRequest(parts=[UserPromptPart(content="Second")]),
+            ModelResponse(parts=[TextPart(content="Ans2")]),
+        )
+    )
     planner.handle_message = AsyncMock(
         side_effect=[
-            PlannerTurnOutcome(response="First answer."),
-            PlannerTurnOutcome(response="Second answer."),
+            (PlannerTurnOutcome(response="Ans1"), seg1),
+            (PlannerTurnOutcome(response="Ans2"), seg2),
         ]
     )
-    turn_contexts = [
-        PlannerContext(objective=Objective(text="First objective")),
-        PlannerContext(objective=Objective(text="Second objective")),
-    ]
-    context_iter = iter(turn_contexts)
+    session = ChatSession()
+    application, _ = _application(planner, session=session)
 
-    application, events = _application(
-        planner,
-        planner_context_factory=lambda: next(context_iter),
-    )
-
-    asyncio.run(application.submit_message("First question."))
-    asyncio.run(application.submit_message("Second question."))
+    asyncio.run(application.submit_message("First"))
+    asyncio.run(application.submit_message("Second"))
 
     assert planner.handle_message.await_count == 2
-    planner.handle_message.assert_has_awaits([
-        (( "First question.",), {"context": turn_contexts[0]}),
-        (( "Second question.",), {"context": turn_contexts[1]}),
-    ])
+    assert session.model_messages() == [*seg1.messages, *seg2.messages]
+    assert len(session.conversation_history.turns) == 2
 
 
 def test_application_fails_closed_when_context_factory_raises() -> None:
     planner = Mock(spec=Planner)
     planner.handle_message = AsyncMock()
 
-    def broken_factory() -> PlannerContext:
-        raise RuntimeError("Persistence failure while building context.")
+    session = Mock(spec=ChatSession)
+    session.current_planner_context.side_effect = RuntimeError(
+        "Persistence failure while building context."
+    )
 
     application, events = _application(
         planner,
-        planner_context_factory=broken_factory,
+        session=session,
     )
 
     asyncio.run(application.submit_message("Investigate."))
@@ -166,8 +206,6 @@ def test_application_fails_closed_when_context_factory_raises() -> None:
     event = cast(MessageProduced, events[0])
     assert event.message.type.value == "error"
     assert "Planner authoritative context could not be materialized." in event.message.content
-
-
 
 
 def test_skill_assignment_reloads_tooling_and_planner() -> None:

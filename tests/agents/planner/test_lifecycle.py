@@ -18,12 +18,10 @@ from pydantic_ai.messages import (
 from sqlmodel import Session
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.context import PlannerContext
-from cognieda.agents.planner.dependencies import PlannerDeps
+from cognieda.agents.planner.context import PlannerContext, PlannerRunContext
+from cognieda.agents.planner.dependencies import PlannerToolDeps
 from cognieda.agents.planner.graph import InProcessPlannerSerializer, build_graph
 from cognieda.agents.planner.state import (
-    PlannerGraphInput,
-    PlannerGraphOutput,
     PlannerState,
     PlannerTurnOutcome,
 )
@@ -37,6 +35,10 @@ from cognieda.infrastructure.persistence.repositories import (
     PlanRepository,
     SessionFrameRepository,
     TaskRepository,
+)
+from cognieda.runtime.conversation import (
+    ConversationHistory,
+    ConversationSegment,
 )
 from cognieda.runtime.planner_context import build_planner_context
 from cognieda.schemas import Objective, Plan, SessionFrame, Task, TaskKind
@@ -61,14 +63,6 @@ class RecordingDispatcher:
             work_id="recorded",
             status=ExecutionStatus.SUCCEEDED,
         )
-
-
-class MutableContextProvider:
-    def __init__(self, context: PlannerContext | None = None) -> None:
-        self.current = context or PlannerContext()
-
-    def materialize(self) -> PlannerContext:
-        return self.current.model_copy()
 
 
 class RecordingAdmission:
@@ -98,7 +92,7 @@ class SequencePlanner(Planner):
         self.message_histories: list[tuple[ModelMessage, ...]] = []
         self.recording_dispatcher = dispatcher or RecordingDispatcher()
         super().__init__(
-            deps=PlannerDeps(dispatcher=self.recording_dispatcher),
+            deps=PlannerToolDeps(dispatcher=self.recording_dispatcher),
             agent_factory=cast(AgentFactoryPort, object()),
             model_config=None,
             plan_admission=plan_admission,
@@ -178,9 +172,10 @@ def test_graph_state_and_outcome_have_exact_separate_ownership(
     assert tuple(PlannerState.__annotations__) == (
         "latest_human_input",
         "candidate_plan",
-        "messages",
         "turn_outcome",
+        "completed_segment",
     )
+    assert "messages" not in PlannerState.__annotations__
     assert "context" not in PlannerState.__annotations__
     assert tuple(PlannerTurnOutcome.model_fields) == (
         "proposed_plan",
@@ -205,25 +200,26 @@ def test_graph_state_and_outcome_have_exact_separate_ownership(
 def test_candidate_proposal_is_checkpointed_without_authoritative_writes(
     db_session: Session,
 ) -> None:
-    messages = _messages("Investigate churn.", "Proposed a plan.")
+    segment = ConversationSegment(messages=_messages("Investigate churn.", "Proposed a plan."))
     candidate = _candidate_result()
     assert candidate.plan is not None
     planner = _planner(
-        (PlannerOutput(result=candidate, messages=messages),),
+        (PlannerOutput(result=candidate, segment=segment),),
         db_session,
     )
 
-    outcome = asyncio.run(
+    outcome, completed_segment = asyncio.run(
         planner.handle_message("Investigate churn.", context=PlannerContext())
     )
     state = _state(planner)
     persisted_candidate = state["candidate_plan"]
 
     assert outcome.proposed_plan == candidate.plan
+    assert completed_segment == segment
     assert persisted_candidate == candidate.plan
     assert persisted_candidate is not None
     assert persisted_candidate.tasks == candidate.plan.tasks
-    assert state["messages"] == messages
+    assert "messages" not in state
     assert _is_waiting(planner)
     assert ObjectiveRepository(db_session).get_by_id(
         candidate.plan.objective.objective_id
@@ -237,10 +233,12 @@ def test_empty_human_input_is_rejected_before_interrupt_resume(
 ) -> None:
     candidate = _candidate_result()
     assert candidate.plan is not None
-    first_messages = _messages("Investigate churn.", "Proposed a plan.")
+    first_segment = ConversationSegment(
+        messages=_messages("Investigate churn.", "Proposed a plan.")
+    )
     planner = _planner(
         (
-            PlannerOutput(result=candidate, messages=first_messages),
+            PlannerOutput(result=candidate, segment=first_segment),
             PlannerOutput(result=PlannerResult(response="The candidate remains available.")),
         ),
         db_session,
@@ -248,7 +246,7 @@ def test_empty_human_input_is_rejected_before_interrupt_resume(
 
     asyncio.run(planner.handle_message("Investigate churn.", context=PlannerContext()))
     before = _state(planner)
-    rejected = asyncio.run(planner.handle_message("  ", context=PlannerContext()))
+    rejected, _ = asyncio.run(planner.handle_message("  ", context=PlannerContext()))
 
     assert rejected.error is not None
     assert rejected.error.code is PlannerErrorCode.INVALID_REQUEST
@@ -256,7 +254,9 @@ def test_empty_human_input_is_rejected_before_interrupt_resume(
     assert _state(planner) == before
     assert _is_waiting(planner)
 
-    resumed = asyncio.run(planner.handle_message("Why this scope?", context=PlannerContext()))
+    resumed, _ = asyncio.run(
+        planner.handle_message("Why this scope?", context=PlannerContext())
+    )
     assert resumed.response == "The candidate remains available."
     assert planner.requests == ["Investigate churn.", "Why this scope?"]
 
@@ -268,22 +268,22 @@ def test_natural_multiturn_review_retain_replace_and_authorize_exact_candidate(
     p1 = _candidate_result(objective=objective, instruction="Analyze pricing cohorts.")
     p2 = _candidate_result(objective=objective, instruction="Analyze support cohorts.")
     assert p1.plan is not None and p2.plan is not None
-    first_messages = _messages("Investigate churn.", "P1")
-    explanation_messages = _messages("Why is pricing included?", "Explanation")
-    replacement_messages = _messages("Remove pricing.", "P2")
-    authorization_messages = _messages("That looks right, proceed.", "Authorized")
+    seg1 = ConversationSegment(messages=_messages("Investigate churn.", "P1"))
+    seg_exp = ConversationSegment(messages=_messages("Why is pricing included?", "Explanation"))
+    seg2 = ConversationSegment(messages=_messages("Remove pricing.", "P2"))
+    seg_auth = ConversationSegment(messages=_messages("That looks right, proceed.", "Authorized"))
     admission = RecordingAdmission(PlanAdmissionService(db_session))
     planner = _planner(
         (
-            PlannerOutput(result=p1, messages=first_messages),
+            PlannerOutput(result=p1, segment=seg1),
             PlannerOutput(
                 result=PlannerResult(response="Pricing was included as a possible driver."),
-                messages=explanation_messages,
+                segment=seg_exp,
             ),
-            PlannerOutput(result=p2, messages=replacement_messages),
+            PlannerOutput(result=p2, segment=seg2),
             PlannerOutput(
                 result=PlannerResult(continue_execution=True),
-                messages=authorization_messages,
+                segment=seg_auth,
             ),
         ),
         db_session,
@@ -291,22 +291,40 @@ def test_natural_multiturn_review_retain_replace_and_authorize_exact_candidate(
     )
     context = PlannerContext(objective=objective)
 
-    first = asyncio.run(planner.handle_message("Investigate churn.", context=context))
+    first, _ = asyncio.run(planner.handle_message("Investigate churn.", context=context))
     assert first.proposed_plan == p1.plan
     assert _state(planner)["candidate_plan"] == p1.plan
 
-    explanation = asyncio.run(planner.handle_message("Why is pricing included?", context=context))
+    explanation, _ = asyncio.run(
+        planner.handle_message(
+            "Why is pricing included?",
+            context=context,
+            message_history=tuple(seg1.messages),
+        )
+    )
     assert explanation.proposed_plan is None
     assert _state(planner)["candidate_plan"] == p1.plan
     assert planner.candidates[1] == p1.plan
     assert admission.calls == []
 
-    replacement = asyncio.run(planner.handle_message("Remove pricing.", context=context))
+    replacement, _ = asyncio.run(
+        planner.handle_message(
+            "Remove pricing.",
+            context=context,
+            message_history=(*seg1.messages, *seg_exp.messages),
+        )
+    )
     assert replacement.proposed_plan == p2.plan
     assert _state(planner)["candidate_plan"] == p2.plan
     assert admission.calls == []
 
-    outcome = asyncio.run(planner.handle_message("That looks right, proceed.", context=context))
+    outcome, _ = asyncio.run(
+        planner.handle_message(
+            "That looks right, proceed.",
+            context=context,
+            message_history=(*seg1.messages, *seg_exp.messages, *seg2.messages),
+        )
+    )
     assert admission.calls == [p2.plan]
     assert _state(planner)["candidate_plan"] is None
     assert outcome.response == "The proposed Plan was admitted and activated."
@@ -316,24 +334,26 @@ def test_natural_multiturn_review_retain_replace_and_authorize_exact_candidate(
     assert not _is_waiting(planner)
     assert planner.message_histories == [
         (),
-        first_messages,
-        (*first_messages, *explanation_messages),
-        (*first_messages, *explanation_messages, *replacement_messages),
+        seg1.messages,
+        (*seg1.messages, *seg_exp.messages),
+        (*seg1.messages, *seg_exp.messages, *seg2.messages),
     ]
 
 
-def test_context_is_fresh_and_native_history_remains_graph_owned(
+def test_context_is_fresh_and_native_history_derived_from_conversation_history(
     db_session: Session,
 ) -> None:
     first_messages = _messages("First question.", "First answer.")
     second_messages = _messages("Second question.", "Second answer.")
+    seg1 = ConversationSegment(messages=first_messages)
+    seg2 = ConversationSegment(messages=second_messages)
     session_frames = SessionFrameRepository(db_session, scope_key="fresh-context")
     planner = _planner(
         (
-            PlannerOutput(result=PlannerResult(response="First answer."), messages=first_messages),
+            PlannerOutput(result=PlannerResult(response="First answer."), segment=seg1),
             PlannerOutput(
                 result=PlannerResult(response="Second answer."),
-                messages=second_messages,
+                segment=seg2,
             ),
         ),
         db_session,
@@ -342,39 +362,75 @@ def test_context_is_fresh_and_native_history_remains_graph_owned(
     second_objective = Objective(text="Second current Objective.")
     session_frames.save_current(SessionFrame(objective=first_objective))
 
+    history = ConversationHistory()
     context_1 = build_planner_context(session_frames.get_current())
-    asyncio.run(planner.handle_message("First question.", context=context_1))
+    _, segment_1 = asyncio.run(
+        planner.handle_message(
+            "First question.",
+            context=context_1,
+            message_history=tuple(history.model_messages()),
+        )
+    )
+    assert segment_1 is not None
+    history = history.commit_segment(segment_1)
 
     session_frames.save_current(SessionFrame(objective=second_objective))
     context_2 = build_planner_context(session_frames.get_current())
-    asyncio.run(planner.handle_message("Second question.", context=context_2))
+    _, segment_2 = asyncio.run(
+        planner.handle_message(
+            "Second question.",
+            context=context_2,
+            message_history=tuple(history.model_messages()),
+        )
+    )
+    assert segment_2 is not None
 
     assert planner.contexts[0].objective == first_objective
     assert planner.contexts[1].objective == second_objective
     assert planner.contexts[0] is not planner.contexts[1]
     assert planner.message_histories == [(), first_messages]
-    assert _state(planner)["messages"] == (*first_messages, *second_messages)
+    assert "messages" not in _state(planner)
     assert "context" not in PlannerState.__annotations__
 
 
-def test_custom_serializer_is_required_for_nested_typed_plan_state() -> None:
-    candidate = _candidate_result()
-    assert candidate.plan is not None
-    state = {
-        "candidate_plan": candidate.plan,
-        "messages": _messages("Question.", "Answer."),
-    }
+def test_segment_pruning_actually_changes_model_context(db_session: Session) -> None:
+    """Regression test: truncating ConversationHistory removes messages from next invocation."""
+    s1 = ConversationSegment(messages=_messages("Q1", "A1"))
+    s2 = ConversationSegment(messages=_messages("Q2", "A2"))
+    s3 = ConversationSegment(messages=_messages("Q3", "A3"))
 
-    plain_serializer = InMemorySaver().serde
-    planner_serializer = InProcessPlannerSerializer()
-    plain = plain_serializer.loads_typed(plain_serializer.dumps_typed(state))
-    restored = planner_serializer.loads_typed(planner_serializer.dumps_typed(state))
+    history = (
+        ConversationHistory()
+        .commit_segment(s1)
+        .commit_segment(s2)
+        .commit_segment(s3)
+    )
 
-    assert isinstance(plain["candidate_plan"], Plan)
-    assert not isinstance(plain["candidate_plan"].tasks[0], Task)
-    assert restored == state
-    assert isinstance(restored["candidate_plan"].tasks[0], Task)
-    assert isinstance(restored["messages"], tuple)
+    # 1. Verify full flattened history
+    assert history.model_messages() == [*s1.messages, *s2.messages, *s3.messages]
+
+    # 2. Truncate from S2 -> retained becomes [S1]
+    truncated_history = history.truncate_from(s2.segment_id)
+    assert truncated_history.model_messages() == list(s1.messages)
+
+    # 3. Next cognitive turn receives history derived only from truncated_history
+    planner = _planner(
+        (PlannerOutput(result=PlannerResult(response="Response to Q4")),),
+        db_session,
+    )
+    asyncio.run(
+        planner.handle_message(
+            "Q4",
+            context=PlannerContext(),
+            message_history=tuple(truncated_history.model_messages()),
+        )
+    )
+
+    assert len(planner.message_histories) == 1
+    assert planner.message_histories[0] == s1.messages
+    # Must NOT contain messages from S2 or S3
+    for msg in (*s2.messages, *s3.messages):
+        assert msg not in planner.message_histories[0]
 
 
 def test_discard_clears_candidate_and_repeat_discard_fails_closed(
@@ -396,14 +452,14 @@ def test_discard_clears_candidate_and_repeat_discard_fails_closed(
     )
 
     asyncio.run(planner.handle_message("Investigate churn.", context=PlannerContext()))
-    discarded = asyncio.run(
+    discarded, _ = asyncio.run(
         planner.handle_message("Abandon that proposal.", context=PlannerContext())
     )
     assert _state(planner)["candidate_plan"] is None
     assert discarded.response == "I discarded the proposal."
     assert not _is_waiting(planner)
 
-    invalid = asyncio.run(
+    invalid, _ = asyncio.run(
         planner.handle_message("Discard it again.", context=PlannerContext())
     )
     assert invalid.error is not None
@@ -428,7 +484,7 @@ def test_admission_failure_retains_exact_candidate_and_reports_controlled_error(
     )
 
     asyncio.run(planner.handle_message("Investigate churn.", context=PlannerContext()))
-    outcome = asyncio.run(
+    outcome, _ = asyncio.run(
         planner.handle_message("Proceed with that exact proposal.", context=PlannerContext())
     )
     persisted_candidate = _state(planner)["candidate_plan"]
@@ -455,7 +511,7 @@ def test_active_plan_continuation_is_visible_and_never_dispatches(
         dispatcher=dispatcher,
     )
 
-    outcome = asyncio.run(planner.handle_message("Continue active work.", context=context))
+    outcome, _ = asyncio.run(planner.handle_message("Continue active work.", context=context))
 
     assert planner.contexts[0].active_plan == candidate.plan
     assert _state(planner)["candidate_plan"] is None
@@ -490,7 +546,7 @@ def test_inmemory_checkpointer_isolates_planner_thread_identity(
     assert _state(first_planner)["candidate_plan"] == first.plan
 
 
-def test_interrupt_resume_receives_fresh_context_while_preserving_candidate_and_history(
+def test_interrupt_resume_receives_fresh_context_while_preserving_candidate(
     db_session: Session,
 ) -> None:
     """Turn 1 interrupts with C1; Turn 2 resumes with C2 and sees C2 in plan_or_answer."""
@@ -501,13 +557,15 @@ def test_interrupt_resume_receives_fresh_context_while_preserving_candidate_and_
 
     turn1_messages = _messages("Propose plan.", "Here is the proposal.")
     turn2_messages = _messages("Explain why S2 matters.", "Here is the explanation for S2.")
+    seg1 = ConversationSegment(messages=turn1_messages)
+    seg2 = ConversationSegment(messages=turn2_messages)
 
     planner = _planner(
         (
-            PlannerOutput(result=candidate, messages=turn1_messages),
+            PlannerOutput(result=candidate, segment=seg1),
             PlannerOutput(
                 result=PlannerResult(response="Explanation with fresh context."),
-                messages=turn2_messages,
+                segment=seg2,
             ),
         ),
         db_session,
@@ -515,7 +573,7 @@ def test_interrupt_resume_receives_fresh_context_while_preserving_candidate_and_
 
     # Turn 1: Propose candidate -> awaits human review
     context_1 = PlannerContext(objective=objective_1)
-    outcome_1 = asyncio.run(planner.handle_message("Propose plan.", context=context_1))
+    outcome_1, _ = asyncio.run(planner.handle_message("Propose plan.", context=context_1))
     assert outcome_1.proposed_plan == candidate.plan
     assert _is_waiting(planner)
     assert _state(planner)["candidate_plan"] == candidate.plan
@@ -526,12 +584,15 @@ def test_interrupt_resume_receives_fresh_context_while_preserving_candidate_and_
     context_2 = PlannerContext(objective=objective_2)
 
     # Turn 2: Human asks a question while candidate is waiting (resumes interrupt)
-    outcome_2 = asyncio.run(
-        planner.handle_message("Explain why S2 matters.", context=context_2)
+    outcome_2, _ = asyncio.run(
+        planner.handle_message(
+            "Explain why S2 matters.",
+            context=context_2,
+            message_history=tuple(seg1.messages),
+        )
     )
 
     assert outcome_2.response == "Explanation with fresh context."
-
 
     # Invariant checks:
     # 1. plan_or_answer in Turn 2 received context_2 (S2)
@@ -543,9 +604,8 @@ def test_interrupt_resume_receives_fresh_context_while_preserving_candidate_and_
     assert _state(planner)["candidate_plan"] == candidate.plan
     assert planner.candidates[1] == candidate.plan
 
-    # 3. Model message history survives across the interrupt-resume boundary
+    # 3. Model message history passed from conversation memory reaches cognitive invocation
     assert planner.message_histories[1] == turn1_messages
-    assert _state(planner)["messages"] == (*turn1_messages, *turn2_messages)
 
 
 def test_planner_context_is_not_checkpointed(db_session: Session) -> None:
@@ -566,8 +626,27 @@ def test_planner_context_is_not_checkpointed(db_session: Session) -> None:
     assert not any(isinstance(v, PlannerContext) for v in values.values())
 
 
+def test_custom_serializer_is_required_for_nested_typed_plan_state() -> None:
+    candidate = _candidate_result()
+    assert candidate.plan is not None
+    state = {
+        "candidate_plan": candidate.plan,
+    }
+
+    plain_serializer = InMemorySaver().serde
+    planner_serializer = InProcessPlannerSerializer()
+    plain = plain_serializer.loads_typed(plain_serializer.dumps_typed(state))
+    restored = planner_serializer.loads_typed(planner_serializer.dumps_typed(state))
+
+    assert isinstance(plain["candidate_plan"], Plan)
+    # The default JsonPlusSerializer fails to round-trip nested Pydantic models as Task instances
+    assert not isinstance(plain["candidate_plan"].tasks[0], Task)
+    assert restored == state
+    assert isinstance(restored["candidate_plan"].tasks[0], Task)
+
+
 def test_build_graph_schema_types() -> None:
-    """build_graph must declare StateGraph with correct StateT, ContextT, InputT, OutputT."""
+    """build_graph must declare StateGraph with correct StateT and ContextT."""
     checkpointer = InMemorySaver(serde=InProcessPlannerSerializer())
 
     async def fake_invoke(request: str, **kwargs: Any) -> PlannerOutput:
@@ -583,10 +662,9 @@ def test_build_graph_schema_types() -> None:
         plan_admission=FakeAdmission(),
     )
 
-    # Verify builder schemas
     builder = graph.builder
     assert builder.state_schema is PlannerState
-    assert builder.context_schema is PlannerContext
-    assert builder.input_schema is PlannerGraphInput
-    assert builder.output_schema is PlannerGraphOutput
+    assert builder.context_schema is PlannerRunContext
+    assert builder.input_schema is PlannerState
+    assert builder.output_schema is PlannerState
 

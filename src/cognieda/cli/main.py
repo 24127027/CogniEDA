@@ -1,18 +1,10 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from typing import TYPE_CHECKING
 
+from cognieda.cli.renderer import Renderer
 from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
-
-if __package__ in {None, ""}:
-    sys.path.append(str(Path(__file__).resolve().parents[2]))
-    from cognieda.cli.renderer import Renderer
-    from cognieda.runtime.messages import Message, MessageRole, MessageType
-else:
-    from ..runtime.messages import Message, MessageRole, MessageType
-    from .renderer import Renderer
+from cognieda.runtime.messages import Message, MessageRole, MessageType
 
 if TYPE_CHECKING:
     from cognieda.runtime import Application

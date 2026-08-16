@@ -28,13 +28,15 @@ These are verified constraints of the bounded current implementation.
 
 - The Planner cognitive core, in-process LangGraph lifecycle, and deterministic
   Data Explorer-to-Evidence admission are **Implemented** at bounded library
-  surfaces. Planner performs one `plan_or_answer` invocation per graph turn
-  with no tools or dispatch. Graph state owns native model history and the exact
-  transient self-contained Plan candidate; `PlannerContext` owns neither and is
-  materialized fresh for every invocation. Candidate retain/replace/discard,
-  natural-language Human review, typed authorization, and interrupt/resume are
-  implemented in process. Restart recovery, durable graph checkpoints, and
-  complete-loop composition are **Deferred**.
+  surfaces. Application owns an active `ChatSession` containing `ConversationHistory`
+  composed of `ConversationTurn`s and prunable `ConversationSegment`s.
+  Planner performs one `plan_or_answer` invocation per graph turn
+  with `PlannerToolDeps` and no execution dispatch. Graph state owns the exact
+  transient self-contained Plan candidate and completed turn segment; `PlannerContext`
+  and native model history are transported fresh via `PlannerRunContext`.
+  Candidate retain/replace/discard, natural-language Human review, typed authorization,
+  and interrupt/resume are implemented in process. Restart recovery, durable graph
+  checkpoints, durable chat-session reopening, and complete-loop composition are **Deferred**.
 - The Phase 1 Plan domain and side-effect-free candidate validation are
   **Implemented**, and append-only repository behavior is **Verified on
   SQLite** with exact Objective and Assumption snapshots plus full Task

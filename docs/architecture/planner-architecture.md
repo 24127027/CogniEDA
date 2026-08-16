@@ -248,19 +248,22 @@ scientific proposal.
 
 ## Implementation status
 
-**Partially implemented.** The Planner directly owns one typed PydanticAI Agent
-and its compiled LangGraph `StateGraph` with exactly `plan_or_answer`,
-`await_human`, and `admit_candidate` lifecycle nodes. `Planner.handle_message()`
-hides graph invocation, interrupt/resume, checkpointer, and thread mechanics
-from Application. The graph does not add an execution node or a Planner-side
-tool.
+**Partially implemented.** The Application runtime owns one active `ChatSession`,
+which provides identity (`session_id`) and conversational lifetime for multiple
+Human turns. The Planner directly owns one typed PydanticAI Agent with
+`PlannerToolDeps` and its compiled LangGraph `StateGraph` with exactly
+`plan_or_answer`, `await_human`, and `admit_candidate` lifecycle nodes.
+`Planner.handle_message()` hides graph invocation, interrupt/resume,
+checkpointer, and thread mechanics from Application. The graph does not add an
+execution node or a Planner-side tool.
 
-`PlannerState` owns only the latest Human input, one self-contained transient
-candidate Plan, the active thread's native model-message history, and a typed turn outcome. It does
-not own `PlannerContext`. Graph construction directly binds the Planner's
-cognitive invocation, the fresh-context port, and the deterministic
-Plan-admission port to node callables; there is no callback-only graph context
-object.
+`PlannerState` owns only lifecycle state: the latest Human input, one
+self-contained transient candidate Plan, the completed `ConversationSegment`
+produced during the current turn (if complete and successful), and a typed
+turn outcome. It does not own `PlannerContext` and does not maintain duplicate
+full conversation history. Graph construction directly binds the Planner's
+cognitive invocation and the deterministic Plan-admission port to node callables;
+there is no callback-only graph context object.
 
 `graph.py` declares the static topology: `START -> plan_or_answer`,
 `await_human -> plan_or_answer`, and `admit_candidate -> END`.
@@ -270,23 +273,18 @@ field or checkpointed `PlannerResult` is added. `Planner.handle_message()`
 rejects empty Human input as a controlled outcome before initial invocation or
 interrupt resume, so the successful `await_human` route remains static.
 
-`build_planner_context` reads the workspace-scoped current SessionFrame and
-exact-materializes its Objective, Assumptions, Hypotheses, Evidence, Discoveries,
-and DataProfile into immutable `PlannerContext`. It resolves the objective-scoped
-active Plan for the frame's exact current Objective and materializes that Plan
-without model inference. `PlannerContext` contains neither candidate Plan state
-nor conversation history. Application materializes it fresh for every Human turn
-via its injected context factory and passes it to `Planner.handle_message(message, context=context)`.
-LangGraph receives `context=context` on each invocation, providing `Runtime[PlannerContext]`
-to `plan_or_answer` via `runtime.context`. `PlannerContext` is never checkpointed.
-The active LangGraph thread checkpoints native messages and candidate lifecycle state,
-supplying messages separately as PydanticAI `message_history`, while the latest Human text
-remains the current user prompt. Only `result.new_messages()` from the current
-run are appended. `ConversationHistory` remains a typed non-authoritative
-session-memory component, but this phase does not synchronize or durably persist
-it alongside graph state. A future unified `SessionMemory` is intended to
-compose `SessionFrame` and `ConversationHistory`; it must not derive research
-authority from conversation.
+`ChatSession` encapsulates session-scoped `SessionFrame` and `ActivePlan`
+persistence. For every Human turn, a fresh `PlannerContext` is materialized
+from the session's current `SessionFrame` and the exact active `Plan` for its
+Objective. `ConversationHistory` is the canonical retained conversational memory,
+composed of ordered `ConversationTurn`s and native `ConversationSegment`s.
+`ConversationSegment` represents one indivisible, completed model-interaction
+unit; truncating from a segment safely removes that segment and subsequent
+dependent conversation from future model context. LangGraph runtime context
+(`PlannerRunContext`) acts as the run-scoped transport channel carrying the
+fresh `PlannerContext` and flattened `message_history` derived from
+`ConversationHistory` into `plan_or_answer`. `PlannerContext` is never
+checkpointed.
 
 The deterministic serialized `PlannerContext` is supplied fresh through the
 current-run instruction channel, explicitly bounded as data/state and declared
@@ -314,12 +312,16 @@ execution routing are absent from the model-visible Planner contracts.
 If no candidate is pending, `continue_execution` still requires an active Plan.
 Planner returns a visible controlled outcome that execution is not implemented
 and performs no dispatch. Application maps that typed outcome to EventBus
-presentation events; EventBus does not own lifecycle state. Application owns no
-persistence repository, Planner history, or `ConversationHistory` lifecycle.
+presentation events; EventBus does not own lifecycle state. Application owns
+no concrete persistence repositories. Completed `ConversationSegment`s returned
+by Planner are committed to `ChatSession` exactly once at the session boundary.
 Planner-owned `InMemorySaver`, its smallest required trusted process-local typed
-serializer, and one Planner thread UUID preserve isolated in-process threads
-only. Restart recovery, durable `ConversationHistory`, unified `SessionMemory`,
-and durable conversation/candidate checkpoints remain **Deferred**.
+serializer (`InProcessPlannerSerializer`), and a stable session/Planner thread UUID
+preserve isolated in-process state across Human turns within an active session.
+Durable chat-session reopening/discovery after process restart, durable
+`ConversationHistory` persistence across restarts, and full Task DAG execution
+remain **Deferred**. Development databases are reset rather than migrated
+while the product is pre-production.
 
 PR #53 is a structural precedent only for Planner-owned `agent.py`, `graph.py`,
 `nodes.py`, and `state.py` placement. Its checkpointed `PlannerContext`, typed

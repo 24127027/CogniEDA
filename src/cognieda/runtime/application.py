@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
+from cognieda.runtime.session import ChatSession
 
 from .messages import Message, MessageRole, MessageType
 from .workspace import MissingModelCredentialError, Workspace
@@ -20,13 +18,13 @@ class Application:
         planner_agent: Planner,
         agent_factory: AgentFactoryPort,
         event_bus: EventBus,
-        planner_context_factory: Callable[[], PlannerContext],
+        session: ChatSession | None = None,
     ) -> None:
         self.workspace = workspace
         self.agent_factory = agent_factory
         self.planner_agent = planner_agent
         self.event_bus = event_bus
-        self._planner_context_factory = planner_context_factory
+        self.session = session or ChatSession()
 
     async def submit_message(self, message: str) -> None:
         if message.startswith("/"):
@@ -35,7 +33,7 @@ class Application:
             return
 
         try:
-            context = self._planner_context_factory()
+            context = self.session.current_planner_context()
         except Exception:
             self._emit_message(
                 "Planner authoritative context could not be materialized.",
@@ -43,11 +41,20 @@ class Application:
             )
             return
 
+        message_history = tuple(self.session.model_messages())
+
         try:
-            outcome = await self.planner_agent.handle_message(message, context=context)
+            outcome, completed_segment = await self.planner_agent.handle_message(
+                message,
+                context=context,
+                message_history=message_history,
+            )
         except MissingModelCredentialError as e:
             self._emit_message(f"{e}\n\nRun '/provider key <provider>' to configure an API key.")
             return
+
+        if completed_segment is not None:
+            self.session.commit_segment(completed_segment)
 
         self._emit_planner_outcome(outcome)
 
@@ -247,3 +254,6 @@ class Application:
                 )
             )
         )
+
+
+__all__ = ("Application",)

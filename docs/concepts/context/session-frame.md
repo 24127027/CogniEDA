@@ -162,9 +162,10 @@ not require the referenced Task as membership; supported Evidence admission
 still requires an authoritative completed Task at the repository and
 application-service boundaries.
 
-The scoped `SessionFrameRepository` remains authoritative for the current
-materialized frame. The fresh-context provider reads its latest committed snapshot on
-every cognitive invocation and exact-copies all six current materialized member
+The scoped `SessionFrameRepository` (scoped to `scope_key=str(session_id)`)
+remains authoritative for the session's current materialized frame, encapsulated
+inside `ChatSession`. The fresh-context provider reads its latest committed snapshot
+on every cognitive invocation and exact-copies all six current materialized member
 categories into immutable `PlannerContext`. Planner receives that context and
 returns a response, Human clarification request, self-contained transient Plan,
 or continuation signal; it never receives, mutates, or returns SessionFrame.
@@ -173,11 +174,10 @@ into `PlannerContext`; the independent Plan admission service can atomically
 admit an exact authorized Plan and its embedded Tasks. Active Plan is
 explicit coordination state in `PlannerContext`, not SessionFrame research
 membership.
-Application owns no repository-backed SessionFrame facade. No retained runtime
-writer for the scoped current-frame snapshot is composed in this phase; writes
-must later enter through the authority responsible for the semantic transition.
-The active graph's native message history and the separate `ConversationHistory`
-contract are both outside `PlannerContext`.
+Application owns no concrete repository-backed SessionFrame facade and delegates
+session operations to `ChatSession`. The active graph's transient state and the
+`ChatSession`-owned `ConversationHistory` (composed of `ConversationTurn`s and
+prunable `ConversationSegment`s) are both outside `PlannerContext`.
 
 The current value is not the canonical typed-reference membership FCO. It has
 no frame identity, Objective-bound session identity, reference manifest,

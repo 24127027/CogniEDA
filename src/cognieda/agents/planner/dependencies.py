@@ -8,7 +8,7 @@ from cognieda.schemas.plan import Plan
 
 
 @dataclass(frozen=True)
-class PlannerDeps:
+class PlannerToolDeps:
     """Model-hidden dependencies reserved for future semantic Planner tools."""
 
     dispatcher: ExecutorDispatcherPort
@@ -22,5 +22,5 @@ class PlanAdmissionPort(Protocol):
 
 __all__ = (
     "PlanAdmissionPort",
-    "PlannerDeps",
+    "PlannerToolDeps",
 )
