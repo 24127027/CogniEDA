@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from typing import Callable, cast
+from collections.abc import Callable
+from typing import cast
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.agents.planner.context import PlannerContext
+from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.agents.planner.types import PlannerControlledError, PlannerErrorCode
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.application import Application
@@ -57,7 +58,9 @@ def _application(
         event_bus=event_bus,
         session_id=session_id or uuid4(),
         conversation_history=conversation_history or ConversationHistory(),
-        planner_context_factory=planner_context_factory or Mock(return_value=Mock(spec=PlannerContext)),
+        planner_context_factory=(
+            planner_context_factory or Mock(return_value=Mock(spec=PlannerContext))
+        ),
     )
     return application, events
 
@@ -72,7 +75,7 @@ def test_application_maps_planner_outcome_to_presentation_events() -> None:
                 response="I propose a bounded investigation.",
                 human_input_request="Does this scope look right?",
             ),
-            None,
+            (),
         )
     )
     planner_context_factory = Mock(return_value=Mock(spec=PlannerContext))
@@ -109,7 +112,7 @@ def test_application_maps_controlled_planner_failure_to_error_event() -> None:
         message="The proposed Plan could not be admitted.",
     )
     planner.handle_message = AsyncMock(
-        return_value=(PlannerTurnOutcome(error=error), None)
+        return_value=(PlannerTurnOutcome(error=error), ())
     )
     application, events = _application(planner)
 
@@ -147,7 +150,7 @@ def test_application_commits_returned_completed_segment_to_session() -> None:
     planner.handle_message = AsyncMock(
         return_value=(
             PlannerTurnOutcome(response="World"),
-            segment,
+            (segment,),
         )
     )
     conversation_history = ConversationHistory()
@@ -159,6 +162,7 @@ def test_application_commits_returned_completed_segment_to_session() -> None:
 
     assert application.conversation_history.model_messages() == list(segment.messages)
     assert len(application.conversation_history.turns) == 1
+    assert application.conversation_history.turns[0].segments == (segment,)
 
 
 def test_application_multiple_submit_messages_remain_in_same_chat_session() -> None:
@@ -177,8 +181,8 @@ def test_application_multiple_submit_messages_remain_in_same_chat_session() -> N
     )
     planner.handle_message = AsyncMock(
         side_effect=[
-            (PlannerTurnOutcome(response="Ans1"), seg1),
-            (PlannerTurnOutcome(response="Ans2"), seg2),
+            (PlannerTurnOutcome(response="Ans1"), (seg1,)),
+            (PlannerTurnOutcome(response="Ans2"), (seg2,)),
         ]
     )
     conversation_history = ConversationHistory()
@@ -190,6 +194,64 @@ def test_application_multiple_submit_messages_remain_in_same_chat_session() -> N
     assert planner.handle_message.await_count == 2
     assert application.conversation_history.model_messages() == [*seg1.messages, *seg2.messages]
     assert len(application.conversation_history.turns) == 2
+
+
+def test_application_commits_multiple_completed_segments_as_single_turn() -> None:
+    planner = Mock(spec=Planner)
+    seg1 = ConversationSegment(
+        messages=(
+            ModelRequest(parts=[UserPromptPart(content="First request")]),
+            ModelResponse(parts=[TextPart(content="First internal step")]),
+        )
+    )
+    seg2 = ConversationSegment(
+        messages=(
+            ModelRequest(parts=[UserPromptPart(content="Second internal prompt")]),
+            ModelResponse(parts=[TextPart(content="Second internal step")]),
+        )
+    )
+    seg3 = ConversationSegment(
+        messages=(
+            ModelRequest(parts=[UserPromptPart(content="Third internal prompt")]),
+            ModelResponse(parts=[TextPart(content="Final response")]),
+        )
+    )
+    planner.handle_message = AsyncMock(
+        return_value=(
+            PlannerTurnOutcome(response="Final response"),
+            (seg1, seg2, seg3),
+        )
+    )
+    conversation_history = ConversationHistory()
+    application, _ = _application(planner, conversation_history=conversation_history)
+
+    asyncio.run(application.submit_message("Execute multi-step work."))
+
+    assert len(application.conversation_history.turns) == 1
+    turn = application.conversation_history.turns[0]
+    assert turn.segments == (seg1, seg2, seg3)
+    assert application.conversation_history.model_messages() == [
+        *seg1.messages,
+        *seg2.messages,
+        *seg3.messages,
+    ]
+
+
+def test_application_zero_completed_segments_does_not_create_empty_turn() -> None:
+    planner = Mock(spec=Planner)
+    planner.handle_message = AsyncMock(
+        return_value=(
+            PlannerTurnOutcome(response="No model execution performed."),
+            (),
+        )
+    )
+    conversation_history = ConversationHistory()
+    application, _ = _application(planner, conversation_history=conversation_history)
+
+    asyncio.run(application.submit_message("Non-model message."))
+
+    assert len(application.conversation_history.turns) == 0
+    assert application.conversation_history.model_messages() == []
 
 
 def test_application_fails_closed_when_context_factory_raises() -> None:

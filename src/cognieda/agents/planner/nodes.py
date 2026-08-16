@@ -24,6 +24,8 @@ async def plan_or_answer(
     planner_context: PlannerContext = run_context.planner_context
     message_history = list(run_context.message_history)
 
+    current_completed_segments = tuple(state.get("completed_segments") or ())
+
     request = state.get("latest_human_input")
     if request is None or not request.strip():
         error = PlannerControlledError(
@@ -31,7 +33,10 @@ async def plan_or_answer(
             message="Planner lifecycle requires a non-empty Human request.",
         )
         return Command(
-            update={"turn_outcome": PlannerTurnOutcome(error=error)},
+            update={
+                "turn_outcome": PlannerTurnOutcome(error=error),
+                "completed_segments": current_completed_segments,
+            },
             goto=END,
         )
 
@@ -46,7 +51,7 @@ async def plan_or_answer(
     result = output.result
     base_update: dict[str, object] = {
         "candidate_plan": candidate_plan,
-        "completed_segment": None,
+        "completed_segments": current_completed_segments,
     }
 
     if output.error is not None:
@@ -73,6 +78,11 @@ async def plan_or_answer(
         )
 
     segment = output.segment
+    completed_segments = (
+        (*current_completed_segments, segment)
+        if segment is not None
+        else current_completed_segments
+    )
 
     if result.plan is not None:
         outcome = PlannerTurnOutcome(
@@ -83,7 +93,7 @@ async def plan_or_answer(
         return Command(
             update={
                 "candidate_plan": result.plan,
-                "completed_segment": segment,
+                "completed_segments": completed_segments,
                 "turn_outcome": outcome,
             },
             goto="await_human",
@@ -94,7 +104,7 @@ async def plan_or_answer(
             return Command(
                 update={
                     "candidate_plan": candidate_plan,
-                    "completed_segment": segment,
+                    "completed_segments": completed_segments,
                 },
                 goto="admit_candidate",
             )
@@ -107,7 +117,7 @@ async def plan_or_answer(
         return Command(
             update={
                 "candidate_plan": None,
-                "completed_segment": segment,
+                "completed_segments": completed_segments,
                 "turn_outcome": outcome,
             },
             goto=END,
@@ -120,7 +130,7 @@ async def plan_or_answer(
         return Command(
             update={
                 "candidate_plan": None,
-                "completed_segment": segment,
+                "completed_segments": completed_segments,
                 "turn_outcome": outcome,
             },
             goto=END,
@@ -136,7 +146,7 @@ async def plan_or_answer(
     return Command(
         update={
             "candidate_plan": candidate_plan,
-            "completed_segment": segment,
+            "completed_segments": completed_segments,
             "turn_outcome": outcome,
         },
         goto="await_human" if awaiting_human else END,
@@ -160,7 +170,7 @@ def await_human(
     return {
         "latest_human_input": answer,
         "turn_outcome": None,
-        "completed_segment": None,
+        "completed_segments": (),
     }
 
 

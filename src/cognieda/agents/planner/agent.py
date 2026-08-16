@@ -23,7 +23,7 @@ from .dependencies import (
     PlannerToolDeps,
 )
 from .graph import InProcessPlannerSerializer, build_graph
-from .state import PlannerTurnOutcome, PlannerState
+from .state import PlannerState, PlannerTurnOutcome
 from .types import (
     PlannerControlledError,
     PlannerErrorCode,
@@ -117,7 +117,7 @@ class Planner:
         *,
         context: PlannerContext,
         message_history: tuple[ModelMessage, ...] = (),
-    ) -> tuple[PlannerTurnOutcome, ConversationSegment | None]:
+    ) -> tuple[PlannerTurnOutcome, tuple[ConversationSegment, ...]]:
         """Handle or resume one Human turn without exposing graph mechanics."""
 
         if not message.strip():
@@ -128,14 +128,17 @@ class Planner:
                         message="Planner requests cannot be empty.",
                     )
                 ),
-                None,
+                (),
             )
 
         snapshot = await self.graph.aget_state(self._graph_config)
         if self._is_interrupted(snapshot):
             graph_input: Command[Any] | PlannerState = Command(resume=message)
         else:
-            graph_input = {"latest_human_input": message}
+            graph_input = {
+                "latest_human_input": message,
+                "completed_segments": (),
+            }
 
         run_context = PlannerRunContext(
             planner_context=context,
@@ -150,8 +153,8 @@ class Planner:
         outcome = graph_output.get("turn_outcome")
         if outcome is None:
             raise RuntimeError("Planner graph completed without a typed turn outcome.")
-        completed_segment = graph_output.get("completed_segment")
-        return outcome, completed_segment
+        completed_segments = tuple(graph_output.get("completed_segments") or ())
+        return outcome, completed_segments
 
     async def _invoke_cognitive(
         self,

@@ -25,7 +25,12 @@ from cognieda.agents.planner.state import (
     PlannerState,
     PlannerTurnOutcome,
 )
-from cognieda.agents.planner.types import PlannerErrorCode, PlannerOutput, PlannerResult
+from cognieda.agents.planner.types import (
+    PlannerControlledError,
+    PlannerErrorCode,
+    PlannerOutput,
+    PlannerResult,
+)
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.application.services import PlanAdmissionService
 from cognieda.delegation import ExecutionRequest, ExecutionResult, ExecutionStatus
@@ -173,8 +178,9 @@ def test_graph_state_and_outcome_have_exact_separate_ownership(
         "latest_human_input",
         "candidate_plan",
         "turn_outcome",
-        "completed_segment",
+        "completed_segments",
     )
+    assert "completed_segment" not in PlannerState.__annotations__
     assert "messages" not in PlannerState.__annotations__
     assert "context" not in PlannerState.__annotations__
     assert tuple(PlannerTurnOutcome.model_fields) == (
@@ -208,14 +214,14 @@ def test_candidate_proposal_is_checkpointed_without_authoritative_writes(
         db_session,
     )
 
-    outcome, completed_segment = asyncio.run(
+    outcome, completed_segments = asyncio.run(
         planner.handle_message("Investigate churn.", context=PlannerContext())
     )
     state = _state(planner)
     persisted_candidate = state["candidate_plan"]
 
     assert outcome.proposed_plan == candidate.plan
-    assert completed_segment == segment
+    assert completed_segments == (segment,)
     assert persisted_candidate == candidate.plan
     assert persisted_candidate is not None
     assert persisted_candidate.tasks == candidate.plan.tasks
@@ -364,26 +370,26 @@ def test_context_is_fresh_and_native_history_derived_from_conversation_history(
 
     history = ConversationHistory()
     context_1 = build_planner_context(session_frames.get_current())
-    _, segment_1 = asyncio.run(
+    _, segments_1 = asyncio.run(
         planner.handle_message(
             "First question.",
             context=context_1,
             message_history=tuple(history.model_messages()),
         )
     )
-    assert segment_1 is not None
-    history = history.commit_segment(segment_1)
+    assert segments_1 == (seg1,)
+    history = history.add_turn(segments_1)
 
     session_frames.save_current(SessionFrame(objective=second_objective))
     context_2 = build_planner_context(session_frames.get_current())
-    _, segment_2 = asyncio.run(
+    _, segments_2 = asyncio.run(
         planner.handle_message(
             "Second question.",
             context=context_2,
             message_history=tuple(history.model_messages()),
         )
     )
-    assert segment_2 is not None
+    assert segments_2 == (seg2,)
 
     assert planner.contexts[0].objective == first_objective
     assert planner.contexts[1].objective == second_objective
@@ -668,3 +674,149 @@ def test_build_graph_schema_types() -> None:
     assert builder.input_schema is PlannerState
     assert builder.output_schema is PlannerState
 
+
+def test_multi_segment_cognitive_execution_accumulates_ordered_segments() -> None:
+    """Exercise sequential cognitive nodes in one Human turn and verify (S1, S2, S3)
+    accumulation.
+    """
+    from functools import partial
+
+    from langgraph.graph import END, START, StateGraph
+
+    from cognieda.agents.planner.nodes import plan_or_answer
+
+    s1 = ConversationSegment(messages=_messages("Step 1", "Resp 1"))
+    s2 = ConversationSegment(messages=_messages("Step 2", "Resp 2"))
+    s3 = ConversationSegment(messages=_messages("Step 3", "Resp 3"))
+
+    async def invoke_1(request: str, **kwargs: Any) -> PlannerOutput:
+        return PlannerOutput(result=PlannerResult(response="R1"), segment=s1)
+
+    async def invoke_2(request: str, **kwargs: Any) -> PlannerOutput:
+        return PlannerOutput(result=PlannerResult(response="R2"), segment=s2)
+
+    async def invoke_3(request: str, **kwargs: Any) -> PlannerOutput:
+        return PlannerOutput(result=PlannerResult(response="R3"), segment=s3)
+
+    builder = StateGraph(state_schema=PlannerState, context_schema=PlannerRunContext)
+    builder.add_node(
+        "node1",
+        partial(plan_or_answer, invoke_cognitive=invoke_1),
+        destinations=("node2",),
+    )
+    builder.add_node(
+        "node2",
+        partial(plan_or_answer, invoke_cognitive=invoke_2),
+        destinations=("node3",),
+    )
+    builder.add_node(
+        "node3",
+        partial(plan_or_answer, invoke_cognitive=invoke_3),
+        destinations=(END,),
+    )
+    builder.add_edge(START, "node1")
+    builder.add_edge("node1", "node2")
+    builder.add_edge("node2", "node3")
+    builder.add_edge("node3", END)
+    graph = builder.compile()
+
+    run_context = PlannerRunContext(planner_context=PlannerContext())
+    result = asyncio.run(
+        graph.ainvoke(
+            {"latest_human_input": "Run multi-step cognitive pipeline", "completed_segments": ()},
+            context=run_context,
+        )
+    )
+
+    assert result.get("completed_segments") == (s1, s2, s3)
+    assert result.get("turn_outcome") == PlannerTurnOutcome(response="R3")
+
+
+def test_subsequent_human_turn_starts_with_fresh_completed_segments(
+    db_session: Session,
+) -> None:
+    """Each subsequent non-interrupted Human turn starts with empty segments and does not recommit
+    prior segments.
+    """
+    s1 = ConversationSegment(messages=_messages("First request", "First response"))
+    s2 = ConversationSegment(messages=_messages("Second request", "Second response"))
+
+    planner = _planner(
+        (
+            PlannerOutput(result=PlannerResult(response="First response"), segment=s1),
+            PlannerOutput(result=PlannerResult(response="Second response"), segment=s2),
+        ),
+        db_session,
+    )
+
+    _, turn1_segments = asyncio.run(
+        planner.handle_message("First request", context=PlannerContext())
+    )
+    assert turn1_segments == (s1,)
+
+    _, turn2_segments = asyncio.run(
+        planner.handle_message("Second request", context=PlannerContext())
+    )
+    assert turn2_segments == (s2,)
+
+
+def test_interrupt_resume_turn_boundary_isolates_segments(
+    db_session: Session,
+) -> None:
+    """Segments from turn 1 before interrupt belong to turn 1; resumed turn accumulates freshly."""
+    candidate = _candidate_result()
+    assert candidate.plan is not None
+    s1 = ConversationSegment(messages=_messages("Propose plan", "Proposed"))
+    s2 = ConversationSegment(messages=_messages("Clarify proposal", "Clarification"))
+
+    planner = _planner(
+        (
+            PlannerOutput(result=candidate, segment=s1),
+            PlannerOutput(result=PlannerResult(response="Clarification"), segment=s2),
+        ),
+        db_session,
+    )
+
+    outcome_1, turn1_segments = asyncio.run(
+        planner.handle_message("Propose plan", context=PlannerContext())
+    )
+    assert outcome_1.proposed_plan == candidate.plan
+    assert turn1_segments == (s1,)
+    assert _is_waiting(planner)
+
+    outcome_2, turn2_segments = asyncio.run(
+        planner.handle_message("Clarify proposal", context=PlannerContext())
+    )
+    assert outcome_2.response == "Clarification"
+    assert turn2_segments == (s2,)
+
+
+def test_failed_or_incomplete_model_invocation_does_not_commit_segment(
+    db_session: Session,
+) -> None:
+    """Controlled error outcomes produce zero completed segments."""
+    planner = _planner(
+        (
+            PlannerOutput(
+                result=PlannerResult(response="Model failed"),
+                segment=None,
+                error=PlannerControlledError(
+                    code=PlannerErrorCode.MODEL_UNAVAILABLE,
+                    message="Model unavailable",
+                ),
+            ),
+        ),
+        db_session,
+    )
+
+    outcome, segments = asyncio.run(
+        planner.handle_message("Try request", context=PlannerContext())
+    )
+    assert outcome.error is not None
+    assert segments == ()
+
+    empty_outcome, empty_segments = asyncio.run(
+        planner.handle_message("   ", context=PlannerContext())
+    )
+    assert empty_outcome.error is not None
+    assert empty_segments == ()

@@ -103,8 +103,9 @@ def test_planner_context_and_result_have_exact_canonical_fields() -> None:
         "latest_human_input",
         "candidate_plan",
         "turn_outcome",
-        "completed_segment",
+        "completed_segments",
     )
+    assert "completed_segment" not in PlannerState.__annotations__
     assert "messages" not in PlannerState.__annotations__
     assert "context" not in PlannerState.__annotations__
 
