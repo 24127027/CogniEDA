@@ -8,7 +8,7 @@ from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.application.ports import AgentFactoryPort
-from cognieda.runtime.conversation.conversation import ConversationHistory
+from cognieda.runtime.conversation.history import ConversationHistory
 from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import MessageProduced, PlanProposed
 from cognieda.runtime.commands.types import CommandSuggestion

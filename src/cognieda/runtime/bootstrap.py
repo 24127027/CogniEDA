@@ -19,7 +19,7 @@ from cognieda.infrastructure.persistence.repositories import (
 )
 
 from .application import Application
-from .conversation.conversation import ConversationHistory
+from .conversation.history import ConversationHistory
 from .event_bus import EventBus
 from .planner_context import build_planner_context
 from .workspace import MissingModelCredentialError, Workspace

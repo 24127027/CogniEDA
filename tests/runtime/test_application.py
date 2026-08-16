@@ -14,7 +14,7 @@ from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.types import PlannerControlledError, PlannerErrorCode
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.application import Application
-from cognieda.runtime.conversation.conversation import ConversationHistory, ConversationSegment
+from cognieda.runtime.conversation.history import ConversationHistory, ConversationSegment
 from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import (
     HumanInputRequested,

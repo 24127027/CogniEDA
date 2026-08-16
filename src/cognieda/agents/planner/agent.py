@@ -14,7 +14,7 @@ from pydantic_ai.messages import ModelMessage
 
 from cognieda.agents.utilities import instruction
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
-from cognieda.runtime.conversation.conversation import ConversationSegment
+from cognieda.runtime.conversation.history import ConversationSegment
 from cognieda.schemas.plan import Plan
 
 from .context import PlannerContext, PlannerRunContext
