@@ -15,7 +15,7 @@ from rich.panel import Panel
 from rich.segment import ControlType
 from rich.text import Text
 from rich.status import Status
-
+from rich.cells import cell_len
 
 from cognieda.runtime.events import (
     AssistantThinkingFinished,
@@ -36,19 +36,34 @@ class Renderer:
         self.console = console or globals()["console"]
 
     def read_input(self) -> str:
-        text = self.console.input("> ").strip()
+        prompt = "> "
+        text = self.console.input(prompt).strip()
 
-        # Remove the terminal's echoed input line so only the styled user panel remains.
-        is_terminal = getattr(self.console, "is_terminal", False) is True
-        is_dumb_terminal = getattr(self.console, "is_dumb_terminal", True) is True
-        if is_terminal and not is_dumb_terminal:
-            self.console.control(
-                Control.move(y=-1),
-                Control.move_to_column(0),
-                Control((ControlType.ERASE_IN_LINE, 2)),
-            )
+        if self.console.is_terminal and not self.console.is_dumb_terminal:
+            self._erase_input(prompt, text)
 
         return text
+
+    def _erase_input(self, prompt: str, text: str) -> None:
+        width = self.console.width
+
+        input_width = cell_len(prompt) + cell_len(text)
+        rows = max(1, (input_width + width - 1) // width)
+
+        controls = [Control.move(y=-rows)]
+
+        for index in range(rows):
+            controls.append(
+                Control((ControlType.ERASE_IN_LINE, 2))
+            )
+
+            if index < rows - 1:
+                controls.append(Control.move(y=1))
+
+        controls.append(Control.move(y=1))
+        controls.append(Control.move_to_column(0))
+
+        self.console.control(*controls)
 
     def render_session_start(self, workspace_root: Path) -> None:
         self.console.print(f"[green]Workspace: {workspace_root}[/green]")
