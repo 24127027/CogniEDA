@@ -23,7 +23,7 @@ from .dependencies import (
     PlannerToolDeps,
 )
 from .graph import InProcessPlannerSerializer, build_graph
-from .state import PlannerTurnOutcome
+from .state import PlannerTurnOutcome, PlannerState
 from .types import (
     PlannerControlledError,
     PlannerErrorCode,
@@ -133,7 +133,7 @@ class Planner:
 
         snapshot = await self.graph.aget_state(self._graph_config)
         if self._is_interrupted(snapshot):
-            graph_input: Command[Any] | dict[str, object] = Command(resume=message)
+            graph_input: Command[Any] | PlannerState = Command(resume=message)
         else:
             graph_input = {"latest_human_input": message}
 
