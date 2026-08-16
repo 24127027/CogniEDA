@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from pathlib import Path
 import asyncio
 
+from opentelemetry.trace import Status
 from rich import box
 from rich.console import Console
 from rich.live import Live
@@ -13,8 +14,12 @@ from rich.padding import Padding
 from rich.panel import Panel
 from rich.segment import ControlType
 from rich.text import Text
+from rich.status import Status
+
 
 from cognieda.runtime.events import (
+    AssistantThinkingFinished,
+    AssistantThinkingStarted,
     HumanInputRequested,
     MessageProduced,
     PlanProposed,
@@ -151,3 +156,22 @@ class Renderer:
                 justify="right",
             )
             self.console.print(model_text)
+
+    def handle_thinking_started(
+        self,
+        event: AssistantThinkingStarted,
+    ) -> None:
+        self._thinking_status = Status(
+            "CogniEDA is thinking",
+            console=self.console,
+            spinner="dots",
+        )
+        self._thinking_status.start()
+
+    def handle_thinking_finished(
+        self,
+        event: AssistantThinkingFinished,
+    ) -> None:
+        if self._thinking_status is not None:
+            self._thinking_status.stop()
+            self._thinking_status = None

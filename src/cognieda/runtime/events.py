@@ -27,3 +27,9 @@ class HumanInputRequested(RuntimeEvent):
 @dataclass(frozen=True, slots=True)
 class ApplicationError(RuntimeEvent):
     error: Exception
+
+class AssistantThinkingStarted(RuntimeEvent):
+    pass
+
+class AssistantThinkingFinished(RuntimeEvent):
+    pass

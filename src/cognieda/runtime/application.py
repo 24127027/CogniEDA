@@ -10,7 +10,13 @@ from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.event_bus import EventBus
-from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
+from cognieda.runtime.events import (
+    HumanInputRequested, 
+    MessageProduced, 
+    PlanProposed, 
+    AssistantThinkingStarted, 
+    AssistantThinkingFinished
+)
 from cognieda.runtime.commands.types import CommandSuggestion
 from cognieda.runtime.commands import (
     CommandContext,
@@ -103,11 +109,13 @@ class Application:
         message_history = tuple(self.conversation_history.model_messages())
 
         try:
+            await self.event_bus.publish(AssistantThinkingStarted())
             outcome, completed_segment = await self.planner_agent.handle_message(
                 message,
                 context=context,
                 message_history=message_history,
             )
+            await self.event_bus.publish(AssistantThinkingFinished())
         except MissingModelCredentialError as e:
             await self._emit_message(f"{e}\n\nRun '/provider key <provider>' to configure an API key.")
             return
