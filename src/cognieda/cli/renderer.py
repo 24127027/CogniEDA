@@ -4,7 +4,6 @@ from collections.abc import Iterable
 from pathlib import Path
 import asyncio
 
-from opentelemetry.trace import Status
 from rich import box
 from rich.console import Console
 from rich.live import Live

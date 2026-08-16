@@ -49,7 +49,7 @@ class Prompt:
             complete_while_typing=True,
             erase_when_done=True,
             key_bindings=bindings,
-            multiline=True,
+            multiline=False,
         )
 
         self._prompt = prompt
