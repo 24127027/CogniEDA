@@ -79,8 +79,6 @@ class CommandRegistry:
         if normalized.startswith("/"):
             normalized = normalized[1:]
 
-        normalized = normalized.replace(" ", ".")
-
         return tuple(
             CommandSuggestion(
                 name=command.name,
