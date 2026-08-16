@@ -29,16 +29,11 @@ class PlanAdmissionService:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def admit(
-        self,
-        plan: Plan,
-        *,
-        tasks: tuple[Task, ...],
-    ) -> Plan:
+    def admit(self, plan: Plan) -> Plan:
         """Validate, persist, and activate one exact authorized bundle atomically."""
 
         try:
-            new_objective, new_tasks = self._validate_authoritative_bundle(plan, tasks)
+            new_objective, new_tasks = self._validate_authoritative_bundle(plan)
             if new_objective:
                 self._session.add(ObjectiveRecord(**schema_to_record_payload(plan.objective)))
             self._session.add_all(
@@ -46,7 +41,7 @@ class PlanAdmissionService:
             )
             self._session.flush()
 
-            canonical = PlanValidator(self._session).validate(plan, tasks=tasks)
+            canonical = PlanValidator(self._session).validate(plan)
             PlanRepository(self._session).add(canonical)
             self._session.flush()
             ActivePlanRepository(self._session).activate(canonical)
@@ -59,10 +54,7 @@ class PlanAdmissionService:
     def _validate_authoritative_bundle(
         self,
         plan: Plan,
-        tasks: tuple[Task, ...],
     ) -> tuple[bool, tuple[Task, ...]]:
-        plan.validate_tasks(tasks)
-
         if self._session.get(PlanRecord, plan.plan_id) is not None:
             raise ValueError("Plan identity already exists; admission cannot overwrite it.")
 
@@ -86,24 +78,15 @@ class PlanAdmissionService:
             raise ValueError("Plan admission rejects an Objective identity collision.")
 
         new_tasks: list[Task] = []
-        for task in tasks:
+        for task in plan.tasks:
             task_row = self._session.get(TaskRecord, task.task_id)
             if task_row is None:
                 new_tasks.append(task)
                 continue
             persisted = record_to_schema(Task, task_row)
-            if self._task_semantics(persisted) != self._task_semantics(task):
+            if persisted.semantic_payload() != task.semantic_payload():
                 raise ValueError("Plan admission rejects a Task identity collision.")
         return new_objective, tuple(new_tasks)
-
-    @staticmethod
-    def _task_semantics(task: Task) -> tuple[object, ...]:
-        return (
-            task.task_id,
-            task.objective_id,
-            task.kind,
-            task.instruction,
-        )
 
 
 __all__ = ("PlanAdmissionService",)

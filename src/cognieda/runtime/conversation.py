@@ -10,42 +10,123 @@ from cognieda.schemas.common import CogniEDABaseModel
 
 
 class ConversationSegment(CogniEDABaseModel):
-    """A coherent native-message unit reserved for finer-grained future history."""
+    """One indivisible native model-history retention and pruning unit."""
 
     segment_id: UUID = Field(default_factory=uuid4)
-    messages: tuple[ModelMessage, ...]
-
-
-class ConversationTurn(CogniEDABaseModel):
-    """One complete Planner/LangGraph run retained as native model messages."""
-
-    turn_id: UUID = Field(default_factory=uuid4)
-    messages: tuple[ModelMessage, ...]
+    messages: tuple[ModelMessage, ...] = ()
 
     @model_validator(mode="after")
-    def _messages_not_empty(self) -> ConversationTurn:
+    def _messages_not_empty(self) -> ConversationSegment:
         if not self.messages:
-            raise ValueError("ConversationTurn requires at least one ModelMessage.")
+            raise ValueError("ConversationSegment requires at least one ModelMessage.")
         return self
 
 
+class ConversationTurn(CogniEDABaseModel):
+    """One ordered, non-authoritative unit of native conversation memory."""
+
+    turn_id: UUID = Field(default_factory=uuid4)
+    segments: tuple[ConversationSegment, ...] = ()
+
+    @model_validator(mode="after")
+    def _segments_not_empty(self) -> ConversationTurn:
+        if not self.segments:
+            raise ValueError("ConversationTurn requires at least one ConversationSegment.")
+        segment_ids = [segment.segment_id for segment in self.segments]
+        if len(segment_ids) != len(set(segment_ids)):
+            raise ValueError("ConversationTurn rejects duplicate ConversationSegment IDs.")
+        return self
+
+    @property
+    def messages(self) -> tuple[ModelMessage, ...]:
+        """Flatten native messages across all segments in this turn."""
+
+        return tuple(
+            message for segment in self.segments for message in segment.messages
+        )
+
+
 class ConversationHistory(CogniEDABaseModel):
-    """Append-only ordered history of complete Planner runs."""
+    """Append-only native conversation memory, separate from research authority."""
 
     turns: tuple[ConversationTurn, ...] = ()
 
     @model_validator(mode="after")
-    def _unique_turn_ids(self) -> ConversationHistory:
+    def _unique_ids(self) -> ConversationHistory:
         turn_ids = [turn.turn_id for turn in self.turns]
         if len(turn_ids) != len(set(turn_ids)):
             raise ValueError("ConversationHistory rejects duplicate ConversationTurn IDs.")
+        segment_ids = [
+            segment.segment_id
+            for turn in self.turns
+            for segment in turn.segments
+        ]
+        if len(segment_ids) != len(set(segment_ids)):
+            raise ValueError(
+                "ConversationHistory rejects duplicate ConversationSegment IDs."
+            )
         return self
 
-    def add_turn(self, messages: Iterable[ModelMessage]) -> ConversationHistory:
-        turn = ConversationTurn(messages=tuple(messages))
+    def commit_segment(self, segment: ConversationSegment) -> ConversationHistory:
+        """Append one completed ConversationSegment as a successor turn."""
+
+        turn = ConversationTurn(segments=(segment,))
         return ConversationHistory(turns=(*self.turns, turn))
 
-    def model_messages(self) -> list[ModelMessage]:
-        """Flatten complete turns for PydanticAI message_history."""
+    def add_turn(
+        self,
+        segments: Iterable[ConversationSegment],
+    ) -> ConversationHistory:
+        """Return a successor history with one complete native-message turn."""
 
-        return [message for turn in self.turns for message in turn.messages]
+        turn = ConversationTurn(segments=tuple(segments))
+        return ConversationHistory(turns=(*self.turns, turn))
+
+    def truncate_from(self, segment_id: UUID) -> ConversationHistory:
+        """Remove the identified segment and all causally subsequent conversation."""
+
+        found = False
+        retained_turns: list[ConversationTurn] = []
+
+        for turn in self.turns:
+            if found:
+                break
+
+            segment_ids = [segment.segment_id for segment in turn.segments]
+            if segment_id in segment_ids:
+                found = True
+                index = segment_ids.index(segment_id)
+                retained_segments = turn.segments[:index]
+                if retained_segments:
+                    retained_turns.append(
+                        ConversationTurn(
+                            turn_id=turn.turn_id,
+                            segments=retained_segments,
+                        )
+                    )
+            else:
+                retained_turns.append(turn)
+
+        if not found:
+            raise ValueError(
+                f"ConversationSegment '{segment_id}' not found in ConversationHistory."
+            )
+
+        return ConversationHistory(turns=tuple(retained_turns))
+
+    def model_messages(self) -> list[ModelMessage]:
+        """Flatten turns and segments in exact append and native-message order."""
+
+        return [
+            message
+            for turn in self.turns
+            for segment in turn.segments
+            for message in segment.messages
+        ]
+
+
+__all__ = (
+    "ConversationHistory",
+    "ConversationSegment",
+    "ConversationTurn",
+)

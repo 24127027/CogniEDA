@@ -102,9 +102,11 @@ protocol revision; a raw frame or retrieval result cannot substitute for it.
 
 **Partially implemented.** The current Planner receives every materialized
 Objective, Assumption, Hypothesis, Evidence, Discovery, and DataProfile retained in
-SessionFrame through immutable `PlannerContext`. Native conversation history is
-kept outside `PlannerContext` and supplied separately as non-authoritative model
-message history. The single `plan_or_answer` operation may use admitted Evidence
+SessionFrame through immutable `PlannerContext`. The active graph thread's native
+messages are kept outside `PlannerContext` and supplied separately as
+non-authoritative model history. `ConversationHistory` is also outside
+`PlannerContext`; it remains an unsynchronized typed memory contract for future
+session-memory composition. The single `plan_or_answer` operation may use admitted Evidence
 and Discovery for an answer; exact admitted Assumptions may guide planning but
 cannot support empirical claims. This protects one important type boundary but
 is not a general context system.

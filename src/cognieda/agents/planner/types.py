@@ -3,9 +3,8 @@ from __future__ import annotations
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from pydantic_ai.messages import ModelMessage
 
-from cognieda.schemas.artifacts import Task
+from cognieda.runtime.conversation import ConversationSegment
 from cognieda.schemas.plan import Plan
 
 
@@ -15,6 +14,8 @@ class PlannerErrorCode(StrEnum):
     INVALID_REQUEST = "invalid_request"
     MODEL_UNAVAILABLE = "model_unavailable"
     INVALID_MODEL_RESULT = "invalid_model_result"
+    INVALID_LIFECYCLE_STATE = "invalid_lifecycle_state"
+    PLAN_ADMISSION_FAILED = "plan_admission_failed"
 
 
 class PlannerControlledError(BaseModel):
@@ -32,17 +33,13 @@ class PlannerResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     plan: Plan | None = None
-    tasks: tuple[Task, ...] = ()
     response: str | None = Field(default=None, min_length=1)
     human_input_request: str | None = Field(default=None, min_length=1)
     continue_execution: bool = False
+    discard_candidate: bool = False
 
     @model_validator(mode="after")
     def _validate_coherence(self) -> PlannerResult:
-        if self.tasks and self.plan is None:
-            raise ValueError("PlannerResult tasks require a candidate Plan.")
-        if self.plan is not None:
-            self.plan.validate_tasks(self.tasks)
         if self.continue_execution and self.plan is not None:
             raise ValueError(
                 "continue_execution cannot accompany a new candidate Plan."
@@ -51,12 +48,19 @@ class PlannerResult(BaseModel):
             raise ValueError(
                 "continue_execution cannot accompany a Human input request."
             )
+        if self.discard_candidate and self.plan is not None:
+            raise ValueError("discard_candidate cannot accompany a new candidate Plan.")
+        if self.discard_candidate and self.continue_execution:
+            raise ValueError("discard_candidate cannot accompany continue_execution.")
+        if self.discard_candidate and self.human_input_request is not None:
+            raise ValueError("discard_candidate cannot accompany a Human input request.")
         if not any(
             (
                 self.plan is not None,
                 self.response is not None,
                 self.human_input_request is not None,
                 self.continue_execution,
+                self.discard_candidate,
             )
         ):
             raise ValueError("PlannerResult must contain a meaningful conclusion.")
@@ -69,7 +73,7 @@ class PlannerOutput(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     result: PlannerResult
-    messages: tuple[ModelMessage, ...] = ()
+    segment: ConversationSegment | None = None
     error: PlannerControlledError | None = None
 
 

@@ -459,5 +459,6 @@ class SessionFrameRecord(SQLModel, table=True):
     __tablename__ = "session_frames"
 
     session_frame_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    scope_key: str = Field(default="default", nullable=False, index=True)
     state: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
     created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)
