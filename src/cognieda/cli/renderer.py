@@ -66,7 +66,7 @@ class Renderer:
 
         self.console.print(segment_area)
 
-    def render(self, message: Message) -> None:
+    async def render(self, message: Message) -> None:
         match message.type, message.role:
             case MessageType.ERROR, _:
                 self.console.print(f"[red][Error] {message.content}[/red]")
@@ -108,16 +108,16 @@ class Renderer:
             case _:
                 self.console.print(str(message.content))
 
-    def handle_message(self, event: MessageProduced) -> None:
-        self.render(event.message)
+    async def handle_message(self, event: MessageProduced) -> None:
+        await self.render(event.message)
 
-    def handle_human_input(self, event: HumanInputRequested) -> None:
-        self.render(event.message)
+    async def handle_human_input(self, event: HumanInputRequested) -> None:
+        await self.render(event.message)
 
-    def handle_plan(self, event: PlanProposed) -> None:
-        self.render_plan(event.plan, event.plan.tasks)
+    async def handle_plan(self, event: PlanProposed) -> None:
+        await self.render_plan(event.plan, event.plan.tasks)
 
-    def render_plan(
+    async def render_plan(
         self,
         plan: Plan,
         tasks: tuple[Task, ...],
