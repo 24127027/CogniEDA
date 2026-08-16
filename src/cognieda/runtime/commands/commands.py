@@ -8,7 +8,7 @@ from .base import CommandContext, ResolvedCommand
 def text(content: str) -> Message:
     return Message(
         type=MessageType.TEXT,
-        role=MessageRole.ASSISTANT,
+        role=MessageRole.SYSTEM,
         content=content,
     )
 
@@ -23,7 +23,7 @@ class SkillAddCommand:
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 2:
-            return text("Usage: /skill add <name> <directory>")
+            return text("Usage: /skill.add <name> <directory>")
 
         name, directory = command.args
 
@@ -47,7 +47,7 @@ class SkillRemoveCommand:
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 1:
-            return text("Usage: /skill rm <name>")
+            return text("Usage: /skill.rm <name>")
 
         name = command.args[0]
 
@@ -71,7 +71,7 @@ class SkillListCommand:
         context: CommandContext,
     ) -> Message:
         if command.args:
-            return text("Usage: /skill list")
+            return text("Usage: /skill.list")
 
         skills = context.workspace.load_skills_config()
 
@@ -96,7 +96,7 @@ class SkillUseCommand:
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 2:
-            return text("Usage: /skill use <worker> <skill>")
+            return text("Usage: /skill.use <worker> <skill>")
 
         worker, skill = command.args
 
@@ -120,7 +120,7 @@ class SkillDropCommand:
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 2:
-            return text("Usage: /skill drop <worker> <skill>")
+            return text("Usage: /skill.drop <worker> <skill>")
 
         worker, skill = command.args
 
@@ -174,7 +174,7 @@ class ProviderListCommand:
         context: CommandContext,
     ) -> Message:
         if command.args:
-            return text("Usage: /provider list")
+            return text("Usage: /provider.list")
 
         return text(
             "\n".join(
@@ -193,7 +193,7 @@ class ProviderUseCommand:
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 1:
-            return text("Usage: /provider use <profile>")
+            return text("Usage: /provider.use <profile>")
 
         profile = command.args[0]
 
@@ -216,7 +216,7 @@ class ProviderModelCommand:
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 2:
-            return text("Usage: /provider model <profile> <model>")
+            return text("Usage: /provider.model <profile> <model>")
 
         profile, model = command.args
 
@@ -244,7 +244,7 @@ class ProviderKeyCommand:
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 1:
-            return text("Usage: /provider key <profile>")
+            return text("Usage: /provider.key <profile>")
 
         profile = command.args[0]
 
