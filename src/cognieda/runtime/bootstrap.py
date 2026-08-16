@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 from cognieda.agents.data_explorer import DataExplorer
 from cognieda.agents.planner.agent import Planner
+from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.dependencies import PlannerToolDeps
 from cognieda.application.services import PlanAdmissionService
 from cognieda.delegation import ExecutorDispatcher, ExecutorRegistry
@@ -18,8 +19,9 @@ from cognieda.infrastructure.persistence.repositories import (
 )
 
 from .application import Application
+from .conversation import ConversationHistory
 from .event_bus import EventBus
-from .session import ChatSession
+from .planner_context import build_planner_context
 from .workspace import MissingModelCredentialError, Workspace
 
 
@@ -52,14 +54,20 @@ def bootstrap_application(workspace_path: Path) -> Application:
     database_url = init_db()
     session = get_session(database_url)
     session_id = uuid4()
-    chat_session = ChatSession(
-        session_id=session_id,
-        session_frames=SessionFrameRepository(
-            session,
-            scope_key=str(session_id),
-        ),
-        active_plans=ActivePlanRepository(session),
+    session_frames = SessionFrameRepository(
+        session,
+        scope_key=str(session_id),
     )
+    active_plans = ActivePlanRepository(session)
+
+    def planner_context_factory() -> PlannerContext:
+        frame = session_frames.get_current()
+        active_plan = (
+            active_plans.get_by_objective_id(frame.objective.objective_id)
+            if frame.objective is not None
+            else None
+        )
+        return build_planner_context(frame, active_plan=active_plan)
 
     planner = Planner(
         deps=PlannerToolDeps(dispatcher=dispatcher),
@@ -76,7 +84,9 @@ def bootstrap_application(workspace_path: Path) -> Application:
         workspace=workspace,
         planner_agent=planner,
         event_bus=event_bus,
-        session=chat_session,
+        session_id=session_id,
+        conversation_history=ConversationHistory(),
+        planner_context_factory=planner_context_factory,
     )
 
 

@@ -6,11 +6,9 @@ if TYPE_CHECKING:
     from .application import Application
     from .bootstrap import bootstrap_application
     from .conversation import ConversationHistory, ConversationSegment, ConversationTurn
-    from .session import ChatSession
 
 __all__ = [
     "Application",
-    "ChatSession",
     "ConversationHistory",
     "ConversationSegment",
     "ConversationTurn",
@@ -29,10 +27,6 @@ def __getattr__(name: str) -> Any:
         from .bootstrap import bootstrap_application
 
         return bootstrap_application
-    if name == "ChatSession":
-        from .session import ChatSession
-
-        return ChatSession
     if name in {"ConversationHistory", "ConversationSegment", "ConversationTurn"}:
         import cognieda.runtime.conversation as conversation_module
 

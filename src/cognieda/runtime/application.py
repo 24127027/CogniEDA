@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from typing import Callable
+from uuid import UUID
+
 from cognieda.agents.planner.agent import Planner
+from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.application.ports import AgentFactoryPort
+from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
-from cognieda.runtime.session import ChatSession
 
 from .messages import Message, MessageRole, MessageType
 from .workspace import MissingModelCredentialError, Workspace
@@ -18,13 +22,17 @@ class Application:
         planner_agent: Planner,
         agent_factory: AgentFactoryPort,
         event_bus: EventBus,
-        session: ChatSession | None = None,
+        session_id: UUID,
+        conversation_history: ConversationHistory,
+        planner_context_factory: Callable[[], PlannerContext],
     ) -> None:
         self.workspace = workspace
         self.agent_factory = agent_factory
         self.planner_agent = planner_agent
         self.event_bus = event_bus
-        self.session = session or ChatSession()
+        self.session_id = session_id
+        self.conversation_history = conversation_history
+        self.planner_context_factory = planner_context_factory
 
     async def submit_message(self, message: str) -> None:
         if message.startswith("/"):
@@ -33,7 +41,7 @@ class Application:
             return
 
         try:
-            context = self.session.current_planner_context()
+            context = self.planner_context_factory()
         except Exception:
             self._emit_message(
                 "Planner authoritative context could not be materialized.",
@@ -41,7 +49,7 @@ class Application:
             )
             return
 
-        message_history = tuple(self.session.model_messages())
+        message_history = tuple(self.conversation_history.model_messages())
 
         try:
             outcome, completed_segment = await self.planner_agent.handle_message(
@@ -54,7 +62,7 @@ class Application:
             return
 
         if completed_segment is not None:
-            self.session.commit_segment(completed_segment)
+            self.conversation_history = self.conversation_history.commit_segment(completed_segment)
 
         self._emit_planner_outcome(outcome)
 
