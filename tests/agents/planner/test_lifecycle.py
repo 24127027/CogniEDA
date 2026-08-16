@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from typing import Any, cast
 from uuid import UUID, uuid4
 
+import pytest
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import StateSnapshot
@@ -227,9 +228,7 @@ def test_candidate_proposal_is_checkpointed_without_authoritative_writes(
     assert persisted_candidate.tasks == candidate.plan.tasks
     assert "messages" not in state
     assert _is_waiting(planner)
-    assert ObjectiveRepository(db_session).get_by_id(
-        candidate.plan.objective.objective_id
-    ) is None
+    assert ObjectiveRepository(db_session).get_by_id(candidate.plan.objective.objective_id) is None
     assert TaskRepository(db_session).get_by_id(candidate.plan.tasks[0].task_id) is None
     assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) is None
 
@@ -260,9 +259,7 @@ def test_empty_human_input_is_rejected_before_interrupt_resume(
     assert _state(planner) == before
     assert _is_waiting(planner)
 
-    resumed, _ = asyncio.run(
-        planner.handle_message("Why this scope?", context=PlannerContext())
-    )
+    resumed, _ = asyncio.run(planner.handle_message("Why this scope?", context=PlannerContext()))
     assert resumed.response == "The candidate remains available."
     assert planner.requests == ["Investigate churn.", "Why this scope?"]
 
@@ -334,9 +331,7 @@ def test_natural_multiturn_review_retain_replace_and_authorize_exact_candidate(
     assert admission.calls == [p2.plan]
     assert _state(planner)["candidate_plan"] is None
     assert outcome.response == "The proposed Plan was admitted and activated."
-    assert ActivePlanRepository(db_session).get_by_objective_id(
-        objective.objective_id
-    ) == p2.plan
+    assert ActivePlanRepository(db_session).get_by_objective_id(objective.objective_id) == p2.plan
     assert not _is_waiting(planner)
     assert planner.message_histories == [
         (),
@@ -405,12 +400,7 @@ def test_segment_pruning_actually_changes_model_context(db_session: Session) -> 
     s2 = ConversationSegment(messages=_messages("Q2", "A2"))
     s3 = ConversationSegment(messages=_messages("Q3", "A3"))
 
-    history = (
-        ConversationHistory()
-        .commit_segment(s1)
-        .commit_segment(s2)
-        .commit_segment(s3)
-    )
+    history = ConversationHistory().commit_segment(s1).commit_segment(s2).commit_segment(s3)
 
     # 1. Verify full flattened history
     assert history.model_messages() == [*s1.messages, *s2.messages, *s3.messages]
@@ -465,9 +455,7 @@ def test_discard_clears_candidate_and_repeat_discard_fails_closed(
     assert discarded.response == "I discarded the proposal."
     assert not _is_waiting(planner)
 
-    invalid, _ = asyncio.run(
-        planner.handle_message("Discard it again.", context=PlannerContext())
-    )
+    invalid, _ = asyncio.run(planner.handle_message("Discard it again.", context=PlannerContext()))
     assert invalid.error is not None
     assert invalid.error.code.value == "invalid_lifecycle_state"
 
@@ -503,36 +491,19 @@ def test_admission_failure_retains_exact_candidate_and_reports_controlled_error(
     assert PlanRepository(db_session).get_by_id(candidate.plan.plan_id) is None
 
 
-def test_active_plan_continuation_is_visible_and_never_dispatches(
+@pytest.mark.parametrize(
+    "objectives",
+    [
+        (),
+        (Objective(text="Single Objective"),),
+        (Objective(text="First Objective"), Objective(text="Second Objective")),
+    ],
+)
+def test_continue_execution_without_candidate_fails_closed_regardless_of_objectives(
     db_session: Session,
+    objectives: tuple[Objective, ...],
 ) -> None:
-    candidate = _candidate_result()
-    assert candidate.plan is not None
-    PlanAdmissionService(db_session).admit(candidate.plan)
-    dispatcher = RecordingDispatcher()
-    context = PlannerContext(
-        active_plans=(candidate.plan,),
-        objectives=(candidate.plan.objective,),
-    )
-    planner = _planner(
-        (PlannerOutput(result=PlannerResult(continue_execution=True)),),
-        db_session,
-        dispatcher=dispatcher,
-    )
-
-    outcome, _ = asyncio.run(planner.handle_message("Continue active work.", context=context))
-
-    assert planner.contexts[0].active_plans == (candidate.plan,)
-    assert _state(planner)["candidate_plan"] is None
-    assert outcome.response is not None
-    assert "execution is not implemented" in outcome.response
-    assert dispatcher.requests == []
-
-
-def test_continue_execution_without_candidate_fails_closed_with_zero_active_plans(
-    db_session: Session,
-) -> None:
-    context = PlannerContext(active_plans=(), objectives=())
+    context = PlannerContext(objectives=objectives)
     planner = _planner(
         (PlannerOutput(result=PlannerResult(continue_execution=True)),),
         db_session,
@@ -541,32 +512,8 @@ def test_continue_execution_without_candidate_fails_closed_with_zero_active_plan
     outcome, _ = asyncio.run(planner.handle_message("Continue work.", context=context))
 
     assert outcome.error is not None
-    assert outcome.error.code.value == "invalid_lifecycle_state"
-
-
-def test_continue_execution_without_candidate_fails_closed_with_multiple_active_plans(
-    db_session: Session,
-) -> None:
-    c1 = _candidate_result(instruction="Task 1.")
-    c2 = _candidate_result(instruction="Task 2.")
-    assert c1.plan is not None and c2.plan is not None
-    admission = PlanAdmissionService(db_session)
-    admission.admit(c1.plan)
-    admission.admit(c2.plan)
-
-    context = PlannerContext(
-        active_plans=(c1.plan, c2.plan),
-        objectives=(c1.plan.objective, c2.plan.objective),
-    )
-    planner = _planner(
-        (PlannerOutput(result=PlannerResult(continue_execution=True)),),
-        db_session,
-    )
-
-    outcome, _ = asyncio.run(planner.handle_message("Continue work.", context=context))
-
-    assert outcome.error is not None
-    assert outcome.error.code.value == "invalid_lifecycle_state"
+    assert outcome.error.code == PlannerErrorCode.INVALID_LIFECYCLE_STATE
+    assert "invalid for the retained lifecycle state" in outcome.error.message
 
 
 def test_inmemory_checkpointer_isolates_planner_thread_identity(
@@ -852,9 +799,7 @@ def test_failed_or_incomplete_model_invocation_does_not_commit_segment(
         db_session,
     )
 
-    outcome, segments = asyncio.run(
-        planner.handle_message("Try request", context=PlannerContext())
-    )
+    outcome, segments = asyncio.run(planner.handle_message("Try request", context=PlannerContext()))
     assert outcome.error is not None
     assert segments == ()
 

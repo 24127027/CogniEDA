@@ -105,8 +105,8 @@ These are verified constraints of the bounded current implementation.
   LangGraph, process-local checkpointer/thread and required trusted typed
   serializer, active native-message history, exact candidate state, and Human
   interrupt/resume. A provider exact-materializes
-  active-Plan `PlannerContext` fresh for every cognitive invocation. No durable
-  graph recovery, durable `ConversationHistory`, unified `SessionMemory`, or
+  `PlannerContext` from SessionFrame fresh for every cognitive invocation. No durable
+  graph recovery, durable `ConversationHistory`, unified session state, or
   supported end-to-end application runtime, worker, service API, or product CLI
   exists. No retained runtime writer for current SessionFrame snapshots is
   composed.
@@ -133,7 +133,7 @@ These are verified constraints of the bounded current implementation.
   exact typed dependency injection, active graph-thread native dialogue continuity,
   fresh current-run PlannerContext, candidate retain/replace/discard and exact
   admission, interrupt/resume, thread isolation, controlled failure retention,
-  and active-Plan continuation without any executor call.
+  and fail-closed continuation without candidate without any executor call.
 - Workspace path selection and initialization are **Implemented**, but
   automatic dataset discovery or admission is **Unsupported**. The
   conventional `data/` directory does not itself establish a DataProfile.

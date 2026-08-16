@@ -61,13 +61,10 @@ async def plan_or_answer(
     try:
         if result.discard_candidate and candidate_plan is None:
             raise ValueError("discard_candidate requires a retained candidate.")
-        if (
-            result.continue_execution
-            and candidate_plan is None
-            and len(planner_context.active_plans) != 1
-        ):
+        if result.continue_execution and candidate_plan is None:
             raise ValueError(
-                "continue_execution without candidate requires exactly one active Plan."
+                "continue_execution without candidate is deferred until an "
+                "authoritative session-local Plan selector exists."
             )
     except ValueError:
         error = PlannerControlledError(
@@ -102,33 +99,16 @@ async def plan_or_answer(
         )
 
     if result.continue_execution:
-        if candidate_plan is not None:
-            return Command(
-                update={
-                    "candidate_plan": candidate_plan,
-                    "completed_segments": completed_segments,
-                },
-                goto="admit_candidate",
-            )
-        outcome = PlannerTurnOutcome(
-            response=(
-                "The active Plan is ready to continue, but Plan execution is not "
-                "implemented in this runtime phase."
-            )
-        )
         return Command(
             update={
-                "candidate_plan": None,
+                "candidate_plan": candidate_plan,
                 "completed_segments": completed_segments,
-                "turn_outcome": outcome,
             },
-            goto=END,
+            goto="admit_candidate",
         )
 
     if result.discard_candidate:
-        outcome = PlannerTurnOutcome(
-            response=result.response or "The proposed Plan was discarded."
-        )
+        outcome = PlannerTurnOutcome(response=result.response or "The proposed Plan was discarded.")
         return Command(
             update={
                 "candidate_plan": None,
@@ -142,9 +122,7 @@ async def plan_or_answer(
         response=result.response,
         human_input_request=result.human_input_request,
     )
-    awaiting_human = (
-        result.human_input_request is not None or candidate_plan is not None
-    )
+    awaiting_human = result.human_input_request is not None or candidate_plan is not None
     return Command(
         update={
             "candidate_plan": candidate_plan,

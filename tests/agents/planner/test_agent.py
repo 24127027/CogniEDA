@@ -163,8 +163,7 @@ def test_planner_directly_owns_one_agent_and_invokes_it_once_with_exact_deps() -
     assert output.result.response == "The answer follows from admitted evidence."
     assert output.segment is not None
     assert all(
-        type(message) in {ModelRequest, ModelResponse}
-        for message in output.segment.messages
+        type(message) in {ModelRequest, ModelResponse} for message in output.segment.messages
     )
     assert not any(message in output.segment.messages for message in prior_messages)
 
@@ -332,9 +331,7 @@ def test_candidate_plan_may_reuse_current_objective_or_propose_a_new_one() -> No
         )
     )
     created = asyncio.run(
-        new_planner._invoke_cognitive(
-            "Investigate.", context=PlannerContext(objectives=(current,))
-        )
+        new_planner._invoke_cognitive("Investigate.", context=PlannerContext(objectives=(current,)))
     )
 
     assert reused.result.plan is not None
@@ -386,25 +383,15 @@ def test_cognitive_boundary_leaves_continue_lifecycle_validation_to_graph() -> N
     objective = Objective(text="Understand retention.")
     candidate = _candidate(objective)
     assert candidate.plan is not None
-    planner_without_active, _, _, _ = _planner(PlannerResult(continue_execution=True))
+    planner_without_candidate, _, _, _ = _planner(PlannerResult(continue_execution=True))
 
     without_state = asyncio.run(
-        planner_without_active._invoke_cognitive(
+        planner_without_candidate._invoke_cognitive(
             "Continue.", context=PlannerContext(objectives=(objective,))
         )
     )
     assert without_state.error is None
     assert without_state.result.continue_execution is True
-
-    planner_with_active, _, _, _ = _planner(PlannerResult(continue_execution=True))
-    accepted = asyncio.run(
-        planner_with_active._invoke_cognitive(
-            "Continue.",
-            context=PlannerContext(objectives=(objective,), active_plans=(candidate.plan,)),
-        )
-    )
-    assert accepted.error is None
-    assert accepted.result.continue_execution is True
 
     planner_with_candidate, _, _, _ = _planner(PlannerResult(continue_execution=True))
     candidate_authorized = asyncio.run(
@@ -415,6 +402,7 @@ def test_cognitive_boundary_leaves_continue_lifecycle_validation_to_graph() -> N
         )
     )
     assert candidate_authorized.error is None
+    assert candidate_authorized.result.continue_execution is True
 
 
 def test_cognitive_boundary_leaves_discard_lifecycle_validation_to_graph() -> None:
@@ -424,16 +412,12 @@ def test_cognitive_boundary_leaves_discard_lifecycle_validation_to_graph() -> No
 
     without_candidate, _, _, _ = _planner(PlannerResult(discard_candidate=True))
     without_state = asyncio.run(
-        without_candidate._invoke_cognitive(
-            "Abandon that proposal.", context=PlannerContext()
-        )
+        without_candidate._invoke_cognitive("Abandon that proposal.", context=PlannerContext())
     )
     assert without_state.error is None
     assert without_state.result.discard_candidate is True
 
-    with_candidate, _, _, _ = _planner(
-        PlannerResult(response="Discarded.", discard_candidate=True)
-    )
+    with_candidate, _, _, _ = _planner(PlannerResult(response="Discarded.", discard_candidate=True))
     accepted = asyncio.run(
         with_candidate._invoke_cognitive(
             "Abandon that proposal.",
@@ -459,8 +443,6 @@ def test_empty_request_and_missing_model_fail_closed_without_invocation() -> Non
         model_config=None,
         plan_admission=NeverAdmission(),
     )
-    missing = asyncio.run(
-        unavailable._invoke_cognitive("Investigate.", context=PlannerContext())
-    )
+    missing = asyncio.run(unavailable._invoke_cognitive("Investigate.", context=PlannerContext()))
     assert missing.error.code is PlannerErrorCode.MODEL_UNAVAILABLE
     assert factory.calls == []

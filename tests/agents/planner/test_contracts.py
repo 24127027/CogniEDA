@@ -83,7 +83,6 @@ def _evidence_and_discovery(
 
 def test_planner_context_and_result_have_exact_canonical_fields() -> None:
     assert tuple(PlannerContext.model_fields) == (
-        "active_plans",
         "objectives",
         "assumptions",
         "hypotheses",
@@ -91,6 +90,7 @@ def test_planner_context_and_result_have_exact_canonical_fields() -> None:
         "discoveries",
         "data_profile",
     )
+    assert "active_plans" not in PlannerContext.model_fields
     assert "active_plan" not in PlannerContext.model_fields
     assert "objective" not in PlannerContext.model_fields
     assert tuple(PlannerResult.model_fields) == (
@@ -118,10 +118,8 @@ def test_planner_context_retains_all_typed_readable_state() -> None:
     task = _task(objective)
     profile = DataProfile(row_count=10, column_count=0, columns=())
     evidence, hypothesis, discovery = _evidence_and_discovery(task, profile)
-    active_plan = _plan(objective, (task,))
 
     context = PlannerContext(
-        active_plans=(active_plan,),
         objectives=(objective,),
         assumptions=(assumption,),
         hypotheses=(hypothesis,),
@@ -130,13 +128,14 @@ def test_planner_context_retains_all_typed_readable_state() -> None:
         data_profile=profile,
     )
 
-    assert context.active_plans == (active_plan,)
     assert context.objectives == (objective,)
     assert context.assumptions == (assumption,)
     assert context.hypotheses == (hypothesis,)
     assert context.evidences == (evidence,)
     assert context.discoveries == (discovery,)
     assert context.data_profile is profile
+    assert "active_plans" not in PlannerContext.model_fields
+    assert "active_plan" not in PlannerContext.model_fields
     assert "tasks" not in PlannerContext.model_fields
     assert "conversation_history" not in PlannerContext.model_fields
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
@@ -329,15 +328,18 @@ def test_planner_instruction_enforces_data_scope_assumptions_and_tool_boundaries
     assert "There is no SYNTHESIS Task." in instruction
 
 
-def test_planner_instruction_enforces_multiple_active_plans_clarification_rule() -> None:
+def test_planner_instruction_enforces_no_candidate_continuation_deferred_rule() -> None:
     instruction = _assembled_planner_instruction()
 
     assert "Inspect the existing Objectives, admitted" in instruction
     assert (
-        "Without a retained candidate, it means the currently active authoritative Plan "
-        "should continue and is valid only when the typed context contains exactly one active Plan."
+        "continue_execution may authorize the exact retained candidate when one is supplied."
     ) in instruction
     assert (
-        "If no candidate exists and multiple active Plans are present, "
-        "do not return continue_execution; request necessary Human clarification instead."
+        "Without a retained candidate, current-Plan continuation is deferred "
+        "because no authoritative session-local Plan selector is implemented."
+    ) in instruction
+    assert (
+        "Planner must not return continue_execution merely from conversation, "
+        "Objective membership, Plan recency, or guessed focus."
     ) in instruction
