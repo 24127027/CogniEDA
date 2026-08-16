@@ -83,14 +83,16 @@ def _evidence_and_discovery(
 
 def test_planner_context_and_result_have_exact_canonical_fields() -> None:
     assert tuple(PlannerContext.model_fields) == (
-        "active_plan",
-        "objective",
+        "active_plans",
+        "objectives",
         "assumptions",
         "hypotheses",
         "evidences",
         "discoveries",
         "data_profile",
     )
+    assert "active_plan" not in PlannerContext.model_fields
+    assert "objective" not in PlannerContext.model_fields
     assert tuple(PlannerResult.model_fields) == (
         "plan",
         "response",
@@ -119,8 +121,8 @@ def test_planner_context_retains_all_typed_readable_state() -> None:
     active_plan = _plan(objective, (task,))
 
     context = PlannerContext(
-        active_plan=active_plan,
-        objective=objective,
+        active_plans=(active_plan,),
+        objectives=(objective,),
         assumptions=(assumption,),
         hypotheses=(hypothesis,),
         evidences=(evidence,),
@@ -128,8 +130,8 @@ def test_planner_context_retains_all_typed_readable_state() -> None:
         data_profile=profile,
     )
 
-    assert context.active_plan is active_plan
-    assert context.objective is objective
+    assert context.active_plans == (active_plan,)
+    assert context.objectives == (objective,)
     assert context.assumptions == (assumption,)
     assert context.hypotheses == (hypothesis,)
     assert context.evidences == (evidence,)
@@ -325,3 +327,17 @@ def test_planner_instruction_enforces_data_scope_assumptions_and_tool_boundaries
     assert "Do not select capabilities, providers, executors, workers, or tools." in instruction
     assert "Planner execution and object edit workflows remain deferred." in instruction
     assert "There is no SYNTHESIS Task." in instruction
+
+
+def test_planner_instruction_enforces_multiple_active_plans_clarification_rule() -> None:
+    instruction = _assembled_planner_instruction()
+
+    assert "Inspect the existing Objectives, admitted" in instruction
+    assert (
+        "Without a retained candidate, it means the currently active authoritative Plan "
+        "should continue and is valid only when the typed context contains exactly one active Plan."
+    ) in instruction
+    assert (
+        "If no candidate exists and multiple active Plans are present, "
+        "do not return continue_execution; request necessary Human clarification instead."
+    ) in instruction

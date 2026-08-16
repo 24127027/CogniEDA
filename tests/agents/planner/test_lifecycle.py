@@ -295,7 +295,7 @@ def test_natural_multiturn_review_retain_replace_and_authorize_exact_candidate(
         db_session,
         plan_admission=admission,
     )
-    context = PlannerContext(objective=objective)
+    context = PlannerContext(objectives=(objective,))
 
     first, _ = asyncio.run(planner.handle_message("Investigate churn.", context=context))
     assert first.proposed_plan == p1.plan
@@ -366,7 +366,7 @@ def test_context_is_fresh_and_native_history_derived_from_conversation_history(
     )
     first_objective = Objective(text="First current Objective.")
     second_objective = Objective(text="Second current Objective.")
-    session_frames.save_current(SessionFrame(objective=first_objective))
+    session_frames.save_current(SessionFrame(objectives=(first_objective,)))
 
     history = ConversationHistory()
     context_1 = build_planner_context(session_frames.get_current())
@@ -380,7 +380,7 @@ def test_context_is_fresh_and_native_history_derived_from_conversation_history(
     assert segments_1 == (seg1,)
     history = history.add_turn(segments_1)
 
-    session_frames.save_current(SessionFrame(objective=second_objective))
+    session_frames.save_current(SessionFrame(objectives=(second_objective,)))
     context_2 = build_planner_context(session_frames.get_current())
     _, segments_2 = asyncio.run(
         planner.handle_message(
@@ -391,8 +391,8 @@ def test_context_is_fresh_and_native_history_derived_from_conversation_history(
     )
     assert segments_2 == (seg2,)
 
-    assert planner.contexts[0].objective == first_objective
-    assert planner.contexts[1].objective == second_objective
+    assert planner.contexts[0].objectives == (first_objective,)
+    assert planner.contexts[1].objectives == (second_objective,)
     assert planner.contexts[0] is not planner.contexts[1]
     assert planner.message_histories == [(), first_messages]
     assert "messages" not in _state(planner)
@@ -510,7 +510,10 @@ def test_active_plan_continuation_is_visible_and_never_dispatches(
     assert candidate.plan is not None
     PlanAdmissionService(db_session).admit(candidate.plan)
     dispatcher = RecordingDispatcher()
-    context = PlannerContext(active_plan=candidate.plan, objective=candidate.plan.objective)
+    context = PlannerContext(
+        active_plans=(candidate.plan,),
+        objectives=(candidate.plan.objective,),
+    )
     planner = _planner(
         (PlannerOutput(result=PlannerResult(continue_execution=True)),),
         db_session,
@@ -519,11 +522,51 @@ def test_active_plan_continuation_is_visible_and_never_dispatches(
 
     outcome, _ = asyncio.run(planner.handle_message("Continue active work.", context=context))
 
-    assert planner.contexts[0].active_plan == candidate.plan
+    assert planner.contexts[0].active_plans == (candidate.plan,)
     assert _state(planner)["candidate_plan"] is None
     assert outcome.response is not None
     assert "execution is not implemented" in outcome.response
     assert dispatcher.requests == []
+
+
+def test_continue_execution_without_candidate_fails_closed_with_zero_active_plans(
+    db_session: Session,
+) -> None:
+    context = PlannerContext(active_plans=(), objectives=())
+    planner = _planner(
+        (PlannerOutput(result=PlannerResult(continue_execution=True)),),
+        db_session,
+    )
+
+    outcome, _ = asyncio.run(planner.handle_message("Continue work.", context=context))
+
+    assert outcome.error is not None
+    assert outcome.error.code.value == "invalid_lifecycle_state"
+
+
+def test_continue_execution_without_candidate_fails_closed_with_multiple_active_plans(
+    db_session: Session,
+) -> None:
+    c1 = _candidate_result(instruction="Task 1.")
+    c2 = _candidate_result(instruction="Task 2.")
+    assert c1.plan is not None and c2.plan is not None
+    admission = PlanAdmissionService(db_session)
+    admission.admit(c1.plan)
+    admission.admit(c2.plan)
+
+    context = PlannerContext(
+        active_plans=(c1.plan, c2.plan),
+        objectives=(c1.plan.objective, c2.plan.objective),
+    )
+    planner = _planner(
+        (PlannerOutput(result=PlannerResult(continue_execution=True)),),
+        db_session,
+    )
+
+    outcome, _ = asyncio.run(planner.handle_message("Continue work.", context=context))
+
+    assert outcome.error is not None
+    assert outcome.error.code.value == "invalid_lifecycle_state"
 
 
 def test_inmemory_checkpointer_isolates_planner_thread_identity(
@@ -578,16 +621,16 @@ def test_interrupt_resume_receives_fresh_context_while_preserving_candidate(
     )
 
     # Turn 1: Propose candidate -> awaits human review
-    context_1 = PlannerContext(objective=objective_1)
+    context_1 = PlannerContext(objectives=(objective_1,))
     outcome_1, _ = asyncio.run(planner.handle_message("Propose plan.", context=context_1))
     assert outcome_1.proposed_plan == candidate.plan
     assert _is_waiting(planner)
     assert _state(planner)["candidate_plan"] == candidate.plan
     assert len(planner.contexts) == 1
-    assert planner.contexts[0].objective == objective_1
+    assert planner.contexts[0].objectives == (objective_1,)
 
     # Between turns: authoritative state changes to S2
-    context_2 = PlannerContext(objective=objective_2)
+    context_2 = PlannerContext(objectives=(objective_2,))
 
     # Turn 2: Human asks a question while candidate is waiting (resumes interrupt)
     outcome_2, _ = asyncio.run(
@@ -603,7 +646,7 @@ def test_interrupt_resume_receives_fresh_context_while_preserving_candidate(
     # Invariant checks:
     # 1. plan_or_answer in Turn 2 received context_2 (S2)
     assert len(planner.contexts) == 2
-    assert planner.contexts[1].objective == objective_2
+    assert planner.contexts[1].objectives == (objective_2,)
     assert planner.contexts[1] is not planner.contexts[0]
 
     # 2. Retained candidate survives across the interrupt-resume boundary
@@ -621,7 +664,7 @@ def test_planner_context_is_not_checkpointed(db_session: Session) -> None:
         (PlannerOutput(result=PlannerResult(response="Done.")),),
         db_session,
     )
-    context = PlannerContext(objective=objective)
+    context = PlannerContext(objectives=(objective,))
     asyncio.run(planner.handle_message("Run test.", context=context))
 
     snapshot = _snapshot(planner)

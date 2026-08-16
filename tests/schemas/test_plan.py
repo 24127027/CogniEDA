@@ -417,7 +417,10 @@ def test_plan_is_immutable_non_fco_and_respects_planner_ownership_surfaces() -> 
     assert "pending_plan" not in PlannerContext.model_fields
     assert "pending_tasks" not in PlannerContext.model_fields
     assert "conversation_history" not in PlannerContext.model_fields
-    assert "active_plan" in PlannerContext.model_fields
+    assert "active_plan" not in PlannerContext.model_fields
+    assert "active_plans" in PlannerContext.model_fields
+    assert "objective" not in PlannerContext.model_fields
+    assert "objectives" in PlannerContext.model_fields
     assert "plan" in PlannerResult.model_fields
     assert "plan" not in PlannerOutput.model_fields
 

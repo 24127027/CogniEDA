@@ -13,10 +13,10 @@ These are verified constraints of the bounded current implementation.
   structural dependencies. An independent application service can atomically
   persist an exact authorized bundle and select a Plan active by Objective, but
   only `DATA` is separately executable and no Plan drives execution.
-- The current materialized SessionFrame can hold one Objective and one
+- The current materialized SessionFrame retains multiple Objectives and one
   DataProfile but is not the canonical reference-based session-membership FCO
   and does not implement canonical Objective-bound multi-session identity. Its
-  append-only SQLite envelope is isolated by exact workspace scope. It now
+  append-only SQLite envelope is isolated by exact workspace scope. It
   retains materialized Hypothesis and Discovery research-state membership for
   Planner readability, but it does not retain Tasks as research knowledge and
   does not implement validity-aware selection or the semantic graph.

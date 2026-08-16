@@ -62,12 +62,12 @@ def bootstrap_application(workspace_path: Path) -> Application:
 
     def planner_context_factory() -> PlannerContext:
         frame = session_frames.get_current()
-        active_plan = (
-            active_plans.get_by_objective_id(frame.objective.objective_id)
-            if frame.objective is not None
-            else None
-        )
-        return build_planner_context(frame, active_plan=active_plan)
+        resolved_plans = [
+            active_plan
+            for objective in frame.objectives
+            if (active_plan := active_plans.get_by_objective_id(objective.objective_id)) is not None
+        ]
+        return build_planner_context(frame, active_plans=tuple(resolved_plans))
 
     planner = Planner(
         deps=PlannerToolDeps(dispatcher=dispatcher),

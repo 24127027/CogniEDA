@@ -64,9 +64,11 @@ async def plan_or_answer(
         if (
             result.continue_execution
             and candidate_plan is None
-            and planner_context.active_plan is None
+            and len(planner_context.active_plans) != 1
         ):
-            raise ValueError("continue_execution requires a retained or active Plan.")
+            raise ValueError(
+                "continue_execution without candidate requires exactly one active Plan."
+            )
     except ValueError:
         error = PlannerControlledError(
             code=PlannerErrorCode.INVALID_LIFECYCLE_STATE,
