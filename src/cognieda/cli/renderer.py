@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
+import asyncio
 
 from rich import box
 from rich.console import Console
+from rich.live import Live
 from rich.control import Control
 from rich.markdown import Markdown
 from rich.padding import Padding
@@ -82,17 +84,7 @@ class Renderer:
                 )
 
             case MessageType.TEXT, MessageRole.ASSISTANT:
-                self.console.print("[bold cyan]CogniEDA[/bold cyan]")
-                self.console.print(Markdown(str(message.content)))
-
-                if message.model:
-                    model_text = Text(
-                        f"◆ {message.model}",
-                        style="dim",
-                        justify="right",
-                    )
-                    self.console.print(model_text)
-
+                await self.render_assistant(message)
             case MessageType.TEXT, MessageRole.SYSTEM:
                 self.console.print(
                     Panel(
@@ -126,3 +118,36 @@ class Renderer:
 
         for index, task in enumerate(tasks, start=1):
             self.console.print(f"{index}. {task}")
+
+    @staticmethod
+    def _stream_chunks(
+        text: str,
+        *,
+        chunk_size: int = 3,
+    ) -> Iterable[str]:
+        for index in range(0, len(text), chunk_size):
+            yield text[index:index + chunk_size]
+
+    async def render_assistant(self, message: Message) -> None:
+        self.console.print("[bold cyan]CogniEDA[/bold cyan]")
+
+        content = str(message.content)
+
+        current = ""
+
+        with Live(
+            Markdown(""),
+            console=self.console,
+            refresh_per_second=30,
+        ) as live:
+            for chunk in self._stream_chunks(content):
+                current += chunk
+                live.update(Markdown(current))
+                await asyncio.sleep(0.01 + len(chunk) * 0.003)
+        if message.model:
+            model_text = Text(
+                f"◆ {message.model}",
+                style="dim",
+                justify="right",
+            )
+            self.console.print(model_text)
