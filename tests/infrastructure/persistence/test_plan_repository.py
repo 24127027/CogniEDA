@@ -70,12 +70,10 @@ def _plan(
     plan_id: UUID | None = None,
 ) -> Plan:
     task_tuple = tuple(tasks)
-    return Plan.create(
-        plan_id=plan_id,
-        objective=objective,
-        assumptions=assumptions,
-        task_ids=(task.task_id for task in task_tuple),
-        dependencies=(
+    data: dict[str, object] = {
+        "objective": objective,
+        "assumptions": tuple(assumptions),
+        "dependencies": (
             (
                 PlanDependency(
                     prerequisite_task_id=task_tuple[0].task_id,
@@ -85,8 +83,11 @@ def _plan(
             if len(task_tuple) > 1
             else ()
         ),
-        tasks=task_tuple,
-    )
+        "tasks": task_tuple,
+    }
+    if plan_id is not None:
+        data["plan_id"] = plan_id
+    return Plan.model_validate(data)
 
 
 def _persist(session: Session, plan: Plan) -> Plan:
@@ -104,6 +105,8 @@ def test_exact_plan_round_trip_includes_normalized_content(db_session: Session) 
     loaded = _persist(db_session, plan)
 
     assert loaded == plan
+    assert loaded.tasks == tuple(sorted(tasks, key=lambda task: str(task.task_id)))
+    assert loaded.task_ids == tuple(task.task_id for task in loaded.tasks)
     assert loaded.fingerprint == plan.fingerprint
     assert db_session.get(PlanRecord, plan.plan_id) is not None
     assert len(db_session.exec(select(PlanAssumptionRecord)).all()) == 2

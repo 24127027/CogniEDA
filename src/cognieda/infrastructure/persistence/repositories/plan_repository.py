@@ -46,13 +46,13 @@ class PlanRepository:
             if record_to_schema(Assumption, assumption_row) != assumption:
                 raise ValueError("Plan Assumption differs from the admitted Assumption.")
 
-        tasks: list[Task] = []
-        for task_id in plan.task_ids:
-            task_row = self._session.get(TaskRecord, task_id)
+        for task in plan.tasks:
+            task_row = self._session.get(TaskRecord, task.task_id)
             if task_row is None:
                 raise ValueError("Plan references a missing Task.")
-            tasks.append(record_to_schema(Task, task_row))
-        plan.validate_tasks(tasks)
+            persisted = record_to_schema(Task, task_row)
+            if persisted.semantic_payload() != task.semantic_payload():
+                raise ValueError("Plan Task differs from the admitted Task definition.")
 
         self._session.add(
             PlanRecord(
@@ -143,7 +143,7 @@ class PlanRepository:
                 "plan_id": header.plan_id,
                 "objective": objective,
                 "assumptions": assumptions,
-                "task_ids": [membership.task_id for membership in task_rows],
+                "tasks": tasks,
                 "dependencies": [
                     {
                         "prerequisite_task_id": prerequisite_task_id,
@@ -155,7 +155,6 @@ class PlanRepository:
                 ],
             }
         )
-        plan.validate_tasks(tasks)
         if plan.fingerprint != header.fingerprint:
             raise ValueError("Persisted Plan fingerprint does not match exact content.")
         return plan

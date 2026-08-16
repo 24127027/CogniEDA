@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from cognieda.agents.planner.context import PlannerContext
+from cognieda.agents.planner.state import PlannerState
 from cognieda.agents.planner.types import PlannerOutput, PlannerResult
 from cognieda.schemas import (
     Assumption,
@@ -30,9 +31,8 @@ def _task(objective: Objective, instruction: str = "Profile missing values.") ->
 
 
 def _plan(objective: Objective, tasks: tuple[Task, ...]) -> Plan:
-    return Plan.create(
+    return Plan(
         objective=objective,
-        task_ids=(task.task_id for task in tasks),
         tasks=tasks,
     )
 
@@ -93,12 +93,20 @@ def test_planner_context_and_result_have_exact_canonical_fields() -> None:
     )
     assert tuple(PlannerResult.model_fields) == (
         "plan",
-        "tasks",
         "response",
         "human_input_request",
         "continue_execution",
+        "discard_candidate",
     )
-    assert tuple(PlannerOutput.model_fields) == ("result", "messages", "error")
+    assert tuple(PlannerOutput.model_fields) == ("result", "segment", "error")
+    assert tuple(PlannerState.__annotations__) == (
+        "latest_human_input",
+        "candidate_plan",
+        "turn_outcome",
+        "completed_segment",
+    )
+    assert "messages" not in PlannerState.__annotations__
+    assert "context" not in PlannerState.__annotations__
 
 
 def test_planner_context_retains_all_typed_readable_state() -> None:
@@ -140,29 +148,11 @@ def test_response_candidate_plan_and_human_input_request_are_valid() -> None:
     assert PlannerResult(response="The admitted evidence answers this.").plan is None
     candidate = PlannerResult(
         plan=plan,
-        tasks=(task,),
         response="I propose this bounded investigation.",
     )
     assert candidate.plan is plan
-    assert candidate.tasks == (task,)
+    assert candidate.plan.tasks == (task,)
     assert PlannerResult(human_input_request="Which cohort is in scope?").plan is None
-
-
-def test_tasks_without_plan_are_rejected() -> None:
-    objective = Objective(text="Understand customer retention.")
-
-    with pytest.raises(ValidationError, match="tasks require"):
-        PlannerResult(tasks=(_task(objective),))
-
-
-def test_plan_must_validate_the_exact_task_bundle() -> None:
-    objective = Objective(text="Understand customer retention.")
-    expected = _task(objective, "Expected task")
-    unexpected = _task(objective, "Unexpected task")
-    plan = _plan(objective, (expected,))
-
-    with pytest.raises(ValidationError, match="exactly match"):
-        PlannerResult(plan=plan, tasks=(unexpected,))
 
 
 def test_candidate_cannot_be_generated_and_authorized_in_same_result() -> None:
@@ -172,13 +162,33 @@ def test_candidate_cannot_be_generated_and_authorized_in_same_result() -> None:
     with pytest.raises(ValidationError, match="candidate Plan"):
         PlannerResult(
             plan=_plan(objective, (task,)),
-            tasks=(task,),
             continue_execution=True,
         )
     with pytest.raises(ValidationError, match="Human input request"):
         PlannerResult(
             human_input_request="Confirm the cohort.",
             continue_execution=True,
+        )
+
+
+def test_discard_signal_has_exact_structural_conflicts() -> None:
+    objective = Objective(text="Understand customer retention.")
+    task = _task(objective)
+    plan = _plan(objective, (task,))
+
+    assert PlannerResult(discard_candidate=True).discard_candidate is True
+    assert PlannerResult(
+        response="Discarded the proposal.",
+        discard_candidate=True,
+    ).response == "Discarded the proposal."
+    with pytest.raises(ValidationError, match="new candidate Plan"):
+        PlannerResult(plan=plan, discard_candidate=True)
+    with pytest.raises(ValidationError, match="continue_execution"):
+        PlannerResult(continue_execution=True, discard_candidate=True)
+    with pytest.raises(ValidationError, match="Human input request"):
+        PlannerResult(
+            human_input_request="Which proposal?",
+            discard_candidate=True,
         )
 
 

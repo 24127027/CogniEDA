@@ -115,10 +115,9 @@ def test_builder_materializes_exact_active_plan_for_current_objective() -> None:
         kind=TaskKind.DATA,
         instruction="Count rows.",
     )
-    plan = Plan.create(
+    plan = Plan(
         objective=frame.objective,
         assumptions=frame.assumptions,
-        task_ids=(task.task_id,),
         tasks=(task,),
     )
 
@@ -133,7 +132,7 @@ def test_builder_materializes_exact_active_plan_for_current_objective() -> None:
 def test_builder_rejects_active_plan_for_different_objective() -> None:
     frame = _full_frame()
     other = Objective(text="Different Objective.")
-    plan = Plan.create(objective=other, task_ids=(), tasks=())
+    plan = Plan(objective=other, tasks=())
 
     with pytest.raises(ValueError, match="exact SessionFrame Objective"):
         build_planner_context(

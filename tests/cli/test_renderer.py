@@ -77,14 +77,13 @@ def test_plan_event_handler_renders_transient_candidate() -> None:
         kind=TaskKind.DATA,
         instruction="Profile retention cohorts.",
     )
-    plan = Plan.create(
+    plan = Plan(
         objective=objective,
-        task_ids=(task.task_id,),
         tasks=(task,),
     )
     renderer, buffer = _renderer_output()
 
-    renderer.handle_plan(PlanProposed(plan=plan, tasks=(task,)))
+    renderer.handle_plan(PlanProposed(plan=plan))
 
     output = buffer.getvalue()
     assert "Proposed Plan" in output

@@ -41,16 +41,15 @@ def _plan(
     *,
     assumptions: tuple[Assumption, ...] = (),
 ) -> Plan:
-    return Plan.create(
+    return Plan(
         objective=objective,
         assumptions=assumptions,
-        task_ids=(task.task_id for task in tasks),
         tasks=tasks,
     )
 
 
-def _admit(session: Session, plan: Plan, tasks: tuple[Task, ...]) -> None:
-    assert PlanAdmissionService(session).admit(plan, tasks=tasks) == plan
+def _admit(session: Session, plan: Plan) -> None:
+    assert PlanAdmissionService(session).admit(plan) == plan
 
 
 def test_review_contracts_are_deleted_and_admission_preserves_authority_boundaries() -> None:
@@ -84,7 +83,7 @@ def test_admission_atomically_persists_exact_new_bundle_and_active_selection(
     tasks = (_task(objective), _task(objective, instruction="Count renewal events."))
     plan = _plan(objective, tasks, assumptions=(assumption,))
 
-    _admit(db_session, plan, tasks)
+    _admit(db_session, plan)
 
     assert ObjectiveRepository(db_session).get_by_id(objective.objective_id) == objective
     assert tuple(TaskRepository(db_session).get_by_id(task.task_id) for task in tasks) == tasks
@@ -100,7 +99,7 @@ def test_existing_exact_objective_and_task_are_reused_without_status_replacement
     candidate_task = persisted_task.model_copy(update={"status": TaskStatus.COMPLETED})
     plan = _plan(objective, (candidate_task,))
 
-    _admit(db_session, plan, (candidate_task,))
+    _admit(db_session, plan)
 
     assert len(db_session.exec(select(ObjectiveRecord)).all()) == 1
     assert len(db_session.exec(select(TaskRecord)).all()) == 1
@@ -119,7 +118,7 @@ def test_objective_identity_collision_fails_without_plan_or_task_writes(
     plan = _plan(counterfeit, (task,))
 
     with pytest.raises(ValueError, match="Objective identity collision"):
-        _admit(db_session, plan, (task,))
+        _admit(db_session, plan)
 
     assert TaskRepository(db_session).get_by_id(task.task_id) is None
     assert PlanRepository(db_session).get_by_id(plan.plan_id) is None
@@ -145,7 +144,7 @@ def test_assumption_must_already_exist_with_exact_content(
     plan = _plan(objective, (task,), assumptions=(candidate,))
 
     with pytest.raises(ValueError, match="Assumption"):
-        _admit(db_session, plan, (task,))
+        _admit(db_session, plan)
 
     persisted_assumption = db_session.get(AssumptionRecord, candidate.assumption_id)
     if case == "missing":
@@ -164,7 +163,7 @@ def test_task_identity_collision_fails_without_plan_write(db_session: Session) -
     plan = _plan(objective, (counterfeit,))
 
     with pytest.raises(ValueError, match="Task identity collision"):
-        _admit(db_session, plan, (counterfeit,))
+        _admit(db_session, plan)
 
     assert TaskRepository(db_session).get_by_id(persisted.task_id) == persisted
     assert PlanRepository(db_session).get_by_id(plan.plan_id) is None
@@ -200,7 +199,7 @@ def test_fingerprint_failure_rolls_back_new_objective_and_task(
     counterfeit = cast(Plan, _FingerprintMismatchCandidate(valid))
 
     with pytest.raises(ValueError, match="fingerprint"):
-        _admit(db_session, counterfeit, (task,))
+        _admit(db_session, counterfeit)
 
     assert ObjectiveRepository(db_session).get_by_id(objective.objective_id) is None
     assert TaskRepository(db_session).get_by_id(task.task_id) is None
@@ -214,7 +213,7 @@ def test_failed_successor_leaves_existing_active_plan_unchanged(
     objective = Objective(text="Understand retention.")
     first_task = _task(objective)
     active = _plan(objective, (first_task,))
-    _admit(db_session, active, (first_task,))
+    _admit(db_session, active)
 
     successor_task = _task(objective, instruction="Inspect a successor scope.")
     missing_assumption = Assumption(text="This premise is not admitted.")
@@ -225,7 +224,7 @@ def test_failed_successor_leaves_existing_active_plan_unchanged(
     )
 
     with pytest.raises(ValueError, match="Assumption"):
-        _admit(db_session, successor, (successor_task,))
+        _admit(db_session, successor)
 
     assert PlanRepository(db_session).get_by_id(successor.plan_id) is None
     assert TaskRepository(db_session).get_by_id(successor_task.task_id) is None
@@ -249,7 +248,7 @@ def test_failure_after_staging_rolls_back_entire_bundle(
     monkeypatch.setattr(ActivePlanRepository, "activate", fail_activation)
 
     with pytest.raises(RuntimeError, match="injected activation failure"):
-        _admit(db_session, plan, (task,))
+        _admit(db_session, plan)
 
     assert ObjectiveRepository(db_session).get_by_id(objective.objective_id) is None
     assert TaskRepository(db_session).get_by_id(task.task_id) is None
@@ -263,15 +262,15 @@ def test_successor_activation_is_objective_scoped_and_preserves_old_plan(
     first_objective = Objective(text="Understand retention.")
     first_task = _task(first_objective)
     first_plan = _plan(first_objective, (first_task,))
-    _admit(db_session, first_plan, (first_task,))
+    _admit(db_session, first_plan)
 
     successor = _plan(first_objective, (first_task,))
-    _admit(db_session, successor, (first_task,))
+    _admit(db_session, successor)
 
     second_objective = Objective(text="Understand acquisition.")
     second_task = _task(second_objective)
     second_plan = _plan(second_objective, (second_task,))
-    _admit(db_session, second_plan, (second_task,))
+    _admit(db_session, second_plan)
 
     assert PlanRepository(db_session).get_by_id(first_plan.plan_id) == first_plan
     assert ActivePlanRepository(db_session).get_by_objective_id(
@@ -288,10 +287,10 @@ def test_plan_identity_can_be_persisted_only_once(db_session: Session) -> None:
     objective = Objective(text="Understand retention.")
     task = _task(objective)
     plan = _plan(objective, (task,))
-    _admit(db_session, plan, (task,))
+    _admit(db_session, plan)
 
     with pytest.raises(ValueError, match="Plan identity already exists"):
-        _admit(db_session, plan, (task,))
+        _admit(db_session, plan)
 
     assert PlanRepository(db_session).get_by_id(plan.plan_id) == plan
     assert ActivePlanRepository(db_session).get_by_objective_id(objective.objective_id) == plan

@@ -47,10 +47,9 @@ def _persisted_bundle(session: Session) -> tuple[Objective, Assumption, Task]:
 
 
 def _candidate(objective: Objective, assumption: Assumption, task: Task) -> Plan:
-    return Plan.create(
+    return Plan(
         objective=objective,
         assumptions=(assumption,),
-        task_ids=(task.task_id,),
         tasks=(task,),
     )
 
@@ -59,11 +58,9 @@ def _assert_code(
     validator: PlanValidator,
     candidate: Plan,
     code: PlanValidationErrorCode,
-    *,
-    tasks: tuple[Task, ...] | None = None,
 ) -> None:
     with pytest.raises(PlanValidationError) as exc_info:
-        validator.validate(candidate, tasks=tasks)
+        validator.validate(candidate)
     assert exc_info.value.code is code
 
 
@@ -71,7 +68,7 @@ def test_valid_candidate_is_canonical_and_not_persisted(db_session: Session) -> 
     objective, assumption, task = _persisted_bundle(db_session)
     candidate = _candidate(objective, assumption, task)
 
-    validated = PlanValidator(db_session).validate(candidate, tasks=(task,))
+    validated = PlanValidator(db_session).validate(candidate)
 
     assert validated == candidate
     assert PlanRepository(db_session).get_by_id(candidate.plan_id) is None
@@ -152,33 +149,6 @@ def test_persisted_task_objective_mismatch_fails_closed(db_session: Session) -> 
     )
 
 
-@pytest.mark.parametrize("case", ["missing", "extra", "duplicate", "wrong_objective"])
-def test_supplied_task_bundle_is_exact(db_session: Session, case: str) -> None:
-    objective, assumption, task = _persisted_bundle(db_session)
-    candidate = _candidate(objective, assumption, task)
-    extra = Task(
-        objective_id=objective.objective_id,
-        kind=TaskKind.DATA,
-        instruction="Extra.",
-    )
-    tasks: tuple[Task, ...]
-    if case == "missing":
-        tasks = ()
-    elif case == "extra":
-        tasks = (task, extra)
-    elif case == "duplicate":
-        tasks = (task, task)
-    else:
-        tasks = (task.model_copy(update={"objective_id": uuid4()}),)
-
-    _assert_code(
-        PlanValidator(db_session),
-        candidate,
-        PlanValidationErrorCode.INVALID_CANDIDATE,
-        tasks=tasks,
-    )
-
-
 def test_task_runtime_status_is_not_plan_content(db_session: Session) -> None:
     objective, assumption, pending = _persisted_bundle(db_session)
     candidate = _candidate(objective, assumption, pending)
@@ -188,7 +158,7 @@ def test_task_runtime_status_is_not_plan_content(db_session: Session) -> None:
     )
     assert completed is not None
 
-    assert PlanValidator(db_session).validate(candidate, tasks=(pending,)) == candidate
+    assert PlanValidator(db_session).validate(candidate) == candidate
 
 
 def test_invalid_identity_is_rejected(db_session: Session) -> None:

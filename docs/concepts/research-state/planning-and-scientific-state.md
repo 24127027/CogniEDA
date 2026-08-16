@@ -59,9 +59,11 @@ response synthesis is Planner behavior, not executable Task work.
 
 `Plan` is the non-FCO immutable aggregate for an entire proposed or approved
 research plan. It contains its exact Objective, the exact admitted Human
-Assumptions that materially influenced planning, canonical Task IDs as its
-direct and only membership representation, and explicit dependency edges.
-Those Plan semantics do not define Task identity.
+Assumptions that materially influenced planning, full canonical Task
+definitions as its direct and only writable membership representation, and
+explicit dependency edges. Task IDs are derived from those definitions. Those
+Plan semantics do not replace independent Task identity or include mutable Task
+execution status.
 
 Duplicate Assumption identities are invalid. Assumption content contributes to
 Plan fingerprint identity because it records the exact planning basis, but it
@@ -159,9 +161,10 @@ deterministic fingerprinting, and persisted Objective/Assumption/Task checks.
 The append-only repository foundation snapshots exact Objective and Assumption
 content and is **Verified on SQLite**. Exact Plan admission and objective-scoped
 active selection are **Verified on SQLite** through an independent
-application-authority service. Phase 2 transient Planner candidate authoring is
-**Implemented**, but the runtime does not retain a candidate or connect Human
-conversation to admission. Candidate lifecycle, conversational authorization,
-Planner LangGraph interrupt/resume, replanning, canonical scientific execution,
-and the complete lifecycle linked above remain **Deferred**; only bounded
-`DATA` execution is supported, and Plan state does not drive it.
+application-authority service. Transient Planner candidate authoring,
+in-process retention, natural-language Human review, typed authorization, and
+LangGraph interrupt/resume are **Implemented**. Authorization invokes the exact
+admission service; the graph does not persist directly or execute the admitted
+Plan. Durable review recovery, replanning, canonical scientific execution, and
+the complete lifecycle linked above remain **Deferred**; only bounded `DATA`
+execution is supported, and Plan state does not drive it.

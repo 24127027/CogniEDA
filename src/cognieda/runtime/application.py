@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-from sqlmodel import Session
+from typing import Callable
+from uuid import UUID
 
 from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.types import PlannerResult
+from cognieda.agents.planner.context import PlannerContext
+from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.application.ports import AgentFactoryPort
-from cognieda.delegation import ExecutorDispatcher
-from cognieda.infrastructure.persistence.repositories import ActivePlanRepository
+from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
-from cognieda.schemas.artifacts import SessionFrame
-from cognieda.schemas.plan import Plan
 
-from .conversation import ConversationHistory
 from .messages import Message, MessageRole, MessageType
-from .planner_context import build_planner_context
 from .workspace import MissingModelCredentialError, Workspace
 
 
@@ -23,19 +20,19 @@ class Application:
         self,
         workspace: Workspace,
         planner_agent: Planner,
-        dispatcher: ExecutorDispatcher,
         agent_factory: AgentFactoryPort,
         event_bus: EventBus,
-        session: Session,
+        session_id: UUID,
+        conversation_history: ConversationHistory,
+        planner_context_factory: Callable[[], PlannerContext],
     ) -> None:
         self.workspace = workspace
         self.agent_factory = agent_factory
         self.planner_agent = planner_agent
         self.event_bus = event_bus
-        self.dispatcher = dispatcher
-        self._active_plans = ActivePlanRepository(session)
-        self.session_frame = SessionFrame()
-        self.conversation_history = ConversationHistory()
+        self.session_id = session_id
+        self.conversation_history = conversation_history
+        self.planner_context_factory = planner_context_factory
 
     async def submit_message(self, message: str) -> None:
         self.event_bus.publish(
@@ -53,64 +50,53 @@ class Application:
             self.event_bus.publish(MessageProduced(message=command_result))
             return
 
-        active_plan = self._resolve_active_plan()
-        planner_context = build_planner_context(
-            self.session_frame,
-            active_plan=active_plan,
-        )
+        try:
+            context = self.planner_context_factory()
+        except Exception:
+            self._emit_message(
+                "Planner authoritative context could not be materialized.",
+                message_type=MessageType.ERROR,
+            )
+            return
+
+        message_history = tuple(self.conversation_history.model_messages())
 
         try:
-            planner_output = await self.planner_agent.run(
+            outcome, completed_segment = await self.planner_agent.handle_message(
                 message,
-                context=planner_context,
-                message_history=self.conversation_history.model_messages(),
+                context=context,
+                message_history=message_history,
             )
         except MissingModelCredentialError as e:
             self._emit_message(f"{e}\n\nRun '/provider key <provider>' to configure an API key.")
             return
 
-        if planner_output.messages:
-            self.conversation_history = self.conversation_history.add_turn(planner_output.messages)
+        if completed_segment is not None:
+            self.conversation_history = self.conversation_history.commit_segment(completed_segment)
 
-        self._emit_planner_result(planner_output.result)
+        self._emit_planner_outcome(outcome)
 
-    def _resolve_active_plan(self) -> Plan | None:
-        objective = self.session_frame.objective
-        if objective is None:
-            return None
-        return self._active_plans.get_by_objective_id(objective.objective_id)
-
-    def _emit_planner_result(self, result: PlannerResult) -> None:
-        if result.plan is not None:
-            self.event_bus.publish(
-                PlanProposed(
-                    plan=result.plan,
-                    tasks=result.tasks,
-                )
-            )
+    def _emit_planner_outcome(self, outcome: PlannerTurnOutcome) -> None:
+        if outcome.error is not None:
+            self._emit_message(outcome.error.message, message_type=MessageType.ERROR)
             return
 
-        if result.response is not None:
-            self._emit_message(result.response)
-            return
+        if outcome.proposed_plan is not None:
+            self.event_bus.publish(PlanProposed(plan=outcome.proposed_plan))
 
-        if result.human_input_request is not None:
+        if outcome.response is not None:
+            self._emit_message(outcome.response)
+
+        if outcome.human_input_request is not None:
             self.event_bus.publish(
                 HumanInputRequested(
                     message=Message(
                         type=MessageType.TEXT,
                         role=MessageRole.ASSISTANT,
-                        content=result.human_input_request,
+                        content=outcome.human_input_request,
                     )
                 )
             )
-            return
-
-        if result.continue_execution:
-            # No public event yet.
-            return
-
-        raise AssertionError("PlannerResult passed validation but has no conclusion.")
 
     # TODO: Move command handling to a separate class or module for better separation of concerns
     async def _handle_command(self, command: str) -> Message:
@@ -271,13 +257,21 @@ class Application:
             recreate_agent=recreate_agent,
         )
 
-    def _emit_message(self, content: str) -> None:
+    def _emit_message(
+        self,
+        content: str,
+        *,
+        message_type: MessageType = MessageType.TEXT,
+    ) -> None:
         self.event_bus.publish(
             MessageProduced(
                 message=Message(
-                    type=MessageType.TEXT,
+                    type=message_type,
                     role=MessageRole.ASSISTANT,
                     content=content,
                 )
             )
         )
+
+
+__all__ = ("Application",)

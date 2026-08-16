@@ -62,19 +62,18 @@ def _plan(
     *,
     objective: Objective | None = None,
     assumptions: Iterable[Assumption] = (),
-    task_ids: Iterable[UUID] | None = None,
     dependencies: Iterable[PlanDependency] = (),
     plan_id: UUID | None = None,
 ) -> Plan:
-    task_tuple = tuple(tasks)
-    return Plan.create(
-        plan_id=plan_id,
-        objective=objective or _objective(),
-        assumptions=assumptions,
-        task_ids=(tuple(task.task_id for task in task_tuple) if task_ids is None else task_ids),
-        dependencies=dependencies,
-        tasks=task_tuple,
-    )
+    data: dict[str, object] = {
+        "objective": objective or _objective(),
+        "assumptions": tuple(assumptions),
+        "tasks": tuple(tasks),
+        "dependencies": tuple(dependencies),
+    }
+    if plan_id is not None:
+        data["plan_id"] = plan_id
+    return Plan.model_validate(data)
 
 
 def test_plan_has_only_minimal_semantic_fields() -> None:
@@ -86,11 +85,12 @@ def test_plan_has_only_minimal_semantic_fields() -> None:
         "plan_id",
         "objective",
         "assumptions",
-        "task_ids",
+        "tasks",
         "dependencies",
     }
     assert plan.objective == _objective()
     assert plan.assumptions == (assumption,)
+    assert plan.tasks == (task,)
     assert plan.task_ids == (task.task_id,)
     assert set(PlanDependency.model_fields) == {
         "prerequisite_task_id",
@@ -106,38 +106,17 @@ def test_plan_rejects_duplicate_assumption_identity() -> None:
         _plan([task], assumptions=[assumption, assumption])
 
 
-def test_plan_rejects_duplicate_task_ids() -> None:
+def test_plan_rejects_duplicate_task_identities() -> None:
     task = _task()
 
-    with pytest.raises(ValidationError, match="duplicate Task IDs"):
-        Plan(objective=_objective(), task_ids=(task.task_id, task.task_id))
+    with pytest.raises(ValidationError, match="duplicate Task identities"):
+        Plan(objective=_objective(), tasks=(task, task))
 
 
-@pytest.mark.parametrize("case", ["missing", "extra"])
-def test_validate_tasks_requires_exact_set_equality(case: str) -> None:
-    first = _task(task_id=FIRST_TASK_ID)
-    second = _task(task_id=SECOND_TASK_ID)
-    plan = _plan([first], task_ids=(first.task_id,))
-    supplied = () if case == "missing" else (first, second)
-
-    with pytest.raises(ValueError, match="exactly match task_ids membership"):
-        plan.validate_tasks(supplied)
-
-
-def test_validate_tasks_rejects_duplicate_task_objects() -> None:
-    task = _task()
-    plan = _plan([task])
-
-    with pytest.raises(ValueError, match="duplicate Task objects"):
-        plan.validate_tasks((task, task))
-
-
-def test_validate_tasks_rejects_task_from_another_objective() -> None:
+def test_plan_rejects_task_from_another_objective() -> None:
     task = _task(objective_id=uuid4())
-    plan = Plan(objective=_objective(), task_ids=(task.task_id,))
-
     with pytest.raises(ValueError, match="Plan Objective"):
-        plan.validate_tasks((task,))
+        Plan(objective=_objective(), tasks=(task,))
 
 
 def test_dependency_endpoint_outside_membership_fails() -> None:
@@ -146,7 +125,7 @@ def test_dependency_endpoint_outside_membership_fails() -> None:
     with pytest.raises(ValidationError, match="outside membership"):
         Plan(
             objective=_objective(),
-            task_ids=(member.task_id,),
+            tasks=(member,),
             dependencies=(_edge(member, outsider),),
         )
 
@@ -324,7 +303,10 @@ def test_canonical_input_order_does_not_change_serialization_or_fingerprint() ->
     assert forward.fingerprint == reverse.fingerprint
 
 
-@pytest.mark.parametrize("change", ["objective", "assumption", "membership", "edge"])
+@pytest.mark.parametrize(
+    "change",
+    ["objective", "assumption", "instruction", "kind", "membership", "edge"],
+)
 def test_each_plan_semantic_change_changes_fingerprint(change: str) -> None:
     first = _task(task_id=FIRST_TASK_ID)
     second = _task(task_id=SECOND_TASK_ID)
@@ -341,6 +323,16 @@ def test_each_plan_semantic_change_changes_fingerprint(change: str) -> None:
         changed = _plan(
             [first, second],
             assumptions=(Assumption(text="Dates may be unreliable."),),
+        )
+    elif change == "instruction":
+        changed = _plan(
+            [first.model_copy(update={"instruction": "Inspect a different scope."}), second],
+            assumptions=(assumption,),
+        )
+    elif change == "kind":
+        changed = _plan(
+            [first.model_copy(update={"kind": TaskKind.GRAPH}), second],
+            assumptions=(assumption,),
         )
     elif change == "membership":
         changed = _plan([first], assumptions=(assumption,))
@@ -365,24 +357,19 @@ def test_fingerprint_payload_contains_only_current_plan_semantics() -> None:
 
     payload = plan._fingerprint_payload()
 
-    assert set(payload) == {"objective", "assumptions", "task_ids", "dependencies"}
+    assert set(payload) == {"objective", "assumptions", "tasks", "dependencies"}
     assert "plan_id" not in payload
-    task_ids = payload["task_ids"]
-    assert isinstance(task_ids, list)
-    assert all(isinstance(task_id, str) for task_id in task_ids)
+    tasks = payload["tasks"]
+    assert isinstance(tasks, list)
+    assert tasks == [task.semantic_payload() for task in plan.tasks]
+    assert all("status" not in task for task in tasks)
 
 
-def test_task_status_and_semantic_payload_are_not_fingerprint_content() -> None:
+def test_task_status_is_not_plan_fingerprint_content() -> None:
     pending = _task(task_id=FIRST_TASK_ID)
-    changed = Task(
-        task_id=pending.task_id,
-        objective_id=pending.objective_id,
-        kind=TaskKind.GRAPH,
-        instruction="Ask a different bounded graph question.",
-        status=TaskStatus.COMPLETED,
-    )
+    completed = pending.model_copy(update={"status": TaskStatus.COMPLETED})
 
-    assert _plan([pending]).fingerprint == _plan([changed]).fingerprint
+    assert _plan([pending]).fingerprint == _plan([completed]).fingerprint
 
 
 def test_obsolete_plan_abstractions_are_absent() -> None:
@@ -425,7 +412,7 @@ def test_plan_is_immutable_non_fco_and_respects_planner_ownership_surfaces() -> 
     plan = _plan([task])
 
     with pytest.raises(ValidationError, match="frozen"):
-        plan.task_ids = ()
+        plan.tasks = ()
     assert "PLAN" not in FirstClassObjectType.__members__
     assert "pending_plan" not in PlannerContext.model_fields
     assert "pending_tasks" not in PlannerContext.model_fields

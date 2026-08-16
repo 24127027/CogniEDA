@@ -14,13 +14,19 @@ SESSION_FRAME_JSON_FIELDS = {"state"}
 
 
 class SessionFrameRepository:
-    """Append and retrieve validated MVP SessionFrame snapshots."""
+    """Append and retrieve current SessionFrame snapshots in one exact scope."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope_key: str = "default") -> None:
+        if not scope_key.strip():
+            raise ValueError("SessionFrame scope_key cannot be empty.")
         self._session = session
+        self._scope_key = scope_key
 
     def create(self, session_frame: SessionFrame) -> SessionFrame:
-        record = SessionFrameRecord(state=session_frame.model_dump(mode="json"))
+        record = SessionFrameRecord(
+            scope_key=self._scope_key,
+            state=session_frame.model_dump(mode="json"),
+        )
         self._session.add(record)
         self._session.commit()
         self._session.refresh(record)
@@ -31,7 +37,14 @@ class SessionFrameRepository:
         return None if record is None else SessionFrame.model_validate(record.state)
 
     def list(self) -> builtins.list[SessionFrame]:
-        statement = select(SessionFrameRecord).order_by(desc(SessionFrameRecord.created_at))
+        statement = (
+            select(SessionFrameRecord)
+            .where(SessionFrameRecord.scope_key == self._scope_key)
+            .order_by(
+                desc(SessionFrameRecord.created_at),
+                desc(SessionFrameRecord.session_frame_id),
+            )
+        )
         return [
             SessionFrame.model_validate(record.state)
             for record in self._session.exec(statement).all()
@@ -43,3 +56,13 @@ class SessionFrameRepository:
     def get_latest(self) -> SessionFrame | None:
         frames = self.list_recent(limit=1)
         return frames[0] if frames else None
+
+    def save_current(self, session_frame: SessionFrame) -> SessionFrame:
+        """Append the new authoritative current snapshot for this scope."""
+
+        return self.create(session_frame)
+
+    def get_current(self) -> SessionFrame:
+        """Return the latest committed snapshot, or deterministic empty state."""
+
+        return self.get_latest() or SessionFrame()

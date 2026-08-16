@@ -106,6 +106,16 @@ class Task(ImmutableCogniEDABaseModel):
     instruction: NonEmptyStr
     status: TaskStatus = TaskStatus.PENDING
 
+    def semantic_payload(self) -> dict[str, Any]:
+        """Return immutable Task definition fields, excluding execution status."""
+
+        return {
+            "task_id": str(self.task_id),
+            "objective_id": str(self.objective_id),
+            "kind": self.kind.value,
+            "instruction": self.instruction,
+        }
+
 
 class Hypothesis(CogniEDABaseModel):
     """Atomic test contract created from one terminal analytical Task."""
