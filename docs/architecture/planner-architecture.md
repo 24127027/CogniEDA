@@ -248,8 +248,8 @@ scientific proposal.
 
 ## Implementation status
 
-**Partially implemented.** The Application runtime owns one active `ChatSession`,
-which provides identity (`session_id`) and conversational lifetime for multiple
+**Partially implemented.** One Application runtime represents one active chat session,
+which provides stable session identity (`session_id`) and conversational lifetime for multiple
 Human turns. The Planner directly owns one typed PydanticAI Agent with
 `PlannerToolDeps` and its compiled LangGraph `StateGraph` with exactly
 `plan_or_answer`, `await_human`, and `admit_candidate` lifecycle nodes.
@@ -273,12 +273,12 @@ field or checkpointed `PlannerResult` is added. `Planner.handle_message()`
 rejects empty Human input as a controlled outcome before initial invocation or
 interrupt resume, so the successful `await_human` route remains static.
 
-`ChatSession` encapsulates session-scoped `SessionFrame` and `ActivePlan`
-persistence. For every Human turn, a fresh `PlannerContext` is materialized
-from the session's current `SessionFrame` and the exact active `Plan` for its
-Objective. `ConversationHistory` is the canonical retained conversational memory,
+The same session identity scopes the Planner thread and current `SessionFrame`
+repository. For every Human turn, a fresh `PlannerContext` is materialized
+from the current `SessionFrame` and the exact active `Plan` for its
+Objective. `ConversationHistory` is the canonical non-authoritative conversational memory,
 composed of ordered `ConversationTurn`s and native `ConversationSegment`s.
-`ConversationSegment` represents one indivisible, completed model-interaction
+`ConversationSegment` is the pruning unit and represents one indivisible, completed model-interaction
 unit; truncating from a segment safely removes that segment and subsequent
 dependent conversation from future model context. LangGraph runtime context
 (`PlannerRunContext`) acts as the run-scoped transport channel carrying the
@@ -314,12 +314,12 @@ Planner returns a visible controlled outcome that execution is not implemented
 and performs no dispatch. Application maps that typed outcome to EventBus
 presentation events; EventBus does not own lifecycle state. Application owns
 no concrete persistence repositories. Completed `ConversationSegment`s returned
-by Planner are committed to `ChatSession` exactly once at the session boundary.
+by Planner are committed to the Application's `ConversationHistory` exactly once at the session boundary.
 Planner-owned `InMemorySaver`, its smallest required trusted process-local typed
 serializer (`InProcessPlannerSerializer`), and a stable session/Planner thread UUID
 preserve isolated in-process state across Human turns within an active session.
 Durable chat-session reopening/discovery after process restart, durable
-`ConversationHistory` persistence across restarts, and full Task DAG execution
+`ConversationHistory` persistence across restarts, full unified `ChatSession` / `SessionMemory` abstraction, and full Task DAG execution
 remain **Deferred**. Development databases are reset rather than migrated
 while the product is pre-production.
 

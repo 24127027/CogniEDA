@@ -163,8 +163,7 @@ still requires an authoritative completed Task at the repository and
 application-service boundaries.
 
 The scoped `SessionFrameRepository` (scoped to `scope_key=str(session_id)`)
-remains authoritative for the session's current materialized frame, encapsulated
-inside `ChatSession`. The fresh-context provider reads its latest committed snapshot
+remains authoritative for the session's current materialized frame. The fresh-context provider reads its latest committed snapshot
 on every cognitive invocation and exact-copies all six current materialized member
 categories into immutable `PlannerContext`. Planner receives that context and
 returns a response, Human clarification request, self-contained transient Plan,
@@ -175,8 +174,8 @@ admit an exact authorized Plan and its embedded Tasks. Active Plan is
 explicit coordination state in `PlannerContext`, not SessionFrame research
 membership.
 Application owns no concrete repository-backed SessionFrame facade and delegates
-session operations to `ChatSession`. The active graph's transient state and the
-`ChatSession`-owned `ConversationHistory` (composed of `ConversationTurn`s and
+session operations to minimal runtime logic. The active graph's transient state and the
+Application-owned `ConversationHistory` (composed of `ConversationTurn`s and
 prunable `ConversationSegment`s) are both outside `PlannerContext`.
 
 The current value is not the canonical typed-reference membership FCO. It has

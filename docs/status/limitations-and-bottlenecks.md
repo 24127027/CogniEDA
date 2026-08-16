@@ -28,7 +28,7 @@ These are verified constraints of the bounded current implementation.
 
 - The Planner cognitive core, in-process LangGraph lifecycle, and deterministic
   Data Explorer-to-Evidence admission are **Implemented** at bounded library
-  surfaces. Application owns an active `ChatSession` containing `ConversationHistory`
+  surfaces. Application owns the stable session identity and `ConversationHistory`
   composed of `ConversationTurn`s and prunable `ConversationSegment`s.
   Planner performs one `plan_or_answer` invocation per graph turn
   with `PlannerToolDeps` and no execution dispatch. Graph state owns the exact
