@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from getpass import getpass
-
 from typing import Callable
 from uuid import UUID
 
@@ -12,8 +11,6 @@ from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
-from cognieda.schemas.artifacts import SessionFrame
-from cognieda.schemas.plan import Plan
 from cognieda.runtime.commands.types import CommandSuggestion
 from cognieda.runtime.commands import (
     CommandContext,
