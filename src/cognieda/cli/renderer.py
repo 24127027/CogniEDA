@@ -13,7 +13,6 @@ from rich.segment import ControlType
 from rich.text import Text
 
 from cognieda.runtime.events import (
-    HumanInputRequested,
     MessageProduced,
     PlanProposed,
 )
@@ -104,14 +103,22 @@ class Renderer:
                         title_align="left",
                     )
                 )
+            case MessageType.INPUT_REQUEST, MessageRole.ASSISTANT:
+                self.console.print(
+                    Panel(
+                        Text(str(message.content), style="dim"),
+                        border_style="grey50",
+                        box=box.ROUNDED,
+                        padding=(0, 1),
+                        title="[dim]Input Request[/dim]",
+                        title_align="left",
+                    )
+                )
                 
             case _:
                 self.console.print(str(message.content))
 
     def handle_message(self, event: MessageProduced) -> None:
-        self.render(event.message)
-
-    def handle_human_input(self, event: HumanInputRequested) -> None:
         self.render(event.message)
 
     def handle_plan(self, event: PlanProposed) -> None:

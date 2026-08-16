@@ -10,7 +10,7 @@ from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.event_bus import EventBus
-from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
+from cognieda.runtime.events import MessageProduced, PlanProposed
 from cognieda.runtime.commands.types import CommandSuggestion
 from cognieda.runtime.commands import (
     CommandContext,
@@ -130,9 +130,9 @@ class Application:
 
         if outcome.human_input_request is not None:
             self.event_bus.publish(
-                HumanInputRequested(
+                MessageProduced(
                     message=Message(
-                        type=MessageType.TEXT,
+                        type=MessageType.INPUT_REQUEST,
                         role=MessageRole.ASSISTANT,
                         content=outcome.human_input_request,
                     )

@@ -17,12 +17,7 @@ class MessageProduced(RuntimeEvent):
 @dataclass(frozen=True, slots=True)
 class PlanProposed(RuntimeEvent):
     plan: Plan
-
-
-@dataclass(frozen=True, slots=True)
-class HumanInputRequested(RuntimeEvent):
-    message: Message
-
+    
 
 @dataclass(frozen=True, slots=True)
 class ApplicationError(RuntimeEvent):

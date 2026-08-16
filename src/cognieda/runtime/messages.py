@@ -12,7 +12,7 @@ class MessageRole(str, Enum):  # noqa: UP042 - preserve the existing runtime con
 class MessageType(str, Enum):  # noqa: UP042 - preserve the existing runtime contract
     TEXT = "text"
     ERROR = "error"
-
+    INPUT_REQUEST = "input_request"
 
 @dataclass
 class Message:

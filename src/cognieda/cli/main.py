@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
+from cognieda.runtime.events import MessageProduced, PlanProposed
 from .prompt import Prompt
 from .renderer import Renderer
 
@@ -14,10 +14,6 @@ async def repl(app: Application, renderer: Renderer) -> None:
     app.event_bus.subscribe(
         MessageProduced,
         renderer.handle_message,
-    )
-    app.event_bus.subscribe(
-        HumanInputRequested,
-        renderer.handle_human_input,
     )
     app.event_bus.subscribe(
         PlanProposed,
