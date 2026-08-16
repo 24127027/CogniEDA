@@ -99,7 +99,7 @@ the final step.
 ## Semantic graph and total persistence
 
 The semantic Knowledge Graph is not the complete persistence model. It contains
-exactly:
+exactly four node types:
 
 ```text
 Objective
@@ -107,6 +107,13 @@ Hypothesis
 Evidence
 Discovery
 ```
+
+Connectivity between `Objective` and `Hypothesis` nodes is many-to-many (M:N) and
+represented by typed, immutable, non-FCO `ObjectiveHypothesisRelation` edge
+contracts (`FORMULATED_FOR` and `BEARS_ON`). These edges capture research-intent
+and relevance context without becoming part of `Hypothesis` scientific identity.
+Scientific validity remains grounded through the `Hypothesis -> Evidence -> Discovery`
+lineage.
 
 Other durable state remains outside that graph. This includes `DataProfile`,
 `Assumption`, `Task`, `SessionFrame`, planning and protocol records,

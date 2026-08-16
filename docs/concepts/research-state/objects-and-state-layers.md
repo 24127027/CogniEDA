@@ -26,7 +26,7 @@ No other record is an FCO. In particular, `Workspace`, `Question`,
 
 ## Semantic graph membership
 
-The semantic Knowledge Graph contains exactly:
+The semantic Knowledge Graph contains exactly four node types:
 
 ```text
 Objective
@@ -42,6 +42,20 @@ not a universal persistence graph. `DataProfile`, `Assumption`, `Task`, and
 planning constraints, workflow state, and session membership have different
 epistemic roles.
 
+Connectivity between `Objective` and `Hypothesis` in the semantic graph is
+many-to-many and represented by typed, immutable, non-FCO
+`ObjectiveHypothesisRelation` edge contracts:
+
+- `FORMULATED_FOR`: captures origin and research-intent provenance—the
+  Hypothesis was originally formalized in work pursuing the focal Objective.
+- `BEARS_ON`: captures semantic relevance of an existing Hypothesis to an
+  Objective beyond its initial formulation context.
+
+These relation edges represent research-intent and relevance semantics. They
+are external to the scientific identity of `Hypothesis` (which contains no
+Objective ownership fields) and do not determine scientific validity. Scientific
+lineage flows strictly through `Hypothesis -> Evidence -> Discovery`.
+
 ## Independent properties
 
 Several properties that are often collapsed must be evaluated separately:
@@ -55,9 +69,10 @@ Several properties that are often collapsed must be evaluated separately:
 | authority | Which boundary may propose, decide, admit, or transition it? | that the record is a scientific claim |
 
 `Evidence` is an immutable FCO and graph node. `DataProfile` is an immutable FCO
-outside the graph. `ExecutionRun` can be durable, transactionally important
-provenance without being an FCO. `GovernanceDecision` can be authoritative for
-admission without becoming scientific content.
+outside the graph. `ObjectiveHypothesisRelation` is an immutable edge contract,
+not an FCO or graph node. `ExecutionRun` can be durable, transactionally
+important provenance without being an FCO. `GovernanceDecision` can be
+authoritative for admission without becoming scientific content.
 
 ## Major non-FCO state families
 
@@ -69,6 +84,7 @@ eight first-class domain identities.
 | State family | Representative records | Responsibility |
 | --- | --- | --- |
 | planning and Plan lifecycle | `Plan`, `PlanDependency`, `TaskLifecycleRecord`, `TaskPresentationMetadata`, `PlannerConsultationRun` | exact Objective and Assumption basis, direct Task-ID membership, explicit dependencies, approval, and presentation; execution strategy is excluded |
+| semantic graph relations | `ObjectiveHypothesisRelation` | typed Knowledge Graph edge contracts (`FORMULATED_FOR`, `BEARS_ON`) connecting Objectives and Hypotheses without mutating scientific identity |
 | scientific investigation | `ScientificInvestigationRun`, feasibility record, `InvestigationPlan`, `InvestigationProtocol`, `ProtocolRevision`, `EvidenceRequest` | feasibility, operationalization, protocol evolution, and evidence obligations |
 | execution and provenance | `ExecutionRun`, `AnalysisFrame` | attempt history and exact data-view lineage |
 | evaluation and outcome | `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal` | protected inputs, typed endings, and proposed scientific content |

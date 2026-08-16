@@ -198,6 +198,13 @@ class HypothesisEvidenceOutcome(StrEnum):
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
 
 
+class ObjectiveHypothesisRelationType(StrEnum):
+    """Semantic relation types connecting an Objective to a Hypothesis."""
+
+    FORMULATED_FOR = "formulated_for"
+    BEARS_ON = "bears_on"
+
+
 class ExecutionRunStatus(StrEnum):
     """Durable lifecycle states for one execution attempt."""
 

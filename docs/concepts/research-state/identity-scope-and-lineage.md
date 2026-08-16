@@ -47,20 +47,66 @@ case, filesystem presence is not a DataProfile, and changed data requires a
 successor physical dataset plus a successor DataProfile rather than an
 in-place identity rewrite. See [Workspace ownership](../../development/workspace-layout.md).
 
-## Objective scope
+## Objective scope and Hypothesis independence
 
-Each Task and scientific investigation is governed within one Objective. One
-Objective may have many Tasks and many scientific investigations over time. A
-Workspace may contain multiple active Objectives, but a Task or Hypothesis does
-not acquire direct multi-Objective ownership.
+Each Task and Plan is coordinated within one focal Objective. One Objective may
+have many Tasks and many scientific investigations over time. A Workspace may
+contain multiple active Objectives.
 
-Objective boundaries also constrain context and reuse. Work from another
-Objective can motivate a proposal, but it does not automatically become
-authoritative state in the new Objective.
+However, a `Hypothesis` represents an empirical scientific proposition whose
+scientific identity and validity are independent of Objective ownership. A
+Hypothesis contains no `objective_id`, `objective_ids`, or equivalent Objective
+membership fields. Adding, removing, or changing a research Objective does not
+mutate an existing Hypothesis or manufacture duplicate Hypotheses for the same
+proposition.
+
+Connectivity between `Objective` and `Hypothesis` is many-to-many in the
+semantic Knowledge Graph and is represented by typed `ObjectiveHypothesisRelation`
+edge contracts:
+
+- `FORMULATED_FOR`: captures origin and research-intent provenance (the
+  Hypothesis was originally formalized in work pursuing the focal Objective).
+- `BEARS_ON`: captures semantic relevance of an existing Hypothesis to an
+  additional Objective beyond its initial formulation context.
+
+For a single Objective-Hypothesis pair, `FORMULATED_FOR` already implies
+relevance; no duplicate `BEARS_ON` edge is required for the same pair.
+
+Objective relevance is research-intent/context semantics. It must not:
+- alter Hypothesis scientific identity;
+- alter Evidence or Discovery validity;
+- imply that an Objective scientifically supports a Hypothesis;
+- authorize unvetted cross-Objective Evidence reuse; or
+- act as an automatic LLM similarity edge.
 
 ## High-level scientific lineage
 
-The foundational lineage is:
+The target conceptual graph separates scientific lineage from research-intent
+relevance:
+
+```text
+                  Objective O1
+                      ^
+                      | FORMULATED_FOR
+                      |
+                  Hypothesis H
+                      |
+          +-----------+-----------+
+          |                       |
+       Evidence                Discovery
+```
+
+and for additional Objectives:
+
+```text
+                  Objective O2
+                      ^
+                      | BEARS_ON
+                      |
+                  Hypothesis H
+```
+
+The foundational lineage rules are:
 
 ```text
 Objective

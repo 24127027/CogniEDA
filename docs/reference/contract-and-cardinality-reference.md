@@ -119,6 +119,7 @@ rejected.
 
 | Source | Target | Canonical cardinality | Consequence |
 | --- | --- | --- | --- |
+| Objective | Hypothesis | many-to-many (M:N) | Connected via typed `ObjectiveHypothesisRelation` edge contracts (`FORMULATED_FOR`, `BEARS_ON`). One Objective connects to zero or many Hypotheses; one Hypothesis connects to one origin formulation context (`FORMULATED_FOR`) and zero or many additional relevant Objectives (`BEARS_ON`). Objective relevance does not alter Hypothesis scientific identity or validity. |
 | eligible feasible leaf `SCIENTIFIC` Task | Hypothesis | exactly one | infeasible or otherwise ineligible Tasks have none; feasible work cannot fork into competing Hypotheses |
 | parent Task | Hypothesis | zero | parent Tasks cannot enter scientific commitment |
 | parent Task | Discovery | zero | parent summaries are GeneratedViews, not Discoveries |
@@ -140,10 +141,10 @@ canonicalization and never edits admitted Evidence in place.
 
 | Role | Must not do |
 | --- | --- |
-| Planner | author Hypothesis, scientific contract, protocol, obligation, decision rule, or protected evaluation |
+| Planner | author Hypothesis, scientific contract, protocol, obligation, decision rule, or protected evaluation; fabricate `FORMULATED_FOR` origin relations |
 | Hypothesis Analyst | access datasets, admit state, self-govern, or bypass Data Explorer |
 | Data Explorer | evaluate Hypothesis, author DiscoveryProposal, govern, or admit Evidence |
-| Graph Miner | mutate state, perform data execution, admit cross-Objective relations, or create Evidence/Discovery |
+| Graph Miner | mutate state, perform data execution, persist or admit `ObjectiveHypothesisRelation` edges, admit cross-Objective relations, or create Evidence/Discovery |
 | governance | rewrite scientific content or perform durable admission |
 | application authority | invent scientific meaning or governance judgment |
 
