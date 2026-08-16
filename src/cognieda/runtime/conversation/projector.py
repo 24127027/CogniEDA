@@ -21,7 +21,7 @@ class ConversationProjector:
         self._current_messages: list[ModelMessage] = []
         self._pending_segments: list[ConversationSegment] = []
 
-    def handle_model_message(
+    def handle(
         self,
         event: ModelMessageProduced,
     ) -> None:
