@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from getpass import getpass
 from typing import Callable
 from uuid import UUID
 
@@ -10,6 +11,12 @@ from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
+from cognieda.runtime.commands import (
+    CommandContext,
+    CommandHandler,
+    CommandParser,
+    create_command_registry,
+)
 
 from .messages import Message, MessageRole, MessageType
 from .workspace import MissingModelCredentialError, Workspace
@@ -34,6 +41,18 @@ class Application:
         self.conversation_history = conversation_history
         self.planner_context_factory = planner_context_factory
 
+        self.command_handler = CommandHandler(
+            parser=CommandParser(),
+            registry=create_command_registry(),
+            context=CommandContext(
+                workspace=self.workspace,
+                agent_factory=self.agent_factory,
+                planner=self.planner_agent,
+                reload_runtime=self._reload_runtime,
+                prompt_secret=getpass,
+            ),
+        )
+
     async def submit_message(self, message: str) -> None:
         self.event_bus.publish(
             MessageProduced(
@@ -46,8 +65,10 @@ class Application:
         )
 
         if message.startswith("/"):
-            command_result = await self._handle_command(message)
-            self.event_bus.publish(MessageProduced(message=command_result))
+            command_result = await self.command_handler.handle(message)
+            self.event_bus.publish(
+                MessageProduced(message=command_result)
+            )
             return
 
         try:
@@ -97,138 +118,6 @@ class Application:
                     )
                 )
             )
-
-    # TODO: Move command handling to a separate class or module for better separation of concerns
-    async def _handle_command(self, command: str) -> Message:
-        parts = command.split()
-
-        match parts:
-            #
-            # Skills
-            #
-            case ["/skill", "add", name, directory]:
-                self.workspace.add_skill(name, directory)
-
-                await self._reload_runtime(
-                    reload_tooling=True,
-                    recreate_agent=True,
-                )
-
-                return self._text(f"Added skill '{name}'.")
-
-            case ["/skill", "rm", name]:
-                self.workspace.remove_skill(name)
-
-                await self._reload_runtime(
-                    reload_tooling=True,
-                    recreate_agent=True,
-                )
-
-                return self._text(f"Removed skill '{name}'.")
-
-            case ["/skill", "list"]:
-                skills = self.workspace.load_skills_config()
-
-                if not skills:
-                    return self._text("No skills registered.")
-
-                return self._text(
-                    "\n".join(f"{name}: {cfg['directories']}" for name, cfg in skills.items())
-                )
-
-            case ["/skill", "use", worker, skill]:
-                self.workspace.add_worker_skill(worker, skill)
-
-                await self._reload_runtime(
-                    reload_tooling=True,
-                    recreate_agent=True,
-                )
-
-                return self._text(f"Assigned '{skill}' to '{worker}'.")
-
-            case ["/skill", "drop", worker, skill]:
-                self.workspace.remove_worker_skill(worker, skill)
-
-                await self._reload_runtime(
-                    reload_tooling=True,
-                    recreate_agent=True,
-                )
-
-                return self._text(f"Removed '{skill}' from '{worker}'.")
-
-            #
-            # Providers
-            #
-            case ["/provider"]:
-                profile = self.workspace.project_config.default_provider
-
-                try:
-                    self.workspace.project_config.validate()
-                except ValueError as e:
-                    return self._text(str(e))
-                provider = self.workspace.project_config.providers[profile]
-
-                configured = "yes" if provider.api_key_configured() else "no"
-
-                return self._text(
-                    f"""Current provider : {profile}
-        Model            : {provider.model}
-        API key          : {configured}"""
-                )
-
-            case ["/provider", "list"]:
-                return self._text("\n".join(self.workspace.project_config.providers.keys()))
-
-            case ["/provider", "use", profile]:
-                self.workspace.use_provider(profile)
-
-                await self._reload_runtime(
-                    recreate_agent=True,
-                )
-
-                return self._text(f"Using provider '{profile}'.")
-
-            case ["/provider", "model", profile, model]:
-                self.workspace.set_provider_model(
-                    profile,
-                    model,
-                )
-
-                await self._reload_runtime(
-                    recreate_agent=True,
-                )
-
-                return self._text(f"Updated '{profile}' model to '{model}'.")
-            # TODO:
-            # Prompting for secrets belongs to the CLI/UI layer.
-            # Application should receive the API key as an argument rather than
-            # calling input() directly.
-            case ["/provider", "key", profile]:
-                api_key = input(f"{profile} API key: ").strip()
-
-                self.workspace.set_provider_api_key(
-                    profile,
-                    api_key,
-                )
-
-                await self._reload_runtime(
-                    recreate_agent=True,
-                )
-
-                return self._text(f"Stored API key for '{profile}'.")
-
-            #
-            # Planner
-            #
-            case ["/reload"]:
-                await self._reload_runtime(
-                    reload_instruction=True,
-                )
-
-                return self._text("Planner instructions reloaded.")
-
-            case _:
-                return self._text(f"Unknown command: '{command}'.")
 
     def _text(self, content: str) -> Message:
         return Message(
