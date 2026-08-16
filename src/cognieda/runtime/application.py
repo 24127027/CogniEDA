@@ -11,12 +11,14 @@ from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.conversation import ConversationHistory
 from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
+from cognieda.runtime.commands.types import CommandSuggestion
 from cognieda.runtime.commands import (
     CommandContext,
     CommandHandler,
     CommandParser,
     create_command_registry,
 )
+
 
 from .messages import Message, MessageRole, MessageType
 from .workspace import MissingModelCredentialError, Workspace
@@ -52,6 +54,24 @@ class Application:
                 prompt_secret=getpass,
             ),
         )
+
+        self.command_handler = CommandHandler(
+            parser=CommandParser(),
+            registry=create_command_registry(),
+            context=CommandContext(
+                workspace=self.workspace,
+                agent_factory=self.agent_factory,
+                planner=self.planner_agent,
+                reload_runtime=self._reload_runtime,
+                prompt_secret=getpass,
+            ),
+        )
+
+    def suggest_commands(
+        self,
+        prefix: str,
+    ) -> tuple[CommandSuggestion, ...]:
+        return self.command_handler.suggest(prefix)
 
     async def submit_message(self, message: str) -> None:
         self.event_bus.publish(

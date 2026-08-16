@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from .types import CommandSuggestion
 from .base import Command, ResolvedCommand
 
 
@@ -69,11 +70,20 @@ class CommandRegistry:
     def commands(self) -> tuple[Command, ...]:
         return tuple(self._commands.values())
 
-    def suggest(self, prefix: str) -> tuple[Command, ...]:
-        normalized = prefix.removeprefix("/")
+    def suggest(
+        self,
+        prefix: str,
+    ) -> tuple[CommandSuggestion, ...]:
+        normalized = prefix.strip()
+
+        if normalized.startswith("/"):
+            normalized = normalized[1:]
 
         return tuple(
-            command
-            for name, command in self._commands.items()
-            if name.startswith(normalized)
+            CommandSuggestion(
+                name=command.name,
+                description=command.description,
+            )
+            for command in self._commands.values()
+            if command.name.startswith(normalized)
         )

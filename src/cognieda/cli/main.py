@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from cognieda.cli.renderer import Renderer
 from cognieda.runtime.events import HumanInputRequested, MessageProduced, PlanProposed
-from cognieda.runtime.messages import Message, MessageRole, MessageType
+from .prompt import Prompt
+from .renderer import Renderer
 
 if TYPE_CHECKING:
     from cognieda.runtime import Application
@@ -26,13 +26,18 @@ async def repl(app: Application, renderer: Renderer) -> None:
 
     renderer.render_session_start(app.workspace.root)
 
+    prompt = Prompt(app)
+
     while True:
-        text = renderer.read_input()
+        try:
+            text = (await prompt.read()).strip()
+        except (EOFError, KeyboardInterrupt):
+            break
 
         if text in {"exit", "quit"}:
             break
 
         if not text:
             continue
-        
+
         await app.submit_message(text)

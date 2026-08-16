@@ -93,6 +93,18 @@ class Renderer:
                     )
                     self.console.print(model_text)
 
+            case MessageType.TEXT, MessageRole.SYSTEM:
+                self.console.print(
+                    Panel(
+                        Text(str(message.content), style="dim"),
+                        border_style="grey50",
+                        box=box.ROUNDED,
+                        padding=(0, 1),
+                        title="[dim]System[/dim]",
+                        title_align="left",
+                    )
+                )
+                
             case _:
                 self.console.print(str(message.content))
 

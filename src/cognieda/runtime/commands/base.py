@@ -32,7 +32,8 @@ class CommandContext:
 
 class Command(Protocol):
     name: str
-
+    description: str
+    
     async def execute(
         self,
         command: ResolvedCommand,

@@ -8,13 +8,14 @@ from .base import CommandContext, ResolvedCommand
 def text(content: str) -> Message:
     return Message(
         type=MessageType.TEXT,
-        role=MessageRole.ASSISTANT,
+        role=MessageRole.SYSTEM,
         content=content,
     )
 
 
 class SkillAddCommand:
     name = "skill.add"
+    description = "Add a skill to the workspace."
 
     async def execute(
         self,
@@ -22,7 +23,7 @@ class SkillAddCommand:
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 2:
-            return text("Usage: /skill add <name> <directory>")
+            return text("Usage: /skill.add <name> <directory>")
 
         name, directory = command.args
 
@@ -38,6 +39,7 @@ class SkillAddCommand:
 
 class SkillRemoveCommand:
     name = "skill.rm"
+    description = "Remove a skill from the workspace."
 
     async def execute(
         self,
@@ -45,7 +47,7 @@ class SkillRemoveCommand:
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 1:
-            return text("Usage: /skill rm <name>")
+            return text("Usage: /skill.rm <name>")
 
         name = command.args[0]
 
@@ -61,6 +63,7 @@ class SkillRemoveCommand:
 
 class SkillListCommand:
     name = "skill.list"
+    description = "List all registered skills."
 
     async def execute(
         self,
@@ -68,7 +71,7 @@ class SkillListCommand:
         context: CommandContext,
     ) -> Message:
         if command.args:
-            return text("Usage: /skill list")
+            return text("Usage: /skill.list")
 
         skills = context.workspace.load_skills_config()
 
@@ -85,6 +88,7 @@ class SkillListCommand:
 
 class SkillUseCommand:
     name = "skill.use"
+    description = "Assign a skill to a worker."
 
     async def execute(
         self,
@@ -92,7 +96,7 @@ class SkillUseCommand:
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 2:
-            return text("Usage: /skill use <worker> <skill>")
+            return text("Usage: /skill.use <worker> <skill>")
 
         worker, skill = command.args
 
@@ -108,6 +112,7 @@ class SkillUseCommand:
 
 class SkillDropCommand:
     name = "skill.drop"
+    description = "Remove a skill from a worker."
 
     async def execute(
         self,
@@ -115,7 +120,7 @@ class SkillDropCommand:
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 2:
-            return text("Usage: /skill drop <worker> <skill>")
+            return text("Usage: /skill.drop <worker> <skill>")
 
         worker, skill = command.args
 
@@ -131,6 +136,7 @@ class SkillDropCommand:
 
 class ProviderStatusCommand:
     name = "provider"
+    description = "Display the status of the current provider."
 
     async def execute(
         self,
@@ -160,6 +166,7 @@ API key          : {configured}"""
 
 class ProviderListCommand:
     name = "provider.list"
+    description = "List all configured providers."
 
     async def execute(
         self,
@@ -167,7 +174,7 @@ class ProviderListCommand:
         context: CommandContext,
     ) -> Message:
         if command.args:
-            return text("Usage: /provider list")
+            return text("Usage: /provider.list")
 
         return text(
             "\n".join(
@@ -178,6 +185,7 @@ class ProviderListCommand:
 
 class ProviderUseCommand:
     name = "provider.use"
+    description = "Switch to a different provider."
 
     async def execute(
         self,
@@ -185,7 +193,7 @@ class ProviderUseCommand:
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 1:
-            return text("Usage: /provider use <profile>")
+            return text("Usage: /provider.use <profile>")
 
         profile = command.args[0]
 
@@ -200,6 +208,7 @@ class ProviderUseCommand:
 
 class ProviderModelCommand:
     name = "provider.model"
+    description = "Set the model for a provider."
 
     async def execute(
         self,
@@ -207,7 +216,7 @@ class ProviderModelCommand:
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 2:
-            return text("Usage: /provider model <profile> <model>")
+            return text("Usage: /provider.model <profile> <model>")
 
         profile, model = command.args
 
@@ -227,6 +236,7 @@ class ProviderModelCommand:
 
 class ProviderKeyCommand:
     name = "provider.key"
+    description = "Set the API key for a provider."
 
     async def execute(
         self,
@@ -234,7 +244,7 @@ class ProviderKeyCommand:
         context: CommandContext,
     ) -> Message:
         if len(command.args) != 1:
-            return text("Usage: /provider key <profile>")
+            return text("Usage: /provider.key <profile>")
 
         profile = command.args[0]
 
@@ -258,6 +268,7 @@ class ProviderKeyCommand:
 
 class ReloadCommand:
     name = "reload"
+    description = "Reload the planner instructions."
 
     async def execute(
         self,
