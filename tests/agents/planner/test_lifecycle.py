@@ -36,7 +36,7 @@ from cognieda.infrastructure.persistence.repositories import (
     SessionFrameRepository,
     TaskRepository,
 )
-from cognieda.runtime.conversation import (
+from cognieda.runtime.conversation.conversation import (
     ConversationHistory,
     ConversationSegment,
 )

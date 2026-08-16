@@ -9,7 +9,7 @@ import cognieda.runtime.bootstrap as bootstrap_module
 from cognieda.agents.planner.dependencies import PlannerToolDeps
 from cognieda.application.services import PlanAdmissionService
 from cognieda.runtime.application import Application
-from cognieda.runtime.conversation import ConversationHistory
+from cognieda.runtime.conversation.conversation import ConversationHistory
 
 
 def test_bootstrap_wires_chat_session_to_application(
