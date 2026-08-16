@@ -257,24 +257,31 @@ overwrite the existing snapshot, while different IDs with the same content
 fingerprint remain distinct. The repository is append-only and exposes no
 update or delete surface.
 
-`PlanAdmissionService` accepts an exact candidate Plan and exact Task bundle at
-an explicit application-authority boundary. It validates membership, identity,
+`PlanAdmissionService.admit(plan)` accepts one self-contained exact candidate
+Plan at an explicit application-authority boundary. It obtains exact Task
+definitions from `plan.tasks` and validates membership, identity,
 Objective and Assumption exactness, persists legal new Objective and Task
 records, persists the immutable Plan, and writes one objective-scoped active
 pointer in a single transaction. Any failure rolls the complete transaction
 back. This service does not interpret Human text.
 
-The current runtime does not retain a Planner candidate or call admission from
-a later conversation turn. Candidate retention, conversational Human
-authorization, and LangGraph interrupt/resume are **Deferred**. Native model
+The in-process Planner LangGraph retains one self-contained exact candidate Plan
+outside authoritative research state. A later natural-language Human turn is
+interpreted by Planner; only a typed `continue_execution` result with that
+candidate pending calls `PlanAdmissionService`. Admission success clears the
+candidate, while failure rolls back and retains it for correction. Native model
 history remains non-authoritative interaction state outside `PlannerContext`.
 Application materializes authoritative research state and the objective-scoped
-active Plan fresh for each invocation; neither conversation nor runtime events
-reconstruct, admit, or activate that state. `PlanProposed` is a transient
-presentation event and does not invoke `PlanAdmissionService`.
+active Plan fresh into `PlannerContext` for each Human turn and passes it into
+`Planner.handle_message()`. Planner calls the deterministic application-authority
+admission service only from its admission node; Planner cognition does not persist
+directly. Application maps Planner lifecycle outcomes to runtime events, which do
+not reconstruct, admit, or activate state; `PlanProposed` remains a presentation
+event rather than an authority boundary.
 
-The complete target boundary is not implemented. Canonical Task DAG execution,
-candidate lifecycle and review recovery, role-native result inbox processing,
+
+The complete target boundary is not implemented. Durable candidate and review
+recovery, canonical Task DAG execution, role-native result inbox processing,
 complete replay coordination, scientific Evidence admission from
 `EvidenceRequest`, governance
 workflow, Discovery admission from exact governed proposals, and end-to-end

@@ -161,7 +161,8 @@ user request
 
 Planning-support observations are not Evidence. `Plan` represents the
 full approved Task DAG. A Task is an independently governed semantic work
-unit. Canonical `task_ids` directly and exclusively represent membership;
+unit. Canonical full `tasks` directly and exclusively represent writable
+membership; `task_ids` is a derived identity view;
 dependencies remain explicit DAG edges. Related workflow-lifecycle state owns
 approval and activation metadata. Capability, provider, specialist, tool, and
 other execution-routing choices are not Plan content.

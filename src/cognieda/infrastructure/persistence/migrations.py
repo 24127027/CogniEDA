@@ -55,3 +55,28 @@ def upgrade_execution_attempt_schema(engine: Engine) -> None:
 
     ExecutionApprovalRecord.__table__.create(engine, checkfirst=True)
     ExecutionOutboxRecord.__table__.create(engine, checkfirst=True)
+
+
+def upgrade_session_frame_scope_schema(engine: Engine) -> None:
+    """Give legacy SQLite SessionFrame snapshots an explicit default scope."""
+
+    if engine.dialect.name != "sqlite":
+        return
+    if "session_frames" not in set(inspect(engine).get_table_names()):
+        return
+    existing = {column["name"] for column in inspect(engine).get_columns("session_frames")}
+    if "scope_key" in existing:
+        return
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "ALTER TABLE session_frames ADD COLUMN scope_key "
+                "TEXT NOT NULL DEFAULT 'default'"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_session_frames_scope_key "
+                "ON session_frames (scope_key)"
+            )
+        )

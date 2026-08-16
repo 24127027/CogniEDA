@@ -4,11 +4,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import toml
-
 from dotenv import set_key
 
 from cognieda.application.ports.llm import ModelConfig, ProviderType
-from cognieda.application.ports.llm import ProviderType
+
 
 @dataclass(slots=True)
 class ProviderProfile:

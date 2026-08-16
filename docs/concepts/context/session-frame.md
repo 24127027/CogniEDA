@@ -126,6 +126,14 @@ understand a follow-up or preserve the native context of a model exchange. It
 does not become SessionFrame membership automatically, and SessionFrame does
 not store raw chat as research authority.
 
+`ConversationHistory` is the typed non-authoritative conversation component.
+The active Planner graph currently checkpoints native messages directly for
+interrupt/resume and PydanticAI history; it does not synchronize them into a
+durable `ConversationHistory`. A future `SessionMemory` is intended to compose
+`SessionFrame` and `ConversationHistory` without collapsing their authority
+boundaries. That unified aggregate and durable conversation persistence are
+**Deferred**.
+
 After restart, authoritative continuity must come from durable typed research
 state and its lifecycle. Replaying conversation may aid presentation, but it
 cannot reconstruct approvals, admissions, or scientific support that were not
@@ -154,24 +162,28 @@ not require the referenced Task as membership; supported Evidence admission
 still requires an authoritative completed Task at the repository and
 application-service boundaries.
 
-The in-process application exact-copies all six current materialized member
+The scoped `SessionFrameRepository` (scoped to `scope_key=str(session_id)`)
+remains authoritative for the session's current materialized frame. The fresh-context provider reads its latest committed snapshot
+on every cognitive invocation and exact-copies all six current materialized member
 categories into immutable `PlannerContext`. Planner receives that context and
-returns a response, Human clarification request, transient Plan plus exact Task
-bundle, or continuation signal; it never receives, mutates, or returns
-SessionFrame. Application materializes the exact active Plan for the frame's
-current Objective into `PlannerContext`; the independent Plan admission service
-can atomically admit an exact authorized Plan/Task bundle. Active Plan is
+returns a response, Human clarification request, self-contained transient Plan,
+or continuation signal; it never receives, mutates, or returns SessionFrame.
+The provider materializes the exact active Plan for the frame's current Objective
+into `PlannerContext`; the independent Plan admission service can atomically
+admit an exact authorized Plan and its embedded Tasks. Active Plan is
 explicit coordination state in `PlannerContext`, not SessionFrame research
 membership.
-Conversation history remains a separate non-authoritative native
-message-history input and is not a `PlannerContext` field.
+Application owns no concrete repository-backed SessionFrame facade and delegates
+session operations to minimal runtime logic. The active graph's transient state and the
+Application-owned `ConversationHistory` (composed of `ConversationTurn`s and
+prunable `ConversationSegment`s) are both outside `PlannerContext`.
 
 The current value is not the canonical typed-reference membership FCO. It has
 no frame identity, Objective-bound session identity, reference manifest,
-active Objective/DataProfile selectors distinct from materialized objects,
-successor lineage, or runtime reload authority. The in-process application
-retains it only for the current process. Canonical durable session continuity
-and restart reconstruction remain **Deferred**. Current source does not define
+active Objective/DataProfile selectors distinct from materialized objects, or
+successor lineage. Its bounded materialized snapshots are workspace-scoped and
+restart-readable on SQLite, but canonical typed-reference session continuity
+and full runtime reconstruction remain **Deferred**. Current source does not define
 how an existing Objective-scoped frame succeeds to a newly approved different
 Objective while preserving or dropping prior Hypotheses, Evidence, and
 Discoveries. It also does not define a coordination-specific projection for

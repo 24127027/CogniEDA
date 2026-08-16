@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
 from cognieda.runtime.messages import Message
-from cognieda.schemas.artifacts import Task
 from cognieda.schemas.plan import Plan
 
 
@@ -18,7 +17,6 @@ class MessageProduced(RuntimeEvent):
 @dataclass(frozen=True, slots=True)
 class PlanProposed(RuntimeEvent):
     plan: Plan
-    tasks: tuple[Task, ...]
 
 
 @dataclass(frozen=True, slots=True)

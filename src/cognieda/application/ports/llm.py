@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any, Protocol, Literal
 from pathlib import Path
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel
 from pydantic_ai import Agent
@@ -30,13 +30,13 @@ class AgentFactoryPort(Protocol):
         deps_type: type[DepsT],
         builtin_tools: Sequence[AgentTool],
     ) -> Agent[DepsT]: ...
+
     def reload_tooling(self) -> None: ...
-    
-# TODO: Consider move this port to somewhere more appropriate, replace or remove it
-# This port is still a questionable design choice
-# whether the AgentFactory should consume a ToolingConfig 
-# or just the paths to the tooling configuration files. 
-# These configuration files are not changed at runtime, so it may be simpler to just pass the paths directly.
+
+
+# TODO: Consider moving this port somewhere more appropriate, replacing or removing it.
+# This port is still a question of whether AgentFactory should consume ToolingConfig
+# or just the paths to the tooling configuration files directly.
 class ToolingConfig(Protocol):
     @property
     def agents_config_path(self) -> Path: ...
