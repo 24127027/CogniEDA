@@ -50,7 +50,6 @@ remain **Deferred** or **Unsupported**.
 | Canonical SessionFrame and durable session state | **Deferred** | The MVP-v2 target is a typed-reference research-session membership FCO with active Objective/DataProfile selectors, governed successor state, Objective-bound session ownership, deterministic context resolution, and restart reconstruction. The current materialized M1-A value does not implement that contract. |
 | Canonical planning and scientific runtime | **Partially implemented** | Plan domain, pure validation, transient candidate authoring, in-process Human review, typed authorization, atomic exact-bundle admission, and objective-scoped active selection are composed. Task DAG selection/execution and successor/replanning orchestration remain absent, and Plan binds no exact DataProfile. The scientific runtime, canonical Evidence admission, protected evaluation, governance, Discovery admission, and validity propagation remain unsupported workflows required by MVP-v2. |
 | Plan lifecycle and replanning | **Partially implemented** | Candidate retain/replace/discard, natural-language authorization, interrupt/resume, atomic activation, and objective-scoped active selection are implemented; successor activation does not mutate the old Plan. Plan completion, execution interruption, successor-authoring policy, actual-cause taxonomy, and durable recovery remain **Deferred**. Scientific stopping remains InvestigationProtocol-owned, and bounded execution stopping remains work-order-owned. |
-| Semantic graph relations | **Implemented** | The minimal typed domain contract `ObjectiveHypothesisRelation` (`objective_id`, `hypothesis_id`, `relation_type`) and `ObjectiveHypothesisRelationType` (`FORMULATED_FOR`, `BEARS_ON`) define immutable non-FCO Knowledge Graph edge contracts connecting Objectives and Hypotheses without mutating Hypothesis scientific identity. Relation persistence, admission runtime, and Graph Miner writes remain **Deferred**. |
 | Semantic graph and Graph Miner | **Deferred** | Objective, Hypothesis, Evidence, and Discovery remain the exact target semantic graph membership, but no supported semantic projection or read-only Graph Miner runtime is composed. The Graph Miner package is an unregistered scaffold that raises `NotImplementedError`. |
 | Runtime entry boundary | **Partially implemented** | Runtime bootstrap composes SQLite metadata and session access, a workspace-scoped authoritative `SessionFrameRepository`, delegation infrastructure, a fully wired Planner, model factory, EventBus, and workspace-local agent tooling. The repository is queried by the context factory closure injected into Application, not directly by Planner; Planner owns only its LangGraph, trusted process-local typed serializer, checkpointer/thread UUID, active native history, and candidate lifecycle. `Application.submit_message()` materializes `PlannerContext`, delegates normal text and context to `Planner.handle_message()`, and maps typed turn outcomes to presentation events. `PlanProposed` carries only the self-contained Plan; EventBus stores no research state or candidate authority. Typed authorization invokes application-owned admission through the deterministic graph node; `continue_execution` for an already-active Plan returns a visible no-execution result and never dispatches. Persisted graph state is not recovered and no Plan execution loop exists, so this is not a supported product CLI. |
 
@@ -60,8 +59,7 @@ remain **Deferred** or **Unsupported**.
 ## Active M1-A contracts
 
 The bounded typed-state surface is below. Task is coordination/work identity;
-the SessionFrame line is the materialized research-state projection; the
-ObjectiveHypothesisRelation line is the typed semantic graph edge contract:
+the SessionFrame line is the materialized research-state projection:
 
 ```text
 Objective(objective_id, text)
@@ -71,7 +69,6 @@ DataProfile(data_profile_id, row_count, column_count, columns)
 Hypothesis(hypothesis_id, task_id, profile_id, statement, scope, ...)
 Evidence(evidence_id, task_id, data_profile_id, content, provenance, artifact_refs)
 Discovery(discovery_id, hypothesis_id, evidence_ids, claim, validity_basis, ...)
-ObjectiveHypothesisRelation(objective_id, hypothesis_id, relation_type)
 SessionFrame(objective, assumptions, hypotheses, evidences, discoveries, data_profile)
 ```
 

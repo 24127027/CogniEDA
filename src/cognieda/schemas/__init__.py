@@ -62,7 +62,6 @@ from cognieda.schemas.enums import (
     LogicalDtype,
     MemorySourceType,
     MemoryStatus,
-    ObjectiveHypothesisRelationType,
     ObjectiveStatus,
     PlannerNodeName,
     PlannerOperationApprovalState,
@@ -83,7 +82,6 @@ from cognieda.schemas.provenance import (
     ExecutionRun,
     ObjectiveRevision,
 )
-from cognieda.schemas.relations import ObjectiveHypothesisRelation
 
 __all__ = [
     "AnalysisFrame",
@@ -135,8 +133,6 @@ __all__ = [
     "MethodParameter",
     "NumericColumnSummary",
     "Objective",
-    "ObjectiveHypothesisRelation",
-    "ObjectiveHypothesisRelationType",
     "ObjectiveRevision",
     "ObjectiveStatus",
     "PlannerCommitResult",

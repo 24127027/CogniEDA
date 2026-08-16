@@ -108,12 +108,12 @@ Evidence
 Discovery
 ```
 
-Connectivity between `Objective` and `Hypothesis` nodes is many-to-many (M:N) and
-represented by typed, immutable, non-FCO `ObjectiveHypothesisRelation` edge
-contracts (`FORMULATED_FOR` and `BEARS_ON`). These edges capture research-intent
-and relevance context without becoming part of `Hypothesis` scientific identity.
-Scientific validity remains grounded through the `Hypothesis -> Evidence -> Discovery`
-lineage.
+In the future semantic Knowledge Graph, one Objective may associate with
+multiple Hypotheses and one Hypothesis may be relevant to multiple Objectives.
+Hypothesis scientific identity remains Objective-independent, and scientific
+validity remains grounded through the `Hypothesis -> Evidence -> Discovery`
+lineage. Exact Objective-Hypothesis relation types, edge representation,
+persistence, and admission remain deferred until semantic graph implementation.
 
 Other durable state remains outside that graph. This includes `DataProfile`,
 `Assumption`, `Task`, `SessionFrame`, planning and protocol records,

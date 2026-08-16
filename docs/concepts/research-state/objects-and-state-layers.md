@@ -42,36 +42,46 @@ not a universal persistence graph. `DataProfile`, `Assumption`, `Task`, and
 planning constraints, workflow state, and session membership have different
 epistemic roles.
 
-Connectivity between `Objective` and `Hypothesis` in the semantic graph is
-many-to-many and represented by typed, immutable, non-FCO
-`ObjectiveHypothesisRelation` edge contracts:
-
-- `FORMULATED_FOR`: captures origin and research-intent provenance—the
-  Hypothesis was originally formalized in work pursuing the focal Objective.
-- `BEARS_ON`: captures semantic relevance of an existing Hypothesis to an
-  Objective beyond its initial formulation context.
-
-These relation edges represent research-intent and relevance semantics. They
-are external to the scientific identity of `Hypothesis` (which contains no
-Objective ownership fields) and do not determine scientific validity. Scientific
-lineage flows strictly through `Hypothesis -> Evidence -> Discovery`.
+In the future semantic Knowledge Graph, one Objective may associate with
+multiple Hypotheses and one Hypothesis may be relevant to multiple Objectives.
+Hypothesis scientific identity remains Objective-independent (containing no
+`objective_id` or `objective_ids` fields), and scientific validity flows
+strictly through `Hypothesis -> Evidence -> Discovery`. Exact
+Objective-Hypothesis relation types, edge representation, persistence,
+admission, and governance remain deferred until semantic graph implementation.
 
 ## Independent properties
 
-Several properties that are often collapsed must be evaluated separately:
+The five core properties are independent:
 
-| Property | Question it answers | What it does not imply |
-| --- | --- | --- |
-| FCO status | Does this domain concept require durable first-class identity? | graph membership or scientific authority |
-| semantic graph membership | Is this an epistemic research node in the canonical graph? | that all related state belongs in the graph |
-| durability | Must the record survive sessions and restarts? | FCO status |
-| immutability | May admitted content be rewritten? | graph membership |
-| authority | Which boundary may propose, decide, admit, or transition it? | that the record is a scientific claim |
+- **FCO status**: durable domain identity with first-class research-state role.
+- **Semantic graph membership**: epistemic node (`Objective`, `Hypothesis`,
+  `Evidence`, `Discovery`).
+- **Durability**: persisted beyond process lifecycle.
+- **Immutability**: payload cannot be rewritten in place.
+- **Authority**: the role, component, or policy authorized to create or mutate
+  the record.
 
-`Evidence` is an immutable FCO and graph node. `DataProfile` is an immutable FCO
-outside the graph. `ObjectiveHypothesisRelation` is an immutable edge contract,
-not an FCO or graph node. `ExecutionRun` can be durable, transactionally
-important provenance without being an FCO. `GovernanceDecision` can be
+| Object or record | FCO? | In semantic graph? | Durable? | Immutable payload? | Authority |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `Objective` | yes | yes | yes | yes | Planner coordinates; application authority admits |
+| `DataProfile` | yes | no | yes | yes | application authority admits |
+| `Assumption` | yes | no | yes | yes | Planner coordinates; application authority admits |
+| `Task` | yes | no | yes | status mutable; identity immutable | Planner proposes; application authority commits |
+| `Hypothesis` | yes | yes | yes | yes | Hypothesis Analyst authors; application authority admits |
+| `Evidence` | yes | yes | yes | yes | application authority admits |
+| `Discovery` | yes | yes | yes | yes | governance authorizes; application authority admits |
+| `SessionFrame` | yes | no | yes | active selectors mutable; history immutable | Planner coordinates; application authority persists |
+| `Plan` | no | no | yes | yes | Planner proposes; human approves; application authority commits |
+| `AnalysisFrame` | no | no | yes | yes | Data Explorer produces; application authority records |
+| `ExecutionRun` | no | no | yes | attempt lifecycle mutable | application authority records |
+| `DiscoveryProposal` | no | no | yes | yes | Hypothesis Analyst authors |
+| `GovernanceDecision` | no | no | yes | yes | governance authorizes |
+| `GeneratedView` | no | no | yes | regenerable | Planner coordinates |
+
+An object may be an FCO without being in the semantic graph (`DataProfile`,
+`Assumption`, `Task`, `SessionFrame`). An object may be in the semantic graph
+without being user-editable (`Evidence`, `Discovery`). A record may be
 authoritative for admission without becoming scientific content.
 
 ## Major non-FCO state families
@@ -84,7 +94,6 @@ eight first-class domain identities.
 | State family | Representative records | Responsibility |
 | --- | --- | --- |
 | planning and Plan lifecycle | `Plan`, `PlanDependency`, `TaskLifecycleRecord`, `TaskPresentationMetadata`, `PlannerConsultationRun` | exact Objective and Assumption basis, direct Task-ID membership, explicit dependencies, approval, and presentation; execution strategy is excluded |
-| semantic graph relations | `ObjectiveHypothesisRelation` | typed Knowledge Graph edge contracts (`FORMULATED_FOR`, `BEARS_ON`) connecting Objectives and Hypotheses without mutating scientific identity |
 | scientific investigation | `ScientificInvestigationRun`, feasibility record, `InvestigationPlan`, `InvestigationProtocol`, `ProtocolRevision`, `EvidenceRequest` | feasibility, operationalization, protocol evolution, and evidence obligations |
 | execution and provenance | `ExecutionRun`, `AnalysisFrame` | attempt history and exact data-view lineage |
 | evaluation and outcome | `EvaluationBundle`, `ScientificInvestigationOutcome`, `DiscoveryProposal` | protected inputs, typed endings, and proposed scientific content |

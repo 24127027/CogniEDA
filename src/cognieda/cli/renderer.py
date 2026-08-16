@@ -2,17 +2,23 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
+import asyncio
 
 from rich import box
 from rich.console import Console
+from rich.live import Live
 from rich.control import Control
 from rich.markdown import Markdown
 from rich.padding import Padding
 from rich.panel import Panel
 from rich.segment import ControlType
 from rich.text import Text
+from rich.status import Status
+from rich.cells import cell_len
 
 from cognieda.runtime.events import (
+    AssistantThinkingFinished,
+    AssistantThinkingStarted,
     HumanInputRequested,
     MessageProduced,
     PlanProposed,
@@ -27,21 +33,6 @@ console = Console()
 class Renderer:
     def __init__(self, console: Console | None = None) -> None:
         self.console = console or globals()["console"]
-
-    def read_input(self) -> str:
-        text = self.console.input("> ").strip()
-
-        # Remove the terminal's echoed input line so only the styled user panel remains.
-        is_terminal = getattr(self.console, "is_terminal", False) is True
-        is_dumb_terminal = getattr(self.console, "is_dumb_terminal", True) is True
-        if is_terminal and not is_dumb_terminal:
-            self.console.control(
-                Control.move(y=-1),
-                Control.move_to_column(0),
-                Control((ControlType.ERASE_IN_LINE, 2)),
-            )
-
-        return text
 
     def render_session_start(self, workspace_root: Path) -> None:
         self.console.print(f"[green]Workspace: {workspace_root}[/green]")
@@ -66,7 +57,7 @@ class Renderer:
 
         self.console.print(segment_area)
 
-    def render(self, message: Message) -> None:
+    async def render(self, message: Message) -> None:
         match message.type, message.role:
             case MessageType.ERROR, _:
                 self.console.print(f"[red][Error] {message.content}[/red]")
@@ -82,17 +73,7 @@ class Renderer:
                 )
 
             case MessageType.TEXT, MessageRole.ASSISTANT:
-                self.console.print("[bold cyan]CogniEDA[/bold cyan]")
-                self.console.print(Markdown(str(message.content)))
-
-                if message.model:
-                    model_text = Text(
-                        f"◆ {message.model}",
-                        style="dim",
-                        justify="right",
-                    )
-                    self.console.print(model_text)
-
+                await self.render_assistant(message)
             case MessageType.TEXT, MessageRole.SYSTEM:
                 self.console.print(
                     Panel(
@@ -108,16 +89,16 @@ class Renderer:
             case _:
                 self.console.print(str(message.content))
 
-    def handle_message(self, event: MessageProduced) -> None:
-        self.render(event.message)
+    async def handle_message(self, event: MessageProduced) -> None:
+        await self.render(event.message)
 
-    def handle_human_input(self, event: HumanInputRequested) -> None:
-        self.render(event.message)
+    async def handle_human_input(self, event: HumanInputRequested) -> None:
+        await self.render(event.message)
 
-    def handle_plan(self, event: PlanProposed) -> None:
-        self.render_plan(event.plan, event.plan.tasks)
+    async def handle_plan(self, event: PlanProposed) -> None:
+        await self.render_plan(event.plan, event.plan.tasks)
 
-    def render_plan(
+    async def render_plan(
         self,
         plan: Plan,
         tasks: tuple[Task, ...],
@@ -126,3 +107,55 @@ class Renderer:
 
         for index, task in enumerate(tasks, start=1):
             self.console.print(f"{index}. {task}")
+
+    @staticmethod
+    def _stream_chunks(
+        text: str,
+        *,
+        chunk_size: int = 3,
+    ) -> Iterable[str]:
+        for index in range(0, len(text), chunk_size):
+            yield text[index:index + chunk_size]
+
+    async def render_assistant(self, message: Message) -> None:
+        self.console.print("[bold cyan]CogniEDA[/bold cyan]")
+
+        content = str(message.content)
+
+        current = ""
+
+        with Live(
+            Markdown(""),
+            console=self.console,
+            refresh_per_second=30,
+        ) as live:
+            for chunk in self._stream_chunks(content):
+                current += chunk
+                live.update(Markdown(current))
+                await asyncio.sleep(0.01 + len(chunk) * 0.003)
+        if message.model:
+            model_text = Text(
+                f"◆ {message.model}",
+                style="dim",
+                justify="right",
+            )
+            self.console.print(model_text)
+
+    def handle_thinking_started(
+        self,
+        event: AssistantThinkingStarted,
+    ) -> None:
+        self._thinking_status = Status(
+            "CogniEDA is thinking",
+            console=self.console,
+            spinner="dots",
+        )
+        self._thinking_status.start()
+
+    def handle_thinking_finished(
+        self,
+        event: AssistantThinkingFinished,
+    ) -> None:
+        if self._thinking_status is not None:
+            self._thinking_status.stop()
+            self._thinking_status = None

@@ -51,8 +51,7 @@ and resume orchestration, and high-level work synthesis.
 The Planner does not define a Hypothesis statement, method, statistical test,
 parameters, decision rule, seed, variable bindings, `InvestigationPlan`,
 `InvestigationProtocol`, protocol revision, Evidence obligation, or protected
-scientific evaluation, and it must not fabricate `FORMULATED_FOR` origin relations
-after the fact. It may propose that scientific work is needed, but only
+scientific evaluation. It may propose that scientific work is needed, but only
 scientific authority may operationalize that work.
 
 Planner consultation with Data Explorer or Graph Miner is bounded planning
@@ -75,12 +74,9 @@ to persistence, or interact directly with the human.
 
 Hypothesis Analyst is the scientific investigation controller. It owns
 scientific feasibility and exactly one Hypothesis for each eligible feasible
-leaf `SCIENTIFIC` Task; infeasible work receives none. When a Hypothesis is
-formalized for a Task pursuing a Plan's focal Objective, the canonical
-`FORMULATED_FOR` origin relation becomes derivable and admissible from
-authoritative scientific lineage upon application admission. Hypothesis Analyst
-also owns the `InvestigationPlan`, `InvestigationProtocol`, Evidence obligations,
-EvidenceRequest construction, governed protocol revision, and protected final
+leaf `SCIENTIFIC` Task; infeasible work receives none. It also owns the
+`InvestigationPlan`, `InvestigationProtocol`, Evidence obligations,
+`EvidenceRequest` construction, governed protocol revision, and protected final
 evaluation. Its final scientific act is a `DiscoveryProposal` or a typed
 non-completion.
 
@@ -93,11 +89,11 @@ separate peer Evaluator agent.
 
 Graph Miner is a read-only research-state inquiry specialist. It may return
 object references, graph paths, contradictions, gaps, validity and dependency
-information, and suggestions for related Objectives (`BEARS_ON` candidates).
+information, and suggestions for related Objectives.
 
-It cannot mutate semantic graph state, persist or admit `ObjectiveHypothesisRelation`
-edges, create Evidence or Discovery, perform dataset operations, perform
-governance, admit cross-Objective relations, or interact directly with the human.
+It cannot mutate semantic graph state, create Evidence or Discovery, perform
+dataset operations, perform governance, admit cross-Objective relations, or
+interact directly with the human.
 
 ## Governance authority
 

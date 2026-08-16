@@ -5,11 +5,9 @@ from typing import TYPE_CHECKING
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.document import Document
 from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.shortcuts import PromptSession
 
-from rich.console import Console
-from rich.control import Control
-from rich.segment import ControlType
 
 if TYPE_CHECKING:
     from cognieda.runtime import Application
@@ -43,25 +41,28 @@ class Prompt:
         *,
         prompt: str = "> ",
     ) -> None:
+        bindings = create_key_bindings()
+
         self._session = PromptSession(
             history=InMemoryHistory(),
             completer=CommandCompleter(application),
             complete_while_typing=True,
+            erase_when_done=True,
+            key_bindings=bindings,
+            multiline=False,
         )
+
         self._prompt = prompt
-        self._console = Console()
 
     async def read(self) -> str:
-        text = await self._session.prompt_async(self._prompt)
-        self._erase_submitted_input()
-        return text
+        return await self._session.prompt_async(self._prompt)
 
-    def _erase_submitted_input(self) -> None:
-        if not self._console.is_terminal or self._console.is_dumb_terminal:
-            return
 
-        self._console.control(
-            Control.move(y=-1),
-            Control.move_to_column(0),
-            Control((ControlType.ERASE_IN_LINE, 2)),
-        )
+def create_key_bindings() -> KeyBindings:
+    bindings = KeyBindings()
+
+    @bindings.add("escape", "enter")
+    def _(event) -> None:
+        event.current_buffer.insert_text("\n")
+
+    return bindings

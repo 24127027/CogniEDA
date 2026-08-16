@@ -60,17 +60,10 @@ membership fields. Adding, removing, or changing a research Objective does not
 mutate an existing Hypothesis or manufacture duplicate Hypotheses for the same
 proposition.
 
-Connectivity between `Objective` and `Hypothesis` is many-to-many in the
-semantic Knowledge Graph and is represented by typed `ObjectiveHypothesisRelation`
-edge contracts:
-
-- `FORMULATED_FOR`: captures origin and research-intent provenance (the
-  Hypothesis was originally formalized in work pursuing the focal Objective).
-- `BEARS_ON`: captures semantic relevance of an existing Hypothesis to an
-  additional Objective beyond its initial formulation context.
-
-For a single Objective-Hypothesis pair, `FORMULATED_FOR` already implies
-relevance; no duplicate `BEARS_ON` edge is required for the same pair.
+In the future semantic Knowledge Graph, one Objective may associate with
+multiple Hypotheses and one Hypothesis may be relevant to multiple Objectives.
+Exact Objective-Hypothesis relation types, edge representation, persistence,
+admission, and governance remain deferred until semantic graph implementation.
 
 Objective relevance is research-intent/context semantics. It must not:
 - alter Hypothesis scientific identity;
@@ -85,25 +78,14 @@ The target conceptual graph separates scientific lineage from research-intent
 relevance:
 
 ```text
-                  Objective O1
-                      ^
-                      | FORMULATED_FOR
-                      |
-                  Hypothesis H
+                  Objective (research scope)
+                      : (future graph association)
+                      :
+                  Hypothesis (scientific commitment)
                       |
           +-----------+-----------+
           |                       |
        Evidence                Discovery
-```
-
-and for additional Objectives:
-
-```text
-                  Objective O2
-                      ^
-                      | BEARS_ON
-                      |
-                  Hypothesis H
 ```
 
 The foundational lineage rules are:

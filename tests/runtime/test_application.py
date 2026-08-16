@@ -92,15 +92,18 @@ def test_application_maps_planner_outcome_to_presentation_events() -> None:
         message_history=(),
     )
     assert [type(event) for event in events] == [
+        MessageProduced,
         PlanProposed,
         MessageProduced,
         HumanInputRequested,
     ]
-    assert cast(PlanProposed, events[0]).plan == plan
-    assert cast(MessageProduced, events[1]).message.content == (
+    assert cast(MessageProduced, events[0]).message.role.value == "user"
+    assert cast(MessageProduced, events[0]).message.content == "Investigate churn."
+    assert cast(PlanProposed, events[1]).plan == plan
+    assert cast(MessageProduced, events[2]).message.content == (
         "I propose a bounded investigation."
     )
-    assert cast(HumanInputRequested, events[2]).message.content == (
+    assert cast(HumanInputRequested, events[3]).message.content == (
         "Does this scope look right?"
     )
 
@@ -118,10 +121,13 @@ def test_application_maps_controlled_planner_failure_to_error_event() -> None:
 
     asyncio.run(application.submit_message("Proceed."))
 
-    assert len(events) == 1
-    event = cast(MessageProduced, events[0])
-    assert event.message.type.value == "error"
-    assert event.message.content == error.message
+    assert len(events) == 2
+    user_event = cast(MessageProduced, events[0])
+    assert user_event.message.role.value == "user"
+    assert user_event.message.content == "Proceed."
+    error_event = cast(MessageProduced, events[1])
+    assert error_event.message.type.value == "error"
+    assert error_event.message.content == error.message
 
 
 def test_application_has_no_concrete_repositories_or_session_frame_authority() -> None:
@@ -271,10 +277,13 @@ def test_application_fails_closed_when_context_factory_raises() -> None:
     asyncio.run(application.submit_message("Investigate."))
 
     planner.handle_message.assert_not_awaited()
-    assert len(events) == 1
-    event = cast(MessageProduced, events[0])
-    assert event.message.type.value == "error"
-    assert "Planner authoritative context could not be materialized." in event.message.content
+    assert len(events) == 2
+    user_event = cast(MessageProduced, events[0])
+    assert user_event.message.role.value == "user"
+    assert user_event.message.content == "Investigate."
+    error_event = cast(MessageProduced, events[1])
+    assert error_event.message.type.value == "error"
+    assert "Planner authoritative context could not be materialized." in error_event.message.content
 
 
 def test_skill_assignment_reloads_tooling_and_planner() -> None:
@@ -301,7 +310,10 @@ def test_skill_assignment_reloads_tooling_and_planner() -> None:
         recreate_agent=True,
     )
     planner.handle_message.assert_not_awaited()
-    produced = [event for event in events if isinstance(event, MessageProduced)]
+    produced = [
+        event for event in events
+        if isinstance(event, MessageProduced) and event.message.role.value != "user"
+    ]
     assert [event.message.content for event in produced] == [
         "Assigned 'review' to 'planner'."
     ]
@@ -324,12 +336,15 @@ def test_provider_and_reload_commands_publish_user_visible_messages() -> None:
     asyncio.run(application.submit_message("/provider"))
     asyncio.run(application.submit_message("/reload"))
 
-    produced = [event for event in events if isinstance(event, MessageProduced)]
+    produced = [
+        event for event in events
+        if isinstance(event, MessageProduced) and event.message.role.value != "user"
+    ]
     assert [event.message.content for event in produced] == [
         (
             "Current provider : openai\n"
-            "        Model            : test-model\n"
-            "        API key          : yes"
+            "Model            : test-model\n"
+            "API key          : yes"
         ),
         "Planner instructions reloaded.",
     ]
