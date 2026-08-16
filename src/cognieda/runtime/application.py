@@ -19,7 +19,8 @@ from cognieda.runtime.commands import (
     create_command_registry,
 )
 
-
+from .projection.message import MessageProjector
+from .conversation.projector import ConversationProjector
 from .messages import Message, MessageRole, MessageType
 from .workspace import MissingModelCredentialError, Workspace
 
@@ -34,6 +35,8 @@ class Application:
         session_id: UUID,
         conversation_history: ConversationHistory,
         planner_context_factory: Callable[[], PlannerContext],
+        message_projector: MessageProjector,
+        conversation_projector: ConversationProjector,
     ) -> None:
         self.workspace = workspace
         self.agent_factory = agent_factory
@@ -42,6 +45,8 @@ class Application:
         self.session_id = session_id
         self.conversation_history = conversation_history
         self.planner_context_factory = planner_context_factory
+        self.message_projector = message_projector
+        self.conversation_projector = conversation_projector
 
         self.command_handler = CommandHandler(
             parser=CommandParser(),
