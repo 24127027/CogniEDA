@@ -2,17 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from typing import cast
+from typing import Callable, cast
 from unittest.mock import AsyncMock, Mock
+from uuid import UUID, uuid4
 
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.state import PlannerTurnOutcome
+from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.types import PlannerControlledError, PlannerErrorCode
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.application import Application
-from cognieda.runtime.conversation import ConversationSegment
+from cognieda.runtime.conversation import ConversationHistory, ConversationSegment
 from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import (
     HumanInputRequested,
@@ -20,7 +22,6 @@ from cognieda.runtime.events import (
     PlanProposed,
     RuntimeEvent,
 )
-from cognieda.runtime.session import ChatSession
 from cognieda.runtime.workspace import Workspace
 from cognieda.schemas import Objective, Plan, Task, TaskKind
 
@@ -40,7 +41,9 @@ def _application(
     *,
     workspace: Workspace | None = None,
     agent_factory: AgentFactoryPort | None = None,
-    session: ChatSession | None = None,
+    session_id: UUID | None = None,
+    conversation_history: ConversationHistory | None = None,
+    planner_context_factory: Callable[[], PlannerContext] | None = None,
 ) -> tuple[Application, list[RuntimeEvent]]:
     event_bus = EventBus()
     events: list[RuntimeEvent] = []
@@ -52,7 +55,9 @@ def _application(
         planner_agent=planner,
         agent_factory=agent_factory or cast(AgentFactoryPort, object()),
         event_bus=event_bus,
-        session=session,
+        session_id=session_id or uuid4(),
+        conversation_history=conversation_history or ConversationHistory(),
+        planner_context_factory=planner_context_factory or Mock(return_value=Mock(spec=PlannerContext)),
     )
     return application, events
 
@@ -70,17 +75,17 @@ def test_application_maps_planner_outcome_to_presentation_events() -> None:
             None,
         )
     )
-    session = ChatSession()
+    planner_context_factory = Mock(return_value=Mock(spec=PlannerContext))
     application, events = _application(
         planner,
-        session=session,
+        planner_context_factory=planner_context_factory,
     )
 
     asyncio.run(application.submit_message("Investigate churn."))
 
     planner.handle_message.assert_awaited_once_with(
         "Investigate churn.",
-        context=session.current_planner_context(),
+        context=planner_context_factory.return_value,
         message_history=(),
     )
     assert [type(event) for event in events] == [
@@ -119,7 +124,9 @@ def test_application_maps_controlled_planner_failure_to_error_event() -> None:
 def test_application_has_no_concrete_repositories_or_session_frame_authority() -> None:
     constructor_parameters = inspect.signature(Application).parameters
 
-    assert "session" in constructor_parameters
+    assert "session_id" in constructor_parameters
+    assert "conversation_history" in constructor_parameters
+    assert "planner_context_factory" in constructor_parameters
     assert "session_frames" not in constructor_parameters
     assert "active_plans" not in constructor_parameters
     assert not hasattr(Application, "session_frame")
@@ -143,15 +150,15 @@ def test_application_commits_returned_completed_segment_to_session() -> None:
             segment,
         )
     )
-    session = ChatSession()
-    application, events = _application(planner, session=session)
+    conversation_history = ConversationHistory()
+    application, events = _application(planner, conversation_history=conversation_history)
 
-    assert session.model_messages() == []
+    assert application.conversation_history.model_messages() == []
 
     asyncio.run(application.submit_message("Hello"))
 
-    assert session.model_messages() == list(segment.messages)
-    assert len(session.conversation_history.turns) == 1
+    assert application.conversation_history.model_messages() == list(segment.messages)
+    assert len(application.conversation_history.turns) == 1
 
 
 def test_application_multiple_submit_messages_remain_in_same_chat_session() -> None:
@@ -174,29 +181,29 @@ def test_application_multiple_submit_messages_remain_in_same_chat_session() -> N
             (PlannerTurnOutcome(response="Ans2"), seg2),
         ]
     )
-    session = ChatSession()
-    application, _ = _application(planner, session=session)
+    conversation_history = ConversationHistory()
+    application, _ = _application(planner, conversation_history=conversation_history)
 
     asyncio.run(application.submit_message("First"))
     asyncio.run(application.submit_message("Second"))
 
     assert planner.handle_message.await_count == 2
-    assert session.model_messages() == [*seg1.messages, *seg2.messages]
-    assert len(session.conversation_history.turns) == 2
+    assert application.conversation_history.model_messages() == [*seg1.messages, *seg2.messages]
+    assert len(application.conversation_history.turns) == 2
 
 
 def test_application_fails_closed_when_context_factory_raises() -> None:
     planner = Mock(spec=Planner)
     planner.handle_message = AsyncMock()
 
-    session = Mock(spec=ChatSession)
-    session.current_planner_context.side_effect = RuntimeError(
+    planner_context_factory = Mock()
+    planner_context_factory.side_effect = RuntimeError(
         "Persistence failure while building context."
     )
 
     application, events = _application(
         planner,
-        session=session,
+        planner_context_factory=planner_context_factory,
     )
 
     asyncio.run(application.submit_message("Investigate."))
