@@ -32,14 +32,14 @@ class MessageProjector:
     def __init__(self, event_bus: EventBus) -> None:
         self.event_bus = event_bus
 
-    def handle(self, event: ModelMessageProduced) -> None:
+    async def handle(self, event: ModelMessageProduced) -> None:
         if not event.visible:
             return
 
         projection = self.project(event.message)
 
         for message in projection.messages:
-            self.event_bus.publish(
+            await self.event_bus.publish(
                 MessageProduced(message=message)
             )
 
