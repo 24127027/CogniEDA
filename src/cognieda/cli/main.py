@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from cognieda.runtime.events import MessageProduced, PlanProposed
+from cognieda.runtime.events import (
+    AssistantThinkingFinished, 
+    AssistantThinkingStarted, 
+    MessageProduced, 
+    PlanProposed
+)
 from .prompt import Prompt
 from .renderer import Renderer
 
@@ -18,6 +23,15 @@ async def repl(app: Application, renderer: Renderer) -> None:
     app.event_bus.subscribe(
         PlanProposed,
         renderer.handle_plan,
+    )
+    app.event_bus.subscribe(
+        AssistantThinkingStarted,
+        renderer.handle_thinking_started,
+    )
+    
+    app.event_bus.subscribe(
+        AssistantThinkingFinished,
+        renderer.handle_thinking_finished,
     )
 
     renderer.render_session_start(app.workspace.root)

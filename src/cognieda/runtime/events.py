@@ -25,6 +25,7 @@ class PlanProposed(RuntimeEvent):
 class ApplicationError(RuntimeEvent):
     error: Exception
 
+
 # TODO: Temporary event types for conversation projector. 
 # These should be replaced with more general events in the future.
 @dataclass(frozen=True, slots=True)
@@ -38,4 +39,10 @@ class SegmentCompleted(RuntimeEvent):
 
 @dataclass(frozen=True, slots=True)
 class TurnCompleted(RuntimeEvent):
+    pass
+
+class AssistantThinkingStarted(RuntimeEvent):
+    pass
+
+class AssistantThinkingFinished(RuntimeEvent):
     pass

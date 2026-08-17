@@ -10,7 +10,15 @@ from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.conversation.history import ConversationHistory
 from cognieda.runtime.event_bus import EventBus
-from cognieda.runtime.events import MessageProduced, ModelMessageProduced, PlanProposed, SegmentCompleted, TurnCompleted
+from cognieda.runtime.events import (
+    ModelMessageProduced,
+    MessageProduced, 
+    PlanProposed, 
+    AssistantThinkingStarted, 
+    AssistantThinkingFinished,
+    SegmentCompleted, 
+    TurnCompleted
+)
 from cognieda.runtime.commands.types import CommandSuggestion
 from cognieda.runtime.commands import (
     CommandContext,
@@ -83,7 +91,7 @@ class Application:
     async def submit_message(self, message: str) -> None:
         # TODO: 
         # Keep this publication here, or place it inside message projector
-        self.event_bus.publish(
+        await self.event_bus.publish(
             MessageProduced(
                 message=Message(
                     type=MessageType.TEXT,
@@ -95,7 +103,7 @@ class Application:
 
         if message.startswith("/"):
             command_result = await self.command_handler.handle(message)
-            self.event_bus.publish(
+            await self.event_bus.publish(
                 MessageProduced(message=command_result)
             )
             return
@@ -103,7 +111,7 @@ class Application:
         try:
             context = self.planner_context_factory()
         except Exception:
-            self._emit_message(
+            await self._emit_message(
                 "Planner authoritative context could not be materialized.",
                 message_type=MessageType.ERROR,
             )
@@ -112,39 +120,40 @@ class Application:
         message_history = tuple(self.conversation_history.model_messages())
 
         try:
+            await self.event_bus.publish(AssistantThinkingStarted())
             outcome, completed_segment = await self.planner_agent.handle_message(
                 message,
                 context=context,
                 message_history=message_history,
             )
+            await self.event_bus.publish(AssistantThinkingFinished())
         except MissingModelCredentialError as e:
-            self._emit_message(f"{e}\n\nRun '/provider key <provider>' to configure an API key.")
+            await self._emit_message(f"{e}\n\nRun '/provider key <provider>' to configure an API key.")
             return
 
         # TODO: This is a temporary solution to emit the completed segment messages. 
         # These should be emitted by the planner agent in the future.
         if completed_segment is not None:
             for msg in completed_segment.messages:
-                self.event_bus.publish(ModelMessageProduced(message=msg))
-            self.event_bus.publish(SegmentCompleted())
-            self.event_bus.publish(TurnCompleted())
+                await self.event_bus.publish(ModelMessageProduced(message=msg))
+            await self.event_bus.publish(SegmentCompleted())
+            await self.event_bus.publish(TurnCompleted())
 
+        await self._emit_planner_outcome(outcome)
 
-        self._emit_planner_outcome(outcome)
-
-    def _emit_planner_outcome(self, outcome: PlannerTurnOutcome) -> None:
+    async def _emit_planner_outcome(self, outcome: PlannerTurnOutcome) -> None:
         if outcome.error is not None:
-            self._emit_message(outcome.error.message, message_type=MessageType.ERROR)
+            await self._emit_message(outcome.error.message, message_type=MessageType.ERROR)
             return
 
         if outcome.proposed_plan is not None:
-            self.event_bus.publish(PlanProposed(plan=outcome.proposed_plan))
+            await self.event_bus.publish(PlanProposed(plan=outcome.proposed_plan))
 
         if outcome.response is not None:
-            self._emit_message(outcome.response)
+            await self._emit_message(outcome.response)
 
         if outcome.human_input_request is not None:
-            self.event_bus.publish(
+            await self.event_bus.publish(
                 MessageProduced(
                     message=Message(
                         type=MessageType.INPUT_REQUEST,
@@ -181,13 +190,13 @@ class Application:
             recreate_agent=recreate_agent,
         )
 
-    def _emit_message(
+    async def _emit_message(
         self,
         content: str,
         *,
         message_type: MessageType = MessageType.TEXT,
     ) -> None:
-        self.event_bus.publish(
+        await self.event_bus.publish(
             MessageProduced(
                 message=Message(
                     type=message_type,
