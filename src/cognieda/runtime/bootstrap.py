@@ -23,7 +23,7 @@ from cognieda.runtime.projection.message import MessageProjector
 from .application import Application
 from .conversation.history import ConversationHistory
 from .event_bus import EventBus
-from .events import ModelMessageProduced
+from .events import ModelMessageProduced, SegmentCompleted, TurnCompleted
 from .planner_context import build_planner_context
 from .workspace import MissingModelCredentialError, Workspace
 
@@ -87,15 +87,26 @@ def bootstrap_application(workspace_path: Path) -> Application:
     conversation_projector = ConversationProjector(
         history=conversation_history,
     )
+
+    # TODO:
+    # Subsribe these events somewhere else cleanly
     event_bus.subscribe(
         ModelMessageProduced,
-        conversation_projector.handle
+        conversation_projector.handle,
     )
     event_bus.subscribe(
-        ModelMessageProduced,
-        message_projector.handle
+        SegmentCompleted,
+        conversation_projector.handle_segment_completed,
+    )
+    event_bus.subscribe(
+        TurnCompleted,
+        conversation_projector.handle_turn_completed,
     )
 
+    event_bus.subscribe(
+        ModelMessageProduced,
+        message_projector.handle,
+    )
     # TODO: Remove the conversation projector and message projector from 
     # the application constructor once we have a more general event system in place.
     return Application(

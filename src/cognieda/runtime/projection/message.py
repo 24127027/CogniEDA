@@ -77,16 +77,22 @@ class MessageProjector:
         projected: list[Message] = []
 
         for part in message.parts:
-            if isinstance(part, UserPromptPart):
-                projected.append(
-                    Message(
-                        role=MessageRole.USER,
-                        type=MessageType.TEXT,
-                        content=str(part.content),
-                    )
-                )
+            # TODO: application.submit_message already handle this, choose one place
+            # if isinstance(part, UserPromptPart):
+            #     projected.append(
+            #         Message(
+            #             role=MessageRole.USER,
+            #             type=MessageType.TEXT,
+            #             content=str(part.content),
+            #         )
+            #     )
 
-            elif isinstance(part, ToolReturnPart):
+            if isinstance(part, ToolReturnPart):
+                # TODO: temporarily filter final results from tool calls, 
+                # until we have a better way to handle them
+                if part.tool_name == "final_result":
+                    continue
+
                 projected.append(
                     Message(
                         role=MessageRole.ASSISTANT,
@@ -119,6 +125,11 @@ class MessageProjector:
                 )
 
             elif isinstance(part, ToolCallPart):
+                # TODO: temporarily filter final results from tool calls, 
+                # until we have a better way to handle them
+                if part.tool_name == "final_result":
+                    continue
+
                 projected.append(
                     Message(
                         role=MessageRole.ASSISTANT,

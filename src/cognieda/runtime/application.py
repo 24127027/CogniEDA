@@ -10,7 +10,7 @@ from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.application.ports import AgentFactoryPort
 from cognieda.runtime.conversation.history import ConversationHistory
 from cognieda.runtime.event_bus import EventBus
-from cognieda.runtime.events import MessageProduced, PlanProposed
+from cognieda.runtime.events import MessageProduced, ModelMessageProduced, PlanProposed, SegmentCompleted, TurnCompleted
 from cognieda.runtime.commands.types import CommandSuggestion
 from cognieda.runtime.commands import (
     CommandContext,
@@ -48,6 +48,8 @@ class Application:
         self.message_projector = message_projector
         self.conversation_projector = conversation_projector
 
+        print()
+
         self.command_handler = CommandHandler(
             parser=CommandParser(),
             registry=create_command_registry(),
@@ -79,6 +81,8 @@ class Application:
         return self.command_handler.suggest(prefix)
 
     async def submit_message(self, message: str) -> None:
+        # TODO: 
+        # Keep this publication here, or place it inside message projector
         self.event_bus.publish(
             MessageProduced(
                 message=Message(
@@ -117,8 +121,14 @@ class Application:
             self._emit_message(f"{e}\n\nRun '/provider key <provider>' to configure an API key.")
             return
 
+        # TODO: This is a temporary solution to emit the completed segment messages. 
+        # These should be emitted by the planner agent in the future.
         if completed_segment is not None:
-            self.conversation_history = self.conversation_history.commit_segment(completed_segment)
+            for msg in completed_segment.messages:
+                self.event_bus.publish(ModelMessageProduced(message=msg))
+            self.event_bus.publish(SegmentCompleted())
+            self.event_bus.publish(TurnCompleted())
+
 
         self._emit_planner_outcome(outcome)
 
