@@ -141,6 +141,12 @@ class Application:
 
         await self._emit_planner_outcome(outcome)
 
+    # TODO: Not tested
+    def conversation_history_snapshot(self) -> tuple[Message, ...]:
+        return self.message_projector.project_history(
+            self.conversation_history
+        )
+
     async def _emit_planner_outcome(self, outcome: PlannerTurnOutcome) -> None:
         if outcome.error is not None:
             await self._emit_message(outcome.error.message, message_type=MessageType.ERROR)
