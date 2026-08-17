@@ -52,7 +52,7 @@ class ConversationProjector:
                 "Cannot complete turn without segments."
             )
 
-        self.history = self.history.add_turn(
+        self.history.add_turn(
             self._pending_segments
         )
 
