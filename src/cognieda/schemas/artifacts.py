@@ -124,7 +124,7 @@ class Task(ImmutableCogniEDABaseModel):
     task_id: UUID = Field(default_factory=uuid4)
     objective_id: UUID
     kind: TaskKind
-    instruction: NonEmptyStr
+    description: NonEmptyStr
     status: TaskStatus = TaskStatus.PENDING
 
     def semantic_payload(self) -> dict[str, Any]:
@@ -134,7 +134,7 @@ class Task(ImmutableCogniEDABaseModel):
             "task_id": str(self.task_id),
             "objective_id": str(self.objective_id),
             "kind": self.kind.value,
-            "instruction": self.instruction,
+            "description": self.description,
         }
 
 
