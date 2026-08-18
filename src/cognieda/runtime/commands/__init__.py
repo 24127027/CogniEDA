@@ -1,5 +1,6 @@
 from .base import CommandContext, ParsedCommand
 from .commands import (
+    ProviderConfigCommand,
     ProviderKeyCommand,
     ProviderListCommand,
     ProviderModelCommand,
@@ -30,6 +31,7 @@ def create_command_registry() -> CommandRegistry:
             ProviderUseCommand(),
             ProviderModelCommand(),
             ProviderKeyCommand(),
+            ProviderConfigCommand(),
             ReloadCommand(),
         )
     )

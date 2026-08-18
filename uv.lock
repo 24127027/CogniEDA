@@ -470,6 +470,7 @@ dependencies = [
     { name = "pandas" },
     { name = "pandera" },
     { name = "prompt-toolkit" },
+    { name = "pwinput" },
     { name = "pyarrow" },
     { name = "pydantic" },
     { name = "pydantic-ai" },
@@ -495,6 +496,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.2,<3.0" },
     { name = "pandera", specifier = ">=0.23,<0.27" },
     { name = "prompt-toolkit", specifier = ">=3.0.52" },
+    { name = "pwinput", specifier = ">=1.0.3" },
     { name = "pyarrow", specifier = ">=18.0,<22.0" },
     { name = "pydantic", specifier = ">=2.9,<3.0" },
     { name = "pydantic-ai", specifier = ">=1.107.0" },
@@ -2573,6 +2575,12 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/16/92/d1e32e3e0d894fe00b15ce28ad4944ab692713f2e7f0a99787405e43533a/protobuf-6.33.6-cp39-abi3-manylinux2014_x86_64.whl", hash = "sha256:e9db7e292e0ab79dd108d7f1a94fe31601ce1ee3f7b79e0692043423020b0593", size = 323436, upload-time = "2026-03-18T19:04:55.768Z" },
     { url = "https://files.pythonhosted.org/packages/c4/72/02445137af02769918a93807b2b7890047c32bfb9f90371cbc12688819eb/protobuf-6.33.6-py3-none-any.whl", hash = "sha256:77179e006c476e69bf8e8ce866640091ec42e1beb80b213c3900006ecfba6901", size = 170656, upload-time = "2026-03-18T19:04:59.826Z" },
 ]
+
+[[package]]
+name = "pwinput"
+version = "1.0.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4b/c9/f6d03c2214c282251baa38c6be08f5b9f81f1ea488716cd2335e7e190b58/pwinput-1.0.3.tar.gz", hash = "sha256:ca1a8bd06e28872d751dbd4132d8637127c25b408ea3a349377314a5491426f3", size = 4433, upload-time = "2023-02-16T17:04:14.592Z" }
 
 [[package]]
 name = "py-key-value-aio"

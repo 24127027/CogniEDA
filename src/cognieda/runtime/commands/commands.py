@@ -266,6 +266,64 @@ class ProviderKeyCommand:
         )
 
 
+class ProviderConfigCommand:
+    name = "provider.config"
+    description = "Configure provider, model, and API key."
+
+    async def execute(
+        self,
+        command: ResolvedCommand,
+        context: CommandContext,
+    ) -> Message:
+        if len(command.args) > 1:
+            return text("Usage: /provider.config [profile]")
+
+        if command.args:
+            profile = command.args[0]
+        else:
+            profile = context.prompt(
+                "Provider profile: "
+            ).strip()
+
+        if not profile:
+            return text("Provider profile cannot be empty.")
+
+        model = context.prompt(
+            f"{profile} model: "
+        ).strip()
+
+        if not model:
+            return text("Model cannot be empty.")
+
+        api_key = context.prompt_secret(
+            f"{profile} API key: "
+        ).strip()
+
+        if not api_key:
+            return text("API key cannot be empty.")
+
+        context.workspace.use_provider(profile)
+
+        context.workspace.set_provider_model(
+            profile,
+            model,
+        )
+
+        context.workspace.set_provider_api_key(
+            profile,
+            api_key,
+        )
+
+        await context.reload_runtime(
+            recreate_agent=True,
+        )
+
+        return text(
+            f"Configured provider '{profile}' "
+            f"with model '{model}'."
+        )
+
+
 class ReloadCommand:
     name = "reload"
     description = "Reload the planner instructions."
