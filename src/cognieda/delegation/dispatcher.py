@@ -3,16 +3,6 @@ from __future__ import annotations
 from .contracts import ExecutionRequest, ExecutionResult
 from .registry import CapabilityNotRegisteredError, ExecutorRegistry
 
-
-class ExecutorError(RuntimeError):
-    def __init__(self, request: ExecutionRequest, cause: Exception) -> None:
-        self.capability = request.capability
-        self.task_id = request.input.task.task_id
-        super().__init__(
-            f"Provider for {request.capability} failed for Task {self.task_id}: {cause}"
-        )
-
-
 class ExecutorDispatcher:
     """Thin typed dispatcher from a capability request to its registered provider."""
 
@@ -28,7 +18,5 @@ class ExecutorDispatcher:
             return result
         except CapabilityNotRegisteredError:
             raise
-        except Exception as exc:
-            if isinstance(exc, ExecutorError):
-                raise
-            raise ExecutorError(request, exc) from exc
+        except Exception as e:
+            raise RuntimeError(f"Error during execution of capability {request.capability}: {e}") from e
