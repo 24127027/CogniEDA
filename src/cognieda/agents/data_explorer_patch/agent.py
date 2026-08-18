@@ -26,6 +26,7 @@ from .dependencies import DataExplorerDeps
 from .state import State
 from .context import Context
 from .graph import build_graph
+from .tools import eda, dataset_profiling, sandbox
 
 class DataExplorer:
     CAPABILITIES: tuple[Capability, ...] = (
@@ -34,7 +35,12 @@ class DataExplorer:
     Capability.DATA_TRANSFORMATION,
     )
 
-    builtin_tools: tuple[()] = ()
+    # Aggregate all callables into a single tuple
+    builtin_tools: tuple = (
+        *eda.all(),
+        *dataset_profiling.all(),
+        *sandbox.all(),
+    )
 
     def __init__(
         self,

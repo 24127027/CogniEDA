@@ -9,6 +9,9 @@ from pydantic_ai import RunContext
 
 from ..dependencies import DataExplorerDeps
 
+from cognieda.agents.utilities import function_registry
+
+sandbox = function_registry.FunctionRegistry()
 
 SANDBOX_TIMEOUT = 15
 
@@ -167,7 +170,7 @@ def _serialize(value: Any) -> Any:
         f"Unsupported result type: {type(value).__name__}"
     )
 
-
+@sandbox.register
 def execute_code(
     ctx: RunContext[DataExplorerDeps],
     *,
@@ -223,3 +226,7 @@ def execute_code(
     return {
         "output": result,
     }
+
+__all__ = [
+    "sandbox",
+]

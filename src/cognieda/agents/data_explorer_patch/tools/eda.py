@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from typing import Any, Literal, cast
 
 import numpy as np
@@ -9,6 +8,9 @@ from pydantic_ai import RunContext
 
 from ..dependencies import DataExplorerDeps
 
+from cognieda.agents.utilities import function_registry
+
+eda = function_registry.FunctionRegistry()
 
 def _column(df: pd.DataFrame, name: str) -> pd.Series:
     if name not in df.columns:
@@ -24,7 +26,7 @@ def _numeric(df: pd.DataFrame, name: str) -> pd.Series:
 
     return pd.to_numeric(series, errors="coerce").astype("float64")
 
-
+@eda.register
 def column_summary(
     ctx: RunContext[DataExplorerDeps],
     *,
@@ -42,7 +44,7 @@ def column_summary(
         "distinct_count": int(series.nunique(dropna=True)),
     }
 
-
+@eda.register
 def value_counts(
     ctx: RunContext[DataExplorerDeps],
     *,
@@ -78,7 +80,7 @@ def value_counts(
         "values": values,
     }
 
-
+@eda.register
 def descriptive_statistics(
     ctx: RunContext[DataExplorerDeps],
     *,
@@ -117,7 +119,7 @@ def descriptive_statistics(
         "statistics": statistics,
     }
 
-
+@eda.register
 def distribution_histogram(
     ctx: RunContext[DataExplorerDeps],
     *,
@@ -148,7 +150,7 @@ def distribution_histogram(
         "counts": [int(c) for c in counts],
     }
 
-
+@eda.register
 def group_summary(
     ctx: RunContext[DataExplorerDeps],
     *,
@@ -225,7 +227,7 @@ def group_summary(
         "groups": groups,
     }
 
-
+@eda.register
 def detect_outliers(
     ctx: RunContext[DataExplorerDeps],
     *,
@@ -279,3 +281,7 @@ def detect_outliers(
         "outlier_count": count,
         "outlier_ratio": float(count / len(valid_values)),
     }
+
+__all__ = [
+    "eda"
+]

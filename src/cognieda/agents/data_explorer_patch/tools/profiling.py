@@ -6,7 +6,12 @@ from cognieda.schemas.enums import VariableType
 
 from ..dependencies import DataExplorerDeps
 
+from cognieda.agents.utilities import function_registry
 
+dataset_profiling = function_registry.FunctionRegistry()
+
+
+@dataset_profiling.register
 def profiling(ctx: RuntimeContext[DataExplorerDeps]) -> DataProfile:
     """Create a deterministic structural profile of the active dataframe."""
     dataframe = ctx.deps.dataframe
@@ -31,3 +36,7 @@ def profiling(ctx: RuntimeContext[DataExplorerDeps]) -> DataProfile:
         column_count=len(dataframe.columns),
         columns=columns,
     )
+
+__all__ = [
+    "dataset_profiling",
+]
