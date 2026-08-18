@@ -3,7 +3,6 @@ from __future__ import annotations
 from .capabilities import Capability
 from .contracts import (
     DEExecutorContext,
-    ExecutionFailure,
     ExecutionRequest,
     ExecutionResult,
     ExecutionStatus,
@@ -19,7 +18,6 @@ __all__ = (
     "Capability",
     "CapabilityNotRegisteredError",
     "DEExecutorContext",
-    "ExecutionFailure",
     "ExecutionRequest",
     "ExecutionResult",
     "ExecutionStatus",

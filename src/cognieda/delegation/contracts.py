@@ -67,46 +67,16 @@ class ExecutionStatus(StrEnum):
     BLOCKED = "blocked"
     FAILED = "failed"
 
-
-class ExecutionFailure(BaseModel):
-    """Controlled provider failure; never represents fabricated success."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    code: str = Field(min_length=1)
-    message: str = Field(min_length=1)
-
-
 class ExecutionResult(BaseModel):
-    """Non-semantic transport metadata shared by role-native results."""
-
     model_config = ConfigDict(extra="forbid")
 
-    source_role: str = Field(min_length=1)
+    source_role: str
     task_id: UUID
-    work_id: str = Field(min_length=1)
+    work_id: str
     status: ExecutionStatus
-    limitations: list[str] = Field(default_factory=list)
-    failure: ExecutionFailure | None = None
 
-    # MVP RAM POINTER STORE — do NOT serialize full artifact payloads here.
-    # This dict maps a semantic key (e.g. "evidence", "data_profile") to the
-    # live in-RAM object produced by the executor.  The caller (Planner) reads
-    # this dict to retrieve the artifact and present it to the user.
-    # In a persistence-backed phase, this would be replaced by UUIDs that
-    # the Planner resolves through a repository.  For now, live objects are
-    # stored here and this field is explicitly excluded from result_digest
-    # computation (see normalize_for_planner).
+    failure: str | None = None
     emitted_artifacts: dict[str, Any] = Field(default_factory=dict)
-
-    @model_validator(mode="after")
-    def _failure_matches_status(self) -> "ExecutionResult":
-        if self.status == ExecutionStatus.SUCCEEDED and self.failure is not None:
-            raise ValueError("A successful execution result cannot contain a failure.")
-        if self.status != ExecutionStatus.SUCCEEDED and self.failure is None:
-            raise ValueError("A blocked or failed execution result requires failure details.")
-        return self
-
 
 @runtime_checkable
 class Executor(Protocol):
@@ -130,7 +100,6 @@ class PlannerWorkOutcome(BaseModel):
     status: ExecutionStatus
     semantic_summary: str
     authoritative_refs: list[str] = Field(default_factory=list)
-    limitations: list[str] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
     permitted_next_actions: list[str] = Field(default_factory=list)
     result_digest: str
@@ -147,7 +116,7 @@ def normalize_for_planner(result: ExecutionResult) -> PlannerWorkOutcome:
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
-    blocker = result.failure.message if result.failure is not None else None
+    blocker = result.failure if result.failure is not None else None
     summary = (
         f"{result.source_role} completed work {result.work_id}."
         if result.status == ExecutionStatus.SUCCEEDED
@@ -160,7 +129,6 @@ def normalize_for_planner(result: ExecutionResult) -> PlannerWorkOutcome:
         work_id=result.work_id,
         status=result.status,
         semantic_summary=summary,
-        limitations=list(result.limitations),
         blockers=[blocker] if blocker is not None else [],
         permitted_next_actions=(
             ["review_result"] if result.status == ExecutionStatus.SUCCEEDED else ["hold", "replan"]
