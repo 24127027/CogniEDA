@@ -1,15 +1,15 @@
 from langgraph.graph import END, START
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 
-from cognieda.delegation.contracts import ExecutorContext
 
+from .context import Context
 from .state import State
 from .nodes import planning, execute, check_result, _route_after_check_result
 
-def build_graph() -> CompiledStateGraph[State, ExecutorContext, State, State]:
+def build_graph() -> CompiledStateGraph[State, Context, State, State]:
     builder = StateGraph(
         State,
-        context_schema=ExecutorContext,
+        context_schema=Context,
     )
 
     builder.add_node("planning", planning)
