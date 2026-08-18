@@ -3,24 +3,26 @@ from __future__ import annotations
 import hashlib
 import json
 from enum import StrEnum
-from typing import Any, Protocol, runtime_checkable
+from typing import Annotated, Any, Protocol, runtime_checkable
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, model_validator
-from pydantic_ai.messages import ModelMessage
+from pydantic import BaseModel, ConfigDict, Field
 
-from cognieda.schemas.artifacts import Task
+from cognieda.schemas.artifacts import DataProfile, Evidence, Hypothesis
 
 from .capabilities import Capability
 
+ContextItem = Annotated[
+    DataProfile,
+    ...
+]
 
 class ExecutorContext(BaseModel):
-    """Small shared context that is safe for every registered executor."""
+    """Contextual information provided to the executor for capability fulfillment."""
 
     model_config = ConfigDict(extra="forbid")
 
-    dataset_path: str | None = None
-    data_profile_id: UUID | None = None
+    content: tuple[ContextItem, ...] = ()
 
 class ExecutorRequest(BaseModel):
     """Typed capability request sent through the executor dispatcher."""
