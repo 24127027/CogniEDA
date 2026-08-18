@@ -187,6 +187,22 @@ class PlanDependencyRecord(SQLModel, table=True):
     dependent_task_id: UUID = Field(foreign_key="tasks.task_id", primary_key=True)
 
 
+class ActivePlanRecord(SQLModel, table=True):
+    """Objective-scoped lifecycle pointer to one authoritative active Plan."""
+
+    __tablename__ = "active_plans"
+
+    objective_id: UUID = Field(
+        foreign_key="objectives.objective_id",
+        primary_key=True,
+    )
+    plan_id: UUID = Field(
+        foreign_key="plans.plan_id",
+        nullable=False,
+        unique=True,
+    )
+
+
 class HypothesisRecord(TimestampedRecord, table=True):
     """Persisted Hypothesis FCO."""
 
@@ -443,5 +459,6 @@ class SessionFrameRecord(SQLModel, table=True):
     __tablename__ = "session_frames"
 
     session_frame_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    scope_key: str = Field(default="default", nullable=False, index=True)
     state: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
     created_at: datetime = Field(default_factory=utc_now, nullable=False, index=True)

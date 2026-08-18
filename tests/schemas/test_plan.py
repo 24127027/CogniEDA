@@ -53,7 +53,7 @@ def _task(
 def _edge(prerequisite: Task, dependent: Task) -> PlanDependency:
     return PlanDependency(
         prerequisite_task_id=prerequisite.task_id,
-        dependent_task_id=dependent.task_id,
+        dependent_task_ids=(dependent.task_id,),
     )
 
 
@@ -62,19 +62,18 @@ def _plan(
     *,
     objective: Objective | None = None,
     assumptions: Iterable[Assumption] = (),
-    task_ids: Iterable[UUID] | None = None,
     dependencies: Iterable[PlanDependency] = (),
     plan_id: UUID | None = None,
 ) -> Plan:
-    task_tuple = tuple(tasks)
-    return Plan.create(
-        plan_id=plan_id,
-        objective=objective or _objective(),
-        assumptions=assumptions,
-        task_ids=(tuple(task.task_id for task in task_tuple) if task_ids is None else task_ids),
-        dependencies=dependencies,
-        tasks=task_tuple,
-    )
+    data: dict[str, object] = {
+        "objective": objective or _objective(),
+        "assumptions": tuple(assumptions),
+        "tasks": tuple(tasks),
+        "dependencies": tuple(dependencies),
+    }
+    if plan_id is not None:
+        data["plan_id"] = plan_id
+    return Plan.model_validate(data)
 
 
 def test_plan_has_only_minimal_semantic_fields() -> None:
@@ -86,15 +85,16 @@ def test_plan_has_only_minimal_semantic_fields() -> None:
         "plan_id",
         "objective",
         "assumptions",
-        "task_ids",
+        "tasks",
         "dependencies",
     }
     assert plan.objective == _objective()
     assert plan.assumptions == (assumption,)
+    assert plan.tasks == (task,)
     assert plan.task_ids == (task.task_id,)
     assert set(PlanDependency.model_fields) == {
         "prerequisite_task_id",
-        "dependent_task_id",
+        "dependent_task_ids",
     }
 
 
@@ -106,38 +106,17 @@ def test_plan_rejects_duplicate_assumption_identity() -> None:
         _plan([task], assumptions=[assumption, assumption])
 
 
-def test_plan_rejects_duplicate_task_ids() -> None:
+def test_plan_rejects_duplicate_task_identities() -> None:
     task = _task()
 
-    with pytest.raises(ValidationError, match="duplicate Task IDs"):
-        Plan(objective=_objective(), task_ids=(task.task_id, task.task_id))
+    with pytest.raises(ValidationError, match="duplicate Task identities"):
+        Plan(objective=_objective(), tasks=(task, task))
 
 
-@pytest.mark.parametrize("case", ["missing", "extra"])
-def test_validate_tasks_requires_exact_set_equality(case: str) -> None:
-    first = _task(task_id=FIRST_TASK_ID)
-    second = _task(task_id=SECOND_TASK_ID)
-    plan = _plan([first], task_ids=(first.task_id,))
-    supplied = () if case == "missing" else (first, second)
-
-    with pytest.raises(ValueError, match="exactly match task_ids membership"):
-        plan.validate_tasks(supplied)
-
-
-def test_validate_tasks_rejects_duplicate_task_objects() -> None:
-    task = _task()
-    plan = _plan([task])
-
-    with pytest.raises(ValueError, match="duplicate Task objects"):
-        plan.validate_tasks((task, task))
-
-
-def test_validate_tasks_rejects_task_from_another_objective() -> None:
+def test_plan_rejects_task_from_another_objective() -> None:
     task = _task(objective_id=uuid4())
-    plan = Plan(objective=_objective(), task_ids=(task.task_id,))
-
     with pytest.raises(ValueError, match="Plan Objective"):
-        plan.validate_tasks((task,))
+        Plan(objective=_objective(), tasks=(task,))
 
 
 def test_dependency_endpoint_outside_membership_fails() -> None:
@@ -146,8 +125,23 @@ def test_dependency_endpoint_outside_membership_fails() -> None:
     with pytest.raises(ValidationError, match="outside membership"):
         Plan(
             objective=_objective(),
-            task_ids=(member.task_id,),
+            tasks=(member,),
             dependencies=(_edge(member, outsider),),
+        )
+
+
+def test_dependency_requires_dependents_and_rejects_duplicates() -> None:
+    prerequisite, dependent = _task(), _task()
+
+    with pytest.raises(ValidationError, match="at least 1 item"):
+        PlanDependency(
+            prerequisite_task_id=prerequisite.task_id,
+            dependent_task_ids=(),
+        )
+    with pytest.raises(ValidationError, match="duplicate dependent"):
+        PlanDependency(
+            prerequisite_task_id=prerequisite.task_id,
+            dependent_task_ids=(dependent.task_id, dependent.task_id),
         )
 
 
@@ -157,16 +151,34 @@ def test_dependency_rejects_self_edge() -> None:
     with pytest.raises(ValidationError, match="self dependency"):
         PlanDependency(
             prerequisite_task_id=task.task_id,
-            dependent_task_id=task.task_id,
+            dependent_task_ids=(task.task_id,),
         )
 
 
-def test_plan_rejects_duplicate_dependency_edge() -> None:
-    first, second = _task(), _task()
-    edge = _edge(first, second)
+def test_one_prerequisite_groups_many_canonical_dependents() -> None:
+    prerequisite = _task(task_id=FIRST_TASK_ID)
+    first_dependent = _task(task_id=SECOND_TASK_ID)
+    second_dependent = _task(task_id=THIRD_TASK_ID)
 
-    with pytest.raises(ValidationError, match="duplicate dependency"):
-        _plan([first, second], dependencies=(edge, edge))
+    dependency = PlanDependency(
+        prerequisite_task_id=prerequisite.task_id,
+        dependent_task_ids=(second_dependent.task_id, first_dependent.task_id),
+    )
+
+    assert dependency.dependent_task_ids == (
+        first_dependent.task_id,
+        second_dependent.task_id,
+    )
+
+
+def test_plan_rejects_duplicate_prerequisite_groups() -> None:
+    first, second, third = _task(), _task(), _task()
+
+    with pytest.raises(ValidationError, match="duplicate prerequisite"):
+        _plan(
+            [first, second, third],
+            dependencies=(_edge(first, second), _edge(first, third)),
+        )
 
 
 def test_plan_rejects_dependency_cycle() -> None:
@@ -176,7 +188,10 @@ def test_plan_rejects_dependency_cycle() -> None:
         _plan(
             [first, second, third],
             dependencies=(
-                _edge(first, second),
+                PlanDependency(
+                    prerequisite_task_id=first.task_id,
+                    dependent_task_ids=(second.task_id, third.task_id),
+                ),
                 _edge(second, third),
                 _edge(third, first),
             ),
@@ -206,6 +221,54 @@ def test_dependency_controls_structural_eligibility() -> None:
     assert plan.eligible_task_ids(completed_task_ids={prerequisite.task_id}) == (dependent.task_id,)
     with pytest.raises(ValueError, match="outside Plan membership"):
         plan.eligible_task_ids(completed_task_ids={uuid4()})
+
+
+def test_many_to_one_dependency_requires_all_incoming_prerequisites() -> None:
+    first = _task(task_id=FIRST_TASK_ID)
+    second = _task(task_id=SECOND_TASK_ID)
+    dependent = _task(task_id=THIRD_TASK_ID)
+    plan = _plan(
+        [first, second, dependent],
+        dependencies=(_edge(first, dependent), _edge(second, dependent)),
+    )
+
+    assert plan.eligible_task_ids() == (first.task_id, second.task_id)
+    assert plan.eligible_task_ids(completed_task_ids={first.task_id}) == (second.task_id,)
+    assert plan.eligible_task_ids(
+        completed_task_ids={first.task_id, second.task_id}
+    ) == (dependent.task_id,)
+
+
+def test_dependent_input_order_does_not_change_fingerprint() -> None:
+    prerequisite = _task(task_id=FIRST_TASK_ID)
+    first_dependent = _task(task_id=SECOND_TASK_ID)
+    second_dependent = _task(task_id=THIRD_TASK_ID)
+    tasks = (prerequisite, first_dependent, second_dependent)
+    plan_id = uuid4()
+
+    forward = _plan(
+        tasks,
+        plan_id=plan_id,
+        dependencies=(
+            PlanDependency(
+                prerequisite_task_id=prerequisite.task_id,
+                dependent_task_ids=(first_dependent.task_id, second_dependent.task_id),
+            ),
+        ),
+    )
+    reverse = _plan(
+        tasks,
+        plan_id=plan_id,
+        dependencies=(
+            PlanDependency(
+                prerequisite_task_id=prerequisite.task_id,
+                dependent_task_ids=(second_dependent.task_id, first_dependent.task_id),
+            ),
+        ),
+    )
+
+    assert forward.dependencies == reverse.dependencies
+    assert forward.fingerprint == reverse.fingerprint
 
 
 def test_canonical_input_order_does_not_change_serialization_or_fingerprint() -> None:
@@ -240,7 +303,10 @@ def test_canonical_input_order_does_not_change_serialization_or_fingerprint() ->
     assert forward.fingerprint == reverse.fingerprint
 
 
-@pytest.mark.parametrize("change", ["objective", "assumption", "membership", "edge"])
+@pytest.mark.parametrize(
+    "change",
+    ["objective", "assumption", "instruction", "kind", "membership", "edge"],
+)
 def test_each_plan_semantic_change_changes_fingerprint(change: str) -> None:
     first = _task(task_id=FIRST_TASK_ID)
     second = _task(task_id=SECOND_TASK_ID)
@@ -257,6 +323,16 @@ def test_each_plan_semantic_change_changes_fingerprint(change: str) -> None:
         changed = _plan(
             [first, second],
             assumptions=(Assumption(text="Dates may be unreliable."),),
+        )
+    elif change == "instruction":
+        changed = _plan(
+            [first.model_copy(update={"instruction": "Inspect a different scope."}), second],
+            assumptions=(assumption,),
+        )
+    elif change == "kind":
+        changed = _plan(
+            [first.model_copy(update={"kind": TaskKind.GRAPH}), second],
+            assumptions=(assumption,),
         )
     elif change == "membership":
         changed = _plan([first], assumptions=(assumption,))
@@ -281,24 +357,19 @@ def test_fingerprint_payload_contains_only_current_plan_semantics() -> None:
 
     payload = plan._fingerprint_payload()
 
-    assert set(payload) == {"objective", "assumptions", "task_ids", "dependencies"}
+    assert set(payload) == {"objective", "assumptions", "tasks", "dependencies"}
     assert "plan_id" not in payload
-    task_ids = payload["task_ids"]
-    assert isinstance(task_ids, list)
-    assert all(isinstance(task_id, str) for task_id in task_ids)
+    tasks = payload["tasks"]
+    assert isinstance(tasks, list)
+    assert tasks == [task.semantic_payload() for task in plan.tasks]
+    assert all("status" not in task for task in tasks)
 
 
-def test_task_status_and_semantic_payload_are_not_fingerprint_content() -> None:
+def test_task_status_is_not_plan_fingerprint_content() -> None:
     pending = _task(task_id=FIRST_TASK_ID)
-    changed = Task(
-        task_id=pending.task_id,
-        objective_id=pending.objective_id,
-        kind=TaskKind.GRAPH,
-        instruction="Ask a different bounded graph question.",
-        status=TaskStatus.COMPLETED,
-    )
+    completed = pending.model_copy(update={"status": TaskStatus.COMPLETED})
 
-    assert _plan([pending]).fingerprint == _plan([changed]).fingerprint
+    assert _plan([pending]).fingerprint == _plan([completed]).fingerprint
 
 
 def test_obsolete_plan_abstractions_are_absent() -> None:
@@ -336,13 +407,16 @@ def test_plan_contract_excludes_routing_data_and_lifecycle_fields() -> None:
     assert prohibited.isdisjoint(PlanDependency.model_fields)
 
 
-def test_plan_is_immutable_non_fco_and_has_explicit_planner_surfaces() -> None:
+def test_plan_is_immutable_non_fco_and_respects_planner_ownership_surfaces() -> None:
     task = _task()
     plan = _plan([task])
 
     with pytest.raises(ValidationError, match="frozen"):
-        plan.task_ids = ()
+        plan.tasks = ()
     assert "PLAN" not in FirstClassObjectType.__members__
+    assert "pending_plan" not in PlannerContext.model_fields
+    assert "pending_tasks" not in PlannerContext.model_fields
+    assert "conversation_history" not in PlannerContext.model_fields
     assert "active_plan" in PlannerContext.model_fields
     assert "plan" in PlannerResult.model_fields
     assert "plan" not in PlannerOutput.model_fields

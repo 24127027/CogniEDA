@@ -15,18 +15,19 @@ not frozen here except for the bounded Phase 1 Plan contract below.
 
 `Plan` is an immutable non-FCO and non-semantic-graph coordination aggregate.
 It contains `plan_id`, the exact `Objective`, exact admitted Human
-`Assumption` planning basis, canonical `task_ids`, canonical dependency edges,
+`Assumption` planning basis, canonical full `tasks`, canonical dependency edges,
 and a deterministic fingerprint. It contains no
 DataProfile identity, stopping condition, replan trigger, approval, activation,
 or successor state.
 
-`task_ids` is the direct and only membership representation. Duplicate Task
+`tasks` is the direct and only writable membership representation; `task_ids`
+is derived exactly from it. Duplicate Task
 IDs, missing Tasks,
 cross-Objective Tasks, non-member dependency endpoints, self-edges, duplicate
 edges, and direct or indirect cycles fail closed.
 
 The fingerprint covers exact Objective and Assumption representations,
-canonical Task IDs, and canonical dependency edges. It
+canonical status-free Task semantic definitions, and canonical dependency edges. It
 excludes Task runtime status and all execution-routing, lifecycle, timestamp,
 conversation, model, and DataProfile-selection state.
 

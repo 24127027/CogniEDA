@@ -19,10 +19,16 @@ A SessionFrame may conceptually track references to:
 
 - Objectives and the active Objective;
 - planning Assumptions;
-- Tasks;
+- Hypotheses;
 - DataProfiles and the active DataProfile;
 - admitted Evidence; and
-- Hypotheses and Discoveries when the supported workflow requires them.
+- Discoveries.
+
+Task remains a First-Class Object for bounded coordination/work identity and
+Plan membership, but it is not research knowledge and is not SessionFrame
+research-state membership. A coordination-specific Task projection may be
+needed by a later Planner execution phase; it must remain distinct from the
+frame-derived research-state base.
 
 The frame preserves membership over time. Moving from one question to another
 does not authorize context construction to rank, filter, or truncate retained
@@ -120,6 +126,14 @@ understand a follow-up or preserve the native context of a model exchange. It
 does not become SessionFrame membership automatically, and SessionFrame does
 not store raw chat as research authority.
 
+`ConversationHistory` is the typed non-authoritative conversation component.
+The active Planner graph currently checkpoints native messages directly for
+interrupt/resume and PydanticAI history; it does not synchronize them into a
+durable `ConversationHistory`. A future `SessionMemory` is intended to compose
+`SessionFrame` and `ConversationHistory` without collapsing their authority
+boundaries. That unified aggregate and durable conversation persistence are
+**Deferred**.
+
 After restart, authoritative continuity must come from durable typed research
 state and its lifecycle. Replaying conversation may aid presentation, but it
 cannot reconstruct approvals, admissions, or scientific support that were not
@@ -140,25 +154,41 @@ closed rather than being repaired from prose or “latest record” heuristics.
 
 **Partially implemented.** Current source has a bounded immutable M1-A
 `SessionFrame` value containing one optional materialized Objective, ordered
-materialized Assumptions, Tasks, Evidence, and Discoveries, and one optional
+materialized Assumptions, Hypotheses, Evidence, and Discoveries, and one optional
 materialized DataProfile. Validated replacement seams protect duplicate
-identity and direct Task/DataProfile/Evidence consistency, and SQLite can
-round-trip bounded frame snapshots.
+identity and direct DataProfile/Evidence consistency, and SQLite can round-trip
+bounded frame snapshots. Evidence retains Task provenance, but the frame does
+not require the referenced Task as membership; supported Evidence admission
+still requires an authoritative completed Task at the repository and
+application-service boundaries.
 
-The in-process application exact-copies all six current materialized member
+The scoped `SessionFrameRepository` (scoped to `scope_key=str(session_id)`)
+remains authoritative for the session's current materialized frame. The fresh-context provider reads its latest committed snapshot
+on every cognitive invocation and exact-copies all six current materialized member
 categories into immutable `PlannerContext`. Planner receives that context and
-returns a response, Human clarification request, transient Plan plus exact Task
-bundle, or continuation signal; it never receives, mutates, or returns
-SessionFrame. Application does not admit candidate state in Phase 2.
-Conversation history remains an explicit non-authoritative context field and
-native message-history input.
+returns a response, Human clarification request, self-contained transient Plan,
+or continuation signal; it never receives, mutates, or returns SessionFrame.
+The provider materializes the exact active Plan for the frame's current Objective
+into `PlannerContext`; the independent Plan admission service can atomically
+admit an exact authorized Plan and its embedded Tasks. Active Plan is
+explicit coordination state in `PlannerContext`, not SessionFrame research
+membership.
+Application owns no concrete repository-backed SessionFrame facade and delegates
+session operations to minimal runtime logic. The active graph's transient state and the
+Application-owned `ConversationHistory` (composed of `ConversationTurn`s and
+prunable `ConversationSegment`s) are both outside `PlannerContext`.
 
 The current value is not the canonical typed-reference membership FCO. It has
 no frame identity, Objective-bound session identity, reference manifest,
-active Objective/DataProfile selectors distinct from materialized objects,
-successor lineage, or runtime reload authority. The in-process application
-retains it only for the current process. Canonical durable session continuity
-and restart reconstruction remain **Deferred**.
+active Objective/DataProfile selectors distinct from materialized objects, or
+successor lineage. Its bounded materialized snapshots are workspace-scoped and
+restart-readable on SQLite, but canonical typed-reference session continuity
+and full runtime reconstruction remain **Deferred**. Current source does not define
+how an existing Objective-scoped frame succeeds to a newly approved different
+Objective while preserving or dropping prior Hypotheses, Evidence, and
+Discoveries. It also does not define a coordination-specific projection for
+the semantic Task definitions in an active Plan.
+The runtime therefore does not apply a transient candidate to the frame.
 
 Continue with [Context type safety](context-type-safety.md) for the rules that
 govern operation-specific selection and [Continuity and resume](continuity-and-resume.md)

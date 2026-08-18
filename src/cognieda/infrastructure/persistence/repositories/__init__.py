@@ -1,5 +1,8 @@
 """Research-state and provenance persistence repositories."""
 
+from cognieda.infrastructure.persistence.repositories.active_plan_repository import (
+    ActivePlanRepository,
+)
 from cognieda.infrastructure.persistence.repositories.analysis_frame_repository import (
     AnalysisFrameRepository,
 )
@@ -54,6 +57,7 @@ from cognieda.infrastructure.persistence.repositories.user_decision_repository i
 )
 
 __all__ = [
+    "ActivePlanRepository",
     "AnalysisFrameRepository",
     "AssumptionRepository",
     "AssumptionUpdate",

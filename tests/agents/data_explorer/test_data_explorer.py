@@ -134,9 +134,7 @@ def test_data_explorer_rejects_direct_scientific_task_dispatch() -> None:
         instruction="Test a scientific relationship.",
     )
 
-    result = asyncio.run(
-        DataExplorer().run(_request(Capability.DATA_ANALYSIS, task))
-    )
+    result = asyncio.run(DataExplorer().run(_request(Capability.DATA_ANALYSIS, task)))
 
     assert result.status is ExecutionStatus.FAILED
     assert result.failure is not None
@@ -147,14 +145,7 @@ def test_data_explorer_rejects_direct_scientific_task_dispatch() -> None:
 
 def test_data_explorer_provider_maps_all_data_capabilities_to_one_instance() -> None:
     registry = ExecutorRegistry()
-    registry.register_provider(
-        DataExplorer,
-        capabilities=(
-            Capability.DATA_ANALYSIS,
-            Capability.DATA_PROFILING,
-            Capability.DATA_TRANSFORMATION,
-        ),
-    )
+    registry.register(DataExplorer)
     dispatcher = ExecutorDispatcher(registry)
 
     providers = {registry.resolve(capability) for capability in registry.list_capabilities()}

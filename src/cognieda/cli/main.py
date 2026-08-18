@@ -1,26 +1,53 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-if __package__ in {None, ""}:
-    sys.path.append(str(Path(__file__).resolve().parents[2]))
-    from cognieda.cli.renderer import Renderer
-    from cognieda.runtime.messages import Message, MessageRole, MessageType
-else:
-    from .renderer import Renderer
-    from ..runtime.messages import Message, MessageRole, MessageType
+from cognieda.runtime.events import (
+    AssistantThinkingFinished, 
+    AssistantThinkingStarted, 
+    HumanInputRequested, 
+    MessageProduced, 
+    PlanProposed
+)
+from .prompt import Prompt
+from .renderer import Renderer
 
 if TYPE_CHECKING:
     from cognieda.runtime import Application
 
 
 async def repl(app: Application, renderer: Renderer) -> None:
+    app.event_bus.subscribe(
+        MessageProduced,
+        renderer.handle_message,
+    )
+    app.event_bus.subscribe(
+        HumanInputRequested,
+        renderer.handle_human_input,
+    )
+    app.event_bus.subscribe(
+        PlanProposed,
+        renderer.handle_plan,
+    )
+    app.event_bus.subscribe(
+        AssistantThinkingStarted,
+        renderer.handle_thinking_started,
+    )
+    
+    app.event_bus.subscribe(
+        AssistantThinkingFinished,
+        renderer.handle_thinking_finished,
+    )
+
     renderer.render_session_start(app.workspace.root)
 
+    prompt = Prompt(app)
+
     while True:
-        text = renderer.read_input()
+        try:
+            text = (await prompt.read()).strip()
+        except (EOFError, KeyboardInterrupt):
+            break
 
         if text in {"exit", "quit"}:
             break
@@ -28,12 +55,4 @@ async def repl(app: Application, renderer: Renderer) -> None:
         if not text:
             continue
 
-        renderer.render(
-            Message(
-                type=MessageType.TEXT,
-                role=MessageRole.USER,
-                content=text,
-            )
-        )
-        response = await app.submit_message(text)
-        renderer.render(response)
+        await app.submit_message(text)

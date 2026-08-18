@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from uuid import UUID
 
 from sqlmodel import Session, select
@@ -45,13 +46,13 @@ class PlanRepository:
             if record_to_schema(Assumption, assumption_row) != assumption:
                 raise ValueError("Plan Assumption differs from the admitted Assumption.")
 
-        tasks: list[Task] = []
-        for task_id in plan.task_ids:
-            task_row = self._session.get(TaskRecord, task_id)
+        for task in plan.tasks:
+            task_row = self._session.get(TaskRecord, task.task_id)
             if task_row is None:
                 raise ValueError("Plan references a missing Task.")
-            tasks.append(record_to_schema(Task, task_row))
-        plan.validate_tasks(tasks)
+            persisted = record_to_schema(Task, task_row)
+            if persisted.semantic_payload() != task.semantic_payload():
+                raise ValueError("Plan Task differs from the admitted Task definition.")
 
         self._session.add(
             PlanRecord(
@@ -87,9 +88,10 @@ class PlanRepository:
                 PlanDependencyRecord(
                     plan_id=plan.plan_id,
                     prerequisite_task_id=dependency.prerequisite_task_id,
-                    dependent_task_id=dependency.dependent_task_id,
+                    dependent_task_id=dependent_task_id,
                 )
                 for dependency in plan.dependencies
+                for dependent_task_id in dependency.dependent_task_ids
             ]
         )
 
@@ -131,22 +133,28 @@ class PlanRepository:
         dependency_rows = self._session.exec(
             select(PlanDependencyRecord).where(PlanDependencyRecord.plan_id == plan_id)
         ).all()
+        dependent_ids_by_prerequisite: defaultdict[UUID, list[UUID]] = defaultdict(list)
+        for dependency in dependency_rows:
+            dependent_ids_by_prerequisite[dependency.prerequisite_task_id].append(
+                dependency.dependent_task_id
+            )
         plan = Plan.model_validate(
             {
                 "plan_id": header.plan_id,
                 "objective": objective,
                 "assumptions": assumptions,
-                "task_ids": [membership.task_id for membership in task_rows],
+                "tasks": tasks,
                 "dependencies": [
                     {
-                        "prerequisite_task_id": dependency.prerequisite_task_id,
-                        "dependent_task_id": dependency.dependent_task_id,
+                        "prerequisite_task_id": prerequisite_task_id,
+                        "dependent_task_ids": dependent_task_ids,
                     }
-                    for dependency in dependency_rows
+                    for prerequisite_task_id, dependent_task_ids in (
+                        dependent_ids_by_prerequisite.items()
+                    )
                 ],
             }
         )
-        plan.validate_tasks(tasks)
         if plan.fingerprint != header.fingerprint:
             raise ValueError("Persisted Plan fingerprint does not match exact content.")
         return plan

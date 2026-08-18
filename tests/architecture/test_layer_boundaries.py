@@ -43,11 +43,10 @@ def test_planner_cannot_access_dataset_implementation_directly() -> None:
     assert violations == []
 
 
-def test_planner_cognitive_core_does_not_import_deferred_scientific_authority() -> None:
+def test_planner_cognitive_core_does_not_import_scientific_authoring_contracts() -> None:
     forbidden_symbols = {
         "EvidenceRequest",
         "GovernanceDecision",
-        "Hypothesis",
         "InvestigationProtocol",
     }
     violations: list[str] = []
@@ -58,9 +57,7 @@ def test_planner_cognitive_core_does_not_import_deferred_scientific_authority() 
                 continue
             imported = forbidden_symbols.intersection(alias.name for alias in node.names)
             if imported:
-                violations.append(
-                    f"{path.relative_to(PROJECT_ROOT)} imports {sorted(imported)}"
-                )
+                violations.append(f"{path.relative_to(PROJECT_ROOT)} imports {sorted(imported)}")
 
     assert violations == []
 
@@ -77,26 +74,91 @@ def test_planner_has_no_session_frame_dependency_or_legacy_graph_surface() -> No
     from cognieda.agents.planner.context import PlannerContext
     from cognieda.agents.planner.types import PlannerOutput, PlannerResult
 
-    signature = inspect.signature(Planner.run)
+    signature = inspect.signature(Planner.handle_message)
     assert violations == []
     assert "session_frame" not in signature.parameters
-    assert signature.parameters["context"].default is inspect.Parameter.empty
+    assert tuple(signature.parameters) == ("self", "message", "context", "message_history")
+    assert signature.parameters["context"].annotation in {PlannerContext, "PlannerContext"}
     assert inspect.iscoroutinefunction(Planner.reload)
     assert "session_frame" not in PlannerContext.model_fields
     assert "session_frame" not in PlannerResult.model_fields
     assert "session_frame" not in PlannerOutput.model_fields
 
     planner_root = SOURCE_ROOT / "agents" / "planner"
-    for obsolete in ("model.py", "graph.py", "nodes.py"):
+    for obsolete in ("model.py",):
         assert not (planner_root / obsolete).exists()
+    for required in ("graph.py", "nodes.py", "state.py"):
+        assert (planner_root / required).is_file()
+
+
+def test_planner_and_application_respect_session_repository_boundary() -> None:
+    planner_imports = _imports(_python_files("agents/planner"))
+    planner_violations = [
+        f"{path.relative_to(PROJECT_ROOT)} imports {module}"
+        for path, module in planner_imports
+        if module.startswith("cognieda.infrastructure.persistence")
+    ]
+    application_path = SOURCE_ROOT / "runtime" / "application.py"
+    application_violations = [
+        module
+        for _, module in _imports((application_path,))
+        if module.startswith("cognieda.infrastructure.persistence")
+    ]
+
+    from cognieda.agents.planner.agent import Planner
+
+    constructor = inspect.signature(Planner).parameters
+    assert planner_violations == []
+    assert application_violations == []
+    assert "planner_context_provider" not in constructor
+
+
+def test_conversation_memory_is_separate_from_authoritative_planner_context() -> None:
+    from cognieda.agents.planner.context import PlannerContext
+    from cognieda.agents.planner.state import PlannerState
+    from cognieda.runtime.application import Application
+    from cognieda.runtime.conversation import (
+        ConversationHistory,
+        ConversationSegment,
+        ConversationTurn,
+    )
+
+    assert tuple(ConversationHistory.model_fields) == ("turns",)
+    assert tuple(ConversationTurn.model_fields) == ("turn_id", "segments")
+    assert tuple(ConversationSegment.model_fields) == ("segment_id", "messages")
+    assert "conversation_history" not in PlannerContext.model_fields
+    assert "context" not in PlannerState.__annotations__
+    assert not hasattr(Application, "conversation_history")
+
+
+def test_runtime_does_not_define_planner_lifecycle_internals() -> None:
+    forbidden = {
+        "PlannerState",
+        "PlannerGraphState",
+        "PlannerRuntime",
+        "PlannerRuntimeContext",
+        "SessionFrameState",
+        "build_planner_graph",
+    }
+    violations: list[str] = []
+    runtime_root = SOURCE_ROOT / "runtime"
+    for path in runtime_root.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name in forbidden:
+                    violations.append(
+                        f"{path.relative_to(PROJECT_ROOT)} defines {node.name}"
+                    )
+
+    assert violations == []
+    assert not (runtime_root / "planner_runtime.py").exists()
+    assert (runtime_root / "planner_context.py").is_file()
 
 
 def test_planner_production_source_has_no_obsolete_cognitive_symbols() -> None:
     planner_root = SOURCE_ROOT / "agents" / "planner"
-    source = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in planner_root.rglob("*.py")
-    )
+    source = "\n".join(path.read_text(encoding="utf-8") for path in planner_root.rglob("*.py"))
 
     for obsolete in (
         "PlannerDecision",
@@ -105,6 +167,10 @@ def test_planner_production_source_has_no_obsolete_cognitive_symbols() -> None:
         "PlannerModelInput",
         "PlannerAnswerInput",
         "PlannerResponseDraft",
+        "PlannerGraphContext",
+        "PlannerCognitiveInvoker",
+        "candidate_tasks",
+        "proposed_tasks",
         "selected_capability",
         "created_assumption",
         "created_objective",
@@ -140,11 +206,7 @@ def test_removed_ownership_packages_have_no_python_source() -> None:
         "tools",
     )
 
-    assert {
-        path
-        for path in removed
-        if any((SOURCE_ROOT / path).rglob("*.py"))
-    } == set()
+    assert {path for path in removed if any((SOURCE_ROOT / path).rglob("*.py"))} == set()
 
 
 def test_specialist_roles_are_peer_packages() -> None:
@@ -181,9 +243,7 @@ def test_data_explorer_has_no_dynamic_code_execution() -> None:
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
             and node.func.id in {"exec", "eval"}
-            for node in ast.walk(
-                ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-            )
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"), filename=str(path)))
         )
     ]
 

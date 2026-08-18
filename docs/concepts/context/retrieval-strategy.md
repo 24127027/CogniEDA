@@ -148,7 +148,7 @@ lineage, not a generic search result.
 **Unsupported.** No supplemental retrieval engine or Graph Miner inquiry is
 composed into the current bounded runtime. The superseded donor policy,
 scoring, retrieval schema, and planning-only Discovery retrieval package have
-been removed. The current Application exact-materializes every retained frame
-member into Planner context and carries in-process conversation history through
-a separate non-authoritative field. Supplemental eligibility-first retrieval
+been removed. The current fresh-context provider exact-materializes every
+retained frame member into Planner context, while the Planner graph carries its
+active native message history separately and non-authoritatively. Supplemental eligibility-first retrieval
 remains **Deferred**.

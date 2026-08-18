@@ -196,18 +196,20 @@ wire format, or serialization details.
 
 ## Implementation status
 
-**Partially implemented.** At the S0 library boundary, one lightweight
-execution-owned `Capability` `StrEnum` drives an explicit `Capability -> ExecutorFactory`
-registry. One dependency-aware factory may serve multiple capabilities and its
-provider instance is reused. Duplicate and absent registrations fail closed.
-The thin async dispatcher invokes the resolved provider and preserves provider
+**Partially implemented.** At the S0 library boundary, the role-neutral
+`delegation` package owns one lightweight `Capability` `StrEnum` and an
+explicit `Capability -> ExecutorFactory` registry. `register(factory)` derives
+capabilities from the executor's declared `CAPABILITIES` metadata. One
+dependency-aware factory may serve multiple capabilities and its resolved
+executor instance is reused. Duplicate and absent registrations fail closed.
+The thin async dispatcher invokes the resolved executor and preserves executor
 failure as a controlled error.
 
 The current PydanticAI adapter exposes a typed data-capability request through
 Planner dependencies. Focused tests validate adapter to dispatcher to
-registered-provider invocation without a model endpoint. Bootstrap explicitly
-composes a registry, Data Explorer provider factory, dispatcher, and
-`PlannerDeps`; availability no longer depends on executor module import order.
+registered-provider invocation without a model endpoint. Bootstrap explicitly composes a registry, Data Explorer provider factory,
+dispatcher, and `PlannerToolDeps`; availability no longer depends on executor
+module import order.
 
 `ExecutionResult` now contains only shared transport metadata.
 `DataExplorerResult` and the deferred `HypothesisAnalystResult` own their
@@ -224,7 +226,7 @@ supported-operation set. Deterministic code
 then validates exact columns and bounded parameters before execution. The
 role-specific `DataAnalysisPlan`, `DataAnalysisOperation`, and
 `CorrelationMethod` contracts live under `agents.data_explorer`; the generic
-`execution` package does not define or import them.
+`delegation` package does not define or import them.
 
 Data Explorer is registered for `DATA_ANALYSIS`, `DATA_PROFILING`, and
 `DATA_TRANSFORMATION`. The first two have a bounded donor implementation when

@@ -1,14 +1,32 @@
 from __future__ import annotations
 
-from cognieda.agents.planner.agent import Planner
-from cognieda.agents.planner.types import PlannerResult
-from cognieda.application.ports import AgentFactoryPort
-from cognieda.delegation import ExecutorDispatcher
-from cognieda.schemas.artifacts import SessionFrame
+from getpass import getpass
+from typing import Callable
+from uuid import UUID
 
-from .conversation import ConversationHistory
+from cognieda.agents.planner.agent import Planner
+from cognieda.agents.planner.context import PlannerContext
+from cognieda.agents.planner.state import PlannerTurnOutcome
+from cognieda.application.ports import AgentFactoryPort
+from cognieda.runtime.conversation import ConversationHistory
+from cognieda.runtime.event_bus import EventBus
+from cognieda.runtime.events import (
+    HumanInputRequested, 
+    MessageProduced, 
+    PlanProposed, 
+    AssistantThinkingStarted, 
+    AssistantThinkingFinished
+)
+from cognieda.runtime.commands.types import CommandSuggestion
+from cognieda.runtime.commands import (
+    CommandContext,
+    CommandHandler,
+    CommandParser,
+    create_command_registry,
+)
+
+
 from .messages import Message, MessageRole, MessageType
-from .planner_context import build_planner_context
 from .workspace import MissingModelCredentialError, Workspace
 
 
@@ -17,216 +35,117 @@ class Application:
         self,
         workspace: Workspace,
         planner_agent: Planner,
-        dispatcher: ExecutorDispatcher,
         agent_factory: AgentFactoryPort,
+        event_bus: EventBus,
+        session_id: UUID,
+        conversation_history: ConversationHistory,
+        planner_context_factory: Callable[[], PlannerContext],
     ) -> None:
         self.workspace = workspace
         self.agent_factory = agent_factory
         self.planner_agent = planner_agent
-        self.dispatcher = dispatcher
-        self.session_frame = SessionFrame()
-        self.conversation_history = ConversationHistory()
+        self.event_bus = event_bus
+        self.session_id = session_id
+        self.conversation_history = conversation_history
+        self.planner_context_factory = planner_context_factory
 
-    async def submit_message(self, message: str) -> Message:
+        self.command_handler = CommandHandler(
+            parser=CommandParser(),
+            registry=create_command_registry(),
+            context=CommandContext(
+                workspace=self.workspace,
+                agent_factory=self.agent_factory,
+                planner=self.planner_agent,
+                reload_runtime=self._reload_runtime,
+                prompt_secret=getpass,
+            ),
+        )
+
+        self.command_handler = CommandHandler(
+            parser=CommandParser(),
+            registry=create_command_registry(),
+            context=CommandContext(
+                workspace=self.workspace,
+                agent_factory=self.agent_factory,
+                planner=self.planner_agent,
+                reload_runtime=self._reload_runtime,
+                prompt_secret=getpass,
+            ),
+        )
+
+    def suggest_commands(
+        self,
+        prefix: str,
+    ) -> tuple[CommandSuggestion, ...]:
+        return self.command_handler.suggest(prefix)
+
+    async def submit_message(self, message: str) -> None:
+        await self.event_bus.publish(
+            MessageProduced(
+                message=Message(
+                    type=MessageType.TEXT,
+                    role=MessageRole.USER,
+                    content=message,
+                )
+            )
+        )
+
         if message.startswith("/"):
-            return await self._handle_command(message)
+            command_result = await self.command_handler.handle(message)
+            await self.event_bus.publish(
+                MessageProduced(message=command_result)
+            )
+            return
 
-        planner_context = build_planner_context(
-            self.session_frame,
-            self.conversation_history,
-        )
         try:
-            planner_output = await self.planner_agent.run(
+            context = self.planner_context_factory()
+        except Exception:
+            await self._emit_message(
+                "Planner authoritative context could not be materialized.",
+                message_type=MessageType.ERROR,
+            )
+            return
+
+        message_history = tuple(self.conversation_history.model_messages())
+
+        try:
+            await self.event_bus.publish(AssistantThinkingStarted())
+            outcome, completed_segment = await self.planner_agent.handle_message(
                 message,
-                context=planner_context,
+                context=context,
+                message_history=message_history,
             )
+            await self.event_bus.publish(AssistantThinkingFinished())
         except MissingModelCredentialError as e:
-            return self._text(
-                f"{e}\n\n"
-                "Run '/provider key <provider>' to configure an API key."
-            )
+            await self._emit_message(f"{e}\n\nRun '/provider key <provider>' to configure an API key.")
+            return
 
-        if planner_output.messages:
-            self.conversation_history = self.conversation_history.add_turn(
-                planner_output.messages
-            )
+        if completed_segment is not None:
+            self.conversation_history = self.conversation_history.commit_segment(completed_segment)
 
-        return Message(
-            type=MessageType.TEXT,
-            role=MessageRole.ASSISTANT,
-            content=self._present_planner_result(planner_output.result),
-        )
+        await self._emit_planner_outcome(outcome)
 
-    @staticmethod
-    def _present_planner_result(result: PlannerResult) -> str:
-        if result.response is not None:
-            return result.response
-        if result.human_input_request is not None:
-            return result.human_input_request
-        if result.plan is not None:
-            return f"Planner proposed a candidate Plan with {len(result.tasks)} Task(s)."
-        if result.continue_execution:
-            return "The active Plan should continue execution."
-        raise ValueError("PlannerResult has no presentable conclusion.")
+    async def _emit_planner_outcome(self, outcome: PlannerTurnOutcome) -> None:
+        if outcome.error is not None:
+            await self._emit_message(outcome.error.message, message_type=MessageType.ERROR)
+            return
 
-    # TODO: Move command handling to a separate class or module for better separation of concerns
-    async def _handle_command(self, command: str) -> Message:
-        parts = command.split()
+        if outcome.proposed_plan is not None:
+            await self.event_bus.publish(PlanProposed(plan=outcome.proposed_plan))
 
-        match parts:
-            #
-            # Skills
-            #
-            case ["/skill", "add", name, directory]:
-                self.workspace.add_skill(name, directory)
+        if outcome.response is not None:
+            await self._emit_message(outcome.response)
 
-                await self._reload_runtime(
-                    reload_tooling=True,
-                    recreate_agent=True,
-                )
-
-                return self._text(
-                    f"Added skill '{name}'."
-                )
-
-            case ["/skill", "rm", name]:
-                self.workspace.remove_skill(name)
-
-                await self._reload_runtime(
-                    reload_tooling=True,
-                    recreate_agent=True,
-                )
-
-                return self._text(
-                    f"Removed skill '{name}'."
-                )
-
-            case ["/skill", "list"]:
-                skills = self.workspace.load_skills_config()
-
-                if not skills:
-                    return self._text("No skills registered.")
-
-                return self._text(
-                    "\n".join(
-                        f"{name}: {cfg['directories']}"
-                        for name, cfg in skills.items()
+        if outcome.human_input_request is not None:
+            await self.event_bus.publish(
+                HumanInputRequested(
+                    message=Message(
+                        type=MessageType.TEXT,
+                        role=MessageRole.ASSISTANT,
+                        content=outcome.human_input_request,
                     )
                 )
-
-            case ["/skill", "use", worker, skill]:
-                self.workspace.add_worker_skill(worker, skill)
-
-                await self._reload_runtime(
-                    reload_tooling=True,
-                    recreate_agent=True,
-                )
-
-                return self._text(
-                    f"Assigned '{skill}' to '{worker}'."
-                )
-
-            case ["/skill", "drop", worker, skill]:
-                self.workspace.remove_worker_skill(worker, skill)
-
-                await self._reload_runtime(
-                    reload_tooling=True,
-                    recreate_agent=True,
-                )
-
-                return self._text(
-                    f"Removed '{skill}' from '{worker}'."
-                )
-
-            #
-            # Providers
-            #
-            case ["/provider"]:
-                profile = self.workspace.project_config.default_provider
-
-                try:
-                    self.workspace.project_config.validate()
-                except ValueError as e:
-                    return self._text(str(e))
-                provider = self.workspace.project_config.providers[profile]
-
-                configured = "yes" if provider.api_key_configured() else "no"
-
-                return self._text(
-                    f"""Current provider : {profile}
-        Model            : {provider.model}
-        API key          : {configured}"""
-                )
-
-            case ["/provider", "list"]:
-                return self._text(
-                    "\n".join(
-                        self.workspace.project_config.providers.keys()
-                    )
-                )
-
-            case ["/provider", "use", profile]:
-                self.workspace.use_provider(profile)
-
-                await self._reload_runtime(
-                    recreate_agent=True,
-                )
-
-                return self._text(
-                    f"Using provider '{profile}'."
-                )
-
-            case ["/provider", "model", profile, model]:
-                self.workspace.set_provider_model(
-                    profile,
-                    model,
-                )
-
-                await self._reload_runtime(
-                    recreate_agent=True,
-                )
-
-                return self._text(
-                    f"Updated '{profile}' model to '{model}'."
-                )
-            # TODO:
-            # Prompting for secrets belongs to the CLI/UI layer.
-            # Application should receive the API key as an argument rather than
-            # calling input() directly.
-            case ["/provider", "key", profile]:
-                api_key = input(
-                    f"{profile} API key: "
-                ).strip()
-
-                self.workspace.set_provider_api_key(
-                    profile,
-                    api_key,
-                )
-
-                await self._reload_runtime(
-                    recreate_agent=True,
-                )
-
-                return self._text(
-                    f"Stored API key for '{profile}'."
-                )
-
-            #
-            # Planner
-            #
-            case ["/reload"]:
-                await self._reload_runtime(
-                    reload_instruction=True,
-                )
-
-                return self._text(
-                    "Planner instructions reloaded."
-                )
-
-            case _:
-                return self._text(
-                    f"Unknown command: '{command}'."
-                )
+            )
 
     def _text(self, content: str) -> Message:
         return Message(
@@ -234,7 +153,7 @@ class Application:
             role=MessageRole.ASSISTANT,
             content=content,
         )
-    
+
     async def _reload_runtime(
         self,
         *,
@@ -247,14 +166,29 @@ class Application:
 
         await self.planner_agent.reload(
             model_config=(
-                self.workspace.project_config.try_resolve_model()
-                if recreate_agent
-                else None
+                self.workspace.project_config.try_resolve_model() if recreate_agent else None
             ),
             agent_instruction=(
-                self.workspace.load_agent_instruction()
-                if reload_instruction
-                else None
+                self.workspace.load_agent_instruction() if reload_instruction else None
             ),
             recreate_agent=recreate_agent,
         )
+
+    async def _emit_message(
+        self,
+        content: str,
+        *,
+        message_type: MessageType = MessageType.TEXT,
+    ) -> None:
+        await self.event_bus.publish(
+            MessageProduced(
+                message=Message(
+                    type=message_type,
+                    role=MessageRole.ASSISTANT,
+                    content=content,
+                )
+            )
+        )
+
+
+__all__ = ("Application",)

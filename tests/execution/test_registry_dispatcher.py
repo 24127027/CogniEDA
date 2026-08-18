@@ -15,8 +15,8 @@ from cognieda.delegation import (
     ExecutionStatus,
     ExecutorContext,
     ExecutorDispatcher,
-    ExecutorInput,
     ExecutorError,
+    ExecutorInput,
     ExecutorRegistry,
     normalize_for_planner,
 )
@@ -43,6 +43,8 @@ def _request(capability: Capability = Capability.DATA_ANALYSIS) -> ExecutionRequ
 
 
 class FakeProvider:
+    CAPABILITIES = (Capability.DATA_ANALYSIS, Capability.DATA_PROFILING)
+
     def __init__(self, dependency: str = "default") -> None:
         self.dependency = dependency
         self.calls: list[ExecutionRequest] = []
@@ -58,11 +60,15 @@ class FakeProvider:
 
 
 class FailingProvider:
+    CAPABILITIES = (Capability.DATA_ANALYSIS,)
+
     async def run(self, request: ExecutionRequest) -> ExecutionResult:
         raise RuntimeError("provider exploded")
 
 
 class InvalidResultProvider:
+    CAPABILITIES = (Capability.DATA_ANALYSIS,)
+
     async def run(self, request: ExecutionRequest) -> object:
         return {"status": "succeeded"}
 
@@ -84,8 +90,11 @@ def test_execution_request_rejects_unknown_raw_capability() -> None:
 
 
 def test_registry_registers_one_capability() -> None:
+    class SingleCapabilityProvider(FakeProvider):
+        CAPABILITIES = (Capability.DATA_ANALYSIS,)
+
     registry = ExecutorRegistry()
-    registry.register_provider(FakeProvider, capabilities=(Capability.DATA_ANALYSIS,))
+    registry.register(SingleCapabilityProvider)
 
     assert isinstance(registry.resolve(Capability.DATA_ANALYSIS), FakeProvider)
     assert registry.list_capabilities() == (Capability.DATA_ANALYSIS,)
@@ -93,10 +102,7 @@ def test_registry_registers_one_capability() -> None:
 
 def test_registry_maps_multiple_capabilities_to_one_reused_provider() -> None:
     registry = ExecutorRegistry()
-    registry.register_provider(
-        FakeProvider,
-        capabilities=(Capability.DATA_ANALYSIS, Capability.DATA_PROFILING),
-    )
+    registry.register(FakeProvider)
 
     first = registry.resolve(Capability.DATA_ANALYSIS)
     second = registry.resolve(Capability.DATA_PROFILING)
@@ -105,13 +111,25 @@ def test_registry_maps_multiple_capabilities_to_one_reused_provider() -> None:
 
 
 def test_registry_rejects_empty_and_duplicate_registration() -> None:
-    registry = ExecutorRegistry()
-    with pytest.raises(ValueError, match="At least one capability"):
-        registry.register_provider(FakeProvider, capabilities=())
+    class EmptyProvider(FakeProvider):
+        CAPABILITIES = ()
 
-    registry.register_provider(FakeProvider, capabilities=(Capability.DATA_ANALYSIS,))
+    class DuplicateCapabilityProvider(FakeProvider):
+        CAPABILITIES = (Capability.DATA_ANALYSIS, Capability.DATA_ANALYSIS)
+
+    class SingleCapabilityProvider(FakeProvider):
+        CAPABILITIES = (Capability.DATA_ANALYSIS,)
+
+    registry = ExecutorRegistry()
+    registry.register(EmptyProvider)
+    assert registry.list_capabilities() == ()
+
+    with pytest.raises(ValueError, match="duplicate capabilities"):
+        registry.register(DuplicateCapabilityProvider)
+
+    registry.register(SingleCapabilityProvider)
     with pytest.raises(ValueError, match="Capability already registered: data_analysis"):
-        registry.register_provider(FakeProvider, capabilities=(Capability.DATA_ANALYSIS,))
+        registry.register(SingleCapabilityProvider)
 
 
 def test_registry_fails_closed_for_unregistered_capability() -> None:
@@ -120,7 +138,7 @@ def test_registry_fails_closed_for_unregistered_capability() -> None:
         registry.resolve(Capability.GRAPH_MINING)
 
 
-def test_dependency_aware_factory_constructs_provider_once() -> None:
+def test_factory_validates_then_reuses_one_resolved_executor() -> None:
     registry = ExecutorRegistry()
     dependency = "injected-repository"
     factory_calls = 0
@@ -130,20 +148,17 @@ def test_dependency_aware_factory_constructs_provider_once() -> None:
         factory_calls += 1
         return FakeProvider(dependency)
 
-    registry.register_provider(
-        factory,
-        capabilities=(Capability.DATA_ANALYSIS, Capability.DATA_PROFILING),
-    )
+    registry.register(factory)
 
     provider = registry.resolve(Capability.DATA_ANALYSIS)
     assert registry.resolve(Capability.DATA_PROFILING) is provider
     assert provider.dependency == dependency
-    assert factory_calls == 1
+    assert factory_calls == 2
 
 
 def test_dispatcher_invokes_registered_provider_asynchronously() -> None:
     registry = ExecutorRegistry()
-    registry.register_provider(FakeProvider, capabilities=(Capability.DATA_ANALYSIS,))
+    registry.register(FakeProvider)
     dispatcher = ExecutorDispatcher(registry)
     request = _request()
 
@@ -156,7 +171,7 @@ def test_dispatcher_invokes_registered_provider_asynchronously() -> None:
 
 def test_dispatcher_preserves_controlled_provider_failure() -> None:
     registry = ExecutorRegistry()
-    registry.register_provider(FailingProvider, capabilities=(Capability.DATA_ANALYSIS,))
+    registry.register(FailingProvider)
     dispatcher = ExecutorDispatcher(registry)
 
     with pytest.raises(ExecutorError, match="provider exploded") as error:
@@ -167,10 +182,7 @@ def test_dispatcher_preserves_controlled_provider_failure() -> None:
 
 def test_dispatcher_rejects_incompatible_provider_result() -> None:
     registry = ExecutorRegistry()
-    registry.register_provider(
-        InvalidResultProvider,
-        capabilities=(Capability.DATA_ANALYSIS,),
-    )
+    registry.register(InvalidResultProvider)
 
     with pytest.raises(ExecutorError, match="incompatible result"):
         asyncio.run(ExecutorDispatcher(registry).dispatch(_request()))
@@ -195,7 +207,9 @@ def test_bootstrap_composes_real_dispatcher_and_data_provider(tmp_path) -> None:
     application = bootstrap_application(tmp_path)
     request = _request(Capability.DATA_TRANSFORMATION)
 
-    result = asyncio.run(application.dispatcher.dispatch(request))
+    result = asyncio.run(
+        application.planner_agent.tool_deps.dispatcher.dispatch(request)
+    )
 
     assert result.status == ExecutionStatus.BLOCKED
     assert result.source_role == "data_explorer"

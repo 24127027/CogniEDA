@@ -23,6 +23,7 @@ from cognieda.schemas import (
     DataProfile,
     Evidence,
     EvidenceProvenance,
+    Hypothesis,
     Objective,
     SessionFrame,
     Task,
@@ -125,9 +126,21 @@ def test_data_profile_evidence_and_session_frame_round_trip_with_direct_lineage(
             tool_reference="pandas:len",
         ),
     )
+    hypothesis = Hypothesis(
+        task_id=task.task_id,
+        profile_id=profile.data_profile_id,
+        statement="The dataset contains three rows.",
+        scope="dataset:customers.csv",
+        validation_method="row count",
+        evidence_expectation="one admitted row-count observation",
+    )
 
     persisted = EvidenceRepository(db_session).create(evidence)
-    frame = SessionFrame(tasks=[task], data_profile=profile, evidences=[persisted])
+    frame = SessionFrame(
+        hypotheses=[hypothesis],
+        data_profile=profile,
+        evidences=[persisted],
+    )
     persisted_frame = SessionFrameRepository(db_session).create(frame)
 
     assert DataProfileRepository(db_session).get_by_id(profile.data_profile_id) == profile
@@ -137,6 +150,32 @@ def test_data_profile_evidence_and_session_frame_round_trip_with_direct_lineage(
     assert persisted.data_profile_id == profile.data_profile_id
     assert persisted_frame == frame
     assert SessionFrameRepository(db_session).get_latest() == frame
+    assert SessionFrameRepository(db_session).get_current() == frame
+
+
+def test_session_frame_current_is_scoped_and_restart_readable(
+    db_session: Session,
+) -> None:
+    first = SessionFrame(objective=Objective(text="First workspace Objective."))
+    second = SessionFrame(objective=Objective(text="Second workspace Objective."))
+    first_repository = SessionFrameRepository(db_session, scope_key="workspace:first")
+    second_repository = SessionFrameRepository(db_session, scope_key="workspace:second")
+
+    assert first_repository.get_current() == SessionFrame()
+    first_repository.save_current(first)
+    second_repository.save_current(second)
+    assert first_repository.get_current() == first
+    assert second_repository.get_current() == second
+
+    restarted_session = Session(db_session.get_bind())
+    try:
+        restarted = SessionFrameRepository(
+            restarted_session,
+            scope_key="workspace:first",
+        )
+        assert restarted.get_current() == first
+    finally:
+        restarted_session.close()
 
 
 def test_evidence_repository_rejects_missing_task_or_profile(db_session) -> None:

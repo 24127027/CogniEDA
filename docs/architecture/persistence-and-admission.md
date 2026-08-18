@@ -243,6 +243,9 @@ Immutable Plan repository infrastructure is **Verified on SQLite**.
 Normalized `plans`, `plan_assumptions`, `plan_tasks`, and
 `plan_dependencies` rows preserve exact Plan content and fingerprint in one
 caller-owned transaction. `plan_tasks` contains only `plan_id` and `task_id`.
+The domain groups all outgoing dependents under one prerequisite; repository
+writes flatten those groups to atomic edge rows and loads regroup them
+canonically.
 The Plan header snapshots exact Objective content;
 each assumption link snapshots exact admitted Assumption content. Reload still
 requires the referenced Objective, Assumptions, and Tasks to exist, but it
@@ -254,15 +257,31 @@ overwrite the existing snapshot, while different IDs with the same content
 fingerprint remain distinct. The repository is append-only and exposes no
 update or delete surface.
 
-No application path currently persists a Plan candidate. Human review
-precedes the intended application commit boundary; no mandatory separate
-application preflight is required before review. Commit-boundary validation and
-atomic persistence, adoption, and activation of the exact approved objects are
-**Deferred**; repository existence alone does not make pending Planner objects
-authoritative.
+`PlanAdmissionService.admit(plan)` accepts one self-contained exact candidate
+Plan at an explicit application-authority boundary. It obtains exact Task
+definitions from `plan.tasks` and validates membership, identity,
+Objective and Assumption exactness, persists legal new Objective and Task
+records, persists the immutable Plan, and writes one objective-scoped active
+pointer in a single transaction. Any failure rolls the complete transaction
+back. This service does not interpret Human text.
 
-The complete target boundary is not implemented. Canonical Plan approval,
-activation, active selection, durable role-native result inbox processing,
+The in-process Planner LangGraph retains one self-contained exact candidate Plan
+outside authoritative research state. A later natural-language Human turn is
+interpreted by Planner; only a typed `continue_execution` result with that
+candidate pending calls `PlanAdmissionService`. Admission success clears the
+candidate, while failure rolls back and retains it for correction. Native model
+history remains non-authoritative interaction state outside `PlannerContext`.
+Application materializes authoritative research state and the objective-scoped
+active Plan fresh into `PlannerContext` for each Human turn and passes it into
+`Planner.handle_message()`. Planner calls the deterministic application-authority
+admission service only from its admission node; Planner cognition does not persist
+directly. Application maps Planner lifecycle outcomes to runtime events, which do
+not reconstruct, admit, or activate state; `PlanProposed` remains a presentation
+event rather than an authority boundary.
+
+
+The complete target boundary is not implemented. Durable candidate and review
+recovery, canonical Task DAG execution, role-native result inbox processing,
 complete replay coordination, scientific Evidence admission from
 `EvidenceRequest`, governance
 workflow, Discovery admission from exact governed proposals, and end-to-end
