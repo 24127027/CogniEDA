@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import Any
+from typing import Any, Mapping
 from uuid import UUID, uuid4
 
 from pydantic import Field, JsonValue, NonNegativeInt, field_validator, model_validator
@@ -88,6 +88,27 @@ class DataProfile(ImmutableCogniEDABaseModel):
         if self.column_count != len(self.columns):
             raise ValueError("column_count must equal the number of ColumnProfile entries.")
         return self
+
+    def with_column_descriptions(
+        self,
+        descriptions: Mapping[str, str],
+    ) -> DataProfile:
+        column_names = {column.name for column in self.columns}
+        unknown = descriptions.keys() - column_names
+
+        if unknown:
+            raise ValueError(f"Unknown columns: {sorted(unknown)}")
+
+        columns = tuple(
+            column.model_copy(
+                update={"semantic_description": descriptions[column.name]}
+            )
+            if column.name in descriptions
+            else column
+            for column in self.columns
+        )
+
+        return self.model_copy(update={"columns": columns})
 
 
 class Assumption(ImmutableCogniEDABaseModel):
