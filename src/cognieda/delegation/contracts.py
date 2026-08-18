@@ -52,16 +52,6 @@ class DEExecutorContext(ExecutorContext):
     # RAM-resident DataProfile, if already produced by a prior profiling pass.
     data_profile: Any | None = None  # DataProfile at runtime; typed Any to avoid circular import
 
-
-class BaseState(BaseModel):
-    """Shared graph state for graph-backed executor scaffolds."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    task: Task
-    messages: list[ModelMessage] = Field(default_factory=list)
-
-
 class ExecutionRequest(BaseModel):
     """Typed capability request sent through the executor dispatcher."""
 
