@@ -3,7 +3,7 @@
 Public API
 ----------
 DataExplorer
-    .run(request: ExecutionRequest) -> DataExplorerResult
+    .run(request: ExecutorRequest) -> DataExplorerResult
         The ExecutorProvider contract entry point.
     .reload() -> None
         Reloads the agent factory and any other internal state.
@@ -20,7 +20,7 @@ calls the planner directly, producing a deterministic result.
 
 from cognieda.application.ports.llm import AgentFactoryPort, ModelConfig
 from cognieda.delegation.capabilities import Capability
-from cognieda.delegation.contracts import ExecutorInput, ExecutionResult
+from cognieda.delegation.contracts import ExecutorRequest, ExecutorResult
 
 from .dependencies import DataExplorerDeps
 
@@ -44,7 +44,7 @@ class DataExplorer:
         self.agent_factory = agent_factory
         self.deps = deps
 
-    async def run(self, request: ExecutorInput) -> ExecutionResult:
+    async def run(self, request: ExecutorRequest) -> ExecutorResult:
         """ExecutorProvider contract entry point."""
         ...
 

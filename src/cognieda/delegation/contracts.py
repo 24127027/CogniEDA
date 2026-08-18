@@ -31,8 +31,8 @@ class DEExecutorContext(ExecutorContext):
     for the RAM MVP we pass the live object to avoid a DB round-trip.
 
     # MVP NOTE: data_profile is a direct in-RAM reference.  It is intentionally
-    # NOT stored inside ExecutionResult.  The pointer pattern below (in
-    # ExecutionResult.emitted_artifacts) sends the UUID key, and the caller
+    # NOT stored inside ExecutorResult.  The pointer pattern below (in
+    # ExecutorResult.emitted_artifacts) sends the UUID key, and the caller
     # retains the live object separately.
     """
 
@@ -44,7 +44,7 @@ class DEExecutorContext(ExecutorContext):
     # RAM-resident DataProfile, if already produced by a prior profiling pass.
     data_profile: Any | None = None  # DataProfile at runtime; typed Any to avoid circular import
 
-class ExecutionRequest(BaseModel):
+class ExecutorRequest(BaseModel):
     """Typed capability request sent through the executor dispatcher."""
 
     model_config = ConfigDict(extra="forbid")
@@ -58,7 +58,7 @@ class ExecutionStatus(StrEnum):
     BLOCKED = "blocked"
     FAILED = "failed"
 
-class ExecutionResult(BaseModel):
+class ExecutorResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     task_id: UUID
@@ -75,7 +75,7 @@ class Executor(Protocol):
         as a tuple of `Capability` instances that it can handle.
     """
 
-    async def run(self, request: ExecutionRequest) -> ExecutionResult: ...
+    async def run(self, request: ExecutorRequest) -> ExecutorResult: ...
 
 
 class PlannerWorkOutcome(BaseModel):
@@ -92,7 +92,7 @@ class PlannerWorkOutcome(BaseModel):
     result_digest: str
 
 
-def normalize_for_planner(result: ExecutionResult) -> PlannerWorkOutcome:
+def normalize_for_planner(result: ExecutorResult) -> PlannerWorkOutcome:
     """Project only shared metadata; role-native payloads remain opaque to Planner."""
 
     # Exclude emitted_artifacts from the digest — it contains live RAM objects

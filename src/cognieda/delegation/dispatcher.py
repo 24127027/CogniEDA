@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .contracts import ExecutionRequest, ExecutionResult
+from .contracts import ExecutorRequest, ExecutorResult
 from .registry import CapabilityNotRegisteredError, ExecutorRegistry
 
 class ExecutorDispatcher:
@@ -9,11 +9,11 @@ class ExecutorDispatcher:
     def __init__(self, registry: ExecutorRegistry) -> None:
         self._registry = registry
 
-    async def dispatch(self, request: ExecutionRequest) -> ExecutionResult:
+    async def dispatch(self, request: ExecutorRequest) -> ExecutorResult:
         try:
             provider = self._registry.resolve(request.capability)
             result = await provider.run(request)
-            if not isinstance(result, ExecutionResult):
+            if not isinstance(result, ExecutorResult):
                 raise TypeError("Provider returned an incompatible result.")
             return result
         except CapabilityNotRegisteredError:

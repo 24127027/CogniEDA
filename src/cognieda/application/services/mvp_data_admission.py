@@ -20,7 +20,7 @@ from cognieda.agents.data_explorer import (
 )
 from cognieda.delegation import (
     Capability,
-    ExecutionRequest,
+    ExecutorRequest,
     ExecutionStatus,
     PlannerWorkOutcome,
     normalize_for_planner,
@@ -192,7 +192,7 @@ class MvpEvidenceAdmissionService:
 
     @staticmethod
     def _evidence_id(
-        request: ExecutionRequest,
+        request: ExecutorRequest,
         result: DataExplorerResult,
         content: dict[str, JsonValue],
     ) -> UUID:
@@ -217,7 +217,7 @@ class MvpEvidenceAdmissionService:
 
     def _validate(
         self,
-        request: ExecutionRequest,
+        request: ExecutorRequest,
         result: DataExplorerResult,
     ) -> tuple[dict[str, JsonValue], EvidenceProvenance]:
         if result.status is not ExecutionStatus.SUCCEEDED or result.failure is not None:
@@ -377,7 +377,7 @@ class MvpEvidenceAdmissionService:
 
     def admit(
         self,
-        request: ExecutionRequest,
+        request: ExecutorRequest,
         result: DataExplorerResult,
     ) -> EvidenceAdmissionResult:
         content, provenance = self._validate(request, result)

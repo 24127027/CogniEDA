@@ -3,8 +3,8 @@ from __future__ import annotations
 from .capabilities import Capability
 from .contracts import (
     DEExecutorContext,
-    ExecutionRequest,
-    ExecutionResult,
+    ExecutorRequest,
+    ExecutorResult,
     ExecutionStatus,
     ExecutorContext,
     PlannerWorkOutcome,
@@ -17,8 +17,8 @@ __all__ = (
     "Capability",
     "CapabilityNotRegisteredError",
     "DEExecutorContext",
-    "ExecutionRequest",
-    "ExecutionResult",
+    "ExecutorRequest",
+    "ExecutorResult",
     "ExecutionStatus",
     "ExecutorContext",
     "ExecutorDispatcher",
