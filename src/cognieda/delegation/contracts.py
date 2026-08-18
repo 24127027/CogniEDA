@@ -70,9 +70,7 @@ class ExecutionStatus(StrEnum):
 class ExecutionResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    source_role: str
     task_id: UUID
-    work_id: str
     status: ExecutionStatus
 
     failure: str | None = None
@@ -94,9 +92,7 @@ class PlannerWorkOutcome(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    source_role: str
     task_id: UUID
-    work_id: str
     status: ExecutionStatus
     semantic_summary: str
     authoritative_refs: list[str] = Field(default_factory=list)
@@ -118,15 +114,12 @@ def normalize_for_planner(result: ExecutionResult) -> PlannerWorkOutcome:
     ).encode("utf-8")
     blocker = result.failure if result.failure is not None else None
     summary = (
-        f"{result.source_role} completed work {result.work_id}."
-        if result.status == ExecutionStatus.SUCCEEDED
-        else f"{result.source_role} could not complete work {result.work_id}."
+        f"Work completed."
+        if result.status == ExecutionStatus.SUCCEEDED else f"Work failed."
     )
 
     return PlannerWorkOutcome(
-        source_role=result.source_role,
         task_id=result.task_id,
-        work_id=result.work_id,
         status=result.status,
         semantic_summary=summary,
         blockers=[blocker] if blocker is not None else [],
