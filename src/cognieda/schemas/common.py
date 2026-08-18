@@ -186,55 +186,11 @@ class QualityFlag(CogniEDABaseModel):
     message: NonEmptyStr
     column_name: str | None = None
 
-
-class ContinuousColumnSummary(ImmutableCogniEDABaseModel):
-    """Finite descriptive statistics for one continuous MVP column."""
-
-    min: float | None = None
-    max: float | None = None
-    mean: float | None = None
-    median: float | None = None
-    std: float | None = None
-    p25: float | None = None
-    p75: float | None = None
-
-    @field_validator("min", "max", "mean", "median", "std", "p25", "p75")
-    @classmethod
-    def _statistics_must_be_finite(cls, value: float | None) -> float | None:
-        if value is not None and not isfinite(value):
-            raise ValueError("Continuous summary statistics must be finite.")
-        return value
-
-
 class DiscreteValueCount(ImmutableCogniEDABaseModel):
     """JSON-safe value and frequency pair for one discrete column."""
 
     value: str | int | float | bool
     count: NonNegativeInt
-
-
-class DiscreteColumnSummary(ImmutableCogniEDABaseModel):
-    """Complete low-cardinality counts or bounded high-cardinality top values."""
-
-    value_counts: tuple[DiscreteValueCount, ...] | None = None
-    top_values: tuple[DiscreteValueCount, ...] | None = None
-
-    @field_validator("top_values")
-    @classmethod
-    def _top_values_must_be_bounded(
-        cls, value: tuple[DiscreteValueCount, ...] | None
-    ) -> tuple[DiscreteValueCount, ...] | None:
-        if value is not None and not value:
-            raise ValueError("top_values must contain at least one value when present.")
-        return value
-
-    @model_validator(mode="after")
-    def _has_exactly_one_count_representation(self) -> DiscreteColumnSummary:
-        if (self.value_counts is None) == (self.top_values is None):
-            raise ValueError("Provide exactly one of value_counts or top_values.")
-        return self
-
-
 class ColumnProfile(ImmutableCogniEDABaseModel):
     """Typed deterministic profile for one dataset column."""
 
@@ -243,20 +199,8 @@ class ColumnProfile(ImmutableCogniEDABaseModel):
     variable_type: VariableType
     distinct_count: NonNegativeInt
     missing_count: NonNegativeInt
-    summary: ContinuousColumnSummary | DiscreteColumnSummary
 
-    @model_validator(mode="after")
-    def _summary_matches_variable_type(self) -> ColumnProfile:
-        if self.variable_type is VariableType.CONTINUOUS and not isinstance(
-            self.summary, ContinuousColumnSummary
-        ):
-            raise ValueError("CONTINUOUS columns require ContinuousColumnSummary.")
-        if self.variable_type is VariableType.DISCRETE and not isinstance(
-            self.summary, DiscreteColumnSummary
-        ):
-            raise ValueError("DISCRETE columns require DiscreteColumnSummary.")
-        return self
-
+    semantic_description: NonEmptyStr | None = None
 
 class EvidenceProvenance(ImmutableCogniEDABaseModel):
     """Bounded MVP lineage from Evidence to dataset/tool work."""
