@@ -40,12 +40,11 @@ class ExecutionStatus(StrEnum):
 
 class ExecutorResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
-    task_id: UUID
+    
     status: ExecutionStatus
 
     failure: str | None = None
-    emitted_artifacts: dict[str, Any] = Field(default_factory=dict)
+    emitted_artifacts: tuple[DataProfile | Evidence | Hypothesis, ...] = Field(default_factory=tuple)
 
 @runtime_checkable
 class Executor(Protocol):
@@ -89,8 +88,10 @@ def normalize_for_planner(result: ExecutorResult) -> PlannerWorkOutcome:
         if result.status == ExecutionStatus.SUCCEEDED else f"Work failed."
     )
 
+    # TODO: Dọn cái này sau
+    import uuid
     return PlannerWorkOutcome(
-        task_id=result.task_id,
+        task_id=uuid.uuid4(),
         status=result.status,
         semantic_summary=summary,
         blockers=[blocker] if blocker is not None else [],
