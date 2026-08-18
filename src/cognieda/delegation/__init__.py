@@ -7,7 +7,6 @@ from .contracts import (
     ExecutionResult,
     ExecutionStatus,
     ExecutorContext,
-    ExecutorInput,
     PlannerWorkOutcome,
     normalize_for_planner,
 )
@@ -23,7 +22,6 @@ __all__ = (
     "ExecutionStatus",
     "ExecutorContext",
     "ExecutorDispatcher",
-    "ExecutorInput",
     "ExecutorError",
     "ExecutorRegistry",
     "PlannerWorkOutcome",

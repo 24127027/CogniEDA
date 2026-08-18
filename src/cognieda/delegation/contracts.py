@@ -14,14 +14,6 @@ from cognieda.schemas.artifacts import Task
 from .capabilities import Capability
 
 
-class ExecutorInput(BaseModel):
-    """Shared invocation input; semantic Task identity comes from project schemas."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    task: Task
-
-
 class ExecutorContext(BaseModel):
     """Small shared context that is safe for every registered executor."""
 
@@ -58,9 +50,8 @@ class ExecutionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     capability: Capability
-    input: SerializeAsAny[ExecutorInput]
+    input: str
     context: ExecutorContext = Field(default_factory=ExecutorContext)
-
 
 class ExecutionStatus(StrEnum):
     SUCCEEDED = "succeeded"
