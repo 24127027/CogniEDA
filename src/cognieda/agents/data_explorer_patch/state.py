@@ -1,5 +1,4 @@
-
-from typing import TypedDict
+from typing import Any, TypedDict
 from cognieda.schemas.artifacts import DataProfile, Evidence
 
 class State(TypedDict, total=False):
@@ -7,3 +6,5 @@ class State(TypedDict, total=False):
     input: str
     external_context: str
     artifacts: list[DataProfile | Evidence]
+    messages: list[Any]
+    feedback: str

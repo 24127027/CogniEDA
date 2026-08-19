@@ -63,7 +63,7 @@ class DataExplorer:
             "input": request.input,
             "external_context": request.context.model_dump_json(),  # Serialize context to JSON string
         }
-        context: Context = Context(agent=self._agent)
+        context: Context = Context(agent=self._agent, deps=self.deps)
 
         try: 
             result = await self.graph.ainvoke(input, context=context)
@@ -77,12 +77,12 @@ class DataExplorer:
         return ExecutorResult(
             status=ExecutionStatus.SUCCEEDED,
             failure=None,
-            emitted_artifacts=tuple(result.get("emitted_artifacts", ())),
+            emitted_artifacts=tuple(result.get("artifacts", ())),
         )
 
     async def reload(self) -> None:
         """Reloads the agent factory and any other internal state."""
-        ...
+        self._create_agent()
 
     def _create_agent(self) -> None:
         if self._model_config is None:
