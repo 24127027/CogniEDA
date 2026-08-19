@@ -59,14 +59,25 @@ class DataExplorer:
         """ExecutorProvider contract entry point."""
         self._ensure_agent()
 
-        input: State = {
+        input_state = {
             "input": request.input,
             "external_context": request.context.model_dump_json(),  # Serialize context to JSON string
         }
-        context: Context = Context(agent=self._agent, deps=self.deps)
+        
+        # Extract data_profile_id from the context items if available
+        from cognieda.schemas.artifacts import DataProfile
+        from dataclasses import replace
+        data_profile_id = None
+        for item in request.context.content:
+            if isinstance(item, DataProfile):
+                data_profile_id = item.data_profile_id
+                break
+                
+        deps = replace(self.deps, data_profile_id=data_profile_id)
+        context: Context = Context(agent=self._agent, deps=deps)
 
         try: 
-            result = await self.graph.ainvoke(input, context=context)
+            result = await self.graph.ainvoke(input_state, context=context)
         except Exception as e:
             return ExecutorResult(
                 status=ExecutionStatus.FAILED,

@@ -52,7 +52,34 @@ async def execute(state: State, runtime: Runtime[Context]) -> State:
     for msg in result.new_messages():
         if isinstance(msg, ToolReturn):
             if isinstance(msg.content, (DataProfile, Evidence)):
-                artifacts.append(msg.content)
+                artifact = msg.content
+                
+                # We need to fill in semantic_description for DataProfile which is generated blank by the tool.
+                if isinstance(artifact, DataProfile):
+                    from pydantic import BaseModel
+                    from pydantic_ai import Agent
+                    
+                    class SemanticDescriptions(BaseModel):
+                        descriptions: dict[str, str]
+                        
+                    desc_prompt = (
+                        f"Based on the following DataProfile schema, generate a short, concise "
+                        f"semantic description for each column explaining what it likely represents.\n\n"
+                        f"{artifact.model_dump_json()}"
+                    )
+                    
+                    # Create a temporary agent bound to the same model to force the structured output
+                    desc_agent = Agent(
+                        runtime.context.agent.model,
+                        result_type=SemanticDescriptions
+                    )
+                    
+                    desc_result = await desc_agent.run(desc_prompt)
+                    
+                    # Use the artifact's built-in method to safely hardcode the descriptions
+                    artifact = artifact.with_column_descriptions(desc_result.data.descriptions)
+                    
+                artifacts.append(artifact)
                 
     return {
         **state,
