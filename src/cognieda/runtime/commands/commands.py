@@ -268,7 +268,7 @@ class ProviderKeyCommand:
 
 class ProviderConfigCommand:
     name = "provider.config"
-    description = "Configure provider, model, and API key."
+    description = "Configure a provider API key."
 
     async def execute(
         self,
@@ -278,49 +278,85 @@ class ProviderConfigCommand:
         if len(command.args) > 1:
             return text("Usage: /provider.config [profile]")
 
+        providers = context.workspace.project_config.providers
+
+        if not providers:
+            return text("No providers configured.")
+
+        current = context.workspace.project_config.default_provider
+
         if command.args:
             profile = command.args[0]
+
+            if profile not in providers:
+                return text(
+                    f"Unknown provider '{profile}'. "
+                    f"Available providers: {', '.join(providers)}"
+                )
         else:
+            provider_list = "\n".join(
+                f"  {name:<12} "
+                f"{'configured' if provider.api_key_configured() else 'not configured'}"
+                for name, provider in providers.items()
+            )
+
             profile = context.prompt(
-                "Provider profile: "
+                f"Available providers:\n"
+                f"{provider_list}\n\n"
+                f"Provider [{current}]: "
             ).strip()
 
-        if not profile:
-            return text("Provider profile cannot be empty.")
+            if not profile:
+                profile = current
 
-        model = context.prompt(
-            f"{profile} model: "
-        ).strip()
+            if profile not in providers:
+                return text(
+                    f"Unknown provider '{profile}'. "
+                    f"Available providers: {', '.join(providers)}"
+                )
 
-        if not model:
-            return text("Model cannot be empty.")
+        provider = providers[profile]
+        configured = provider.api_key_configured()
 
-        api_key = context.prompt_secret(
-            f"{profile} API key: "
-        ).strip()
+        if configured:
+            api_key = context.prompt_secret(
+                f"{profile} API key [configured]: "
+            ).strip()
 
-        if not api_key:
-            return text("API key cannot be empty.")
+            # Empty input means keep the existing key.
+            if not api_key:
+                context.workspace.use_provider(profile)
 
-        context.workspace.use_provider(profile)
+                await context.reload_runtime(
+                    recreate_agent=True,
+                )
 
-        context.workspace.set_provider_model(
-            profile,
-            model,
-        )
+                return text(
+                    f"Using provider '{profile}'."
+                )
+        else:
+            api_key = context.prompt_secret(
+                f"{profile} API key: "
+            ).strip()
+
+            if not api_key:
+                return text(
+                    f"API key for '{profile}' cannot be empty."
+                )
 
         context.workspace.set_provider_api_key(
             profile,
             api_key,
         )
 
+        context.workspace.use_provider(profile)
+
         await context.reload_runtime(
             recreate_agent=True,
         )
 
         return text(
-            f"Configured provider '{profile}' "
-            f"with model '{model}'."
+            f"Configured provider '{profile}'."
         )
 
 
