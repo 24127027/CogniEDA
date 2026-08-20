@@ -72,7 +72,7 @@ async def main() -> None:
     config = ModelConfig(provider=args.provider, model_name=args.model, api_key=api_key or "")
     de = DataExplorer(agent_factory=factory, model_config=config)
     
-    print(f"\n--- Running Data Explorer ---")
+    print("\n--- Running Data Explorer ---")
     print(f"Dataset: {args.dataset} ({len(df)} rows)")
     if args.instruction:
         print(f"Initial Instruction: {args.instruction}")

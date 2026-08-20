@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import asyncio
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 from uuid import uuid4
 
 import pandas as pd
 import pytest
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
 from cognieda.agents.data_explorer.agent import DataExplorer
@@ -20,8 +20,8 @@ from cognieda.agents.data_explorer.types import (
 )
 from cognieda.application.ports.llm import AgentFactoryPort, ModelConfig
 from cognieda.schemas.artifacts import DataProfile
-
 from cognieda.schemas.common import ColumnProfile, ContinuousColumnSummary, VariableType
+
 
 def create_dummy_profile() -> DataProfile:
     return DataProfile(

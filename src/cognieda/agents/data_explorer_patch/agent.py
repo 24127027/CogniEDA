@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
 from cognieda.application.ports.llm import AgentFactoryPort, ModelConfig
 from cognieda.delegation.capabilities import Capability
 from cognieda.delegation.contracts import (
@@ -9,12 +7,15 @@ from cognieda.delegation.contracts import (
     ExecutorRequest,
     ExecutorResult,
 )
+from cognieda.schemas.artifacts import DataProfile
 
 from .context import Context
 from .dependencies import DataExplorerDeps
 from .graph import build_graph
 from .state import State
-from .tools import eda, dataset_profiling, sandbox
+from .tools import dataset_profiling, eda, sandbox
+
+
 class DataExplorer:
     CAPABILITIES: tuple[Capability, ...] = (
         Capability.DATA_ANALYSIS,
@@ -23,9 +24,9 @@ class DataExplorer:
     )
 
     builtin_tools: tuple = (
-        eda.all(),
-        dataset_profiling.all(),
-        sandbox.all(),
+        *eda.all(),
+        *dataset_profiling.all(),
+        *sandbox.all(),
     )
 
     def __init__(
@@ -52,9 +53,19 @@ class DataExplorer:
             "artifacts": [],
         }
 
+        deps = self.deps
+        if deps.data_profile_id is None and request.context and request.context.content:
+            for item in request.context.content:
+                if isinstance(item, DataProfile):
+                    deps = DataExplorerDeps(
+                        dataframe=deps.dataframe,
+                        data_profile_id=item.data_profile_id,
+                    )
+                    break
+
         context = Context(
             agent=self._agent,
-            deps=self.deps,
+            deps=deps,
             context=request.context,
         )
 

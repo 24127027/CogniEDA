@@ -1,9 +1,12 @@
-import pandas as pd
-import pytest
 from unittest.mock import MagicMock
 from uuid import uuid4
-from cognieda.agents.data_explorer_patch.tools.sandbox import execute_code
+
+import pandas as pd
+import pytest
+
 from cognieda.agents.data_explorer_patch.dependencies import DataExplorerDeps
+from cognieda.agents.data_explorer_patch.tools.sandbox import execute_code
+
 
 @pytest.fixture
 def mock_ctx():

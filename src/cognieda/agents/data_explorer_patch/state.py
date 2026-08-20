@@ -1,5 +1,7 @@
 from typing import Any, TypedDict
+
 from cognieda.schemas.artifacts import DataProfile, Evidence
+
 
 class State(TypedDict, total=False):
     input: str

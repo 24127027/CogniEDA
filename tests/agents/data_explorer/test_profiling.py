@@ -1,10 +1,12 @@
-import pandas as pd
-import pytest
 from unittest.mock import MagicMock
-from cognieda.agents.data_explorer_patch.tools.profiling import profiling
+
+import pandas as pd
+
 from cognieda.agents.data_explorer_patch.dependencies import DataExplorerDeps
+from cognieda.agents.data_explorer_patch.tools.profiling import profiling
 from cognieda.schemas.artifacts import DataProfile
 from cognieda.schemas.enums import VariableType
+
 
 def test_profiling():
     df = pd.DataFrame({"A": [1, 2, 3], "B": ["x", "y", "z"]})

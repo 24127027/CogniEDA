@@ -1,162 +1,209 @@
+"""Node implementations for DataExplorer patch workflow."""
+
+from __future__ import annotations
+
+from typing import Any
+from uuid import UUID
+
 from langgraph.graph import END
 from langgraph.runtime import Runtime
-from pydantic_ai.messages import ToolReturnPart
-from cognieda.schemas.artifacts import DataProfile, Evidence
+from pydantic_ai.messages import ToolCallPart, ToolReturnPart
 
-from .state import State
+from cognieda.schemas.artifacts import DataProfile, Evidence
+from cognieda.schemas.common import EvidenceProvenance
+
 from .context import Context
+from .instructions import (
+    CHECK_RESULT_PROMPT,
+    DATA_EXPLORER_BASE_INSTRUCTION,
+    EXECUTE_PROMPT,
+    PLANNING_PROMPT_TEMPLATE,
+    PLANNING_REVISION_PROMPT_TEMPLATE,
+)
+from .state import State
+
+
+def _resolve_data_profile_id(
+    runtime: Runtime[Context],
+    artifacts: list[DataProfile | Evidence],
+) -> UUID | None:
+    """Resolve authoritative data_profile_id without fabricating identifiers."""
+    deps = getattr(runtime.context, "deps", None)
+    if deps and getattr(deps, "data_profile_id", None) is not None:
+        return deps.data_profile_id
+
+    for art in artifacts:
+        if isinstance(art, DataProfile):
+            return art.data_profile_id
+
+    ctx = getattr(runtime.context, "context", None)
+    if ctx and hasattr(ctx, "content") and ctx.content:
+        for item in ctx.content:
+            if isinstance(item, DataProfile):
+                return item.data_profile_id
+
+    return None
+
+
+def _extract_tool_executions(messages: list[Any]) -> list[tuple[str, dict[str, Any], Any]]:
+    """Extract tool call arguments and returns from message history."""
+    calls: dict[str, tuple[str, dict[str, Any]]] = {}
+    executions: list[tuple[str, dict[str, Any], Any]] = []
+
+    for msg in messages:
+        parts = msg.parts if hasattr(msg, "parts") else [msg]
+        for part in parts:
+            if isinstance(part, ToolCallPart):
+                args = part.args if isinstance(part.args, dict) else {}
+                calls[part.tool_call_id] = (part.tool_name, args)
+            elif isinstance(part, ToolReturnPart):
+                call_info = calls.get(part.tool_call_id, (part.tool_name, {}))
+                executions.append((part.tool_name, call_info[1], part.content))
+    return executions
+
 
 async def planning(state: State, runtime: Runtime[Context]) -> State:
     """Planning node of the DataExplorer agent's internal workflow."""
-    # When tracking back to planning, drop the evidence/dataprofile generated at execute node
-    # as they did not successfully answer the request.
-    state["artifacts"] = []
-    
     iterations = state.get("iterations", 0) + 1
     state["iterations"] = iterations
-    
-    prompt = (
-        f"Analyze the following request and create a step-by-step plan to solve it.\n\n"
-        f"Context: {runtime.context.context.model_dump_json()}\n"
-        f"Task: {state.get('input')}"
-    )
-    
-    if state.get("feedback"):
-        prompt += (
-            f"\n\nIMPORTANT: Your previous plan failed. Here is the feedback from the evaluation: "
-            f"'{state['feedback']}'. Please revise your plan to address these issues."
+
+    # Preserve existing valid artifacts across revision iterations
+    artifacts = list(state.get("artifacts") or [])
+
+    feedback = state.get("feedback")
+    if feedback and not feedback.upper().startswith("YES"):
+        if artifacts:
+            obs_lines = []
+            for art in artifacts:
+                if isinstance(art, DataProfile):
+                    obs_lines.append(
+                        f"- DataProfile (rows={art.row_count}, columns={art.column_count})"
+                    )
+                elif isinstance(art, Evidence):
+                    tool_name = (
+                        art.provenance.tool_reference
+                        or art.provenance.work_reference
+                    )
+                    obs_lines.append(
+                        f"- Evidence from '{tool_name}' on columns {art.artifact_refs}"
+                    )
+            obs_str = "\n".join(obs_lines)
+        else:
+            obs_str = "None yet."
+
+        prompt = PLANNING_REVISION_PROMPT_TEMPLATE.format(
+            feedback=feedback,
+            existing_observations=obs_str,
         )
-    
+    else:
+        context_obj = getattr(runtime.context, "context", None)
+        if context_obj is not None and hasattr(context_obj, "model_dump_json"):
+            context_json = context_obj.model_dump_json()
+        else:
+            context_json = "{}"
+
+        prompt = PLANNING_PROMPT_TEMPLATE.format(
+            context_json=context_json,
+            task_input=state.get("input", ""),
+        )
+
     result = await runtime.context.agent.run(
         prompt,
         deps=runtime.context.deps,
-        message_history=state.get("messages", [])
+        message_history=state.get("messages", []),
+        instructions=DATA_EXPLORER_BASE_INSTRUCTION,
     )
-    
+
     return {
         **state,
+        "iterations": iterations,
+        "artifacts": artifacts,
         "messages": result.all_messages(),
     }
 
+
 async def execute(state: State, runtime: Runtime[Context]) -> State:
     """Execute node of the DataExplorer agent's internal workflow."""
-    prompt = "Now execute the plan you just created. Use tools as necessary."
-    
     result = await runtime.context.agent.run(
-        prompt,
+        EXECUTE_PROMPT,
         deps=runtime.context.deps,
-        message_history=state.get("messages", [])
+        message_history=state.get("messages", []),
+        instructions=DATA_EXPLORER_BASE_INSTRUCTION,
     )
-    
-    artifacts = state.get("artifacts", [])
-    if artifacts is None:
-        artifacts = []
-        
-    for msg in result.new_messages():
-        if isinstance(msg, ToolReturnPart):
-            if isinstance(msg.content, DataProfile):
-                artifact = msg.content
-                
-                try:
-                    from pydantic import BaseModel
-                    from pydantic_ai import Agent
-                    
-                    class SemanticDescriptions(BaseModel):
-                        descriptions: dict[str, str]
-                        
-                    desc_prompt = (
-                        f"Based on the following DataProfile schema, generate a short, concise "
-                        f"semantic description for each column explaining what it likely represents.\n\n"
-                        f"{artifact.model_dump_json()}"
-                    )
-                    
-                    desc_agent = Agent(
-                        runtime.context.agent.model,
-                        output_type=SemanticDescriptions
-                    )
-                    
-                    desc_result = await desc_agent.run(desc_prompt)
-                    artifact = artifact.with_column_descriptions(desc_result.output.descriptions)
-                except Exception:
-                    pass # Ignore if generation fails to prevent crashes
-                    
-                artifacts.append(artifact)
-                
-    tool_responses = [
-        msg.content for msg in result.new_messages()
-        if isinstance(msg, ToolReturnPart) and not isinstance(msg.content, DataProfile)
-    ]
-    
-    if tool_responses:
-        from typing import Any
-        from pydantic import BaseModel
-        from pydantic_ai import Agent
-        from cognieda.schemas.artifacts import EvidenceProvenance
-        from uuid import uuid4
-        
-        class SynthesizedEvidence(BaseModel):
-            content: dict[str, Any]
-            artifact_refs: list[str]
-            
-        evidence_prompt = (
-            "Based on the following tool execution outputs, summarize the analytical findings "
-            "into a structured JSON content and identify any referenced columns or artifacts.\n\n"
-            f"Tool Outputs: {tool_responses}"
-        )
-        
-        evidence_agent = Agent(
-            runtime.context.agent.model,
-            output_type=SynthesizedEvidence
-        )
-        
-        try:
-            ev_result = await evidence_agent.run(evidence_prompt)
-            ev_result = ev_result.output
-            
+
+    artifacts = list(state.get("artifacts") or [])
+    new_messages = result.new_messages() if hasattr(result, "new_messages") else []
+    executions = _extract_tool_executions(new_messages)
+
+    for tool_name, tool_args, tool_content in executions:
+        if isinstance(tool_content, DataProfile):
+            # Authoritative DataProfile without ungrounded LLM enrichment
+            artifacts.append(tool_content)
+        elif isinstance(tool_content, dict):
+            # Exclude execution errors from empirical evidence
+            if tool_content.get("error") is not None:
+                continue
+
+            profile_id = _resolve_data_profile_id(runtime, artifacts)
+            if profile_id is None:
+                # Do NOT fabricate random UUIDs. Fail-closed without valid profile provenance.
+                continue
+
+            artifact_refs: list[str] = []
+            for key in ("column", "group_by", "value_column"):
+                val = tool_args.get(key)
+                if isinstance(val, str) and val:
+                    artifact_refs.append(val)
+            if "columns" in tool_args and isinstance(tool_args["columns"], (list, tuple)):
+                for col in tool_args["columns"]:
+                    if isinstance(col, str) and col:
+                        artifact_refs.append(col)
+
             evidence = Evidence(
-                data_profile_id=uuid4(),
-                content=ev_result.content,
-                artifact_refs=tuple(ev_result.artifact_refs),
+                data_profile_id=profile_id,
+                content=tool_content,
+                artifact_refs=tuple(artifact_refs),
                 provenance=EvidenceProvenance(
                     producer_role="data_explorer",
-                    work_reference="execute_node",
+                    work_reference=tool_name,
                     dataset_reference="active_dataframe",
-                    data_profile_id=uuid4(),
-                )
+                    data_profile_id=profile_id,
+                    tool_reference=tool_name,
+                    code_reference=(
+                        tool_args.get("code")
+                        if tool_name == "execute_code"
+                        and isinstance(tool_args.get("code"), str)
+                        else None
+                    ),
+                ),
             )
             artifacts.append(evidence)
-        except Exception:
-            pass
-            
+
     return {
         **state,
         "artifacts": artifacts,
         "messages": result.all_messages(),
     }
 
+
 async def check_result(state: State, runtime: Runtime[Context]) -> State:
     """Check result node of the DataExplorer agent's internal workflow."""
-    prompt = (
-        "Review the actions you have taken and the artifacts generated. "
-        "Did you successfully and fully complete the original task? "
-        "If you succeeded, reply with ONLY the word 'YES'. "
-        "If you failed or the output is incomplete, reply with 'NO: ' followed by a detailed reason "
-        "explaining why it failed and what needs to be done differently."
-    )
-    
     result = await runtime.context.agent.run(
-        prompt,
+        CHECK_RESULT_PROMPT,
         deps=runtime.context.deps,
-        message_history=state.get("messages", [])
+        message_history=state.get("messages", []),
+        instructions=DATA_EXPLORER_BASE_INSTRUCTION,
     )
-    
-    feedback = result.output.strip()
-    
+
+    output = getattr(result, "output", getattr(result, "data", ""))
+    feedback = str(output).strip()
+
     return {
         **state,
         "messages": result.all_messages(),
         "feedback": feedback,
     }
+
 
 def _route_after_check_result(state: State) -> str:
     """Determine the next node after check_result based on the state."""
