@@ -291,16 +291,10 @@ class ProviderConfigCommand:
                 f"{profile} API key [configured]: "
             ).strip()
 
-            # Empty input means keep the existing key.
-            if not api_key:
-                context.workspace.use_provider(profile)
-
-                await context.reload_runtime(
-                    recreate_agent=True,
-                )
-
-                return text(
-                    f"Using provider '{profile}'."
+            if api_key:
+                context.workspace.set_provider_api_key(
+                    profile,
+                    api_key,
                 )
         else:
             api_key = context.prompt_secret(
@@ -312,9 +306,19 @@ class ProviderConfigCommand:
                     f"API key for '{profile}' cannot be empty."
                 )
 
-        context.workspace.set_provider_api_key(
+            context.workspace.set_provider_api_key(
+                profile,
+                api_key,
+            )
+
+        base_url = context.prompt(
+            f"{profile} base URL "
+            f"[{provider.base_url or 'default'}]: "
+        ).strip()
+
+        context.workspace.set_provider_base_url(
             profile,
-            api_key,
+            base_url,
         )
 
         context.workspace.use_provider(profile)

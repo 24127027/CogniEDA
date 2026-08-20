@@ -322,6 +322,34 @@ class Workspace:
         # Make the key immediately available without restarting.
         os.environ[provider.api_key_env] = api_key
 
+    def set_provider_base_url(
+        self,
+        profile: str,
+        base_url: str,
+    ) -> None:
+        config = self._load_toml(self.project_config_path)
+
+        providers = config.get("providers", {})
+
+        if profile not in providers:
+            raise ValueError(f"Unknown provider '{profile}'.")
+
+        base_url = base_url.strip()
+
+        if base_url:
+            providers[profile]["base_url"] = base_url
+        else:
+            providers[profile].pop("base_url", None)
+
+        self._save_toml(
+            self.project_config_path,
+            config,
+        )
+
+        self.project_config = ProjectConfig.load(
+            self.project_config_path,
+        )
+        
     # -------------------------------------------------------------------------
     # TODO: Configuration editing
     #
