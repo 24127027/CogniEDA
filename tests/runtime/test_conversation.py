@@ -12,7 +12,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
-from cognieda.runtime.conversation import (
+from cognieda.runtime.conversation.history import (
     ConversationHistory,
     ConversationSegment,
     ConversationTurn,

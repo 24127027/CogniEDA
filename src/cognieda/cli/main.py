@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 from cognieda.runtime.events import (
     AssistantThinkingFinished, 
     AssistantThinkingStarted, 
-    HumanInputRequested, 
     MessageProduced, 
     PlanProposed
 )
@@ -20,10 +19,6 @@ async def repl(app: Application, renderer: Renderer) -> None:
     app.event_bus.subscribe(
         MessageProduced,
         renderer.handle_message,
-    )
-    app.event_bus.subscribe(
-        HumanInputRequested,
-        renderer.handle_human_input,
     )
     app.event_bus.subscribe(
         PlanProposed,

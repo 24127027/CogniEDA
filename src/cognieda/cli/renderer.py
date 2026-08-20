@@ -19,7 +19,6 @@ from rich.cells import cell_len
 from cognieda.runtime.events import (
     AssistantThinkingFinished,
     AssistantThinkingStarted,
-    HumanInputRequested,
     MessageProduced,
     PlanProposed,
 )
@@ -85,6 +84,17 @@ class Renderer:
                         title_align="left",
                     )
                 )
+            case MessageType.INPUT_REQUEST, MessageRole.ASSISTANT:
+                self.console.print(
+                    Panel(
+                        Text(str(message.content), style="dim"),
+                        border_style="grey50",
+                        box=box.ROUNDED,
+                        padding=(0, 1),
+                        title="[dim]Input Request[/dim]",
+                        title_align="left",
+                    )
+                )
                 
             case _:
                 self.console.print(str(message.content))
@@ -92,8 +102,6 @@ class Renderer:
     async def handle_message(self, event: MessageProduced) -> None:
         await self.render(event.message)
 
-    async def handle_human_input(self, event: HumanInputRequested) -> None:
-        await self.render(event.message)
 
     async def handle_plan(self, event: PlanProposed) -> None:
         await self.render_plan(event.plan, event.plan.tasks)
