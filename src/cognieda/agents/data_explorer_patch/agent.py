@@ -32,7 +32,7 @@ class DataExplorer:
         self,
         deps: DataExplorerDeps,
         *,
-        config: ModelConfig,
+        config: ModelConfig | None = None,
         agent_factory: AgentFactoryPort,
     ) -> None:
         self._model_config = config

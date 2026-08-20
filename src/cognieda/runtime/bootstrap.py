@@ -59,7 +59,7 @@ def bootstrap_application(workspace_path: Path) -> Application:
         lambda: DataExplorer(
             deps=DataExplorerDeps(dataframe=df),
             config=model_config,
-            agent_factory=agent_factory if model_config is not None else None,
+            agent_factory=agent_factory
         ),
     )
     dispatcher = ExecutorDispatcher(registry)
@@ -81,8 +81,12 @@ def bootstrap_application(workspace_path: Path) -> Application:
         )
         return build_planner_context(frame, active_plan=active_plan)
 
+    # Temporary
     planner = Planner(
-        deps=PlannerDeps(dispatcher=dispatcher),
+        deps=PlannerDeps(
+            dispatcher=dispatcher,
+            planner_context=PlannerContext(),
+                         ),
         agent_factory=agent_factory,
         model_config=model_config,
         plan_admission=PlanAdmissionService(session),
