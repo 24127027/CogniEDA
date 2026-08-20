@@ -23,9 +23,9 @@ class DataExplorer:
     )
 
     builtin_tools: tuple = (
-        eda.all(),
-        dataset_profiling.all(),
-        sandbox.all(),
+        *eda.all(),
+        *dataset_profiling.all(),
+        *sandbox.all(),
     )
 
     def __init__(
