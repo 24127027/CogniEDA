@@ -27,6 +27,7 @@ class CommandContext:
     planner: Planner
 
     reload_runtime: Callable[..., Awaitable[None]]
+    prompt: Callable[[str], str]
     prompt_secret: Callable[[str], str]
 
 

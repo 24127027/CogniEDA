@@ -28,15 +28,17 @@ async def repl(app: Application, renderer: Renderer) -> None:
         AssistantThinkingStarted,
         renderer.handle_thinking_started,
     )
-    
     app.event_bus.subscribe(
         AssistantThinkingFinished,
         renderer.handle_thinking_finished,
     )
 
-    renderer.render_session_start(app.workspace.root)
-
     prompt = Prompt(app)
+
+    if app.workspace.project_config.try_resolve_model() is None:
+        await app.submit_message("/provider.config")
+
+    renderer.render_session_start(app.workspace.root)
 
     while True:
         try:

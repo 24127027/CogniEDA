@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from getpass import getpass
+import pwinput
 from typing import Callable
 from uuid import UUID
 
@@ -66,7 +66,8 @@ class Application:
                 agent_factory=self.agent_factory,
                 planner=self.planner_agent,
                 reload_runtime=self._reload_runtime,
-                prompt_secret=getpass,
+                prompt=input,
+                prompt_secret=pwinput.pwinput,
             ),
         )
 
@@ -78,7 +79,8 @@ class Application:
                 agent_factory=self.agent_factory,
                 planner=self.planner_agent,
                 reload_runtime=self._reload_runtime,
-                prompt_secret=getpass,
+                prompt=input,
+                prompt_secret=pwinput.pwinput,
             ),
         )
 

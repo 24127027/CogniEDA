@@ -209,7 +209,8 @@ class Planner:
                 PlannerErrorCode.INVALID_MODEL_RESULT,
                 "Planner produced a result that is invalid for the current context.",
             )
-        except Exception:
+        except Exception as e:
+            print(f"Unexpected error occurred: {e}")
             return self._controlled_output(
                 PlannerErrorCode.MODEL_UNAVAILABLE,
                 "Planner model invocation failed.",
