@@ -158,7 +158,7 @@ class Evidence(ImmutableCogniEDABaseModel):
     """Immutable structured result linked directly to real MVP work and data state."""
 
     evidence_id: UUID = Field(default_factory=uuid4)
-    task_id: UUID
+    # task_id: UUID
     data_profile_id: UUID
     content: dict[str, JsonValue] = Field(min_length=1)
     provenance: EvidenceProvenance

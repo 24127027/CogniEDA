@@ -12,6 +12,9 @@ async def planning(state: State, runtime: Runtime[Context]) -> State:
     # as they did not successfully answer the request.
     state["artifacts"] = []
     
+    iterations = state.get("iterations", 0) + 1
+    state["iterations"] = iterations
+    
     prompt = (
         f"Analyze the following request and create a step-by-step plan to solve it.\n\n"
         f"Context: {state.get('external_context')}\n"
@@ -51,11 +54,10 @@ async def execute(state: State, runtime: Runtime[Context]) -> State:
         
     for msg in result.new_messages():
         if isinstance(msg, ToolReturn):
-            if isinstance(msg.content, (DataProfile, Evidence)):
+            if isinstance(msg.content, DataProfile):
                 artifact = msg.content
                 
-                # We need to fill in semantic_description for DataProfile which is generated blank by the tool.
-                if isinstance(artifact, DataProfile):
+                try:
                     from pydantic import BaseModel
                     from pydantic_ai import Agent
                     
@@ -68,19 +70,64 @@ async def execute(state: State, runtime: Runtime[Context]) -> State:
                         f"{artifact.model_dump_json()}"
                     )
                     
-                    # Create a temporary agent bound to the same model to force the structured output
                     desc_agent = Agent(
                         runtime.context.agent.model,
                         result_type=SemanticDescriptions
                     )
                     
                     desc_result = await desc_agent.run(desc_prompt)
-                    
-                    # Use the artifact's built-in method to safely hardcode the descriptions
                     artifact = artifact.with_column_descriptions(desc_result.data.descriptions)
+                except Exception:
+                    pass # Ignore if generation fails to prevent crashes
                     
                 artifacts.append(artifact)
                 
+    tool_responses = [
+        msg.content for msg in result.new_messages()
+        if isinstance(msg, ToolReturn) and not isinstance(msg.content, DataProfile)
+    ]
+    
+    if tool_responses:
+        from typing import Any
+        from pydantic import BaseModel
+        from pydantic_ai import Agent
+        from cognieda.schemas.artifacts import EvidenceProvenance
+        from uuid import uuid4
+        
+        class SynthesizedEvidence(BaseModel):
+            content: dict[str, Any]
+            artifact_refs: list[str]
+            
+        evidence_prompt = (
+            "Based on the following tool execution outputs, summarize the analytical findings "
+            "into a structured JSON content and identify any referenced columns or artifacts.\n\n"
+            f"Tool Outputs: {tool_responses}"
+        )
+        
+        evidence_agent = Agent(
+            runtime.context.agent.model,
+            result_type=SynthesizedEvidence
+        )
+        
+        try:
+            ev_result = await evidence_agent.run(evidence_prompt)
+            data_profile_id = runtime.context.deps.data_profile_id or uuid4()
+            
+            evidence = Evidence(
+                data_profile_id=data_profile_id,
+                content=ev_result.data.content,
+                artifact_refs=tuple(ev_result.data.artifact_refs),
+                provenance=EvidenceProvenance(
+                    producer_role="data_explorer",
+                    work_reference="execute_node",
+                    dataset_reference="active_dataframe",
+                    data_profile_id=data_profile_id,
+                )
+            )
+            artifacts.append(evidence)
+        except Exception:
+            pass
+            
     return {
         **state,
         "artifacts": artifacts,
@@ -116,4 +163,7 @@ def _route_after_check_result(state: State) -> str:
     feedback = state.get("feedback", "")
     if feedback.upper().startswith("YES"):
         return END
-    return "planning"
+    iterations = state.get("iterations", 0)
+    if iterations < 3:
+        return "planning"
+    return END

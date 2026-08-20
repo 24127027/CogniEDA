@@ -5,7 +5,9 @@ from uuid import uuid4
 
 from dotenv import load_dotenv
 
-from cognieda.agents.data_explorer import DataExplorer
+import pandas as pd
+from cognieda.agents.data_explorer_patch.agent import DataExplorer
+from cognieda.agents.data_explorer_patch.dependencies import DataExplorerDeps
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.dependencies import PlannerToolDeps
@@ -44,8 +46,18 @@ def bootstrap_application(workspace_path: Path) -> Application:
     agent_factory = AgentFactory(tooling_config=workspace)
 
     registry = ExecutorRegistry()
+    try:
+        dataset_path = workspace.data_dir / "sample.csv"
+        if dataset_path.exists():
+            df = pd.read_csv(dataset_path)
+        else:
+            df = pd.DataFrame()
+    except Exception:
+        df = pd.DataFrame()
+
     registry.register(
         lambda: DataExplorer(
+            deps=DataExplorerDeps(dataframe=df),
             config=model_config,
             agent_factory=agent_factory if model_config is not None else None,
         ),

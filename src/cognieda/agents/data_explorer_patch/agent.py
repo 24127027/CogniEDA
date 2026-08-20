@@ -62,6 +62,7 @@ class DataExplorer:
         input_state = {
             "input": request.input,
             "external_context": request.context.model_dump_json(),  # Serialize context to JSON string
+            "iterations": 0,
         }
         
         # Extract data_profile_id from the context items if available
@@ -83,6 +84,16 @@ class DataExplorer:
                 status=ExecutionStatus.FAILED,
                 failure=str(e),
                 emitted_artifacts=(),
+            )
+
+        feedback = result.get("feedback", "")
+        iterations = result.get("iterations", 0)
+        
+        if iterations >= 3 and not feedback.upper().startswith("YES"):
+            return ExecutorResult(
+                status=ExecutionStatus.FAILED,
+                failure=feedback,
+                emitted_artifacts=tuple(result.get("artifacts", ())),
             )
 
         return ExecutorResult(

@@ -8,3 +8,4 @@ class State(TypedDict, total=False):
     artifacts: list[DataProfile | Evidence]
     messages: list[Any]
     feedback: str
+    iterations: int

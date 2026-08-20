@@ -16,21 +16,7 @@ from ..dependencies import DataExplorerDeps
 
 sandbox = function_registry.FunctionRegistry()
 
-@sandbox.register
-def submit_evidence(ctx: RunContext[DataExplorerDeps], content: dict[str, Any], artifact_refs: list[str]) -> Evidence:
-    """Submit your final analytical findings. Use this tool when you have fully answered the request."""
-    return Evidence(
-        # TODO: Dọn cái này sau (Match PlannerWorkOutcome mock)
-        data_profile_id=ctx.deps.data_profile_id or uuid4(),
-        content=content,
-        artifact_refs=tuple(artifact_refs),
-        provenance=EvidenceProvenance(
-            producer_role="data_explorer",
-            work_reference="sandbox",
-            dataset_reference="active_dataframe",
-            data_profile_id=ctx.deps.data_profile_id or uuid4(),
-        )
-    )
+
 
 
 SANDBOX_TIMEOUT = 15
