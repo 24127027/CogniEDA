@@ -17,10 +17,13 @@ from cognieda.infrastructure.persistence.repositories import (
     ActivePlanRepository,
     SessionFrameRepository,
 )
+from cognieda.runtime.conversation.projector import ConversationProjector
+from cognieda.runtime.projection.message import MessageProjector
 
 from .application import Application
-from .conversation import ConversationHistory
+from .conversation.history import ConversationHistory
 from .event_bus import EventBus
+from .events import ModelMessageProduced, SegmentCompleted, TurnCompleted
 from .planner_context import build_planner_context
 from .workspace import MissingModelCredentialError, Workspace
 
@@ -77,16 +80,45 @@ def bootstrap_application(workspace_path: Path) -> Application:
         agent_instruction=workspace.load_agent_instruction(),
         thread_id=session_id,
     )
+    conversation_history = ConversationHistory()
     event_bus = EventBus()
 
+    message_projector = MessageProjector(event_bus=event_bus)
+    conversation_projector = ConversationProjector(
+        history=conversation_history,
+    )
+
+    # TODO:
+    # Subsribe these events somewhere else cleanly
+    event_bus.subscribe(
+        ModelMessageProduced,
+        conversation_projector.handle,
+    )
+    event_bus.subscribe(
+        SegmentCompleted,
+        conversation_projector.handle_segment_completed,
+    )
+    event_bus.subscribe(
+        TurnCompleted,
+        conversation_projector.handle_turn_completed,
+    )
+
+    event_bus.subscribe(
+        ModelMessageProduced,
+        message_projector.handle,
+    )
+    # TODO: Remove the conversation projector and message projector from 
+    # the application constructor once we have a more general event system in place.
     return Application(
         agent_factory=agent_factory,
         workspace=workspace,
         planner_agent=planner,
         event_bus=event_bus,
         session_id=session_id,
-        conversation_history=ConversationHistory(),
+        conversation_history=conversation_history,
         planner_context_factory=planner_context_factory,
+        message_projector=message_projector,
+        conversation_projector=conversation_projector,
     )
 
 

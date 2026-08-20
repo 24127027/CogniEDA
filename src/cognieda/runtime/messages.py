@@ -13,7 +13,7 @@ class MessageType(str, Enum):  # noqa: UP042 - preserve the existing runtime con
     TEXT = "text"
     ERROR = "error"
     THINNKING = "thinking"
-
+    INPUT_REQUEST = "input_request"
 
 @dataclass
 class Message:

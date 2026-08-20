@@ -8,14 +8,16 @@ from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
 from cognieda.agents.planner.state import PlannerTurnOutcome
 from cognieda.application.ports import AgentFactoryPort
-from cognieda.runtime.conversation import ConversationHistory
+from cognieda.runtime.conversation.history import ConversationHistory
 from cognieda.runtime.event_bus import EventBus
 from cognieda.runtime.events import (
-    HumanInputRequested, 
+    ModelMessageProduced,
     MessageProduced, 
     PlanProposed, 
     AssistantThinkingStarted, 
-    AssistantThinkingFinished
+    AssistantThinkingFinished,
+    SegmentCompleted, 
+    TurnCompleted
 )
 from cognieda.runtime.commands.types import CommandSuggestion
 from cognieda.runtime.commands import (
@@ -25,7 +27,8 @@ from cognieda.runtime.commands import (
     create_command_registry,
 )
 
-
+from .projection.message import MessageProjector
+from .conversation.projector import ConversationProjector
 from .messages import Message, MessageRole, MessageType
 from .workspace import MissingModelCredentialError, Workspace
 
@@ -40,6 +43,8 @@ class Application:
         session_id: UUID,
         conversation_history: ConversationHistory,
         planner_context_factory: Callable[[], PlannerContext],
+        message_projector: MessageProjector,
+        conversation_projector: ConversationProjector,
     ) -> None:
         self.workspace = workspace
         self.agent_factory = agent_factory
@@ -48,6 +53,10 @@ class Application:
         self.session_id = session_id
         self.conversation_history = conversation_history
         self.planner_context_factory = planner_context_factory
+        self.message_projector = message_projector
+        self.conversation_projector = conversation_projector
+
+        print()
 
         self.command_handler = CommandHandler(
             parser=CommandParser(),
@@ -82,6 +91,8 @@ class Application:
         return self.command_handler.suggest(prefix)
 
     async def submit_message(self, message: str) -> None:
+        # TODO: 
+        # Keep this publication here, or place it inside message projector
         await self.event_bus.publish(
             MessageProduced(
                 message=Message(
@@ -122,10 +133,21 @@ class Application:
             await self._emit_message(f"{e}\n\nRun '/provider key <provider>' to configure an API key.")
             return
 
+        # TODO: This is a temporary solution to emit the completed segment messages. 
+        # These should be emitted by the planner agent in the future.
         if completed_segment is not None:
-            self.conversation_history = self.conversation_history.commit_segment(completed_segment)
+            for msg in completed_segment.messages:
+                await self.event_bus.publish(ModelMessageProduced(message=msg))
+            await self.event_bus.publish(SegmentCompleted())
+            await self.event_bus.publish(TurnCompleted())
 
         await self._emit_planner_outcome(outcome)
+
+    # TODO: Not tested
+    def conversation_history_snapshot(self) -> tuple[Message, ...]:
+        return self.message_projector.project_history(
+            self.conversation_history
+        )
 
     async def _emit_planner_outcome(self, outcome: PlannerTurnOutcome) -> None:
         if outcome.error is not None:
@@ -140,9 +162,9 @@ class Application:
 
         if outcome.human_input_request is not None:
             await self.event_bus.publish(
-                HumanInputRequested(
+                MessageProduced(
                     message=Message(
-                        type=MessageType.TEXT,
+                        type=MessageType.INPUT_REQUEST,
                         role=MessageRole.ASSISTANT,
                         content=outcome.human_input_request,
                     )
