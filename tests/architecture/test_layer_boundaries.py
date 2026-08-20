@@ -117,7 +117,7 @@ def test_conversation_memory_is_separate_from_authoritative_planner_context() ->
     from cognieda.agents.planner.context import PlannerContext
     from cognieda.agents.planner.state import PlannerState
     from cognieda.runtime.application import Application
-    from cognieda.runtime.conversation import (
+    from cognieda.runtime.conversation.history import (
         ConversationHistory,
         ConversationSegment,
         ConversationTurn,

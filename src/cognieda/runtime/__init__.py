@@ -5,7 +5,7 @@ from .messages import Message, MessageType
 if TYPE_CHECKING:
     from .application import Application
     from .bootstrap import bootstrap_application
-    from .conversation import ConversationHistory, ConversationSegment, ConversationTurn
+    from .conversation.history import ConversationHistory, ConversationSegment, ConversationTurn
 
 __all__ = [
     "Application",
@@ -28,7 +28,7 @@ def __getattr__(name: str) -> Any:
 
         return bootstrap_application
     if name in {"ConversationHistory", "ConversationSegment", "ConversationTurn"}:
-        import cognieda.runtime.conversation as conversation_module
+        import cognieda.runtime.conversation.history as conversation_module
 
         return getattr(conversation_module, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

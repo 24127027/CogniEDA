@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 from cognieda.runtime.events import (
     AssistantThinkingFinished, 
     AssistantThinkingStarted, 
-    HumanInputRequested, 
     MessageProduced, 
     PlanProposed
 )
@@ -22,10 +21,6 @@ async def repl(app: Application, renderer: Renderer) -> None:
         renderer.handle_message,
     )
     app.event_bus.subscribe(
-        HumanInputRequested,
-        renderer.handle_human_input,
-    )
-    app.event_bus.subscribe(
         PlanProposed,
         renderer.handle_plan,
     )
@@ -33,15 +28,17 @@ async def repl(app: Application, renderer: Renderer) -> None:
         AssistantThinkingStarted,
         renderer.handle_thinking_started,
     )
-    
     app.event_bus.subscribe(
         AssistantThinkingFinished,
         renderer.handle_thinking_finished,
     )
 
-    renderer.render_session_start(app.workspace.root)
-
     prompt = Prompt(app)
+
+    if app.workspace.project_config.try_resolve_model() is None:
+        await app.submit_message("/provider.config")
+
+    renderer.render_session_start(app.workspace.root)
 
     while True:
         try:

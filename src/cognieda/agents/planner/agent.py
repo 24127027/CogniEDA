@@ -14,7 +14,7 @@ from pydantic_ai.messages import ModelMessage
 
 from cognieda.agents.utilities import instruction
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
-from cognieda.runtime.conversation import ConversationSegment
+from cognieda.runtime.conversation.history import ConversationSegment
 from cognieda.schemas.plan import Plan
 
 from .context import PlannerContext, PlannerRunContext
@@ -213,7 +213,8 @@ class Planner:
                 PlannerErrorCode.INVALID_MODEL_RESULT,
                 "Planner produced a result that is invalid for the current context.",
             )
-        except Exception:
+        except Exception as e:
+            print(f"Unexpected error occurred: {e}")
             return self._controlled_output(
                 PlannerErrorCode.MODEL_UNAVAILABLE,
                 "Planner model invocation failed.",

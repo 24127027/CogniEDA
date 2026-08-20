@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from cognieda.runtime.conversation import ConversationSegment
+from cognieda.runtime.conversation.history import ConversationSegment
 from cognieda.schemas.plan import Plan
 
 
