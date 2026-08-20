@@ -1,46 +1,28 @@
-"""Data Explorer agent — contract-native executor with LangGraph internal workflow.
+from __future__ import annotations
 
-Public API
-----------
-DataExplorer
-    .run(request: ExecutorRequest) -> DataExplorerResult
-        The ExecutorProvider contract entry point.
-    .reload() -> None
-        Reloads the agent factory and any other internal state.
-Internal workflow (LangGraph graph)
-------------------------------------
-The graph: start -> planning -> execute -> check_result -> end
-check_result can loop back to planning when execution output is incomplete.
-
-The graph is used when no analysis_planner is injected. When analysis_planner
-is supplied (typically in tests), DataExplorer.run() bypasses the graph and
-calls the planner directly, producing a deterministic result.
-"""
-from cognieda.delegation.contracts import ExecutionStatus
+from dataclasses import replace
 
 from cognieda.application.ports.llm import AgentFactoryPort, ModelConfig
 from cognieda.delegation.capabilities import Capability
-from cognieda.delegation.contracts import ExecutorRequest, ExecutorResult
+from cognieda.delegation.contracts import (
+    ExecutionStatus,
+    ExecutorRequest,
+    ExecutorResult,
+)
 
-from .dependencies import DataExplorerDeps
-from .state import State
 from .context import Context
+from .dependencies import DataExplorerDeps
 from .graph import build_graph
-from .tools import eda, dataset_profiling, sandbox
+
 
 class DataExplorer:
     CAPABILITIES: tuple[Capability, ...] = (
-    Capability.DATA_ANALYSIS,
-    Capability.DATA_PROFILING,
-    Capability.DATA_TRANSFORMATION,
+        Capability.DATA_ANALYSIS,
+        Capability.DATA_PROFILING,
+        Capability.DATA_TRANSFORMATION,
     )
 
-    # Aggregate all callables into a single tuple
-    builtin_tools: tuple = (
-        *eda.all(),
-        *dataset_profiling.all(),
-        *sandbox.all(),
-    )
+    builtin_tools: tuple = ()
 
     def __init__(
         self,
@@ -62,61 +44,62 @@ class DataExplorer:
 
         input_state = {
             "input": request.input,
-            "external_context": request.context.model_dump_json(),  # Serialize context to JSON string
+            "external_context": request.context.model_dump_json(),
             "iterations": 0,
+            "artifacts": [],
         }
-        
-        # Extract data_profile_id from the context items if available
-        from cognieda.schemas.artifacts import DataProfile
-        from dataclasses import replace
-        data_profile_id = None
-        for item in request.context.content:
-            if isinstance(item, DataProfile):
-                data_profile_id = item.data_profile_id
-                break
-                
-        deps = replace(self.deps, data_profile_id=data_profile_id)
-        context: Context = Context(agent=self._agent, deps=deps)
 
-        try: 
-            result = await self.graph.ainvoke(input_state, context=context)
-        except Exception as e:
+        context = Context(
+            agent=self._agent,
+            deps=self.deps,
+        )
+
+        try:
+            result = await self.graph.ainvoke(
+                input_state,
+                context=context,
+            )
+        except Exception as exc:
             return ExecutorResult(
                 status=ExecutionStatus.FAILED,
-                failure=str(e),
+                failure=str(exc),
                 emitted_artifacts=(),
             )
 
         feedback = result.get("feedback", "")
-        iterations = result.get("iterations", 0)
-        
-        if iterations >= 3 and not feedback.upper().startswith("YES"):
+        artifacts = tuple(result.get("artifacts", ()))
+
+        if not feedback.upper().startswith("YES"):
             return ExecutorResult(
                 status=ExecutionStatus.FAILED,
-                failure=feedback,
-                emitted_artifacts=tuple(result.get("artifacts", ())),
+                failure=feedback or "DataExplorer did not complete the request.",
+                emitted_artifacts=artifacts,
             )
 
         return ExecutorResult(
             status=ExecutionStatus.SUCCEEDED,
             failure=None,
-            emitted_artifacts=tuple(result.get("artifacts", ())),
+            emitted_artifacts=artifacts,
         )
 
     async def reload(self) -> None:
-        """Reloads the agent factory and any other internal state."""
+        """Reload the underlying agent."""
+
         self._create_agent()
+
+    def _ensure_agent(self) -> None:
+        if self._agent is None:
+            self._create_agent()
 
     def _create_agent(self) -> None:
         if self._model_config is None:
-            raise RuntimeError("Data Explorer model configuration has not been configured.")
+            raise RuntimeError(
+                "Data Explorer model configuration has not been configured."
+            )
+
         self._agent = self._agent_factory.create_agent(
             worker="data_explorer",
             config=self._model_config,
             deps_type=DataExplorerDeps,
             builtin_tools=self.builtin_tools,
         )
-
-    def _ensure_agent(self):
-        if self._agent is None:
-            self._create_agent()
