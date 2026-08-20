@@ -30,12 +30,12 @@ from .types import (
     PlannerOutput,
     PlannerResult,
 )
-
+from .tools.delegation import data_analysis, data_profiling, data_transformation
 
 class Planner:
     """Human-facing coordinator over authoritative coordination and research state."""
 
-    builtin_tools: tuple[()] = ()
+    builtin_tools: tuple = (data_analysis, data_profiling, data_transformation)
 
     def __init__(
         self,
