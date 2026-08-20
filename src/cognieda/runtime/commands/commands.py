@@ -234,38 +234,6 @@ class ProviderModelCommand:
         )
 
 
-class ProviderKeyCommand:
-    name = "provider.key"
-    description = "Set the API key for a provider."
-
-    async def execute(
-        self,
-        command: ResolvedCommand,
-        context: CommandContext,
-    ) -> Message:
-        if len(command.args) != 1:
-            return text("Usage: /provider.key <profile>")
-
-        profile = command.args[0]
-
-        api_key = context.prompt_secret(
-            f"{profile} API key: "
-        ).strip()
-
-        context.workspace.set_provider_api_key(
-            profile,
-            api_key,
-        )
-
-        await context.reload_runtime(
-            recreate_agent=True,
-        )
-
-        return text(
-            f"Stored API key for '{profile}'."
-        )
-
-
 class ProviderConfigCommand:
     name = "provider.config"
     description = "Configure a provider API key."
