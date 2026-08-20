@@ -13,8 +13,8 @@ from cognieda.delegation.contracts import (
 from .context import Context
 from .dependencies import DataExplorerDeps
 from .graph import build_graph
-
-
+from .state import State
+from .tools import eda, dataset_profiling, sandbox
 class DataExplorer:
     CAPABILITIES: tuple[Capability, ...] = (
         Capability.DATA_ANALYSIS,
@@ -22,7 +22,11 @@ class DataExplorer:
         Capability.DATA_TRANSFORMATION,
     )
 
-    builtin_tools: tuple = ()
+    builtin_tools: tuple = (
+        eda.all(),
+        dataset_profiling.all(),
+        sandbox.all(),
+    )
 
     def __init__(
         self,
@@ -42,7 +46,7 @@ class DataExplorer:
         """ExecutorProvider contract entry point."""
         self._ensure_agent()
 
-        input_state = {
+        input_state: State = {
             "input": request.input,
             "iterations": 0,
             "artifacts": [],
