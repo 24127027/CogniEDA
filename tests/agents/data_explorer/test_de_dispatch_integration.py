@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from dotenv import load_dotenv
 
+from cognieda.agents.data_explorer.agent import DataExplorer
+from cognieda.agents.data_explorer.contracts import DataExplorerInput
+from cognieda.application.ports.llm import ModelConfig
 from cognieda.delegation.contracts import (
     Capability,
     ExecutionRequest,
@@ -13,18 +18,13 @@ from cognieda.delegation.contracts import (
     ExecutorContext,
     ExecutorInput,
 )
-from cognieda.agents.data_explorer.contracts import DataExplorerInput
-from cognieda.schemas.artifacts import Task
-from cognieda.schemas.enums import TaskKind
-from cognieda.runtime.workspace import Workspace
-from cognieda.application.ports.llm import ModelConfig
-from cognieda.infrastructure.llm import AgentFactory
 from cognieda.delegation.dispatcher import ExecutorDispatcher
 from cognieda.delegation.registry import ExecutorRegistry
-from cognieda.agents.data_explorer.agent import DataExplorer
-import os
-import asyncio
-from dotenv import load_dotenv
+from cognieda.infrastructure.llm import AgentFactory
+from cognieda.runtime.workspace import Workspace
+from cognieda.schemas.artifacts import Task
+from cognieda.schemas.enums import TaskKind
+
 
 @pytest.fixture(autouse=True)
 async def delay_between_analysis(request):

@@ -1,17 +1,19 @@
-import pandas as pd
-import pytest
-import numpy as np
 from unittest.mock import MagicMock
 from uuid import uuid4
+
+import pandas as pd
+import pytest
+
+from cognieda.agents.data_explorer_patch.dependencies import DataExplorerDeps
 from cognieda.agents.data_explorer_patch.tools.eda import (
     column_summary,
-    value_counts,
     descriptive_statistics,
+    detect_outliers,
     distribution_histogram,
     group_summary,
-    detect_outliers
+    value_counts,
 )
-from cognieda.agents.data_explorer_patch.dependencies import DataExplorerDeps
+
 
 @pytest.fixture
 def mock_ctx():

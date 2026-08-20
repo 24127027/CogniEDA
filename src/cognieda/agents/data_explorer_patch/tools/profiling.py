@@ -1,12 +1,11 @@
 from pydantic_ai import RunContext
 
+from cognieda.agents.utilities import function_registry
 from cognieda.schemas.artifacts import DataProfile
 from cognieda.schemas.common import ColumnProfile
 from cognieda.schemas.enums import VariableType
 
 from ..dependencies import DataExplorerDeps
-
-from cognieda.agents.utilities import function_registry
 
 dataset_profiling = function_registry.FunctionRegistry()
 

@@ -2,22 +2,16 @@ from __future__ import annotations
 
 import threading
 from typing import Any
-from uuid import uuid4
 
 import numpy as np
 import pandas as pd
 from pydantic_ai import RunContext
 
 from cognieda.agents.utilities import function_registry
-from cognieda.schemas.artifacts import Evidence, EvidenceProvenance
 
 from ..dependencies import DataExplorerDeps
 
-
 sandbox = function_registry.FunctionRegistry()
-
-
-
 
 SANDBOX_TIMEOUT = 15
 
@@ -176,6 +170,7 @@ def _serialize(value: Any) -> Any:
         f"Unsupported result type: {type(value).__name__}"
     )
 
+
 @sandbox.register
 def execute_code(
     ctx: RunContext[DataExplorerDeps],
@@ -186,6 +181,7 @@ def execute_code(
 
     The code must assign its final result to ``result``.
     The available variables are ``df``, ``pd`` and ``np``.
+    Explicit request constraints and computations must be respected.
     """
 
     namespace = _globals()
@@ -232,6 +228,7 @@ def execute_code(
     return {
         "output": result,
     }
+
 
 __all__ = [
     "sandbox",

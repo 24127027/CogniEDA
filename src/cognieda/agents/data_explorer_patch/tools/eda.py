@@ -1,21 +1,16 @@
 from __future__ import annotations
 
 from typing import Any, Literal, cast
-from uuid import uuid4
 
 import numpy as np
 import pandas as pd
 from pydantic_ai import RunContext
 
 from cognieda.agents.utilities import function_registry
-from cognieda.schemas.artifacts import Evidence, EvidenceProvenance
 
 from ..dependencies import DataExplorerDeps
 
 eda = function_registry.FunctionRegistry()
-
-
-
 
 
 def _column(df: pd.DataFrame, name: str) -> pd.Series:
@@ -32,13 +27,17 @@ def _numeric(df: pd.DataFrame, name: str) -> pd.Series:
 
     return pd.to_numeric(series, errors="coerce").astype("float64")
 
+
 @eda.register
 def column_summary(
     ctx: RunContext[DataExplorerDeps],
     *,
     column: str,
 ) -> dict[str, Any]:
-    """Summarize basic properties of one column."""
+    """Summarize basic structural properties of one column.
+    
+    Includes dtype, row count, missing count, and distinct count.
+    """
     df = ctx.deps.dataframe
     series = _column(df, column)
 
@@ -50,6 +49,7 @@ def column_summary(
         "distinct_count": int(series.nunique(dropna=True)),
     }
 
+
 @eda.register
 def value_counts(
     ctx: RunContext[DataExplorerDeps],
@@ -57,7 +57,11 @@ def value_counts(
     column: str,
     top_k: int = 20,
 ) -> dict[str, Any]:
-    """Return the most frequent values of a column."""
+    """Return the most frequent values of a column.
+    
+    When top_k is unspecified in the request, defaults to 20 (bounded between 1 and 100).
+    Explicit request constraints override defaults.
+    """
     df = ctx.deps.dataframe
     series = _column(df, column)
 
@@ -86,13 +90,17 @@ def value_counts(
         "values": values,
     }
 
+
 @eda.register
 def descriptive_statistics(
     ctx: RunContext[DataExplorerDeps],
     *,
     column: str,
 ) -> dict[str, Any]:
-    """Return basic descriptive statistics for a numeric column."""
+    """Return basic descriptive statistics for a numeric column.
+    
+    Includes min, max, mean, median, std, p25, and p75.
+    """
     df = ctx.deps.dataframe
     series = _numeric(df, column)
     valid_values = series[np.isfinite(series)]
@@ -125,6 +133,7 @@ def descriptive_statistics(
         "statistics": statistics,
     }
 
+
 @eda.register
 def distribution_histogram(
     ctx: RunContext[DataExplorerDeps],
@@ -132,7 +141,11 @@ def distribution_histogram(
     column: str,
     bins: int = 10,
 ) -> dict[str, Any]:
-    """Return histogram counts and bin edges for a numeric column."""
+    """Return histogram counts and bin edges for a numeric column.
+    
+    When bins is unspecified in the request, defaults to 10 (bounded between 1 and 50).
+    Explicit request constraints override defaults.
+    """
     df = ctx.deps.dataframe
     series = _numeric(df, column)
     valid_values = series[np.isfinite(series)]
@@ -156,6 +169,7 @@ def distribution_histogram(
         "counts": [int(c) for c in counts],
     }
 
+
 @eda.register
 def group_summary(
     ctx: RunContext[DataExplorerDeps],
@@ -166,7 +180,11 @@ def group_summary(
         Literal["mean", "median", "sum", "std", "count"]
     ] | None = None,
 ) -> dict[str, Any]:
-    """Aggregate a numeric column by another column."""
+    """Aggregate a numeric column by another column.
+    
+    When aggregations is unspecified in the request, defaults to ['mean', 'count'].
+    Explicit request constraints override defaults.
+    """
     df = ctx.deps.dataframe
 
     _column(df, group_by)
@@ -233,6 +251,7 @@ def group_summary(
         "groups": groups,
     }
 
+
 @eda.register
 def detect_outliers(
     ctx: RunContext[DataExplorerDeps],
@@ -241,7 +260,11 @@ def detect_outliers(
     method: Literal["iqr", "zscore"] = "iqr",
     threshold: float = 1.5,
 ) -> dict[str, Any]:
-    """Detect outliers in a numeric column."""
+    """Detect outliers in a numeric column using IQR or Z-score method.
+    
+    When method or threshold is unspecified in the request, defaults to IQR with threshold=1.5.
+    Explicit request constraints (e.g. method='zscore', threshold=3.0) override defaults.
+    """
     df = ctx.deps.dataframe
     series = _numeric(df, column)
     valid_values = series[np.isfinite(series)]
@@ -273,7 +296,7 @@ def detect_outliers(
         std = float(valid_values.std(ddof=1)) if len(valid_values) > 1 else 0.0
 
         lower = mean - threshold * std
-        upper = mean + threshold * std  # Sửa bug: thay '-' bằng '+'
+        upper = mean + threshold * std
 
     outliers = (valid_values < lower) | (valid_values > upper)
     count = int(outliers.sum())
@@ -288,6 +311,7 @@ def detect_outliers(
         "outlier_ratio": float(count / len(valid_values)),
     }
 
+
 __all__ = [
-    "eda"
+    "eda",
 ]
