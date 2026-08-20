@@ -20,7 +20,7 @@ from cognieda.schemas.plan import Plan
 from .context import PlannerContext, PlannerRunContext
 from .dependencies import (
     PlanAdmissionPort,
-    PlannerToolDeps,
+    PlannerDeps,
 )
 from .graph import InProcessPlannerSerializer, build_graph
 from .state import PlannerTurnOutcome, PlannerState
@@ -39,7 +39,7 @@ class Planner:
 
     def __init__(
         self,
-        deps: PlannerToolDeps,
+        deps: PlannerDeps,
         *,
         agent_factory: AgentFactoryPort,
         model_config: ModelConfig | None,
@@ -53,7 +53,7 @@ class Planner:
         self._model_config = model_config
         self._agent_instruction = agent_instruction
         self._instructions = self._assemble_instructions()
-        self._agent: Agent[PlannerToolDeps] | None = None
+        self._agent: Agent[PlannerDeps] | None = None
         if model_config is not None:
             self._create_agent()
         self._checkpointer = checkpointer or InMemorySaver(
@@ -81,11 +81,11 @@ class Planner:
         self._agent = self._agent_factory.create_agent(
             worker="planner",
             config=self._model_config,
-            deps_type=PlannerToolDeps,
+            deps_type=PlannerDeps,
             builtin_tools=self.builtin_tools,
         )
 
-    def _ensure_agent(self) -> Agent[PlannerToolDeps]:
+    def _ensure_agent(self) -> Agent[PlannerDeps]:
         if self._agent is None:
             self._create_agent()
         agent = self._agent

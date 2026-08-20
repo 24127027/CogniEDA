@@ -10,7 +10,7 @@ from cognieda.agents.data_explorer_patch.agent import DataExplorer
 from cognieda.agents.data_explorer_patch.dependencies import DataExplorerDeps
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
-from cognieda.agents.planner.dependencies import PlannerToolDeps
+from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.application.services import PlanAdmissionService
 from cognieda.delegation import ExecutorDispatcher, ExecutorRegistry
 from cognieda.infrastructure.llm import AgentFactory
@@ -82,7 +82,7 @@ def bootstrap_application(workspace_path: Path) -> Application:
         return build_planner_context(frame, active_plan=active_plan)
 
     planner = Planner(
-        deps=PlannerToolDeps(dispatcher=dispatcher),
+        deps=PlannerDeps(dispatcher=dispatcher),
         agent_factory=agent_factory,
         model_config=model_config,
         plan_admission=PlanAdmissionService(session),

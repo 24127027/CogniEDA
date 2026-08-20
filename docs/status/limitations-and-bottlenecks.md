@@ -31,7 +31,7 @@ These are verified constraints of the bounded current implementation.
   surfaces. Application owns the stable session identity and `ConversationHistory`
   composed of `ConversationTurn`s and prunable `ConversationSegment`s.
   Planner performs one `plan_or_answer` invocation per graph turn
-  with `PlannerToolDeps` and no execution dispatch. Graph state owns the exact
+  with `PlannerDeps` and no execution dispatch. Graph state owns the exact
   transient self-contained Plan candidate and completed turn segment; `PlannerContext`
   and native model history are transported fresh via `PlannerRunContext`.
   Candidate retain/replace/discard, natural-language Human review, typed authorization,
