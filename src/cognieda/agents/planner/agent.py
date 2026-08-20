@@ -48,7 +48,7 @@ class Planner:
         checkpointer: BaseCheckpointSaver[Any] | None = None,
         thread_id: UUID | None = None,
     ) -> None:
-        self.tool_deps = deps
+        self.deps = deps
         self._agent_factory = agent_factory
         self._model_config = model_config
         self._agent_instruction = agent_instruction
@@ -186,7 +186,7 @@ class Planner:
             run_result = await agent.run(
                 request,
                 output_type=PlannerResult,
-                deps=self.tool_deps,
+                deps=self.deps,
                 message_history=message_history,
                 instructions=[
                     *self._instructions,
