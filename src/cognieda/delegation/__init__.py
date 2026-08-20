@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from .capabilities import Capability
 from .contracts import (
-    DEExecutorContext,
     ExecutorRequest,
     ExecutorResult,
     ExecutionStatus,
@@ -16,7 +15,6 @@ from .registry import CapabilityNotRegisteredError, ExecutorRegistry
 __all__ = (
     "Capability",
     "CapabilityNotRegisteredError",
-    "DEExecutorContext",
     "ExecutorRequest",
     "ExecutorResult",
     "ExecutionStatus",

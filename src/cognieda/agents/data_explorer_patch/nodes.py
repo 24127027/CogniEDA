@@ -1,6 +1,6 @@
 from langgraph.graph import END
 from langgraph.runtime import Runtime
-from pydantic_ai.messages import ToolReturn
+from pydantic_ai.messages import ToolReturnPart
 from cognieda.schemas.artifacts import DataProfile, Evidence
 
 from .state import State
@@ -53,7 +53,7 @@ async def execute(state: State, runtime: Runtime[Context]) -> State:
         artifacts = []
         
     for msg in result.new_messages():
-        if isinstance(msg, ToolReturn):
+        if isinstance(msg, ToolReturnPart):
             if isinstance(msg.content, DataProfile):
                 artifact = msg.content
                 
@@ -84,7 +84,7 @@ async def execute(state: State, runtime: Runtime[Context]) -> State:
                 
     tool_responses = [
         msg.content for msg in result.new_messages()
-        if isinstance(msg, ToolReturn) and not isinstance(msg.content, DataProfile)
+        if isinstance(msg, ToolReturnPart) and not isinstance(msg.content, DataProfile)
     ]
     
     if tool_responses:

@@ -52,6 +52,7 @@ class DataExplorer:
         self._model_config = config
         self._agent_factory = agent_factory
         self.deps = deps
+        self._agent = None
 
         self.graph = build_graph()
 

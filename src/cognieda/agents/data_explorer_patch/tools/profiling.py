@@ -1,4 +1,4 @@
-from pydantic_ai import RuntimeContext
+from pydantic_ai import RunContext
 
 from cognieda.schemas.artifacts import DataProfile
 from cognieda.schemas.common import ColumnProfile
@@ -12,7 +12,7 @@ dataset_profiling = function_registry.FunctionRegistry()
 
 
 @dataset_profiling.register
-def profiling(ctx: RuntimeContext[DataExplorerDeps]) -> DataProfile:
+def profiling(ctx: RunContext[DataExplorerDeps]) -> DataProfile:
     """Create a deterministic structural profile of the active dataframe."""
     dataframe = ctx.deps.dataframe
 
