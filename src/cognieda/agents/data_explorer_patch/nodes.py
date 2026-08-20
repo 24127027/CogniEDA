@@ -17,7 +17,7 @@ async def planning(state: State, runtime: Runtime[Context]) -> State:
     
     prompt = (
         f"Analyze the following request and create a step-by-step plan to solve it.\n\n"
-        f"Context: {state.get('external_context')}\n"
+        f"Context: {runtime.context.context.model_dump_json()}\n"
         f"Task: {state.get('input')}"
     )
     
@@ -40,7 +40,7 @@ async def planning(state: State, runtime: Runtime[Context]) -> State:
 
 async def execute(state: State, runtime: Runtime[Context]) -> State:
     """Execute node of the DataExplorer agent's internal workflow."""
-    prompt = "Now execute the plan you just created. Use your built-in tools as necessary."
+    prompt = "Now execute the plan you just created. Use tools as necessary."
     
     result = await runtime.context.agent.run(
         prompt,
@@ -72,11 +72,11 @@ async def execute(state: State, runtime: Runtime[Context]) -> State:
                     
                     desc_agent = Agent(
                         runtime.context.agent.model,
-                        result_type=SemanticDescriptions
+                        output_type=SemanticDescriptions
                     )
                     
                     desc_result = await desc_agent.run(desc_prompt)
-                    artifact = artifact.with_column_descriptions(desc_result.data.descriptions)
+                    artifact = artifact.with_column_descriptions(desc_result.output.descriptions)
                 except Exception:
                     pass # Ignore if generation fails to prevent crashes
                     
@@ -106,22 +106,22 @@ async def execute(state: State, runtime: Runtime[Context]) -> State:
         
         evidence_agent = Agent(
             runtime.context.agent.model,
-            result_type=SynthesizedEvidence
+            output_type=SynthesizedEvidence
         )
         
         try:
             ev_result = await evidence_agent.run(evidence_prompt)
-            data_profile_id = runtime.context.deps.data_profile_id or uuid4()
+            ev_result = ev_result.output
             
             evidence = Evidence(
-                data_profile_id=data_profile_id,
-                content=ev_result.data.content,
-                artifact_refs=tuple(ev_result.data.artifact_refs),
+                data_profile_id=uuid4(),
+                content=ev_result.content,
+                artifact_refs=tuple(ev_result.artifact_refs),
                 provenance=EvidenceProvenance(
                     producer_role="data_explorer",
                     work_reference="execute_node",
                     dataset_reference="active_dataframe",
-                    data_profile_id=data_profile_id,
+                    data_profile_id=uuid4(),
                 )
             )
             artifacts.append(evidence)
@@ -150,7 +150,7 @@ async def check_result(state: State, runtime: Runtime[Context]) -> State:
         message_history=state.get("messages", [])
     )
     
-    feedback = result.data.strip()
+    feedback = result.output.strip()
     
     return {
         **state,

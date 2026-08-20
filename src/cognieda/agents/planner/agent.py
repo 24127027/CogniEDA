@@ -183,6 +183,10 @@ class Planner:
         )
         new_messages: tuple[ModelMessage, ...] = ()
         try:
+            self.deps = PlannerDeps(
+                dispatcher=self.deps.dispatcher,
+                planner_context=context,
+            )
             run_result = await agent.run(
                 request,
                 output_type=PlannerResult,

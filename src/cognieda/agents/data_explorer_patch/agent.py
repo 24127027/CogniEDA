@@ -44,7 +44,6 @@ class DataExplorer:
 
         input_state = {
             "input": request.input,
-            "external_context": request.context.model_dump_json(),
             "iterations": 0,
             "artifacts": [],
         }
@@ -52,6 +51,7 @@ class DataExplorer:
         context = Context(
             agent=self._agent,
             deps=self.deps,
+            context=request.context,
         )
 
         try:
