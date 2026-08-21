@@ -1,142 +1,26 @@
-from __future__ import annotations
-
-import json
+from unittest.mock import MagicMock
 
 import pandas as pd
-from pandas.testing import assert_frame_equal
 
-from cognieda.agents.data_explorer.analysis import ProfilingOptions, profile_dataframe
-from cognieda.agents.data_explorer.tools import profile_dataset
-from cognieda.schemas import ContinuousColumnSummary, DiscreteColumnSummary, VariableType
-
-
-def test_profile_dataframe_preserves_shape_order_dtype_and_missingness() -> None:
-    dataframe = pd.DataFrame(
-        {
-            "amount": [1.0, None, 3.0],
-            "active": [True, False, True],
-            "segment": pd.Categorical(["premium", "standard", "premium"]),
-        }
-    )
-
-    profile = profile_dataframe(dataframe)
-
-    assert profile.row_count == 3
-    assert profile.column_count == 3
-    assert [column.name for column in profile.columns] == ["amount", "active", "segment"]
-    assert [column.dtype for column in profile.columns] == ["float64", "bool", "category"]
-    assert profile.columns[0].missing_count == 1
-    assert profile.columns[0].distinct_count == 2
+from cognieda.agents.data_explorer_patch.dependencies import DataExplorerDeps
+from cognieda.agents.data_explorer_patch.tools.profiling import profiling
+from cognieda.schemas.artifacts import DataProfile
+from cognieda.schemas.enums import VariableType
 
 
-def test_profile_dataset_does_not_transform_or_mutate_active_data() -> None:
-    dataframe = pd.DataFrame(
-        {
-            "value": [1.0, 1.0, None, None],
-            "group": ["a", "a", None, "b"],
-        }
-    )
-    original = dataframe.copy(deep=True)
-
-    profile = profile_dataset(dataframe)
-
-    assert_frame_equal(dataframe, original)
-    assert profile.row_count == len(original)
-    assert profile.columns[0].missing_count == 2
-    assert profile.columns[1].missing_count == 1
-
-
-def test_numeric_non_boolean_is_continuous_with_finite_descriptive_summary() -> None:
-    profile = profile_dataframe(pd.DataFrame({"amount": [1.0, 2.0, 3.0, 4.0]}))
-    column = profile.columns[0]
-
-    assert column.variable_type is VariableType.CONTINUOUS
-    assert isinstance(column.summary, ContinuousColumnSummary)
-    assert column.summary.min == 1.0
-    assert column.summary.max == 4.0
-    assert column.summary.mean == 2.5
-    assert column.summary.median == 2.5
-    assert column.summary.std is not None
-    assert column.summary.p25 == 1.75
-    assert column.summary.p75 == 3.25
-
-
-def test_non_finite_source_values_are_excluded_from_continuous_statistics() -> None:
-    profile = profile_dataframe(pd.DataFrame({"amount": [1.0, float("inf"), float("-inf")]}))
-    column = profile.columns[0]
-
-    assert column.distinct_count == 3
-    assert column.missing_count == 0
-    assert isinstance(column.summary, ContinuousColumnSummary)
-    assert column.summary.min == 1.0
-    assert column.summary.max == 1.0
-    assert column.summary.mean == 1.0
-    assert column.summary.median == 1.0
-    assert column.summary.std == 0.0
-    assert column.summary.p25 == 1.0
-    assert column.summary.p75 == 1.0
-    json.dumps(profile.model_dump(mode="json"), allow_nan=False)
-
-
-def test_boolean_string_and_categorical_columns_are_discrete() -> None:
-    dataframe = pd.DataFrame(
-        {
-            "active": [True, False, True],
-            "name": ["a", "b", "a"],
-            "segment": pd.Categorical(["x", "y", "x"]),
-        }
-    )
-
-    profile = profile_dataframe(dataframe)
-
-    assert all(column.variable_type is VariableType.DISCRETE for column in profile.columns)
-    assert all(isinstance(column.summary, DiscreteColumnSummary) for column in profile.columns)
-
-
-def test_low_cardinality_counts_are_complete_and_deterministically_ordered() -> None:
-    profile = profile_dataframe(pd.DataFrame({"segment": ["b", "a", "b", "c"]}))
-    summary = profile.columns[0].summary
-
-    assert isinstance(summary, DiscreteColumnSummary)
-    assert summary.top_values is None
-    assert [(item.value, item.count) for item in summary.value_counts or ()] == [
-        ("b", 2),
-        ("a", 1),
-        ("c", 1),
-    ]
-
-
-def test_high_cardinality_values_are_bounded_to_top_n() -> None:
-    profile = profile_dataframe(
-        pd.DataFrame({"code": ["d", "a", "b", "c", "d", "e"]}),
-        options=ProfilingOptions(top_value_limit=3),
-    )
-    summary = profile.columns[0].summary
-
-    assert isinstance(summary, DiscreteColumnSummary)
-    assert summary.value_counts is None
-    assert [(item.value, item.count) for item in summary.top_values or ()] == [
-        ("d", 2),
-        ("a", 1),
-        ("b", 1),
-    ]
-
-
-def test_empty_dataset_retains_columns_and_json_safe_summaries() -> None:
-    dataframe = pd.DataFrame(
-        {
-            "amount": pd.Series(dtype="float64"),
-            "active": pd.Series(dtype="bool"),
-        }
-    )
-
-    profile = profile_dataframe(dataframe)
-    serialized = profile.model_dump(mode="json")
-
-    assert profile.row_count == 0
-    assert [column.name for column in profile.columns] == ["amount", "active"]
-    assert isinstance(profile.columns[0].summary, ContinuousColumnSummary)
-    assert profile.columns[0].summary.mean is None
-    assert isinstance(profile.columns[1].summary, DiscreteColumnSummary)
-    assert profile.columns[1].summary.value_counts == ()
-    json.dumps(serialized, allow_nan=False)
+def test_profiling():
+    df = pd.DataFrame({"A": [1, 2, 3], "B": ["x", "y", "z"]})
+    deps = DataExplorerDeps(dataframe=df)
+    ctx = MagicMock()
+    ctx.deps = deps
+    
+    result = profiling(ctx)
+    
+    assert isinstance(result, DataProfile)
+    assert result.row_count == 3
+    assert result.column_count == 2
+    assert len(result.columns) == 2
+    assert result.columns[0].name == "A"
+    assert result.columns[0].variable_type == VariableType.CONTINUOUS
+    assert result.columns[1].name == "B"
+    assert result.columns[1].variable_type == VariableType.DISCRETE

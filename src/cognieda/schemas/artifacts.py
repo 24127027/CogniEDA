@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import Any
+from typing import Any, Mapping
 from uuid import UUID, uuid4
 
 from pydantic import Field, JsonValue, NonNegativeInt, field_validator, model_validator
@@ -89,6 +89,27 @@ class DataProfile(ImmutableCogniEDABaseModel):
             raise ValueError("column_count must equal the number of ColumnProfile entries.")
         return self
 
+    def with_column_descriptions(
+        self,
+        descriptions: Mapping[str, str],
+    ) -> DataProfile:
+        column_names = {column.name for column in self.columns}
+        unknown = descriptions.keys() - column_names
+
+        if unknown:
+            raise ValueError(f"Unknown columns: {sorted(unknown)}")
+
+        columns = tuple(
+            column.model_copy(
+                update={"semantic_description": descriptions[column.name]}
+            )
+            if column.name in descriptions
+            else column
+            for column in self.columns
+        )
+
+        return self.model_copy(update={"columns": columns})
+
 
 class Assumption(ImmutableCogniEDABaseModel):
     """Planning-only statement; an Assumption is never empirical Evidence."""
@@ -103,7 +124,7 @@ class Task(ImmutableCogniEDABaseModel):
     task_id: UUID = Field(default_factory=uuid4)
     objective_id: UUID
     kind: TaskKind
-    instruction: NonEmptyStr
+    description: NonEmptyStr
     status: TaskStatus = TaskStatus.PENDING
 
     def semantic_payload(self) -> dict[str, Any]:
@@ -113,7 +134,7 @@ class Task(ImmutableCogniEDABaseModel):
             "task_id": str(self.task_id),
             "objective_id": str(self.objective_id),
             "kind": self.kind.value,
-            "instruction": self.instruction,
+            "description": self.description,
         }
 
 
@@ -137,7 +158,7 @@ class Evidence(ImmutableCogniEDABaseModel):
     """Immutable structured result linked directly to real MVP work and data state."""
 
     evidence_id: UUID = Field(default_factory=uuid4)
-    task_id: UUID
+    # task_id: UUID
     data_profile_id: UUID
     content: dict[str, JsonValue] = Field(min_length=1)
     provenance: EvidenceProvenance

@@ -158,7 +158,7 @@ durable recovery remain **Deferred**.
 
 Planner-focused tests use deterministic fake Agent and PydanticAI
 `FunctionModel` boundaries to verify direct Agent ownership, exact typed
-`PlannerToolDeps` dependency injection, one invocation per graph turn, native history
+`PlannerDeps` dependency injection, one invocation per graph turn, native history
 pass-through and current-message isolation, fresh current-run context,
 stale-context non-replay, exact candidate validation, and absence of
 model-visible Capability. Planner lifecycle tests prove exact graph-state and
@@ -175,7 +175,7 @@ Runtime Application tests prove response, proposal, clarification, error, and
 command publication without transferring lifecycle authority to EventBus or
 giving Application direct persistence repository ownership. Bootstrap
 tests prove Application owns the `session_id` while SessionFrame and active-Plan
-repositories are scoped and Planner is wired with `PlannerToolDeps` and `session_id` as `thread_id`.
+repositories are scoped and Planner is wired with `PlannerDeps` and `session_id` as `thread_id`.
 Independent service tests prove atomic admission and rollback; runtime context tests prove that the exact
 objective-scoped active Plan reaches `PlannerContext` alongside all six
 materialized SessionFrame research-state member categories. Layer tests verify

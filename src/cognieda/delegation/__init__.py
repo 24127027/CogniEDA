@@ -2,30 +2,26 @@ from __future__ import annotations
 
 from .capabilities import Capability
 from .contracts import (
-    ExecutionFailure,
-    ExecutionRequest,
-    ExecutionResult,
+    ExecutorRequest,
+    ExecutorResult,
     ExecutionStatus,
     ExecutorContext,
-    ExecutorInput,
     PlannerWorkOutcome,
     normalize_for_planner,
 )
-from .dispatcher import ExecutorDispatcher, ExecutorError
+from .dispatcher import ExecutorDispatcher
 from .registry import CapabilityNotRegisteredError, ExecutorRegistry
 
 __all__ = (
     "Capability",
     "CapabilityNotRegisteredError",
-    "ExecutionFailure",
-    "ExecutionRequest",
-    "ExecutionResult",
+    "ExecutorRequest",
+    "ExecutorResult",
     "ExecutionStatus",
     "ExecutorContext",
     "ExecutorDispatcher",
-    "ExecutorInput",
-    "ExecutorError",
     "ExecutorRegistry",
     "PlannerWorkOutcome",
     "normalize_for_planner",
 )
+

@@ -19,7 +19,7 @@ from sqlmodel import Session
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext, PlannerRunContext
-from cognieda.agents.planner.dependencies import PlannerToolDeps
+from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.graph import InProcessPlannerSerializer, build_graph
 from cognieda.agents.planner.state import (
     PlannerState,
@@ -92,7 +92,7 @@ class SequencePlanner(Planner):
         self.message_histories: list[tuple[ModelMessage, ...]] = []
         self.recording_dispatcher = dispatcher or RecordingDispatcher()
         super().__init__(
-            deps=PlannerToolDeps(dispatcher=self.recording_dispatcher),
+            deps=PlannerDeps(dispatcher=self.recording_dispatcher),
             agent_factory=cast(AgentFactoryPort, object()),
             model_config=None,
             plan_admission=plan_admission,

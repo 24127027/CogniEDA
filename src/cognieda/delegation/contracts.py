@@ -3,88 +3,48 @@ from __future__ import annotations
 import hashlib
 import json
 from enum import StrEnum
-from typing import Protocol, runtime_checkable
+from typing import Annotated, Any, Protocol, runtime_checkable
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, model_validator
-from pydantic_ai.messages import ModelMessage
+from pydantic import BaseModel, ConfigDict, Field
 
-from cognieda.schemas.artifacts import Task
+from cognieda.schemas.artifacts import DataProfile, Evidence, Hypothesis
 
 from .capabilities import Capability
 
-
-class ExecutorInput(BaseModel):
-    """Shared invocation input; semantic Task identity comes from project schemas."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    task: Task
-
+ContextItem = Annotated[
+    DataProfile,
+    ...
+]
 
 class ExecutorContext(BaseModel):
-    """Small shared context that is safe for every registered executor."""
+    """Contextual information provided to the executor for capability fulfillment."""
 
     model_config = ConfigDict(extra="forbid")
 
-    dataset_path: str | None = None
-    data_profile_id: UUID | None = None
+    content: tuple[ContextItem, ...] = ()
 
-
-class BaseState(BaseModel):
-    """Shared graph state for graph-backed executor scaffolds."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    task: Task
-    messages: list[ModelMessage] = Field(default_factory=list)
-
-
-class ExecutionRequest(BaseModel):
+class ExecutorRequest(BaseModel):
     """Typed capability request sent through the executor dispatcher."""
 
     model_config = ConfigDict(extra="forbid")
 
     capability: Capability
-    input: SerializeAsAny[ExecutorInput]
+    input: str
     context: ExecutorContext = Field(default_factory=ExecutorContext)
-
 
 class ExecutionStatus(StrEnum):
     SUCCEEDED = "succeeded"
     BLOCKED = "blocked"
     FAILED = "failed"
 
-
-class ExecutionFailure(BaseModel):
-    """Controlled provider failure; never represents fabricated success."""
-
+class ExecutorResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
-    code: str = Field(min_length=1)
-    message: str = Field(min_length=1)
-
-
-class ExecutionResult(BaseModel):
-    """Non-semantic transport metadata shared by role-native results."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    source_role: str = Field(min_length=1)
-    task_id: UUID
-    work_id: str = Field(min_length=1)
+    
     status: ExecutionStatus
-    limitations: list[str] = Field(default_factory=list)
-    failure: ExecutionFailure | None = None
 
-    @model_validator(mode="after")
-    def _failure_matches_status(self) -> ExecutionResult:
-        if self.status == ExecutionStatus.SUCCEEDED and self.failure is not None:
-            raise ValueError("A successful execution result cannot contain a failure.")
-        if self.status != ExecutionStatus.SUCCEEDED and self.failure is None:
-            raise ValueError("A blocked or failed execution result requires failure details.")
-        return self
-
+    failure: str | None = None
+    emitted_artifacts: tuple[DataProfile | Evidence | Hypothesis, ...] = Field(default_factory=tuple)
 
 @runtime_checkable
 class Executor(Protocol):
@@ -94,7 +54,7 @@ class Executor(Protocol):
         as a tuple of `Capability` instances that it can handle.
     """
 
-    async def run(self, request: ExecutionRequest) -> ExecutionResult: ...
+    async def run(self, request: ExecutorRequest) -> ExecutorResult: ...
 
 
 class PlannerWorkOutcome(BaseModel):
@@ -102,40 +62,38 @@ class PlannerWorkOutcome(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    source_role: str
     task_id: UUID
-    work_id: str
     status: ExecutionStatus
     semantic_summary: str
     authoritative_refs: list[str] = Field(default_factory=list)
-    limitations: list[str] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
     permitted_next_actions: list[str] = Field(default_factory=list)
     result_digest: str
 
 
-def normalize_for_planner(result: ExecutionResult) -> PlannerWorkOutcome:
+def normalize_for_planner(result: ExecutorResult) -> PlannerWorkOutcome:
     """Project only shared metadata; role-native payloads remain opaque to Planner."""
 
+    # Exclude emitted_artifacts from the digest — it contains live RAM objects
+    # that are not serializable and must not leak into the digest.
+    serializable = result.model_dump(mode="json", exclude={"emitted_artifacts"})
     serialized = json.dumps(
-        result.model_dump(mode="json"),
+        serializable,
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
-    blocker = result.failure.message if result.failure is not None else None
+    blocker = result.failure if result.failure is not None else None
     summary = (
-        f"{result.source_role} completed work {result.work_id}."
-        if result.status == ExecutionStatus.SUCCEEDED
-        else f"{result.source_role} could not complete work {result.work_id}."
+        f"Work completed."
+        if result.status == ExecutionStatus.SUCCEEDED else f"Work failed."
     )
 
+    # TODO: Dọn cái này sau
+    import uuid
     return PlannerWorkOutcome(
-        source_role=result.source_role,
-        task_id=result.task_id,
-        work_id=result.work_id,
+        task_id=uuid.uuid4(),
         status=result.status,
         semantic_summary=summary,
-        limitations=list(result.limitations),
         blockers=[blocker] if blocker is not None else [],
         permitted_next_actions=(
             ["review_result"] if result.status == ExecutionStatus.SUCCEEDED else ["hold", "replan"]

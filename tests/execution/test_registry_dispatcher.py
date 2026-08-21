@@ -208,7 +208,7 @@ def test_bootstrap_composes_real_dispatcher_and_data_provider(tmp_path) -> None:
     request = _request(Capability.DATA_TRANSFORMATION)
 
     result = asyncio.run(
-        application.planner_agent.tool_deps.dispatcher.dispatch(request)
+        application.planner_agent.deps.dispatcher.dispatch(request)
     )
 
     assert result.status == ExecutionStatus.BLOCKED

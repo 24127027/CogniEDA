@@ -18,7 +18,7 @@ from pydantic_ai.models.function import FunctionModel
 
 from cognieda.agents.planner.agent import Planner
 from cognieda.agents.planner.context import PlannerContext
-from cognieda.agents.planner.dependencies import PlannerToolDeps
+from cognieda.agents.planner.dependencies import PlannerDeps
 from cognieda.agents.planner.types import PlannerErrorCode, PlannerResult
 from cognieda.application.ports import AgentFactoryPort, ModelConfig
 from cognieda.delegation import ExecutionRequest
@@ -92,12 +92,12 @@ def _planner(
 ) -> tuple[
     Planner,
     RecordingAgent,
-    PlannerToolDeps,
+    PlannerDeps,
     RecordingFactory,
 ]:
     agent = RecordingAgent(FakeRunResult(output=result, messages=messages))
     factory = RecordingFactory(agent)
-    deps = PlannerToolDeps(dispatcher=NeverDispatcher())  # type: ignore[arg-type]
+    deps = PlannerDeps(dispatcher=NeverDispatcher())  # type: ignore[arg-type]
     planner = Planner(
         deps,
         agent_factory=cast(AgentFactoryPort, factory),
@@ -145,7 +145,7 @@ def test_planner_directly_owns_one_agent_and_invokes_it_once_with_exact_deps() -
     assert not hasattr(planner, "model")
     assert planner.graph is not None
     assert len(factory.calls) == 1
-    assert factory.calls[0]["deps_type"] is PlannerToolDeps
+    assert factory.calls[0]["deps_type"] is PlannerDeps
     assert factory.calls[0]["builtin_tools"] == ()
     assert len(agent.calls) == 1
     prompt, kwargs = agent.calls[0]
@@ -217,7 +217,7 @@ def test_fresh_context_does_not_replay_stale_snapshot_into_second_model_call() -
             pass
 
     planner = Planner(
-        PlannerToolDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
+        PlannerDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
         agent_factory=cast(AgentFactoryPort, FunctionModelFactory()),
         model_config=ModelConfig(
             provider="openai",
@@ -454,7 +454,7 @@ def test_empty_request_and_missing_model_fail_closed_without_invocation() -> Non
 
     factory = RecordingFactory(agent)
     unavailable = Planner(
-        PlannerToolDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
+        PlannerDeps(dispatcher=NeverDispatcher()),  # type: ignore[arg-type]
         agent_factory=cast(AgentFactoryPort, factory),
         model_config=None,
         plan_admission=NeverAdmission(),

@@ -251,7 +251,7 @@ scientific proposal.
 **Partially implemented.** One Application runtime represents one active chat session,
 which provides stable session identity (`session_id`) and conversational lifetime for multiple
 Human turns. The Planner directly owns one typed PydanticAI Agent with
-`PlannerToolDeps` and its compiled LangGraph `StateGraph` with exactly
+`PlannerDeps` and its compiled LangGraph `StateGraph` with exactly
 `plan_or_answer`, `await_human`, and `admit_candidate` lifecycle nodes.
 `Planner.handle_message()` hides graph invocation, interrupt/resume,
 checkpointer, and thread mechanics from Application. The graph does not add an

@@ -1,32 +1,38 @@
-from __future__ import annotations
+"""Data Explorer agent package."""
 
-from .agent import DataExplorer, DataExplorerConfig, DataExplorerExecutor, create_de_agent
+from .agent import DataExplorer
 from .contracts import (
     CorrelationMethod,
     DataAnalysisOperation,
     DataAnalysisPlan,
     DataAnalysisPlannerPort,
     DataAnalysisPlanningRequest,
-    DataExecutionProvenance,
     DataExplorerInput,
     DataExplorerObservation,
     DataExplorerResult,
+    DataExecutionProvenance,
     DataProfileCandidate,
 )
+from .dependencies import DEDependencies
+from .planning import DataAnalysisPlanner, UnsupportedAnalysisRequest
 
 __all__ = (
+    # Primary executor
     "DataExplorer",
-    "DataExplorerConfig",
-    "DataExplorerExecutor",
-    "DataExplorerResult",
-    "DataExecutionProvenance",
-    "DataProfileCandidate",
-    "DataExplorerObservation",
+    # Contract types
     "CorrelationMethod",
     "DataAnalysisOperation",
     "DataAnalysisPlan",
     "DataAnalysisPlannerPort",
     "DataAnalysisPlanningRequest",
     "DataExplorerInput",
-    "create_de_agent",
+    "DataExplorerObservation",
+    "DataExplorerResult",
+    "DataExecutionProvenance",
+    "DataProfileCandidate",
+    # Dependencies (used by LangGraph nodes)
+    "DEDependencies",
+    # Planning
+    "DataAnalysisPlanner",
+    "UnsupportedAnalysisRequest",
 )
